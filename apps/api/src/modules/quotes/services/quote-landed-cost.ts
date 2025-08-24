@@ -2,13 +2,13 @@ import { QuoteInput } from '../schemas.js';
 import { db, merchantProfilesTable, taxRegistrationsTable } from '@clearcost/db';
 import { and, eq } from 'drizzle-orm';
 import { EU_ISO2, volumeM3, volumetricKg } from '../utils.js';
-import { getFreight } from './get-freight.js';
-import { resolveHs6 } from './resolve-hs6.js';
-import { convertCurrency } from './convert-currency.js';
-import { getDeMinimis } from './get-de-minimis.js';
-import { getActiveDutyRate } from './get-active-duty-rate.js';
-import { getVat } from './get-vat.js';
-import { getSurcharges } from './get-surcharges.js';
+import { resolveHs6 } from '../../hs-codes/services/resolve-hs6.js';
+import { convertCurrency } from '../../fx/services/convert-currency.js';
+import { getDeMinimis } from '../../de-minimis/services/get-de-minimis.js';
+import { getActiveDutyRate } from '../../duty-rates/services/get-active-duty-rate.js';
+import { getSurcharges } from '../../surcharges/services/get-surcharges.js';
+import { getFreight } from '../../freight/services/get-freight.js';
+import { getVat } from '../../vat/services/get-vat.js';
 
 export async function quoteLandedCost(input: QuoteInput & { merchantId?: string }) {
   const now = new Date();
@@ -56,6 +56,7 @@ export async function quoteLandedCost(input: QuoteInput & { merchantId?: string 
     qty,
     on: now,
   });
+
   const freightInDest = await convertCurrency(
     freightRow?.price ?? 0,
     input.itemValue.currency,
