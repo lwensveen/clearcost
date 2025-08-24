@@ -114,6 +114,10 @@
         "typescript-eslint": "^8.40.0",
       },
     },
+    "packages/sdk": {
+      "name": "@clearcost/sdk",
+      "version": "0.1.0",
+    },
     "packages/types": {
       "name": "@clearcost/types",
       "version": "0.0.0",
@@ -209,6 +213,8 @@
     "@clearcost/db": ["@clearcost/db@workspace:packages/db"],
 
     "@clearcost/eslint-config": ["@clearcost/eslint-config@workspace:packages/eslint-config"],
+
+    "@clearcost/sdk": ["@clearcost/sdk@workspace:packages/sdk"],
 
     "@clearcost/types": ["@clearcost/types@workspace:packages/types"],
 
