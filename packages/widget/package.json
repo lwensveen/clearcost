@@ -1,0 +1,34 @@
+{
+  "name": "@clearcost/widget",
+  "version": "0.1.0",
+  "devDependencies": {
+    "esbuild": "^0.25.9",
+    "typescript": "^5.9.2"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.esm.js",
+      "default": "./dist/index.esm.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "jsdelivr": "dist/index.umd.js",
+  "license": "MIT",
+  "main": "dist/index.umd.js",
+  "module": "dist/index.esm.js",
+  "private": true,
+  "scripts": {
+    "build": "bun run build:types && bun run build:esm && bun run build:umd",
+    "build:esm": "esbuild src/index.ts --bundle --format=esm --target=es2020 --sourcemap --minify --outfile=dist/index.esm.js",
+    "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
+    "build:umd": "esbuild src/index.ts --bundle --format=iife --global-name=ClearCostWidget --target=es2020 --sourcemap --minify --outfile=dist/index.umd.js",
+    "prepare": "bun run build"
+  },
+  "sideEffects": false,
+  "type": "module",
+  "types": "dist/index.d.ts",
+  "unpkg": "dist/index.umd.js"
+}

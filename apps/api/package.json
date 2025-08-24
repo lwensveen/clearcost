@@ -28,8 +28,8 @@
     "build": "tsc -p tsconfig.json",
     "check-types": "tsc --noEmit",
     "dev": "bun --watch src/main.ts",
-    "start": "node dist/src/main.js",
-    "fx:refresh": "bun run src/modules/fx/jobs/fx-refresh.ts"
+    "fx:refresh": "bun run src/modules/fx/jobs/fx-refresh.ts",
+    "start": "node dist/src/main.js"
   },
   "type": "module"
 }

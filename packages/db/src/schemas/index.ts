@@ -1,5 +1,6 @@
 import { accountsTable } from './auth/accounts.js';
 import { apiKeysTable } from './auth/api-keys.js';
+import { apiUsageTable } from './api-usage.js';
 import { auditQuotesTable } from './audit-quotes.js';
 import { categoriesTable } from './categories.js';
 import { deMinimisTable } from './de-minimis.js';
@@ -18,6 +19,7 @@ import { usersTable } from './users/users.js';
 import { vatRulesTable } from './vat-rules.js';
 import { verificationsTable } from './auth/verifications.js';
 
+export * from './api-usage.js';
 export * from './audit-quotes.js';
 export * from './auth/accounts.js';
 export * from './auth/api-keys.js';
@@ -41,6 +43,7 @@ export * from './vat-rules.js';
 export const schema = {
   accountsTable,
   apiKeysTable,
+  apiUsageTable,
   auditQuotesTable,
   categoriesTable,
   deMinimisTable,

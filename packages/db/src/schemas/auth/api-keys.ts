@@ -1,4 +1,4 @@
-import { boolean, index, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { boolean, index, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { createTimestampColumn } from '../../utils.js';
 
@@ -15,7 +15,8 @@ export const apiKeysTable = pgTable(
       .default(sql`'{}'::text[]`),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: createTimestampColumn('created_at'),
-    lastUsedAt: timestamp('last_used_at', { withTimezone: false }),
+    updatedAt: createTimestampColumn('created_at', { onUpdate: true }),
+    lastUsedAt: createTimestampColumn('last_used_at'),
   },
   (t) => ({
     byOwner: index('idx_api_keys_owner').on(t.ownerId, t.isActive),
