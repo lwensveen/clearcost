@@ -1,9 +1,24 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
-import { db } from '@clearcost/db';
-import { quoteInputSchema, QuoteResponseSchema } from './schemas.js';
+import { auditQuotesTable, db } from '@clearcost/db';
+import { quoteInputSchema } from './schemas.js';
 import { withIdempotency } from '../../lib/idempotency.js';
 import { quoteLandedCost } from './services.js';
+
+export const QuoteResponseSchema = z.object({
+  hs6: z.string().regex(/^\d{6}$/),
+  chargeableKg: z.number(),
+  freight: z.number(),
+  components: z.object({
+    CIF: z.number(),
+    duty: z.number(),
+    vat: z.number(),
+    fees: z.number(),
+  }),
+  total: z.number(),
+  guaranteedMax: z.number(),
+  policy: z.string(),
+});
 
 const IdemHeaderSchema = z.object({
   'idempotency-key': z.string().min(1).optional(),
@@ -16,6 +31,7 @@ function getIdemKey(h: unknown) {
 }
 
 export default function quoteRoutes(app: FastifyInstance) {
+  // POST /v1/quotes — compute (idempotent) + audit on fresh compute
   app.post<{
     Body: z.infer<typeof quoteInputSchema>;
     Reply: z.infer<typeof QuoteResponseSchema> | { error: unknown };
@@ -34,11 +50,11 @@ export default function quoteRoutes(app: FastifyInstance) {
       },
     },
     async (req, reply) => {
+      const started = Date.now();
       const idemKey = getIdemKey(req.headers);
       if (!idemKey) {
-        return reply
-          .code(400)
-          .send({ error: 'Idempotency-Key (or X-Idempotency-Key) header required' });
+        req.log.warn({ msg: 'missing idempotency key' });
+        return reply.badRequest('Idempotency-Key (or X-Idempotency-Key) header required');
       }
 
       try {
@@ -46,20 +62,61 @@ export default function quoteRoutes(app: FastifyInstance) {
           'quotes',
           idemKey,
           req.body,
-          async () => await quoteLandedCost(req.body),
+          async () => {
+            const out = await quoteLandedCost(req.body);
+
+            try {
+              await db.insert(auditQuotesTable).values({
+                laneOrigin: req.body.origin,
+                laneDest: req.body.dest,
+                hs6: out.hs6,
+                itemValue: String(req.body.itemValue.amount),
+                itemCurrency: req.body.itemValue.currency,
+                dimsCm: { l: req.body.dimsCm.l, w: req.body.dimsCm.w, h: req.body.dimsCm.h } as any,
+                weightKg: String(req.body.weightKg),
+                chargeableKg: String(out.chargeableKg),
+                freight: String(out.freight),
+                dutyQuoted: String(out.components.duty),
+                vatQuoted: String(out.components.vat),
+                feesQuoted: String(out.components.fees),
+                totalQuoted: String(out.total),
+                lowConfidence: !req.body.userHs6,
+                notes: null,
+              });
+            } catch (e) {
+              req.log.warn({ err: e, msg: 'audit insert failed' });
+            }
+
+            return out;
+          },
           { maxAgeMs: 86_400_000, onReplay: async (cached) => cached }
         );
 
-        reply.header('Idempotency-Key', idemKey);
-        reply.header('Cache-Control', 'no-store');
-        return reply.code(200).send(result);
+        req.log.info({
+          msg: 'quote computed',
+          idemKey,
+          origin: req.body.origin,
+          dest: req.body.dest,
+          mode: req.body.mode,
+          total: result.total,
+          ms: Date.now() - started,
+        });
+
+        reply.header('Idempotency-Key', idemKey).header('Cache-Control', 'no-store');
+        return reply.send(result);
       } catch (err: any) {
         const status = Number(err?.statusCode) || 500;
-        return reply.code(status).send({ error: err?.message ?? 'quote failed' });
+        if (status === 409) {
+          req.log.warn({ err, idemKey, msg: 'idempotency conflict' });
+          return reply.conflict(err?.message ?? 'Processing');
+        }
+        req.log.error({ err, idemKey, msg: 'quote failed' });
+        return reply.internalServerError(err?.message ?? 'quote failed');
       }
     }
   );
 
+  // GET /v1/quotes/by-key/:key — fetch cached response
   app.get<{
     Params: { key: string };
     Reply: z.infer<typeof QuoteResponseSchema> | { error: unknown };
@@ -69,10 +126,7 @@ export default function quoteRoutes(app: FastifyInstance) {
       preHandler: app.requireApiKey(['quotes:read']),
       schema: {
         params: z.object({ key: z.string().min(1) }),
-        response: {
-          200: QuoteResponseSchema,
-          404: z.object({ error: z.unknown() }),
-        },
+        response: { 200: QuoteResponseSchema, 404: z.object({ error: z.unknown() }) },
       },
     },
     async (req, reply) => {
@@ -82,11 +136,12 @@ export default function quoteRoutes(app: FastifyInstance) {
       });
 
       if (!row || !row.response) {
-        return reply.code(404).send({ error: 'Not found' });
+        req.log.info({ key: req.params.key, msg: 'quote not found for key' });
+        return reply.notFound('Not found');
       }
 
-      reply.header('Idempotency-Key', req.params.key);
-      reply.header('Cache-Control', 'no-store');
+      req.log.info({ key: req.params.key, msg: 'quote replay served' });
+      reply.header('Idempotency-Key', req.params.key).header('Cache-Control', 'no-store');
       return reply.send(row.response as any);
     }
   );
