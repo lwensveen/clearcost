@@ -34,12 +34,24 @@ function fmtMs(n: number) {
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Record<string, string | undefined>;
+  searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const apiKeyId = searchParams.apiKeyId;
-  const month = searchParams.month;
-  let from = searchParams.from;
-  let to = searchParams.to;
+  const sp = await searchParams;
+
+  const apiKeyId =
+    typeof sp.apiKeyId === 'string'
+      ? sp.apiKeyId
+      : Array.isArray(sp.apiKeyId)
+        ? (sp.apiKeyId[0] ?? '')
+        : '';
+
+  const month =
+    typeof sp.month === 'string' ? sp.month : Array.isArray(sp.month) ? (sp.month[0] ?? '') : '';
+
+  let from =
+    typeof sp.from === 'string' ? sp.from : Array.isArray(sp.from) ? (sp.from[0] ?? '') : '';
+
+  let to = typeof sp.to === 'string' ? sp.to : Array.isArray(sp.to) ? (sp.to[0] ?? '') : '';
 
   if (month && (!from || !to)) {
     from = `${month}-01`;

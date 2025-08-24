@@ -13,12 +13,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-export default async function StepsPage({ params }: { params: { id: string } }) {
-  const steps = await getSteps(params.id);
+export default async function StepsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const steps = await getSteps(id);
+
   return (
     <div className="max-w-3xl mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Card {params.id} — Steps</h1>
+        <h1 className="text-xl font-semibold">Card {id} — Steps</h1>
         <Button asChild variant="secondary">
           <Link href="/admin/freight">Back</Link>
         </Button>
@@ -30,7 +32,7 @@ export default async function StepsPage({ params }: { params: { id: string } }) 
         </CardHeader>
         <CardContent>
           <form
-            action={`/api/admin/freight/cards/${params.id}/steps/create`}
+            action={`/api/admin/freight/cards/${id}/steps/create`}
             method="post"
             className="grid md:grid-cols-3 gap-4"
           >
@@ -72,11 +74,11 @@ export default async function StepsPage({ params }: { params: { id: string } }) 
                   <TableCell className="text-right">
                     <div className="flex gap-2 justify-end">
                       <form
-                        action={`/api/admin/freight/cards/${params.id}/steps/${s.id}/update`}
+                        action={`/api/admin/freight/cards/${id}/steps/${s.id}/update`}
                         method="post"
                         className="flex gap-2"
                       >
-                        <input type="hidden" name="cardId" value={params.id} />
+                        <input type="hidden" name="cardId" value={id} />
                         <Input
                           name="uptoQty"
                           type="number"
@@ -96,7 +98,7 @@ export default async function StepsPage({ params }: { params: { id: string } }) 
                         </Button>
                       </form>
                       <form
-                        action={`/api/admin/freight/cards/${params.id}/steps/${s.id}/delete`}
+                        action={`/api/admin/freight/cards/${id}/steps/${s.id}/delete`}
                         method="post"
                       >
                         <Button size="sm" variant="destructive">

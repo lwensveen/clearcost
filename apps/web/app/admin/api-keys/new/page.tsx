@@ -4,12 +4,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-export default function NewKeyPage({
+export default async function NewKeyPage({
   searchParams,
 }: {
-  searchParams: Record<string, string | undefined>;
+  searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const ownerId = searchParams.ownerId ?? '';
+  const sp = await searchParams;
+  const ownerId =
+    typeof sp.ownerId === 'string'
+      ? sp.ownerId
+      : Array.isArray(sp.ownerId)
+        ? (sp.ownerId[0] ?? '')
+        : '';
+
   return (
     <div className="max-w-xl mx-auto p-6">
       <Card>

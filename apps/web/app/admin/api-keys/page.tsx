@@ -18,10 +18,19 @@ import {
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Record<string, string | undefined>;
+  searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const ownerId = searchParams.ownerId ?? '';
-  const token = searchParams.token ?? '';
+  const sp = await searchParams;
+
+  const ownerId =
+    typeof sp.ownerId === 'string'
+      ? sp.ownerId
+      : Array.isArray(sp.ownerId)
+        ? (sp.ownerId[0] ?? '')
+        : '';
+
+  const token =
+    typeof sp.token === 'string' ? sp.token : Array.isArray(sp.token) ? (sp.token[0] ?? '') : '';
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
@@ -63,6 +72,7 @@ export default async function Page({
 
 async function KeysTable({ ownerId }: { ownerId: string }) {
   const rows = await listKeys(ownerId);
+
   return (
     <Card>
       <CardHeader className="flex items-center justify-between">
