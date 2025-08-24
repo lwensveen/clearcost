@@ -2,14 +2,14 @@
   "name": "web",
   "version": "0.1.0",
   "dependencies": {
-    "@clearcost/ui": "*",
+    "@clearcost/ui": "workspace:*",
     "next": "^15.5.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
-    "@clearcost/eslint-config": "*",
-    "@clearcost/typescript-config": "*",
+    "@clearcost/eslint-config": "workspace:*",
+    "@clearcost/typescript-config": "workspace:*",
     "@types/node": "^24.3.0",
     "@types/react": "19.1.11",
     "@types/react-dom": "19.1.7",
