@@ -1,0 +1,35 @@
+name: Release
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  release:
+    if: "github.event.head_commit.message != 'chore(release): version bump and changelogs'"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+
+      - name: Setup Node & Bun
+        uses: ./.github/actions/setup-node-bun
+        with:
+          node-version: '22'
+          bun-version: 'latest'
+
+      - run: bun install --frozen-lockfile
+
+      - name: Version packages via Changesets
+        run: bunx changeset version
+
+      - name: Commit & push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "chore(release): version bump and changelogs" || echo "No changes to commit"
+          git push

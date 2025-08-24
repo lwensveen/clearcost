@@ -1,0 +1,42 @@
+name: Setup Node & Bun
+description: "Checkout, pin Node & Bun, cache deps, and install"
+
+inputs:
+  node-version:
+    description: 'Node.js version to use'
+    required: true
+    default: '22'
+  bun-version:
+    description: 'Bun version to install'
+    required: false
+    default: 'latest'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: ${{ inputs.bun-version }}
+
+    - name: Cache deps
+      id: cache
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.bun/install/cache
+          **/node_modules
+        key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-bun-
+
+    - name: Install dependencies
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: bun install --frozen-lockfile
+      shell: bash
+

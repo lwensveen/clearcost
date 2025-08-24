@@ -1,0 +1,40 @@
+name: CI
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+
+      - name: Setup Node & Bun
+        uses: ./.github/actions/setup-node-bun
+        with:
+          node-version: '22'
+          bun-version: 'latest'
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Set GIT_SHA
+        run: echo "GIT_SHA=${GITHUB_SHA}" >> $GITHUB_ENV
+
+      - name: Build
+        run: bun run build
+
+      - name: Lint & Type‑check
+        run: bun run lint typecheck
+
+      - name: Coverage
+        run: bun run test:coverage
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: lwensveen/risk-scan
