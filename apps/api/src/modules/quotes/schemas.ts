@@ -30,10 +30,12 @@ export const QuoteResponseSchema = z.object({
     duty: z.number(),
     vat: z.number(),
     fees: z.number(),
+    checkoutVAT: z.number().optional(),
   }),
   total: z.number(),
   guaranteedMax: z.number(),
   policy: z.string(),
+  incoterm: z.enum(['DAP', 'DDP']),
 });
 
 export type QuoteInput = z.infer<typeof quoteInputSchema>;

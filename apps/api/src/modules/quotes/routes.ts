@@ -3,7 +3,7 @@ import { z } from 'zod/v4';
 import { auditQuotesTable, db } from '@clearcost/db';
 import { quoteInputSchema } from './schemas.js';
 import { withIdempotency } from '../../lib/idempotency.js';
-import { quoteLandedCost } from './services.js';
+import { quoteLandedCost } from './services/quote-landed-cost.js';
 
 export const QuoteResponseSchema = z.object({
   hs6: z.string().regex(/^\d{6}$/),
@@ -63,7 +63,7 @@ export default function quoteRoutes(app: FastifyInstance) {
           idemKey,
           req.body,
           async () => {
-            const out = await quoteLandedCost(req.body);
+            const out = await quoteLandedCost({ ...req.body, merchantId: req.apiKey?.ownerId });
 
             try {
               await db.insert(auditQuotesTable).values({
@@ -77,11 +77,11 @@ export default function quoteRoutes(app: FastifyInstance) {
                 chargeableKg: String(out.chargeableKg),
                 freight: String(out.freight),
                 dutyQuoted: String(out.components.duty),
-                vatQuoted: String(out.components.vat),
+                vatQuoted: String(out.components.vat ?? 0),
                 feesQuoted: String(out.components.fees),
                 totalQuoted: String(out.total),
+                notes: out.components['checkoutVAT'] ? 'IOSS checkout VAT included' : null,
                 lowConfidence: !req.body.userHs6,
-                notes: null,
               });
             } catch (e) {
               req.log.warn({ err: e, msg: 'audit insert failed' });
