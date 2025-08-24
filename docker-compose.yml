@@ -1,0 +1,29 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: containo-db
+    environment:
+      POSTGRES_DB: containo
+      POSTGRES_USER: containo
+      POSTGRES_PASSWORD: containo
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U containo -d containo" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  adminer:
+    image: adminer:4
+    container_name: containo-adminer
+    depends_on:
+      - db
+    ports:
+      - "8080:8080"
+
+volumes:
+  db_data:
