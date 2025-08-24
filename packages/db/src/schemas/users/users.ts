@@ -15,8 +15,8 @@ export const usersTable = pgTable(
     banned: boolean('banned').notNull().default(false),
     banReason: text('ban_reason'),
     banExpires: bigint('ban_expires', { mode: 'number' }),
-    createdAt: createTimestampColumn('created_at'),
-    updatedAt: createTimestampColumn('updated_at', true),
+    createdAt: createTimestampColumn('created_at', { defaultNow: true }),
+    updatedAt: createTimestampColumn('updated_at', { defaultNow: true, onUpdate: true }),
   },
   (table) => [index('user_email_idx').on(table.email)]
 );

@@ -12,6 +12,6 @@ export const sessionsTable = pgTable('sessions', {
     .notNull()
     .references(() => usersTable.id, { onDelete: 'cascade' }),
   impersonatedBy: uuid('impersonated_by').references(() => usersTable.id),
-  createdAt: createTimestampColumn('created_at'),
-  updatedAt: createTimestampColumn('updated_at', true),
+  createdAt: createTimestampColumn('created_at', { defaultNow: true }),
+  updatedAt: createTimestampColumn('updated_at', { defaultNow: true, onUpdate: true }),
 });

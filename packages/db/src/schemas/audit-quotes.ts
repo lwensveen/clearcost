@@ -1,7 +1,7 @@
 import { boolean, index, jsonb, numeric, pgTable, text, uuid, varchar } from 'drizzle-orm/pg-core';
 import { createTimestampColumn } from '../utils.js';
 
-export const auditQuotes = pgTable(
+export const auditQuotesTable = pgTable(
   'audit_quotes',
   {
     id: uuid('id').primaryKey().defaultRandom(),
@@ -26,8 +26,8 @@ export const auditQuotes = pgTable(
     // Flags & metadata
     lowConfidence: boolean('low_confidence').default(false).notNull(),
     notes: text('notes'),
-    createdAt: createTimestampColumn('created_at'),
-    updatedAt: createTimestampColumn('updated_at', true),
+    createdAt: createTimestampColumn('created_at', { defaultNow: true }),
+    updatedAt: createTimestampColumn('updated_at', { defaultNow: true, onUpdate: true }),
   },
   (t) => ({
     idxLaneHs: index('audit_lane_hs_idx').on(t.laneOrigin, t.laneDest, t.hs6),

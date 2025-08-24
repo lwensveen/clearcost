@@ -16,6 +16,6 @@ export const accountsTable = pgTable('accounts', {
   refreshTokenExpiresAt: timestamp('refresh_token_expires_at'),
   scope: text('scope'),
   password: text('password'),
-  createdAt: createTimestampColumn('created_at'),
-  updatedAt: createTimestampColumn('updated_at', true),
+  createdAt: createTimestampColumn('created_at', { defaultNow: true }),
+  updatedAt: createTimestampColumn('updated_at', { defaultNow: true, onUpdate: true }),
 });

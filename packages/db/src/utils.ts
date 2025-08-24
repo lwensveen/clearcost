@@ -5,7 +5,18 @@ export const defaultTimestampOptions: PgTimestampConfig = {
   mode: 'date',
 };
 
-export const createTimestampColumn = (columnName: string, isUpdatedColumn = false) => {
-  const column = timestamp(columnName, defaultTimestampOptions).notNull().defaultNow();
-  return isUpdatedColumn ? column.$onUpdateFn(() => new Date()) : column;
+type TsOpts = {
+  nullable?: boolean;
+  defaultNow?: boolean;
+  onUpdate?: boolean;
+};
+
+export const createTimestampColumn = (columnName: string, opts: TsOpts = {}) => {
+  const { nullable = false, defaultNow = true, onUpdate = false } = opts;
+
+  let col = timestamp(columnName, defaultTimestampOptions);
+  if (!nullable) col = col.notNull();
+  if (defaultNow) col = col.defaultNow();
+  if (onUpdate) col = col.$onUpdateFn(() => new Date());
+  return col;
 };

@@ -1,18 +1,8 @@
-import { sql } from 'drizzle-orm';
-import {
-  date,
-  index,
-  numeric,
-  pgTable,
-  text,
-  uniqueIndex,
-  uuid,
-  varchar,
-} from 'drizzle-orm/pg-core';
+import { index, numeric, pgTable, text, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { dutyRuleEnum } from '../enums.js';
 import { createTimestampColumn } from '../utils.js';
 
-export const dutyRates = pgTable(
+export const dutyRatesTable = pgTable(
   'duty_rates',
   {
     id: uuid('id').primaryKey().defaultRandom(),
@@ -21,13 +11,11 @@ export const dutyRates = pgTable(
     ratePct: numeric('rate_pct', { precision: 6, scale: 3 }).notNull(), // e.g., 16.500
     rule: dutyRuleEnum('rule').default('mfn').notNull(), // MFN by default
     currency: varchar('currency', { length: 3 }).default('USD').notNull(), // display currency (optional)
-    effectiveFrom: date('effective_from')
-      .notNull()
-      .default(sql`CURRENT_DATE`),
-    effectiveTo: date('effective_to'),
+    effectiveFrom: createTimestampColumn('effective_from', { defaultNow: true }),
+    effectiveTo: createTimestampColumn('effective_to', { defaultNow: true }),
     notes: text('notes'),
-    createdAt: createTimestampColumn('created_at'),
-    updatedAt: createTimestampColumn('updated_at', true),
+    createdAt: createTimestampColumn('created_at', { defaultNow: true }),
+    updatedAt: createTimestampColumn('updated_at', { defaultNow: true, onUpdate: true }),
   },
   (t) => ({
     byDestHs6From: uniqueIndex('duty_rates_dest_hs6_from_uq').on(t.dest, t.hs6, t.effectiveFrom),

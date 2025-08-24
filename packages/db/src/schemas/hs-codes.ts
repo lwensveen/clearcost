@@ -2,7 +2,7 @@ import { check, pgTable, text, uuid, varchar } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { createTimestampColumn } from '../utils.js';
 
-export const hsCodes = pgTable(
+export const hsCodesTable = pgTable(
   'hs_codes',
   {
     id: uuid('id').primaryKey().defaultRandom(),
@@ -12,8 +12,8 @@ export const hsCodes = pgTable(
     cn8: varchar('cn8', { length: 8 }),
     hts10: varchar('hts10', { length: 10 }),
     notes: text('notes'),
-    createdAt: createTimestampColumn('created_at'),
-    updatedAt: createTimestampColumn('updated_at', true),
+    createdAt: createTimestampColumn('created_at', { defaultNow: true }),
+    updatedAt: createTimestampColumn('updated_at', { defaultNow: true, onUpdate: true }),
   },
   (t) => ({
     chk_hs6_digits: check('hs6_is_digits', sql`${t.hs6}  ~ '^[0-9]{6}$'`),

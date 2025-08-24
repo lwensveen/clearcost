@@ -6,6 +6,6 @@ export const verificationsTable = pgTable('verifications', {
   identifier: text('identifier').notNull(),
   value: text('value').notNull(),
   expiresAt: timestamp('expires_at').notNull(),
-  createdAt: createTimestampColumn('created_at'),
-  updatedAt: createTimestampColumn('updated_at', true),
+  createdAt: createTimestampColumn('created_at', { defaultNow: true }),
+  updatedAt: createTimestampColumn('updated_at', { defaultNow: true, onUpdate: true }),
 });

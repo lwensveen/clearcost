@@ -14,6 +14,6 @@ export const passkeysTable = pgTable('passkey', {
   deviceType: text('device_type').notNull(),
   backedUp: boolean('backed_up').notNull().default(false),
   transports: text('transports').notNull(),
-  createdAt: createTimestampColumn('created_at'),
-  updatedAt: createTimestampColumn('updated_at', true),
+  createdAt: createTimestampColumn('created_at', { defaultNow: true }),
+  updatedAt: createTimestampColumn('updated_at', { defaultNow: true, onUpdate: true }),
 });
