@@ -5,13 +5,13 @@
   "dependencies": {
     "@clearcost/db": "workspace:*",
     "drizzle-zod": "^0.8.3",
-    "zod": "^4.0.17"
+    "zod": "^4.1.1"
   },
   "devDependencies": {
     "@clearcost/eslint-config": "workspace:*",
     "@clearcost/typescript-config": "workspace:*",
     "@types/node": "^24.3.0",
-    "eslint": "^9.33.0"
+    "eslint": "^9.34.0"
   },
   "files": [
     "dist"
@@ -20,8 +20,8 @@
   "private": true,
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "lint": "eslint src ",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src "
   },
   "sideEffects": false,
   "type": "module",

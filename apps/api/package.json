@@ -13,7 +13,7 @@
     "fastify": "^5.5.0",
     "fastify-type-provider-zod": "^5.0.3",
     "postgres": "^3.4.7",
-    "zod": "^4.0.17",
+    "zod": "^4.1.1",
     "zod-to-json-schema": "^3.24.6"
   },
   "devDependencies": {
@@ -26,9 +26,9 @@
   "private": true,
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "check-types": "tsc --noEmit",
     "dev": "bun --watch src/main.ts",
-    "start": "node dist/src/main.js",
-    "check-types": "tsc --noEmit"
+    "start": "node dist/src/main.js"
   },
   "type": "module"
 }
