@@ -1,0 +1,17 @@
+# Quotes API
+
+**Endpoint**: `POST /v1/quotes`
+**Auth**: API key (`Authorization: Bearer ck_...`)
+**Idempotency**: Send `Idempotency-Key` header.
+
+```bash
+curl -X POST "$API_BASE/v1/quotes" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Idempotency-Key: $IDEM" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "origin":"JP","dest":"US",
+    "itemValue":{"amount":120,"currency":"USD"},
+    "dimsCm":{"l":30,"w":20,"h":15},
+    "weightKg":2.3,"categoryKey":"collectibles.figure","mode":"air"
+  }'
