@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import z from 'zod/v4';
 import { ClassifyInputSchema, ClassifyResponseSchema } from './schemas.js';
 import { withIdempotency } from '../../lib/idempotency.js';
-import { classifyHS6 } from './service.js';
+import { classifyHS6 } from './services.js';
 
 export default function classifyRoutes(app: FastifyInstance) {
   app.post<{
