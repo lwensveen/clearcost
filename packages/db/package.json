@@ -1,9 +1,10 @@
 {
   "name": "@clearcost/db",
-  "description": "Shared Zod schemas & TypeScript types for Containo monorepo",
+  "description": "Shared Zod schemas & TypeScript types for Clearcost monorepo",
   "version": "0.0.0",
   "dependencies": {
     "@neondatabase/serverless": "^1.0.1",
+    "drizzle-kit": "^0.31.4",
     "drizzle-orm": "^0.44.4",
     "drizzle-zod": "^0.8.3",
     "pg": "^8.16.3",
@@ -27,7 +28,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check-types": "tsc --noEmit",
-    "lint": "eslint src "
+    "lint": "eslint src",
+    "migrate:generate": "drizzle-kit generate --config ./drizzle.config.ts",
+    "migrate:push": "DRIZZLE_LOG=info drizzle-kit push --config ./drizzle.config.ts"
   },
   "sideEffects": false,
   "type": "module",
