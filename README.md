@@ -1,135 +1,241 @@
-# Turborepo starter
+# ClearCost
 
-This Turborepo starter is maintained by the Turborepo core team.
+**Developer‑first landed cost API.** Transparent duties, tariffs, VAT/GST and fees — priced for startups and
+pooling‑friendly.
 
-## Using this example
+> Stack: Turborepo • TypeScript • Next.js • Node.js • Bun • Zod • Drizzle ORM • PostgreSQL
 
-Run the following command:
+---
 
-```sh
-npx create-turbo@latest
-```
+## What is ClearCost?
 
-## What's inside?
+ClearCost is a standalone service (and SDK) that returns **all‑in landed cost quotes** at checkout time. Give it:origin,
+destination, item value, dimensions/weight, and category → get back: **freight share, duty, VAT, fees, and total**, with
+a **small variance guardrail** for real‑world accuracy.
 
-This Turborepo includes the following packages/apps:
+* **Pooling‑native**: supports per‑manifest/container pricing and multi‑consignee workflows.
+* **Cheap & predictable**: per‑API or per‑manifest pricing (no \$2 + 10% per parcel).
+* **Own your data**: Postgres tables you can tune; no vendor lock‑in.
 
-### Apps and Packages
+---
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
+## Monorepo Layout (Turborepo)
 
 ```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
+clearcost/
+  apps/
+    api/              # Node.js (Fastify/Express) REST API
+    docs/             # Next.js docs site (or dashboard)
+  packages/
+    db/               # Drizzle ORM schema + migrations
+    sdk/              # TypeScript client SDK
+    config/           # ESLint, TSConfig, Prettier shared
+    utils/            # shared calc + zod schemas
+  .github/
+  turbo.json
 ```
 
-You can build a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+---
 
+## Quickstart
+
+1. **Clone & install**
+
+   ```bash
+   bun install
+   ```
+2. **Environment**
+   Create `apps/api/.env` and `packages/db/.env`:
+
+   ```bash
+   # apps/api/.env
+   NODE_ENV=development
+   PORT=4000
+   DATABASE_URL=postgres://user:pass@localhost:5432/clearcost
+   CURRENCY_BASE=USD
+   VARIANCE_UNDERWRITE_BPS=50     # we absorb first 0.5% under-quote
+   VARIANCE_GUARDRAIL_BPS=200     # +/- 2% guardrail on quotes
+
+   # packages/db/.env
+   DATABASE_URL=postgres://user:pass@localhost:5432/clearcost
+   ```
+3. **Run Postgres** (example)
+
+   ```bash
+   docker run --name clearcost-pg -e POSTGRES_PASSWORD=postgres \
+     -e POSTGRES_DB=clearcost -p 5432:5432 -d postgres:16
+   ```
+4. **Migrate & seed**
+
+   ```bash
+   bun run --cwd packages/db migrate
+   bun run --cwd packages/db seed
+   ```
+5. **Dev servers**
+
+   ```bash
+   bunx turbo run dev        # runs API and docs in parallel
+   ```
+
+> Use **Bun** as the package manager. If you prefer npm or pnpm, adjust `turbo.json` scripts accordingly.
+
+---
+
+## Database (Drizzle + PostgreSQL)
+
+**Initial tables** (minimal, extend later):
+
+* `hs_codes` — `{ id, hs6, title, ahtn8?, cn8?, hts10? }`
+* `categories` — `{ id, key, default_hs6 }` (maps UI categories → HS6)
+* `duty_rates` — `{ id, dest, hs6, rate_pct, rule }`
+* `vat_rules` — `{ id, dest, rate_pct, base }`  // base ∈ {CIF, CIF\_PLUS\_DUTY}
+* `de_minimis` — `{ id, dest, currency, value, applies_to }` // applies\_to ∈ {DUTY, DUTY\_VAT, NONE}
+* `freight_rates` — `{ id, origin, dest, mode, unit, breakpoint, price }` // mode ∈ {air, sea}; unit ∈ {kg, m3}
+* `surcharges` — `{ id, dest, code, fixed_amt?, pct_amt?, rule_expr? }`
+* `audit_quotes` — store input/output & drift for continuous tuning
+
+> Start with **HS6** + a small curated set of codes for your first lanes. Add AHTN8/CN8/HTS10 per lane when drift
+> demands it.
+
+---
+
+## Calculation Model (MVP)
+
+**Inputs (required):** origin, destination, value (amount+currency), dimensions (L×W×H), weight, category (→ HS6),
+optional user HS6.
+
+**Steps:**
+
+1. **Chargeable weight** = `max(realKg, (L*W*H)/5000)` (air). For sea use `volumeM3 = (L*W*H)/1e6`.
+2. **Freight** = lookup from `freight_rates` by lane + unit curve.
+3. **CIF** = item value (in dest currency) + freight (+ optional insurance).
+4. **De minimis** = if CIF ≤ threshold → waive per rule.
+5. **Duty** = `duty_rate% × CIF` *(or × value where applicable)*.
+6. **VAT** = `vat_rate% × (CIF + Duty)` *(or CIF)*.
+7. **Fees** = small fixed/percent surcharges if enabled.
+8. **Total** = `CIF + Duty + VAT + Fees`.
+9. **Guardrail**: show `±2%` band; absorb first `0.5%` under‑quote.
+
+---
+
+## API (REST, JSON)
+
+### `POST /v1/quote`
+
+**Body**
+
+```json
+{
+  "origin": "JP",
+  "dest": "US",
+  "itemValue": {
+    "amount": 250,
+    "currency": "USD"
+  },
+  "dimsCm": {
+    "l": 30,
+    "w": 25,
+    "h": 20
+  },
+  "weightKg": 1.8,
+  "categoryKey": "collectibles.figure",
+  "userHs6": "950300"
+}
 ```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+**Response**
+
+```json
+{
+  "hs6": "950300",
+  "chargeableKg": 3.0,
+  "freight": 12.4,
+  "components": {
+    "CIF": 262.4,
+    "duty": 5.25,
+    "vat": 17.9,
+    "fees": 0.8
+  },
+  "total": 286.35,
+  "guaranteedMax": 292.08,
+  "policy": "We absorb the first 0.5% under‑quote; beyond that we true‑up post‑delivery."
+}
 ```
 
-### Develop
+### `GET /v1/hs-codes/search?query=violin`
 
-To develop all apps and packages, run the following command:
+Returns HS candidates for quick selection.
 
-```
-cd my-turborepo
+### `POST /v1/classify` *(optional)*
 
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
+Accepts title/description and returns `{ hs6, confidence }` from heuristic rules (ML later).
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
-```
+---
 
-You can develop a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+## SDK (TypeScript)
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
+```ts
+import { createClient } from "@clearcost/sdk";
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
+const cc = createClient({baseUrl: process.env.CLEARCOST_URL!, apiKey: process.env.CLEARCOST_KEY!});
 
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
+const quote = await cc.quote({
+    origin: "JP",
+    dest: "US",
+    itemValue: {amount: 250, currency: "USD"},
+    dimsCm: {l: 30, w: 25, h: 20},
+    weightKg: 1.8,
+    categoryKey: "collectibles.figure"
+});
+console.log(quote.total);
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+---
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+## Validation & Safety (Zod)
 
+* Zod schemas on all endpoints (reject missing dims/weight).
+* Category → HS6 fallback; user HS override flagged for review.
+* Unsupported SKUs blocked early (hazmat, CE/FCC, IP‑restricted).
+
+---
+
+## Ops Loop
+
+* **HS Audit Queue**: low‑confidence or high‑duty items reviewed pre‑cutoff.
+* **CFS re‑measure/repack**: auto‑adjust if >X% discrepancy.
+* **Reconciliation**: compare broker entry vs quote; log drift per lane/HS.
+* **Tuning**: edit duty/VAT/freight tables via admin UI weekly.
+
+---
+
+## Scripts
+
+```bash
+bunx turbo run dev
+bun run --cwd packages/db migrate
+bun run --cwd packages/db seed
+bun run --cwd apps/api build && bun run --cwd apps/api start
 ```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
-```
+---
 
-## Useful Links
+## Roadmap
 
-Learn more about the power of Turborepo:
+* v0: HS6 + US/EU/TH/JP duty & VAT, basic lanes, REST API, SDK.
+* v0.1: Admin UI for tables; drift dashboard.
+* v0.2: AHTN8/CN8/HTS10 per lane; FTA rules on select origins.
+* v0.3: Heuristic HS classifier; quote caching; FX improvements.
+* v1.0: Manifest pricing mode; SLAs; audit exports.
 
-- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.com/docs/reference/configuration)
-- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
+---
+
+## 🤝 License
+
+MIT — see `LICENSE`.
+
+---
+
+## Credits
+
+Built by Lodewijk Wensveen. Designed for pooled, multi‑consignee cross‑border commerce.
