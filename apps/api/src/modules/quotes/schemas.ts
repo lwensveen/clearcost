@@ -21,4 +21,19 @@ export const quoteInputSchema = z.object({
   mode: z.enum(['air', 'sea']),
 });
 
+export const QuoteResponseSchema = z.object({
+  hs6: z.string().regex(/^\d{6}$/),
+  chargeableKg: z.number(),
+  freight: z.number(),
+  components: z.object({
+    CIF: z.number(),
+    duty: z.number(),
+    vat: z.number(),
+    fees: z.number(),
+  }),
+  total: z.number(),
+  guaranteedMax: z.number(),
+  policy: z.string(),
+});
+
 export type QuoteInput = z.infer<typeof quoteInputSchema>;

@@ -6,6 +6,7 @@ import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-
 import dateSerializer from './plugins/date-serializer.js';
 import { apiKeyAuthPlugin } from './plugins/api-key-auth.js';
 import rateLimit from '@fastify/rate-limit';
+import quoteRoutes from './modules/quotes/routes.js';
 
 export async function buildServer() {
   const app = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
@@ -26,6 +27,8 @@ export async function buildServer() {
   app.register(rateLimit, { global: false });
 
   app.get('/health', async () => ({ ok: true, service: 'clearcost-api' }));
+
+  app.register(quoteRoutes, { prefix: '/v1/quotes' });
 
   return app;
 }
