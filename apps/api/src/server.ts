@@ -9,6 +9,7 @@ import rateLimit from '@fastify/rate-limit';
 import quoteRoutes from './modules/quotes/routes.js';
 import classifyRoutes from './modules/classify/routes.js';
 import hsRoutes from './modules/hs-codes/routes.js';
+import fxRoutes from './modules/fx/routes.js';
 
 export async function buildServer() {
   const app = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
@@ -31,6 +32,7 @@ export async function buildServer() {
   app.get('/health', async () => ({ ok: true, service: 'clearcost-api' }));
 
   app.register(classifyRoutes, { prefix: '/v1/classify' });
+  app.register(fxRoutes, { prefix: '/v1/fx' });
   app.register(hsRoutes, { prefix: '/v1/hs-codes' });
   app.register(quoteRoutes, { prefix: '/v1/quotes' });
 
