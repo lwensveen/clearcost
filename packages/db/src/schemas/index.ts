@@ -18,6 +18,7 @@ import { taxRegistrationsTable } from './tax-registrations.js';
 import { usersTable } from './users/users.js';
 import { vatRulesTable } from './vat-rules.js';
 import { verificationsTable } from './auth/verifications.js';
+import { webhookDeliveriesTable, webhookEndpointsTable } from './webhooks.js';
 
 export * from './api-usage.js';
 export * from './audit-quotes.js';
@@ -39,6 +40,7 @@ export * from './surcharges.js';
 export * from './tax-registrations.js';
 export * from './users/users.js';
 export * from './vat-rules.js';
+export * from './webhooks.js';
 
 export const schema = {
   accountsTable,
@@ -61,6 +63,8 @@ export const schema = {
   usersTable,
   vatRulesTable,
   verificationsTable,
+  webhookDeliveriesTable,
+  webhookEndpointsTable,
 };
 
 export type Schema = typeof schema;
