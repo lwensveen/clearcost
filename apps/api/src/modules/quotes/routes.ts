@@ -1,9 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
-import { auditQuotesTable, db } from '@clearcost/db';
+import { auditQuotesTable, db, idempotencyKeysTable } from '@clearcost/db';
 import { quoteInputSchema } from './schemas.js';
 import { withIdempotency } from '../../lib/idempotency.js';
 import { quoteLandedCost } from './services/quote-landed-cost.js';
+import { and, eq } from 'drizzle-orm';
 
 export const QuoteResponseSchema = z.object({
   hs6: z.string().regex(/^\d{6}$/),
@@ -18,6 +19,11 @@ export const QuoteResponseSchema = z.object({
   total: z.number(),
   guaranteedMax: z.number(),
   policy: z.string(),
+});
+
+const ReplayQuery = z.object({
+  key: z.string().min(1),
+  scope: z.string().default('quotes'),
 });
 
 const IdemHeaderSchema = z.object({
@@ -143,6 +149,41 @@ export default function quoteRoutes(app: FastifyInstance) {
       req.log.info({ key: req.params.key, msg: 'quote replay served' });
       reply.header('Idempotency-Key', req.params.key).header('Cache-Control', 'no-store');
       return reply.send(row.response as any);
+    }
+  );
+
+  app.get<{ Querystring: z.infer<typeof ReplayQuery> }>(
+    '/replay',
+    {
+      schema: {
+        querystring: ReplayQuery,
+        response: {
+          200: QuoteResponseSchema,
+          404: z.object({ error: z.string() }),
+          409: z.object({ error: z.string() }),
+        },
+      },
+    },
+    async (req, reply) => {
+      const { key, scope } = ReplayQuery.parse(req.query);
+
+      const [row] = await db
+        .select({
+          status: idempotencyKeysTable.status,
+          requestHash: idempotencyKeysTable.requestHash,
+          response: idempotencyKeysTable.response,
+        })
+        .from(idempotencyKeysTable)
+        .where(and(eq(idempotencyKeysTable.scope, scope), eq(idempotencyKeysTable.key, key)))
+        .limit(1);
+
+      if (!row) return reply.code(404).send({ error: 'Unknown idempotency key' });
+
+      if (row.status !== 'completed' || !row.response) {
+        return reply.code(409).send({ error: 'Processing or unavailable' });
+      }
+
+      return reply.send(row.response as z.infer<typeof QuoteResponseSchema>);
     }
   );
 }
