@@ -25,6 +25,8 @@ function generateApiKey(): string {
   return 'ck_' + randomBytes(24).toString('base64url');
 }
 
+const IdParam = z.object({ id: z.string().uuid() });
+
 export default function apiKeyRoutes(app: FastifyInstance) {
   // GET /v1/api-keys?ownerId=UUID  (admin)
   app.get<{ Querystring: z.infer<typeof ListQuery> }>(
@@ -149,11 +151,48 @@ export default function apiKeyRoutes(app: FastifyInstance) {
         .returning({
           id: apiKeysTable.id,
           isActive: apiKeysTable.isActive,
-          updatedAt: apiKeysTable.lastUsedAt,
+          updatedAt: apiKeysTable.updatedAt,
         });
 
       if (!row) return reply.notFound('Not found');
       return reply.send(row);
+    }
+  );
+
+  app.get<{ Params: z.infer<typeof IdParam> }>(
+    '/:id',
+    {
+      preHandler: app.requireApiKey(['admin:api-keys']),
+      schema: {
+        params: IdParam,
+        response: {
+          200: z.object({
+            id: z.string().uuid(),
+            ownerId: z.string().uuid(),
+            isActive: z.boolean(),
+            createdAt: z.any().nullable(),
+            lastUsedAt: z.any().nullable(),
+          }),
+        },
+      },
+    },
+    async (req, reply) => {
+      const { id } = IdParam.parse(req.params);
+
+      const [row] = await db
+        .select({
+          id: apiKeysTable.id,
+          ownerId: apiKeysTable.ownerId,
+          isActive: apiKeysTable.isActive,
+          createdAt: apiKeysTable.createdAt,
+          lastUsedAt: apiKeysTable.lastUsedAt,
+        })
+        .from(apiKeysTable)
+        .where(eq(apiKeysTable.id, id))
+        .limit(1);
+
+      if (!row) return reply.notFound('Not found');
+      return row;
     }
   );
 }
