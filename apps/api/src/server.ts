@@ -15,6 +15,7 @@ import apiKeyRoutes from './modules/api-keys/routes.js';
 import vatRoutes from './modules/vat/routes.js';
 import surchargesRoutes from './modules/surcharges/routes.js';
 import freightRoutes from './modules/freight/routes.js';
+import healthRoutes from './modules/health/routes.js';
 
 export async function buildServer() {
   const app = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
@@ -35,7 +36,7 @@ export async function buildServer() {
   app.register(rateLimit, { global: false });
   app.register(usagePlugin);
 
-  app.get('/health', async () => ({ ok: true, service: 'clearcost-api' }));
+  app.register(healthRoutes);
 
   app.register(apiKeyRoutes, { prefix: '/v1/api-keys' });
   app.register(classifyRoutes, { prefix: '/v1/classify' });
