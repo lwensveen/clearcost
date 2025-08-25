@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
 import { db, vatRulesTable } from '@clearcost/db';
 import { and, desc, eq, gte, ilike, lte, sql } from 'drizzle-orm';
+import { importVatRules, VatRows } from './services/import-vat.js';
 
 const VatBaseEnum = z.enum(['CIF', 'CIF_PLUS_DUTY']);
 
@@ -151,5 +152,17 @@ export default function vatRoutes(app: FastifyInstance) {
       }
       return { inserted };
     }
+  );
+
+  app.post<{ Body: z.infer<typeof VatRows> }>(
+    '/import',
+    {
+      preHandler: app.requireApiKey(['admin:rates']),
+      schema: {
+        body: VatRows,
+        response: { 200: z.object({ ok: z.literal(true), count: z.number() }) },
+      },
+    },
+    async (req) => importVatRules(req.body)
   );
 }

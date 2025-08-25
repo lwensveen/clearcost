@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
 import { db, freightRateCardsTable, freightRateStepsTable } from '@clearcost/db';
 import { and, desc, eq, gte, ilike, lte, sql } from 'drizzle-orm';
+import { FreightCards, importFreightCards } from './services/import-cards.js';
 
 const ModeEnum = z.enum(['air', 'sea']);
 const UnitEnum = z.enum(['kg', 'm3']);
@@ -277,5 +278,17 @@ export default function freightRoutes(app: FastifyInstance) {
       }
       return { insertedCards, insertedSteps };
     }
+  );
+
+  app.post<{ Body: z.infer<typeof FreightCards> }>(
+    '/cards/import',
+    {
+      preHandler: app.requireApiKey(['admin:rates']),
+      schema: {
+        body: FreightCards,
+        response: { 200: z.object({ ok: z.literal(true), count: z.number() }) },
+      },
+    },
+    async (req) => importFreightCards(req.body)
   );
 }

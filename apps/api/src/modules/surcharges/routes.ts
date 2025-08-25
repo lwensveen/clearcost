@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
 import { db, surchargesTable } from '@clearcost/db';
 import { and, desc, eq, gte, ilike, lte, sql } from 'drizzle-orm';
+import { importSurcharges, SurchargeRows } from './services/import-surcharges.js';
 
 const SurchargeCreate = z.object({
   dest: z.string().length(2), // ISO2 country
@@ -151,5 +152,17 @@ export default function surchargesRoutes(app: FastifyInstance) {
       }
       return { inserted };
     }
+  );
+
+  app.post<{ Body: z.infer<typeof SurchargeRows> }>(
+    '/import',
+    {
+      preHandler: app.requireApiKey(['admin:rates']),
+      schema: {
+        body: SurchargeRows,
+        response: { 200: z.object({ ok: z.literal(true), count: z.number() }) },
+      },
+    },
+    async (req) => importSurcharges(req.body)
   );
 }
