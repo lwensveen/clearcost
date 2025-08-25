@@ -4,7 +4,7 @@ export const vatBaseEnum = pgEnum('vat_base', ['CIF', 'CIF_PLUS_DUTY', 'FOB']);
 
 export const deMinimisAppliesEnum = pgEnum('de_minimis_applies', ['DUTY', 'DUTY_VAT', 'NONE']);
 
-export const freightModeEnum = pgEnum('freight_mode', ['air', 'sea']);
+export const freightModeEnum = pgEnum('freight_mode', ['air', 'sea', 'express']);
 
 export const freightUnitEnum = pgEnum('freight_unit', ['kg', 'm3']);
 
