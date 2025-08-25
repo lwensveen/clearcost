@@ -13,6 +13,8 @@ export async function getFreight(opts: {
     .select({
       id: freightRateCardsTable.id,
       currency: freightRateCardsTable.currency,
+      minCharge: freightRateCardsTable.minCharge,
+      priceRounding: freightRateCardsTable.priceRounding,
     })
     .from(freightRateCardsTable)
     .where(
@@ -62,6 +64,12 @@ export async function getFreight(opts: {
 
   if (!step) return null;
 
-  const price = Number(step.price) * opts.qty;
-  return { currency: card.currency, price };
+  let price = Number(step.price) * opts.qty;
+  if (card.minCharge != null) price = Math.max(price, Number(card.minCharge));
+  if (card.priceRounding != null) {
+    const r = Number(card.priceRounding);
+    price = Math.round(price / r) * r;
+  }
+
+  return { currency: card.currency, unit: opts.unit, qty: opts.qty, price };
 }
