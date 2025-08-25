@@ -1,12 +1,24 @@
 import { db, dutyRatesTable } from '@clearcost/db';
 import { and, desc, eq, gt, isNull, lte, or } from 'drizzle-orm';
 
-export async function getActiveDutyRate(dest: string, hs6: string, on: Date) {
-  const rows = await db
+export type DutyRateRow = {
+  ratePct: number;
+  rule: string | null;
+  effectiveFrom: Date | null;
+  effectiveTo: Date | null;
+};
+
+export async function getActiveDutyRate(
+  dest: string,
+  hs6: string,
+  on: Date
+): Promise<DutyRateRow | null> {
+  const [row] = await db
     .select({
       ratePct: dutyRatesTable.ratePct,
       rule: dutyRatesTable.rule,
-      from: dutyRatesTable.effectiveFrom,
+      effectiveFrom: dutyRatesTable.effectiveFrom,
+      effectiveTo: dutyRatesTable.effectiveTo,
     })
     .from(dutyRatesTable)
     .where(
@@ -19,5 +31,13 @@ export async function getActiveDutyRate(dest: string, hs6: string, on: Date) {
     )
     .orderBy(desc(dutyRatesTable.effectiveFrom))
     .limit(1);
-  return rows[0] ?? null;
+
+  return row
+    ? {
+        ratePct: row.ratePct != null ? Number(row.ratePct) : 0,
+        rule: row.rule ?? null,
+        effectiveFrom: row.effectiveFrom,
+        effectiveTo: row.effectiveTo ?? null,
+      }
+    : null;
 }
