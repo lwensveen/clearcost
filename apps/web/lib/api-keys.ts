@@ -35,6 +35,19 @@ export async function createKey(
   return { id: j.id, token: j.token as string };
 }
 
+export async function getKeyOwner(id: string): Promise<string | null> {
+  const r = await fetch(`${BASE}/v1/api-keys/${encodeURIComponent(id)}`, {
+    headers: { Authorization: `Bearer ${KEY}` },
+    cache: 'no-store',
+  });
+
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+
+  const j: { id: string; ownerId: string } = await r.json();
+  return j.ownerId ?? null;
+}
+
 export async function setActive(id: string, active: boolean): Promise<void> {
   const r = await fetch(`${BASE}/v1/api-keys/${encodeURIComponent(id)}`, {
     method: 'PATCH',
