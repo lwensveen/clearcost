@@ -1,19 +1,31 @@
 import type { Metadata } from 'next';
-import { Roboto_Flex, Source_Sans_3 } from 'next/font/google';
 import './globals.css';
+import { Footer } from '@/components/layout/footer';
+import { Header } from '@/components/layout/header';
+import CookieConsent from '@/components/cookies/cookie-consent';
+import { ThemeProvider } from '@/components/theme/provider';
 
-const robotoFlex = Roboto_Flex({
+import { Inter, JetBrains_Mono, Space_Grotesk } from 'next/font/google';
+
+const fontHeading = Space_Grotesk({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+  weight: ['600', '700'],
   display: 'swap',
   variable: '--font-heading',
 });
 
-const sourceSans3 = Source_Sans_3({
+const fontBody = Inter({
   subsets: ['latin'],
   weight: ['400', '500'],
   display: 'swap',
-  variable: '--font-body',
+  variable: '--font-sans',
+});
+
+const fontMono = JetBrains_Mono({
+  subsets: ['latin'],
+  weight: ['400', '600'],
+  display: 'swap',
+  variable: '--font-mono',
 });
 
 export const metadata: Metadata = {
@@ -27,11 +39,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
-        className={`${robotoFlex.variable} ${sourceSans3.variable} min-h-screen bg-white text-slate-900`}
+        className={`${fontHeading.variable} ${fontBody.variable} ${fontMono.variable} min-h-screen bg-white text-slate-900`}
       >
-        {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <Header />
+          <main className="min-h-[calc(100vh-64px)]">{children}</main>
+          <Footer />
+          <CookieConsent />
+        </ThemeProvider>
       </body>
     </html>
   );

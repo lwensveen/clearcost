@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, varchar } from 'drizzle-orm/pg-core';
+import { boolean, pgTable, text, uuid, varchar } from 'drizzle-orm/pg-core';
 import { createTimestampColumn } from '../utils.js';
 
 export const taxRegistrationsTable = pgTable('tax_registrations', {
@@ -10,7 +10,7 @@ export const taxRegistrationsTable = pgTable('tax_registrations', {
   registrationNumber: text('registration_number').notNull(),
   validFrom: createTimestampColumn('valid_from', { defaultNow: true }),
   validTo: createTimestampColumn('valid_to', { nullable: true, defaultNow: false }),
-  isActive: text('is_active').notNull().default('true'),
+  isActive: boolean('is_active').notNull().default(true),
   createdAt: createTimestampColumn('created_at', { defaultNow: true }),
   updatedAt: createTimestampColumn('updated_at', { defaultNow: true, onUpdate: true }),
 });
