@@ -1,4 +1,14 @@
-import { index, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  index,
+  integer,
+  numeric,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { freightModeEnum, freightUnitEnum } from '../enums.js';
 import { createTimestampColumn, defaultTimestampOptions } from '../utils.js';
 
@@ -11,6 +21,9 @@ export const freightRateCardsTable = pgTable(
     mode: freightModeEnum('mode').notNull(),
     unit: freightUnitEnum('unit').notNull(),
     currency: varchar('currency', { length: 3 }).notNull().default('USD'),
+    minCharge: numeric('min_charge', { precision: 12, scale: 2 }).default('0').notNull(),
+    priceRounding: numeric('price_rounding', { precision: 12, scale: 2 }),
+    volumetricDivisor: integer('volumetric_divisor'),
     carrier: varchar('carrier', { length: 64 }),
     service: varchar('service', { length: 64 }),
     effectiveFrom: createTimestampColumn('effective_from', { defaultNow: true }),
