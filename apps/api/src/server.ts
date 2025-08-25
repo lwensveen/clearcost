@@ -1,21 +1,22 @@
 import Fastify from 'fastify';
-import cors from '@fastify/cors';
-import sensible from '@fastify/sensible';
-import swaggerPlugin from './plugins/swagger.js';
-import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
-import dateSerializer from './plugins/date-serializer.js';
-import { apiKeyAuthPlugin } from './plugins/api-key-auth.js';
-import rateLimit from '@fastify/rate-limit';
-import quoteRoutes from './modules/quotes/routes.js';
-import classifyRoutes from './modules/classify/routes.js';
-import hsRoutes from './modules/hs-codes/routes.js';
-import fxRoutes from './modules/fx/routes.js';
-import usagePlugin from './plugins/api-usage.js';
 import apiKeyRoutes from './modules/api-keys/routes.js';
-import vatRoutes from './modules/vat/routes.js';
-import surchargesRoutes from './modules/surcharges/routes.js';
+import classifyRoutes from './modules/classify/routes.js';
+import cors from '@fastify/cors';
+import dateSerializer from './plugins/date-serializer.js';
 import freightRoutes from './modules/freight/routes.js';
+import fxRoutes from './modules/fx/routes.js';
 import healthRoutes from './modules/health/routes.js';
+import hsRoutes from './modules/hs-codes/routes.js';
+import quoteRoutes from './modules/quotes/routes.js';
+import rateLimit from '@fastify/rate-limit';
+import sensible from '@fastify/sensible';
+import surchargesRoutes from './modules/surcharges/routes.js';
+import swaggerPlugin from './plugins/swagger.js';
+import usagePlugin from './plugins/api-usage.js';
+import vatRoutes from './modules/vat/routes.js';
+import webhookRoutes from './modules/webhooks/routes.js';
+import { apiKeyAuthPlugin } from './plugins/api-key-auth.js';
+import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
 
 export async function buildServer() {
   const app = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
@@ -46,6 +47,7 @@ export async function buildServer() {
   app.register(quoteRoutes, { prefix: '/v1/quotes' });
   app.register(surchargesRoutes, { prefix: '/v1/surcharges' });
   app.register(vatRoutes, { prefix: '/v1/vat' });
+  app.register(webhookRoutes, { prefix: '/v1/webhooks' });
 
   return app;
 }
