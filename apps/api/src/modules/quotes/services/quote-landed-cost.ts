@@ -83,7 +83,7 @@ export async function quoteLandedCost(input: QuoteInput & { merchantId?: string 
   const underDeMinimis = demValueDest != null ? CIF <= demValueDest : false;
 
   const dutyRow = await getActiveDutyRate(input.dest, hs6, now);
-  const vatRow = await getVat(input.dest);
+  const vatRow = await getVat(input.dest, now);
 
   let duty = 0;
   if (!(underDeMinimis && (dem?.appliesTo === 'DUTY' || dem?.appliesTo === 'DUTY_VAT'))) {
