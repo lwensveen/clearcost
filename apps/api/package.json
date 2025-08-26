@@ -35,7 +35,7 @@
     "dev": "bun --watch src/main.ts",
     "fx:refresh": "bun run src/modules/fx/jobs/fx-refresh.ts",
     "start": "node dist/src/main.js",
-    "task": "bun run scripts/run-task.ts"
+    "task": "bun run scripts/run-cron.ts"
   },
   "type": "module"
 }
