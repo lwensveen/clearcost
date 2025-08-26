@@ -16,7 +16,7 @@ type ProvOpts = {
  */
 export async function batchUpsertDutyRatesFromStream(
   source: AsyncIterable<DutyRateInsertRow> | DutyRateInsertRow[],
-  opts: { batchSize?: number } & ProvOpts = {}
+  opts: { batchSize?: number; dryRun?: boolean } & ProvOpts = {}
 ) {
   const batchSize = Math.max(1, opts.batchSize ?? 5000);
   let total = 0;
@@ -25,10 +25,15 @@ export async function batchUpsertDutyRatesFromStream(
   async function flush() {
     if (buf.length === 0) return;
 
-    // Upsert and return the full typed rows
+    if (opts.dryRun) {
+      total += buf.length;
+      buf = [];
+      return;
+    }
+
     const rows = await db
       .insert(dutyRatesTable)
-      .values(buf as any)
+      .values(buf)
       .onConflictDoUpdate({
         target: [
           dutyRatesTable.dest,
@@ -47,7 +52,6 @@ export async function batchUpsertDutyRatesFromStream(
 
     total += rows.length;
 
-    // Optional provenance
     if (opts.importId && rows.length) {
       const provRows = rows.map((row) => ({
         importId: opts.importId!,
@@ -66,7 +70,7 @@ export async function batchUpsertDutyRatesFromStream(
           })
         ),
       }));
-      await db.insert(provenanceTable).values(provRows as any);
+      await db.insert(provenanceTable).values(provRows);
     }
 
     buf = [];
@@ -88,5 +92,5 @@ export async function batchUpsertDutyRatesFromStream(
   }
 
   await flush();
-  return { ok: true as const, inserted: total };
+  return { ok: true as const, inserted: total, dryRun: Boolean(opts.dryRun) };
 }

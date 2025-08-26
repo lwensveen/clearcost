@@ -49,7 +49,7 @@ type ProvCtx = { dest: string; partner?: string | null; year: number };
 
 /** Default sourceRef formatter if caller doesn't provide one. */
 function defaultMakeWitsSourceRef(row: DutyRateInsert, ctx: ProvCtx): string {
-  const partner = (row as any).partner ?? ctx.partner ?? null;
+  const partner = row.partner ?? ctx.partner ?? null;
   const rule = row.rule ?? 'mfn';
   const y = row.effectiveFrom instanceof Date ? row.effectiveFrom.getUTCFullYear() : ctx.year;
   const partnerToken = partner ?? 'ERGA';

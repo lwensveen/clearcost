@@ -12,7 +12,7 @@ export async function importUsPreferential({
     batchSize: 5000,
     importId,
     makeSourceRef: (row) => {
-      const partner = (row as any).partner ?? 'special';
+      const partner = row.partner ?? 'special';
       const ymd = row.effectiveFrom?.toISOString().slice(0, 10);
       return `usitc:hts:col1-special:partner=${partner}:hs6=${row.hs6}:ef=${ymd}`;
     },

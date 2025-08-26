@@ -92,7 +92,7 @@ export async function s3Select(versionId: string, query: string): Promise<any[] 
   try {
     const j = await res.json();
     if (Array.isArray(j)) return j;
-    if (Array.isArray((j as any).records)) return (j as any).records;
+    if (Array.isArray(j.records)) return j.records;
     return null;
   } catch {
     return null;

@@ -32,7 +32,7 @@ const ParamsSchema = z.object({
 
 export type ImportFromUkParams = z.infer<typeof ParamsSchema>;
 
-export async function importDutyRatesFromUK(params: ImportFromUkParams = {} as any) {
+export async function importDutyRatesFromUK(params: ImportFromUkParams) {
   const p = ParamsSchema.parse(params);
 
   const jobs: Promise<{ ok: true; inserted: number }>[] = [];
