@@ -48,14 +48,20 @@ export const importSourceEnum = pgEnum('import_source', [
   'MANUAL',
   'AHTN',
   'UK_OPS',
+  'ECB',
+  'UK_TT',
+  'US',
+  'file',
+  'OECD/IMF',
 ]);
 
 export const importStatusEnum = pgEnum('import_status', ['running', 'succeeded', 'failed']);
 
 export const resourceTypeEnum = pgEnum('resource_type', [
   'duty_rate',
+  'freight_card',
+  'hs_code',
+  'hs_code_alias',
   'surcharge',
   'vat_rule',
-  'hs_code',
-  'hs_alias',
 ]);
