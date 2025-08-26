@@ -1,0 +1,21 @@
+name: Sweep stale imports (hourly)
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch: { }
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /internal/cron/imports/sweep-stale
+        run: |
+          curl -sS -X POST \
+            -H "x-admin-token: $ADMIN_TOKEN" \
+            -H "content-type: application/json" \
+            -d '{"thresholdMinutes": '${THRESHOLD_MINUTES:-30}'}' \
+            "$API_BASE/internal/cron/imports/sweep-stale"
+        env:
+          API_BASE: ${{ secrets.API_BASE }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          THRESHOLD_MINUTES: '30'
