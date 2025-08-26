@@ -122,7 +122,7 @@ export async function importFreightCards(cards: FreightCardInput[], opts: Import
           resourceId: cardId,
           sourceRef: opts.makeSourceRef?.(card),
           rowHash: sha256Hex(JSON.stringify(canonical)),
-        } as any);
+        });
       }
     }
   });

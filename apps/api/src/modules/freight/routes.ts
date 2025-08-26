@@ -51,11 +51,11 @@ export default function freightRoutes(app: FastifyInstance) {
       const where = and(
         origin ? eq(freightRateCardsTable.origin, origin) : sql`TRUE`,
         dest ? eq(freightRateCardsTable.dest, dest) : sql`TRUE`,
-        mode ? eq(freightRateCardsTable.mode as any, mode) : sql`TRUE`,
-        unit ? eq(freightRateCardsTable.unit as any, unit) : sql`TRUE`,
+        mode ? eq(freightRateCardsTable.mode, mode) : sql`TRUE`,
+        unit ? eq(freightRateCardsTable.unit, unit) : sql`TRUE`,
         q ? ilike(freightRateCardsTable.carrier, `%${q}%`) : sql`TRUE`,
-        from ? gte(freightRateCardsTable.effectiveFrom as any, from) : sql`TRUE`,
-        to ? lte(freightRateCardsTable.effectiveFrom as any, to) : sql`TRUE`
+        from ? gte(freightRateCardsTable.effectiveFrom, from) : sql`TRUE`,
+        to ? lte(freightRateCardsTable.effectiveFrom, to) : sql`TRUE`
       );
       return db
         .select()
@@ -80,14 +80,14 @@ export default function freightRoutes(app: FastifyInstance) {
         .values({
           origin: b.origin,
           dest: b.dest,
-          mode: b.mode as any,
-          unit: b.unit as any,
+          mode: b.mode,
+          unit: b.unit,
           carrier: b.carrier ?? null,
           service: b.service ?? null,
           notes: b.notes ?? null,
-          effectiveFrom: b.effectiveFrom as any,
-          effectiveTo: (b.effectiveTo ?? null) as any,
-        } as any)
+          effectiveFrom: b.effectiveFrom,
+          effectiveTo: b.effectiveTo ?? null,
+        })
         .returning();
       return reply.code(201).send(row);
     }
@@ -106,16 +106,16 @@ export default function freightRoutes(app: FastifyInstance) {
         .set({
           ...(b.origin ? { origin: b.origin } : {}),
           ...(b.dest ? { dest: b.dest } : {}),
-          ...(b.mode ? { mode: b.mode as any } : {}),
-          ...(b.unit ? { unit: b.unit as any } : {}),
+          ...(b.mode ? { mode: b.mode } : {}),
+          ...(b.unit ? { unit: b.unit } : {}),
           ...(b.carrier !== undefined ? { carrier: b.carrier ?? null } : {}),
           ...(b.service !== undefined ? { service: b.service ?? null } : {}),
           ...(b.notes !== undefined ? { notes: b.notes ?? null } : {}),
-          ...(b.effectiveFrom ? { effectiveFrom: b.effectiveFrom as any } : {}),
-          ...(b.effectiveTo !== undefined ? { effectiveTo: (b.effectiveTo ?? null) as any } : {}),
-          updatedAt: new Date() as any,
-        } as any)
-        .where(eq(freightRateCardsTable.id, req.params.id as any))
+          ...(b.effectiveFrom ? { effectiveFrom: b.effectiveFrom } : {}),
+          ...(b.effectiveTo !== undefined ? { effectiveTo: b.effectiveTo ?? null } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(freightRateCardsTable.id, req.params.id))
         .returning();
       if (!row) return reply.notFound('Not found');
       return row;
@@ -131,7 +131,7 @@ export default function freightRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const [row] = await db
         .delete(freightRateCardsTable)
-        .where(eq(freightRateCardsTable.id, req.params.id as any))
+        .where(eq(freightRateCardsTable.id, req.params.id))
         .returning();
       if (!row) return reply.notFound('Not found');
       return reply.code(204).send();
@@ -148,8 +148,8 @@ export default function freightRoutes(app: FastifyInstance) {
       const rows = await db
         .select()
         .from(freightRateStepsTable)
-        .where(eq(freightRateStepsTable.cardId, req.params.id as any))
-        .orderBy(freightRateStepsTable.uptoQty as any);
+        .where(eq(freightRateStepsTable.cardId, req.params.id))
+        .orderBy(freightRateStepsTable.uptoQty);
       return reply.send(rows);
     }
   );
@@ -165,10 +165,10 @@ export default function freightRoutes(app: FastifyInstance) {
       const [row] = await db
         .insert(freightRateStepsTable)
         .values({
-          cardId: req.params.id as any,
+          cardId: req.params.id,
           uptoQty: String(b.uptoQty),
           pricePerUnit: String(b.pricePerUnit),
-        } as any)
+        })
         .returning();
       return reply.code(201).send(row);
     }
@@ -187,12 +187,12 @@ export default function freightRoutes(app: FastifyInstance) {
         .set({
           ...(b.uptoQty !== undefined ? { uptoQty: String(b.uptoQty) } : {}),
           ...(b.pricePerUnit !== undefined ? { pricePerUnit: String(b.pricePerUnit) } : {}),
-          updatedAt: new Date() as any,
-        } as any)
+          updatedAt: new Date(),
+        })
         .where(
           and(
-            eq(freightRateStepsTable.cardId, req.params.id as any),
-            eq(freightRateStepsTable.id, req.params.stepId as any)
+            eq(freightRateStepsTable.cardId, req.params.id),
+            eq(freightRateStepsTable.id, req.params.stepId)
           )
         )
         .returning();
@@ -212,8 +212,8 @@ export default function freightRoutes(app: FastifyInstance) {
         .delete(freightRateStepsTable)
         .where(
           and(
-            eq(freightRateStepsTable.cardId, req.params.id as any),
-            eq(freightRateStepsTable.id, req.params.stepId as any)
+            eq(freightRateStepsTable.cardId, req.params.id),
+            eq(freightRateStepsTable.id, req.params.stepId)
           )
         )
         .returning();
@@ -247,14 +247,14 @@ export default function freightRoutes(app: FastifyInstance) {
           .values({
             origin: c.origin,
             dest: c.dest,
-            mode: c.mode as any,
-            unit: c.unit as any,
+            mode: c.mode,
+            unit: c.unit,
             carrier: c.carrier ?? null,
             service: c.service ?? null,
             notes: c.notes ?? null,
-            effectiveFrom: c.effectiveFrom as any,
-            effectiveTo: (c.effectiveTo ?? null) as any,
-          } as any)
+            effectiveFrom: c.effectiveFrom,
+            effectiveTo: c.effectiveTo ?? null,
+          })
           .returning();
 
         const card = cards[0];
@@ -267,10 +267,10 @@ export default function freightRoutes(app: FastifyInstance) {
             await db
               .insert(freightRateStepsTable)
               .values({
-                cardId: card.id as any,
+                cardId: card.id,
                 uptoQty: String(s.uptoQty),
                 pricePerUnit: String(s.pricePerUnit),
-              } as any)
+              })
               .onConflictDoNothing();
             insertedSteps++;
           }
