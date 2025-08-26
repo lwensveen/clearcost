@@ -10,14 +10,19 @@
     "@fastify/swagger-ui": "^5.2.3",
     "dotenv": "^17.2.1",
     "drizzle-orm": "^0.44.4",
+    "fast-xml-parser": "^5.2.5",
     "fastify": "^5.5.0",
     "fastify-type-provider-zod": "^5.0.3",
+    "i18n-iso-countries": "^7.14.0",
     "postgres": "^3.4.7",
+    "sax": "^1.4.1",
+    "xlsx": "^0.18.5",
     "zod": "^4.1.1",
     "zod-to-json-schema": "^3.24.6"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "@types/sax": "^1.2.7",
     "typescript": "5.9.2"
   },
   "exports": {
@@ -29,7 +34,8 @@
     "check-types": "tsc --noEmit",
     "dev": "bun --watch src/main.ts",
     "fx:refresh": "bun run src/modules/fx/jobs/fx-refresh.ts",
-    "start": "node dist/src/main.js"
+    "start": "node dist/src/main.js",
+    "task": "bun run scripts/run-task.ts"
   },
   "type": "module"
 }
