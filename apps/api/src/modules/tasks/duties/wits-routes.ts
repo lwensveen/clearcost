@@ -22,7 +22,7 @@ export default function witsDutyRoutes(app: FastifyInstance) {
         hs6List: z.array(z.string().regex(/^\d{6}$/)).optional(),
       });
       const p = Body.parse(req.body ?? {});
-      const importId = (req as any).importRunId as string | undefined;
+      const importId = req.importCtx?.runId;
 
       const res = await importDutyRatesFromWITS({
         dests: p.dests,
@@ -59,7 +59,7 @@ export default function witsDutyRoutes(app: FastifyInstance) {
       const defaultDests = ['SG', 'MY', 'TH', 'ID', 'PH', 'VN', 'BN', 'KH', 'LA', 'MM'];
       const dests = (b.dests ?? defaultDests).map((s) => s.toUpperCase());
       const partners = (b.partners ?? defaultDests).map((s) => s.toUpperCase());
-      const importId = (req as any).importRunId as string | undefined;
+      const importId = req.importCtx?.runId;
 
       const res = await importDutyRatesFromWITS({
         dests,
@@ -113,7 +113,7 @@ export default function witsDutyRoutes(app: FastifyInstance) {
         'US',
       ];
       const partners = (b.partners ?? defaultPartners).map((s) => s.toUpperCase());
-      const importId = (req as any).importRunId as string | undefined;
+      const importId = req.importCtx?.runId;
 
       const res = await importDutyRatesFromWITS({
         dests: ['JP'],

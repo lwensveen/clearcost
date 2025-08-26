@@ -20,7 +20,7 @@ export default function ukDutyRoutes(app: FastifyInstance) {
         batchSize: z.coerce.number().int().min(1).max(20000).optional(),
       });
       const { hs6, batchSize } = Body.parse(req.body ?? {});
-      const importId: string | undefined = (req as any).importRunId;
+      const importId = req.importCtx?.runId;
 
       const res = await batchUpsertDutyRatesFromStream(streamUkMfnDutyRates({ hs6List: hs6 }), {
         batchSize,
@@ -46,7 +46,7 @@ export default function ukDutyRoutes(app: FastifyInstance) {
         batchSize: z.coerce.number().int().min(1).max(20000).optional(),
       });
       const { hs6, partners, batchSize } = Body.parse(req.body ?? {});
-      const importId: string | undefined = (req as any).importRunId;
+      const importId = req.importCtx?.runId;
 
       const res = await batchUpsertDutyRatesFromStream(
         streamUkPreferentialDutyRates({ hs6List: hs6, partners }),

@@ -12,7 +12,7 @@ export default function usDutyRoutes(app: FastifyInstance) {
       config: { importMeta: { source: 'USITC_HTS', job: 'duties:us-mfn' } },
     },
     async (req, reply) => {
-      const importId = (req as any).importRunId as string | undefined;
+      const importId = req.importCtx?.runId;
       const res = await importUsMfn({ importId });
       return reply.send(res);
     }
@@ -26,7 +26,7 @@ export default function usDutyRoutes(app: FastifyInstance) {
       config: { importMeta: { source: 'USITC_HTS', job: 'duties:us-fta' } },
     },
     async (req, reply) => {
-      const importId = (req as any).importRunId as string | undefined;
+      const importId = req.importCtx?.runId;
       const res = await importUsPreferential({ importId });
       return reply.send(res);
     }

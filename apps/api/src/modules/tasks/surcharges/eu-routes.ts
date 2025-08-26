@@ -20,7 +20,7 @@ export default function surchargeEuRoutes(app: FastifyInstance) {
             .filter(Boolean)
         : [];
 
-      const importId = (req as any).importRunId as string | undefined;
+      const importId = req.importCtx?.runId;
 
       const res = await importEuTradeRemediesAsSurcharges({
         measureTypeIds,

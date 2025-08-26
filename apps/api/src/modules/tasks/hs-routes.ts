@@ -13,7 +13,7 @@ export default function hsRoutes(app: FastifyInstance) {
       config: { importMeta: { source: 'TARIC', job: 'hs:eu-hs6' } },
     },
     async (req, reply) => {
-      const importId = (req as any).importRunId as string | undefined;
+      const importId = req.importCtx?.runId;
       const res = await importEuHs6FromTaric({ importId });
       return reply.send(res);
     }
@@ -32,7 +32,7 @@ export default function hsRoutes(app: FastifyInstance) {
         batchSize: z.coerce.number().int().min(1).max(20000).optional(),
       });
       const b = Body.parse(req.body ?? {});
-      const importId = (req as any).importRunId as string | undefined;
+      const importId = req.importCtx?.runId;
 
       const res = await importAhtnAliases({
         url: b.url,

@@ -14,7 +14,7 @@ export default function surchargeJsonRoute(app: FastifyInstance) {
       const path = 'surcharges/surcharges.json';
       const rows = await fetchJSON<SurchargeInsert[]>(path);
 
-      const importId = (req as any).importRunId as string | undefined;
+      const importId = req.importCtx?.runId;
 
       const res = await batchUpsertSurchargesFromStream(rows, {
         importId,

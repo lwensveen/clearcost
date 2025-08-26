@@ -25,7 +25,7 @@ export default function surchargeUsRoutes(app: FastifyInstance) {
         skipFree?: boolean;
       };
 
-      const importId = (req as any).importRunId as string | undefined;
+      const importId = req.importCtx?.runId;
 
       const res = await importUsTradeRemediesFromHTS({
         effectiveFrom,
@@ -50,7 +50,7 @@ export default function surchargeUsRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const { batchSize } = (req.body ?? {}) as { batchSize?: number };
-      const importId = (req as any).importRunId as string | undefined;
+      const importId = req.importCtx?.runId;
       const res = await importAllUsSurcharges({ batchSize, importId });
 
       return reply.send(res);

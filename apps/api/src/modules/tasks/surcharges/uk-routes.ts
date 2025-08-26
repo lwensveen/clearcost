@@ -9,7 +9,7 @@ export default function surchargeUkRoutes(app: FastifyInstance) {
       config: { importMeta: { source: 'UK_TT', job: 'surcharges:uk-remedies' } },
     },
     async (req, reply) => {
-      const importId = (req as any).importRunId as string | undefined;
+      const importId = req.importCtx?.runId;
 
       const measureTypeIds = (process.env.UK_REMEDY_MEASURE_TYPES ?? '')
         .split(',')

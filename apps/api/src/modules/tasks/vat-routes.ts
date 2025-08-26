@@ -14,7 +14,7 @@ export default function vatRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const rows = await fetchVatRowsFromOfficialSources();
 
-      const importId = (req as any).importRunId as string | undefined;
+      const importId = req.importCtx?.runId;
 
       const res = await importVatRules(rows, {
         importId,
