@@ -49,6 +49,21 @@ const OECD_XLSX_URL =
 
 const IMF_XLSX_URL = 'https://www.imf.org/external/np/fad/tpaf/files/vat_substandard_rates.xlsx';
 
+const NAME_ALIASES: Record<string, string> = {
+  'viet nam': 'Vietnam',
+  'brunei darussalam': 'Brunei',
+  'lao pdr': 'Laos',
+  'korea, republic of': 'South Korea',
+  'myanmar (burma)': 'Myanmar',
+  'côte d’ivoire': "Cote d'Ivoire",
+};
+
+/** 🔧 NEW: skip places without VAT/GST so we don’t generate spurious rows */
+const SKIP_ISO2 = new Set<string>([
+  'BN', // Brunei — no VAT (GST repealed)
+  // add more if you want to exclude SST-only jurisdictions, etc.
+]);
+
 type RowRates = {
   dest: string; // ISO-2
   standard?: number | null;
@@ -79,8 +94,12 @@ function extractRows(
     const countryHdr = findHeader(row, hints.countryKeys);
     if (!countryHdr) continue;
 
-    const dest = toIso2(row[countryHdr]);
-    if (!dest) continue;
+    const rawName = String(row[countryHdr] ?? '').trim();
+    const alias = NAME_ALIASES[rawName.toLowerCase()];
+    const normName = alias ?? rawName;
+
+    const dest = toIso2(normName);
+    if (!dest || SKIP_ISO2.has(dest)) continue;
 
     const pick = (cands: string[]) => {
       const hdr = findHeader(row, cands);
@@ -213,20 +232,25 @@ export async function fetchVatRowsFromOfficialSources(): Promise<VatRuleInsert[]
   // Merge with prefer-OECD policy
   const merged = mergePreferOecd(oecdRows, imfRows);
 
-  // Effective dates:
-  // Today (UTC) is used as a pragmatic default. Consider parsing metadata
-  // or publication dates from the sources to refine these.
-  const effectiveFromOecd = todayISO();
-  const effectiveFromImf = todayISO();
+  const stableKey = (r: { dest: string; kind: VatRateKind; rate: number }) =>
+    `${r.dest}:${r.kind}:${r.rate}`;
+  const dedup = new Map<
+    string,
+    { dest: string; kind: VatRateKind; rate: number; source: SourceId }
+  >();
+  for (const r of merged) dedup.set(stableKey(r), r);
+  const stable = [...dedup.values()];
+
+  // Effective dates: today (UTC) as pragmatic default.
+  const today = todayISO();
 
   // Normalize to DB insert rows (VatRuleInsert)
-
-  return merged.map(({ dest, kind, rate, source }) => ({
+  return stable.map(({ dest, kind, rate, source }) => ({
     dest,
     kind,
-    ratePct: toNumeric3String(rate), // NUMERIC(6,3) as string
+    ratePct: toNumeric3String(rate),
     base: DEFAULT_BASE,
-    effectiveFrom: new Date(source === 'oecd' ? effectiveFromOecd : effectiveFromImf),
+    effectiveFrom: new Date(today),
     effectiveTo: null,
     notes:
       source === 'oecd'
