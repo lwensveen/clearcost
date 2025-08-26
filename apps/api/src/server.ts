@@ -7,17 +7,20 @@ import freightRoutes from './modules/freight/routes.js';
 import fxRoutes from './modules/fx/routes.js';
 import healthRoutes from './modules/health/routes.js';
 import hsRoutes from './modules/hs-codes/routes.js';
+import importInstrumentationPlugin from './plugins/import-instrumentation.js';
+import metricsHttp from './plugins/prometheus/metrics-http.js';
+import metricsImportHealth from './plugins/prometheus/metrics-import-health.js';
 import quoteRoutes from './modules/quotes/routes.js';
 import rateLimit from '@fastify/rate-limit';
 import sensible from '@fastify/sensible';
 import surchargesRoutes from './modules/surcharges/routes.js';
 import swaggerPlugin from './plugins/swagger.js';
+import tasksRoutes from './modules/tasks/index.js';
 import usagePlugin from './plugins/api-usage.js';
 import vatRoutes from './modules/vat/routes.js';
 import webhookRoutes from './modules/webhooks/routes.js';
 import { apiKeyAuthPlugin } from './plugins/api-key-auth.js';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
-import tasksRoutes from './modules/tasks/routes.js';
 
 export async function buildServer() {
   const app = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
@@ -37,6 +40,9 @@ export async function buildServer() {
   app.register(apiKeyAuthPlugin);
   app.register(rateLimit, { global: false });
   app.register(usagePlugin);
+  app.register(metricsHttp);
+  app.register(metricsImportHealth);
+  app.register(importInstrumentationPlugin);
 
   app.register(healthRoutes);
 
@@ -47,9 +53,9 @@ export async function buildServer() {
   app.register(hsRoutes, { prefix: '/v1/hs-codes' });
   app.register(quoteRoutes, { prefix: '/v1/quotes' });
   app.register(surchargesRoutes, { prefix: '/v1/surcharges' });
+  app.register(tasksRoutes);
   app.register(vatRoutes, { prefix: '/v1/vat' });
   app.register(webhookRoutes, { prefix: '/v1/webhooks' });
-  app.register(tasksRoutes);
 
   return app;
 }
