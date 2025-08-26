@@ -1,6 +1,7 @@
-import { db, freightRateCardsTable, freightRateStepsTable } from '@clearcost/db';
+import { db, freightRateCardsTable, freightRateStepsTable, provenanceTable } from '@clearcost/db';
 import { z } from 'zod/v4';
 import { eq, sql } from 'drizzle-orm';
+import { sha256Hex } from '../../../lib/provenance.js';
 
 const Step = z.object({
   uptoQty: z.coerce.number().positive(),
@@ -26,8 +27,17 @@ export const FreightCard = z.object({
 export const FreightCards = z.array(FreightCard);
 export type FreightCardInput = z.infer<typeof FreightCard>;
 
-export async function importFreightCards(cards: FreightCardInput[]) {
-  const items = cards.map((card) => ({
+type ImportOpts = {
+  batchSize?: number;
+  importId?: string;
+  makeSourceRef?: (card: FreightCardInput) => string | undefined;
+};
+
+const ymd = (d?: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+
+export async function importFreightCards(cards: FreightCardInput[], opts: ImportOpts = {}) {
+  const parsed = FreightCards.parse(cards);
+  const items = parsed.map((card) => ({
     ...card,
     origin: card.origin.toUpperCase(),
     dest: card.dest.toUpperCase(),
@@ -89,8 +99,33 @@ export async function importFreightCards(cards: FreightCardInput[]) {
             set: { pricePerUnit: String(step.pricePerUnit), updatedAt: new Date() },
           });
       }
+
+      if (opts.importId) {
+        const canonical = {
+          origin: card.origin,
+          dest: card.dest,
+          mode: card.mode,
+          unit: card.unit,
+          currency: card.currency,
+          effectiveFrom: ymd(card.effectiveFrom),
+          effectiveTo: ymd(card.effectiveTo ?? null),
+          minCharge: card.minCharge ?? null,
+          priceRounding: card.priceRounding ?? null,
+          volumetricDivisor: card.volumetricDivisor ?? null,
+          notes: card.notes ?? null,
+          steps: card.steps.map((s) => ({ uptoQty: s.uptoQty, pricePerUnit: s.pricePerUnit })),
+        };
+
+        await tx.insert(provenanceTable).values({
+          importId: opts.importId,
+          resourceType: 'freight_card',
+          resourceId: cardId,
+          sourceRef: opts.makeSourceRef?.(card),
+          rowHash: sha256Hex(JSON.stringify(canonical)),
+        } as any);
+      }
     }
   });
 
-  return { ok: true, count: items.length };
+  return { ok: true as const, count: items.length };
 }
