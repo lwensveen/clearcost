@@ -1,0 +1,135 @@
+name: Cron Imports (Nightly)
+
+on:
+  schedule:
+    - cron: '7 3 * * *' # daily 03:07 UTC
+  workflow_dispatch: { }
+
+concurrency:
+  group: cron-nightly
+  cancel-in-progress: false
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    env:
+      API: ${{ secrets.CLEARCOST_API_URL }}
+      ADMIN: ${{ secrets.CLEARCOST_ADMIN_TOKEN }}
+      API_KEY: ${{ secrets.CLEARCOST_API_KEY }}
+    steps:
+      - name: FX daily (ECB)
+        run: |
+          curl -fS --retry 3 --retry-all-errors -X POST \
+            -H "x-admin-token: $ADMIN" \
+            "$API/internal/cron/fx/daily"
+
+      - name: VAT (OECD/IMF auto)
+        run: |
+          curl -fS --retry 3 --retry-all-errors -X POST \
+            -H "x-admin-token: $ADMIN" \
+            "$API/internal/cron/import/vat/auto"
+
+      # Duties: native/authoritative
+      - name: UK MFN
+        run: |
+          curl -fS --retry 3 --retry-all-errors -X POST \
+            -H "x-admin-token: $ADMIN" \
+            "$API/internal/cron/import/duties/uk-mfn"
+
+      - name: UK Preferential
+        run: |
+          curl -fS --retry 3 --retry-all-errors -X POST \
+            -H "x-admin-token: $ADMIN" \
+            "$API/internal/cron/import/duties/uk-fta"
+
+      - name: EU MFN (TARIC)
+        run: |
+          curl -fS --retry 3 --retry-all-errors -X POST \
+            -H "x-admin-token: $ADMIN" \
+            "$API/internal/cron/import/duties/eu-mfn"
+
+      - name: EU Preferential (TARIC)
+        run: |
+          curl -fS --retry 3 --retry-all-errors -X POST \
+            -H "x-admin-token: $ADMIN" \
+            "$API/internal/cron/import/duties/eu-fta"
+
+      - name: US MFN (HTS General)
+        run: |
+          curl -fS --retry 3 --retry-all-errors -X POST \
+            -H "x-admin-token: $ADMIN" \
+            "$API/internal/cron/import/duties/us-mfn"
+
+      - name: US Preferential (HTS Special)
+        run: |
+          curl -fS --retry 3 --retry-all-errors -X POST \
+            -H "x-admin-token: $ADMIN" \
+            "$API/internal/cron/import/duties/us-preferential"
+
+      # Surcharges
+      - name: US Trade Remedies (301/232) from HTS
+        run: |
+          curl -fS --retry 3 --retry-all-errors -X POST \
+            -H "x-admin-token: $ADMIN" \
+            -H "content-type: application/json" \
+            -d '{}' \
+            "$API/internal/cron/import/surcharges/us-trade-remedies"
+
+      - name: US Surcharges (All)
+        run: |
+          curl -fS --retry 3 --retry-all-errors -X POST \
+            -H "x-admin-token: $ADMIN" \
+            -H "content-type: application/json" \
+            -d '{"batchSize":5000}' \
+            "$API/internal/cron/import/surcharges/us-all"
+
+      # JSON-driven (optional)
+      - name: Import Surcharges (JSON)
+        run: |
+          curl -fS --retry 3 --retry-all-errors -X POST \
+            -H "x-admin-token: $ADMIN" \
+            "$API/internal/cron/import/surcharges"
+
+      - name: Import Freight Cards
+        run: |
+          curl -fS --retry 3 --retry-all-errors -X POST \
+            -H "x-admin-token: $ADMIN" \
+            "$API/internal/cron/import/freight"
+
+      - name: Slack (success)
+        if: success()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -fsS -X POST -H 'Content-type: application/json' \
+          --data "{\"text\":\"✅ ${{ github.workflow }} succeeded in ${{ github.repository }} on \\\`${{ github.ref_name }}\\\`\\n${{ env.RUN_URL }}\"}" \
+          "$SLACK_WEBHOOK_URL"
+
+          - name: Slack (failure)
+            if: failure()
+            env:
+              SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+            run: |
+              curl -fsS -X POST -H 'Content-type: application/json' \
+                --data "{\"text\":\"🚨 ${{ github.workflow }} failed in ${{ github.repository }} on \\\`${{ github.ref_name }}\\\`\\n${{ env.RUN_URL }}\"}" \
+                "$SLACK_WEBHOOK_URL"
+
+      - name: Discord (success)
+        if: success()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          content="✅ **${{ github.workflow }}** succeeded in **${{ github.repository }}** on \`${{ github.ref_name }}\`\n${{ env.RUN_URL }}"
+          curl -fsS -H "Content-Type: application/json" -X POST \
+            -d "{\"content\":\"$content\"}" \
+            "$DISCORD_WEBHOOK_URL"
+
+      - name: Discord (failure)
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          content="🚨 **${{ github.workflow }}** failed in **${{ github.repository }}** on \`${{ github.ref_name }}\`\n${{ env.RUN_URL }}"
+          curl -fsS -H "Content-Type: application/json" -X POST \
+            -d "{\"content\":\"$content\"}" \
+            "$DISCORD_WEBHOOK_URL"
