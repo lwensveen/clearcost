@@ -1,0 +1,36 @@
+name: Cron Imports
+
+on:
+  schedule:
+    - cron: '7 3 * * *'   # daily 03:07 UTC
+  workflow_dispatch: { }
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger FX daily (ECB)
+        run: |
+          curl -fsS -X POST \
+            -H "x-admin-token: ${{ secrets.CLEARCOST_ADMIN_TOKEN }}" \
+            "${{ secrets.CLEARCOST_API_URL }}/internal/cron/fx/daily"
+      - name: Import VAT
+        run: |
+          curl -fsS -X POST \
+            -H "x-admin-token: ${{ secrets.CLEARCOST_ADMIN_TOKEN }}" \
+            "${{ secrets.CLEARCOST_API_URL }}/internal/cron/import/vat"
+      - name: Import Duty Rates
+        run: |
+          curl -fsS -X POST \
+            -H "x-admin-token: ${{ secrets.CLEARCOST_ADMIN_TOKEN }}" \
+            "${{ secrets.CLEARCOST_API_URL }}/internal/cron/import/duties"
+      - name: Import Surcharges
+        run: |
+          curl -fsS -X POST \
+            -H "x-admin-token: ${{ secrets.CLEARCOST_ADMIN_TOKEN }}" \
+            "${{ secrets.CLEARCOST_API_URL }}/internal/cron/import/surcharges"
+      - name: Import Freight Cards
+        run: |
+          curl -fsS -X POST \
+            -H "x-admin-token: ${{ secrets.CLEARCOST_ADMIN_TOKEN }}" \
+            "${{ secrets.CLEARCOST_API_URL }}/internal/cron/import/freight"
