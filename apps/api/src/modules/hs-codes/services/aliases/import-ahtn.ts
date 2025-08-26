@@ -84,8 +84,10 @@ function parseCsv(text: string): Record<string, string>[] {
 
     rows.push({ code8: c8, hs6: c6, title });
   }
-  return rows as any;
+  return rows;
 }
+
+export type ImportAhtnResult = { ok: true; count: number; message?: string };
 
 type ImportAhtnOpts = {
   url?: string; // CSV URL; default: process.env.AHTN_CSV_URL
@@ -94,7 +96,7 @@ type ImportAhtnOpts = {
   makeSourceRef?: (code8: string) => string | undefined; // optional provenance source ref builder
 };
 
-export async function importAhtnAliases(opts: ImportAhtnOpts = {}) {
+export async function importAhtnAliases(opts: ImportAhtnOpts = {}): Promise<ImportAhtnResult> {
   const url = opts.url ?? process.env.AHTN_CSV_URL ?? '';
   if (!url) return { ok: true as const, count: 0, message: 'AHTN_CSV_URL not set' };
 
@@ -153,7 +155,7 @@ export async function importAhtnAliases(opts: ImportAhtnOpts = {}) {
       }
 
       if (prov.length) {
-        await trx.insert(provenanceTable).values(prov as any);
+        await trx.insert(provenanceTable).values(prov);
       }
 
       inserted += chunk.length;

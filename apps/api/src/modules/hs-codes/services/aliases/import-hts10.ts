@@ -1,6 +1,8 @@
 import { db, hsCodeAliasesTable } from '@clearcost/db';
 import { exportChapterJson } from '../../../duty-rates/services/us/hts-base.js';
 
+export type ImportUsHts10AliasesResult = { ok: true; count: number };
+
 /** Extract 10-digit code (digits only) from a row; return { code10, title }. */
 function parseHts10AndTitle(
   row: Record<string, unknown>
@@ -26,25 +28,21 @@ function hs6(code10: string) {
   return code10.slice(0, 6);
 }
 
-export async function importUsHts10Aliases() {
+export async function importUsHts10Aliases(): Promise<ImportUsHts10AliasesResult> {
   const chapters = Array.from({ length: 97 }, (_, i) => i + 1);
 
-  // Buffer writes; do small batches
+  let inserted = 0;
   const batch: { hs6: string; system: 'HTS10'; code: string; title: string }[] = [];
+
   const flush = async () => {
     if (!batch.length) return;
     await db.transaction(async (trx) => {
-      for (const r of batch) {
-        await trx
-          .insert(hsCodeAliasesTable)
-          .values({
-            hs6: r.hs6,
-            system: 'HTS10',
-            code: r.code,
-            title: r.title,
-          } as any)
-          .onConflictDoNothing();
-      }
+      const ret = await trx
+        .insert(hsCodeAliasesTable)
+        .values(batch)
+        .onConflictDoNothing()
+        .returning({ id: hsCodeAliasesTable.id });
+      inserted += ret.length;
     });
     batch.length = 0;
   };
@@ -54,15 +52,18 @@ export async function importUsHts10Aliases() {
     for (const row of rows) {
       const parsed = parseHts10AndTitle(row);
       if (!parsed) continue;
+
       batch.push({
         hs6: hs6(parsed.code10),
         system: 'HTS10',
         code: parsed.code10,
         title: parsed.title,
       });
+
       if (batch.length >= 2000) await flush();
     }
   }
+
   await flush();
-  return { ok: true as const };
+  return { ok: true as const, count: inserted };
 }

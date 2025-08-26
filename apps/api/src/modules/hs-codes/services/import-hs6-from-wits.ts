@@ -1,7 +1,10 @@
 import { db, hsCodesTable } from '@clearcost/db';
+import { sql } from 'drizzle-orm';
 
 // WITS SDMX "TRAINS" endpoint; we piggyback a single query just to get PRODUCT values.
 const SDMX_BASE = 'https://wits.worldbank.org/API/V1/SDMX/V21/rest/data/DF_WITS_Tariff_TRAINS';
+
+type ImportHs6FromWitsResult = { ok: true; count: number };
 
 // Minimal SDMX types we need
 type SdmxJson = {
@@ -54,27 +57,34 @@ async function fetchHs6FromWits(year: number) {
   return Array.from(uniq.entries()).map(([hs6, title]) => ({ hs6, title }));
 }
 
-/** Upsert HS6 rows into hs_codes (keeps your table exactly as-is). */
-export async function importHs6FromWits(year?: number) {
+/** Upsert HS6 rows into hs_codes; returns total affected (inserted + updated). */
+export async function importHs6FromWits(year?: number): Promise<ImportHs6FromWitsResult> {
   const targetYear = year ?? new Date().getUTCFullYear() - 1; // WITS is typically T-1
   const rows = await fetchHs6FromWits(targetYear);
-  if (!rows.length) return { ok: true as const, inserted: 0 };
+  if (!rows.length) return { ok: true as const, count: 0 };
+
+  const batchSize = 2000;
+  let affected = 0;
 
   await db.transaction(async (trx) => {
-    for (const r of rows) {
-      await trx
+    for (let i = 0; i < rows.length; i += batchSize) {
+      const chunk = rows.slice(i, i + batchSize);
+      const ret = await trx
         .insert(hsCodesTable)
-        .values({
-          hs6: r.hs6,
-          title: r.title,
-          // leave ahtn8/cn8/hts10/notes null — you can populate later
-        } as any)
+        .values(
+          chunk.map((r) => ({
+            hs6: r.hs6,
+            title: r.title,
+          }))
+        )
         .onConflictDoUpdate({
           target: hsCodesTable.hs6,
-          set: { title: r.title }, // refresh title if it changed
-        });
+          set: { title: sql`excluded.title`, updatedAt: sql`now()` },
+        })
+        .returning({ hs6: hsCodesTable.hs6 });
+      affected += ret.length;
     }
   });
 
-  return { ok: true as const, inserted: rows.length };
+  return { ok: true as const, count: affected };
 }

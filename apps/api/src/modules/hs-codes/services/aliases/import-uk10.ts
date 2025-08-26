@@ -7,6 +7,8 @@ import {
 } from '../../../duty-rates/utils/stream-csv.js';
 import { getLatestVersionId } from '../../../duty-rates/services/uk/base.js';
 
+export type ImportUk10AliasesResult = { ok: true; count: number };
+
 function onlyDigits(s: string) {
   return s.replace(/\D+/g, '');
 }
@@ -14,7 +16,7 @@ function isUk10(s: string) {
   return /^\d{10}$/.test(s);
 }
 
-export async function importUk10Aliases() {
+export async function importUk10Aliases(): Promise<ImportUk10AliasesResult> {
   const versionId = await getLatestVersionId();
   const stream = await fetchTableCsvStream(versionId);
 
@@ -22,15 +24,19 @@ export async function importUk10Aliases() {
   let idxCode = -1,
     idxDesc = -1;
 
+  let inserted = 0;
   const batch: { hs6: string; code: string; title: string }[] = [];
+
   const flush = async () => {
     if (!batch.length) return;
     await db.transaction(async (trx) => {
       for (const r of batch) {
-        await trx
+        const ret = await trx
           .insert(hsCodeAliasesTable)
-          .values({ hs6: r.hs6, system: 'UK10', code: r.code, title: r.title } as any)
-          .onConflictDoNothing();
+          .values({ hs6: r.hs6, system: 'UK10', code: r.code, title: r.title })
+          .onConflictDoNothing()
+          .returning({ id: hsCodeAliasesTable.id });
+        inserted += ret.length;
       }
     });
     batch.length = 0;
@@ -56,5 +62,6 @@ export async function importUk10Aliases() {
   }
 
   await flush();
-  return { ok: true as const };
+
+  return { ok: true as const, count: inserted };
 }

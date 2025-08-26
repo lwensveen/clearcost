@@ -95,7 +95,7 @@ export async function importEuHs6FromTaric(opts: ImportOpts = {}) {
     }
 
     if (provRows.length) {
-      await trx.insert(provenanceTable).values(provRows as any);
+      await trx.insert(provenanceTable).values(provRows);
     }
   });
 
