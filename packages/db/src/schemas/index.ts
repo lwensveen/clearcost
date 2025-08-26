@@ -8,10 +8,13 @@ import { dutyRatesTable } from './duty-rates.js';
 import { freightRateCardsTable } from './freight-rate-cards.js';
 import { freightRateStepsTable } from './freight-rate-steps.js';
 import { fxRatesTable } from './fx-rates.js';
+import { hsCodeAliasesTable } from './hs-code-aliases.js';
 import { hsCodesTable } from './hs-codes.js';
 import { idempotencyKeysTable } from './idempotency-keys.js';
+import { importsTable } from './imports.js';
 import { merchantProfilesTable } from './merchant-profiles.js';
 import { passkeysTable } from './auth/passkeys.js';
+import { provenanceTable } from './provenance.js';
 import { sessionsTable } from './auth/sessions.js';
 import { surchargesTable } from './surcharges.js';
 import { taxRegistrationsTable } from './tax-registrations.js';
@@ -34,9 +37,12 @@ export * from './duty-rates.js';
 export * from './freight-rate-cards.js';
 export * from './freight-rate-steps.js';
 export * from './fx-rates.js';
+export * from './hs-code-aliases.js';
 export * from './hs-codes.js';
 export * from './idempotency-keys.js';
+export * from './imports.js';
 export * from './merchant-profiles.js';
+export * from './provenance.js';
 export * from './surcharges.js';
 export * from './tax-registrations.js';
 export * from './users/users.js';
@@ -55,10 +61,13 @@ export const schema = {
   freightRateCardsTable,
   freightRateStepsTable,
   fxRatesTable,
+  hsCodeAliasesTable,
   hsCodesTable,
   idempotencyKeysTable,
+  importsTable,
   merchantProfilesTable,
   passkeysTable,
+  provenanceTable,
   sessionsTable,
   surchargesTable,
   taxRegistrationsTable,

@@ -38,3 +38,24 @@ export const surchargeCodeEnum = pgEnum('surcharge_code', [
   'TRADE_REMEDY_232',
   'TRADE_REMEDY_301',
 ]);
+
+export const importSourceEnum = pgEnum('import_source', [
+  'WITS',
+  'TARIC',
+  'USITC_HTS',
+  'OECD',
+  'IMF',
+  'MANUAL',
+  'AHTN',
+  'UK_OPS',
+]);
+
+export const importStatusEnum = pgEnum('import_status', ['running', 'succeeded', 'failed']);
+
+export const resourceTypeEnum = pgEnum('resource_type', [
+  'duty_rate',
+  'surcharge',
+  'vat_rule',
+  'hs_code',
+  'hs_alias',
+]);
