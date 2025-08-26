@@ -5,11 +5,11 @@
 // - Uses a small worker pool (p.concurrency) so we don't fire all HTTP jobs at once.
 // - Upserts each job's results immediately via batchUpsertDutyRatesFromStream (default 5k/txn).
 // - Avoids building one giant in-memory array.
+// - Adds provenance support via { importId, makeSourceRef }.
 //
 // Examples:
 //   await importDutyRatesFromWITS({ dests: ['US','GB'], partners: ['CA','MX'] });
 //   await importDutyRatesFromWITS({ dests: ['TH'], year: 2024, backfillYears: 0, batchSize: 2000, concurrency: 4 });
-
 import { z } from 'zod/v4';
 import type { DutyRateInsert } from '@clearcost/types';
 import { fetchWitsMfnDutyRates } from './mfn.js';
@@ -37,37 +37,68 @@ const ParamsSchema = z.object({
 
   /** Optional HS6 allowlist to reduce scope across all jobs. */
   hs6List: z.array(z.string().regex(/^\d{6}$/)).optional(),
+
+  /** OPTIONAL: provenance run id (useful for audit linking). */
+  importId: z.string().optional(),
 });
 
-export type ImportFromWitsParams = z.infer<typeof ParamsSchema>;
+export type ImportFromWitsCore = z.infer<typeof ParamsSchema>;
+
+/** Context for building a stable WITS source reference string. */
+type ProvCtx = { dest: string; partner?: string | null; year: number };
+
+/** Default sourceRef formatter if caller doesn't provide one. */
+function defaultMakeWitsSourceRef(row: DutyRateInsert, ctx: ProvCtx): string {
+  const partner = (row as any).partner ?? ctx.partner ?? null;
+  const rule = row.rule ?? 'mfn';
+  const y = row.effectiveFrom instanceof Date ? row.effectiveFrom.getUTCFullYear() : ctx.year;
+  const partnerToken = partner ?? 'ERGA';
+  return `wits:${ctx.dest}:${partnerToken}:${rule}:hs6=${row.hs6}:y=${y}`;
+}
+
+/** Public params type: core + optional makeSourceRef override. */
+export type ImportFromWitsParams = ImportFromWitsCore & {
+  makeSourceRef?: (row: DutyRateInsert, ctx: ProvCtx) => string;
+};
 
 export async function importDutyRatesFromWITS(params: ImportFromWitsParams) {
   const p = ParamsSchema.parse(params);
+  const makeSourceRef = params.makeSourceRef ?? defaultMakeWitsSourceRef;
+
   const targetYear = p.year ?? new Date().getUTCFullYear() - 1;
 
-  type Job = () => Promise<DutyRateInsert[]>;
+  type Job = {
+    ctx: ProvCtx;
+    run: () => Promise<DutyRateInsert[]>;
+  };
   const jobs: Job[] = [];
 
   for (const dest of p.dests) {
-    jobs.push(() =>
-      fetchWitsMfnDutyRates({
-        dest,
-        year: targetYear,
-        backfillYears: p.backfillYears,
-        hs6List: p.hs6List,
-      }).catch(() => [] as DutyRateInsert[])
-    );
-
-    for (const partner of p.partners) {
-      jobs.push(() =>
-        fetchWitsPreferentialDutyRates({
+    // MFN
+    jobs.push({
+      ctx: { dest, year: targetYear },
+      run: () =>
+        fetchWitsMfnDutyRates({
           dest,
-          partner,
           year: targetYear,
           backfillYears: p.backfillYears,
           hs6List: p.hs6List,
-        }).catch(() => [] as DutyRateInsert[])
-      );
+        }).catch(() => [] as DutyRateInsert[]),
+    });
+
+    // Preferential per (dest, partner)
+    for (const partner of p.partners) {
+      jobs.push({
+        ctx: { dest, partner, year: targetYear },
+        run: () =>
+          fetchWitsPreferentialDutyRates({
+            dest,
+            partner,
+            year: targetYear,
+            backfillYears: p.backfillYears,
+            hs6List: p.hs6List,
+          }).catch(() => [] as DutyRateInsert[]),
+      });
     }
   }
 
@@ -82,18 +113,22 @@ export async function importDutyRatesFromWITS(params: ImportFromWitsParams) {
 
     while (true) {
       const i = nextIndex++;
-      const job: Job | undefined = jobs[i];
+      const job = jobs[i];
       if (!job) break;
 
       let rows: DutyRateInsert[] = [];
       try {
-        rows = await job();
+        rows = await job.run();
       } catch {
         rows = [];
       }
 
       if (rows.length > 0) {
-        const res = await batchUpsertDutyRatesFromStream(rows, { batchSize: p.batchSize });
+        const res = await batchUpsertDutyRatesFromStream(rows, {
+          batchSize: p.batchSize,
+          importId: p.importId,
+          makeSourceRef: (row) => makeSourceRef(row as DutyRateInsert, job.ctx),
+        });
         localInserted += res.inserted;
       }
     }

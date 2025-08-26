@@ -4,7 +4,17 @@ import { batchUpsertDutyRatesFromStream } from '../../utils/batch-upsert.js';
 export async function importUsPreferential({
   effectiveFrom,
   skipFree,
-}: { effectiveFrom?: Date; skipFree?: boolean } = {}) {
+  importId,
+}: { effectiveFrom?: Date; skipFree?: boolean; importId?: string } = {}) {
   const rows = await fetchUsPreferentialDutyRates({ effectiveFrom, skipFree });
-  return await batchUpsertDutyRatesFromStream(rows, { batchSize: 5000 });
+
+  return await batchUpsertDutyRatesFromStream(rows, {
+    batchSize: 5000,
+    importId,
+    makeSourceRef: (row) => {
+      const partner = (row as any).partner ?? 'special';
+      const ymd = row.effectiveFrom?.toISOString().slice(0, 10);
+      return `usitc:hts:col1-special:partner=${partner}:hs6=${row.hs6}:ef=${ymd}`;
+    },
+  });
 }

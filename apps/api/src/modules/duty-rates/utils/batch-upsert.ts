@@ -1,38 +1,92 @@
-import type { DutyRateInsert } from '@clearcost/types';
-import { importDutyRates } from '../services/import-duty-rates.js';
+import { db, dutyRatesTable, provenanceTable } from '@clearcost/db';
+import { sha256Hex } from '../../../lib/provenance.js';
+import { sql } from 'drizzle-orm';
+
+type DutyRateInsertRow = typeof dutyRatesTable.$inferInsert;
+type DutyRateSelectRow = typeof dutyRatesTable.$inferSelect;
+
+type ProvOpts = {
+  importId?: string;
+  makeSourceRef?: (row: DutyRateSelectRow) => string | undefined; // e.g., 'WITS …#series=…'
+};
 
 /**
- * Consume a stream or array of DutyRateInsert and upsert in batches to keep memory flat.
- * Defaults to 5,000 rows per transaction; tune via batchSize.
+ * Upsert duty rates from a stream or array in batches (default 5,000).
+ * Optionally records provenance rows linked to an importId.
  */
 export async function batchUpsertDutyRatesFromStream(
-  source: AsyncIterable<DutyRateInsert> | DutyRateInsert[],
-  opts: { batchSize?: number } = {}
+  source: AsyncIterable<DutyRateInsertRow> | DutyRateInsertRow[],
+  opts: { batchSize?: number } & ProvOpts = {}
 ) {
   const batchSize = Math.max(1, opts.batchSize ?? 5000);
   let total = 0;
-  let buf: DutyRateInsert[] = [];
+  let buf: DutyRateInsertRow[] = [];
 
   async function flush() {
     if (buf.length === 0) return;
-    const res = await importDutyRates(buf);
-    total += res.count ?? buf.length;
+
+    // Upsert and return the full typed rows
+    const rows = await db
+      .insert(dutyRatesTable)
+      .values(buf as any)
+      .onConflictDoUpdate({
+        target: [
+          dutyRatesTable.dest,
+          dutyRatesTable.hs6,
+          dutyRatesTable.rule,
+          dutyRatesTable.effectiveFrom,
+        ],
+        set: {
+          ratePct: sql`EXCLUDED.rate_pct`,
+          effectiveTo: sql`EXCLUDED.effective_to`,
+          notes: sql`EXCLUDED.notes`,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+
+    total += rows.length;
+
+    // Optional provenance
+    if (opts.importId && rows.length) {
+      const provRows = rows.map((row) => ({
+        importId: opts.importId!,
+        resourceType: 'duty_rate' as const,
+        resourceId: row.id,
+        sourceRef: opts.makeSourceRef?.(row),
+        rowHash: sha256Hex(
+          JSON.stringify({
+            dest: row.dest,
+            hs6: row.hs6,
+            rule: row.rule,
+            ratePct: row.ratePct,
+            ef: row.effectiveFrom?.toISOString(),
+            et: row.effectiveTo ? row.effectiveTo.toISOString() : null,
+            notes: row.notes ?? null,
+          })
+        ),
+      }));
+      await db.insert(provenanceTable).values(provRows as any);
+    }
+
     buf = [];
   }
 
-  if (Symbol.asyncIterator in Object(source)) {
-    for await (const row of source as AsyncIterable<DutyRateInsert>) {
+  const isAsyncIterable = (s: any): s is AsyncIterable<DutyRateInsertRow> =>
+    s && typeof s[Symbol.asyncIterator] === 'function';
+
+  if (isAsyncIterable(source)) {
+    for await (const row of source) {
       buf.push(row);
       if (buf.length >= batchSize) await flush();
     }
-    await flush();
   } else {
-    for (const row of source as DutyRateInsert[]) {
+    for (const row of source) {
       buf.push(row);
       if (buf.length >= batchSize) await flush();
     }
-    await flush();
   }
 
-  return { ok: true, inserted: total } as const;
+  await flush();
+  return { ok: true as const, inserted: total };
 }
