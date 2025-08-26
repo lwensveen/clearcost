@@ -1,16 +1,5 @@
-// services/us/import-us-trade-remedies.ts
-// Import US trade-remedy surcharges (Section 301/232) from USITC HTS JSON (Chapter 99).
-// v1 scope:
-//   • 301 (China):       9903.88.xx → origin='CN'
-//   • 232 (steel/alum.): 9903.80.xx / 9903.85.xx → origin=null (country carve-outs later)
-//   • Ad-valorem % only. Specific/compound noted in `notes`, skipped if no % is found.
-// Aggregation rule (fits unique index dest+code+effectiveFrom):
-//   → Keep ONE row per code (301, 232), taking the MAX % across all matching 10-digit lines.
-//
-// Later (v2): parse U.S. Notes (e.g., Note 20) to map coverage into `hs6`, and 232 carve-outs.
-
 import type { SurchargeInsert } from '@clearcost/types';
-import { importSurcharges } from '../import-surcharges.js';
+import { batchUpsertSurchargesFromStream } from '../../utils/batch-upsert.js';
 import {
   exportChapterJson,
   hasCompound,
@@ -18,8 +7,10 @@ import {
 } from '../../../duty-rates/services/us/hts-base.js';
 
 type ImportOpts = {
-  effectiveFrom?: Date; // default: Jan 1 of current UTC year
-  skipFree?: boolean; // if true, drop 0% rows
+  effectiveFrom?: Date; // default: Jan 1 UTC of current year
+  skipFree?: boolean; // drop 0% rows
+  importId?: string; // provenance run id
+  batchSize?: number; // upsert batch size (default 5000)
 };
 
 function jan1UTCOfCurrentYear(): Date {
@@ -27,7 +18,6 @@ function jan1UTCOfCurrentYear(): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
 }
 
-/** Extract a % from "25%", "10 %", etc. */
 function parsePercent(text: string | null | undefined): number | null {
   if (!text) return null;
   const m = /(\d+(?:\.\d+)?)\s*%/.exec(String(text));
@@ -36,7 +26,6 @@ function parsePercent(text: string | null | undefined): number | null {
   return Number.isFinite(v) && v >= 0 ? v : null;
 }
 
-/** Column 1 (General) cell — HTS dumps vary; try common keys. */
 function getGeneralDutyCell(row: Record<string, unknown>): string | null {
   const candidates = [
     'column1General',
@@ -55,14 +44,12 @@ function getGeneralDutyCell(row: Record<string, unknown>): string | null {
   return null;
 }
 
-/** Classify 99xx line into 301/232 buckets. */
 function classifyTradeRemedy(hts10: string): '301' | '232' | null {
   if (/^9903\.88\./.test(hts10)) return '301';
   if (/^9903\.(80|85)\./.test(hts10)) return '232';
   return null;
 }
 
-/** Nice notes text. */
 function makeNotes(
   code: 'TRADE_REMEDY_301' | 'TRADE_REMEDY_232',
   hts10: string,
@@ -77,15 +64,14 @@ function makeNotes(
 }
 
 /**
- * PUBLIC: Scan HTS Ch.99 and insert ONE surcharge row for 301 and one for 232,
- * using the max ad-valorem percent found in the chapter for each program.
+ * Scan HTS Ch.99 and insert program-level surcharge rows (301, 232).
+ * Writes provenance when `importId` is provided.
  */
 export async function importUsTradeRemediesFromHTS(
   opts: ImportOpts = {}
-): Promise<{ ok: true; count: number }> {
+): Promise<{ ok: true; inserted: number; count: number }> {
   const effectiveFrom = opts.effectiveFrom ?? jan1UTCOfCurrentYear();
 
-  // Buckets track the max % found + an example hts10 for notes.
   type Bucket = { maxPct: number; anyHts10: string; anyText?: string };
   const buckets: Record<'TRADE_REMEDY_301' | 'TRADE_REMEDY_232', Bucket | undefined> = {
     TRADE_REMEDY_301: undefined,
@@ -113,22 +99,20 @@ export async function importUsTradeRemediesFromHTS(
   }
 
   const out: SurchargeInsert[] = [];
-  // 301 (origin CN)
   if (buckets.TRADE_REMEDY_301) {
     const b = buckets.TRADE_REMEDY_301;
     out.push({
       dest: 'US',
       origin: 'CN',
-      hs6: null, // v2: map note coverage into hs6
+      hs6: null, // v2: map coverage into hs6 via U.S. Notes
       code: 'TRADE_REMEDY_301',
-      pctAmt: String(b.maxPct), // importer handles numeric-as-string → SQL numeric
+      pctAmt: b.maxPct.toFixed(3),
       fixedAmt: null,
       effectiveFrom,
       effectiveTo: null,
       notes: makeNotes('TRADE_REMEDY_301', b.anyHts10, b.anyText),
     });
   }
-  // 232 (no per-country carve-outs yet)
   if (buckets.TRADE_REMEDY_232) {
     const b = buckets.TRADE_REMEDY_232;
     out.push({
@@ -136,7 +120,7 @@ export async function importUsTradeRemediesFromHTS(
       origin: null,
       hs6: null,
       code: 'TRADE_REMEDY_232',
-      pctAmt: String(b.maxPct),
+      pctAmt: b.maxPct.toFixed(3),
       fixedAmt: null,
       effectiveFrom,
       effectiveTo: null,
@@ -144,7 +128,20 @@ export async function importUsTradeRemediesFromHTS(
     });
   }
 
-  if (out.length === 0) return { ok: true as const, count: 0 };
-  const res = await importSurcharges(out as any);
-  return { ok: true as const, count: res.count ?? out.length };
+  if (!out.length) return { ok: true as const, inserted: 0, count: 0 };
+
+  const res = await batchUpsertSurchargesFromStream(out, {
+    batchSize: opts.batchSize ?? 5000,
+    importId: opts.importId,
+    makeSourceRef: (r) => {
+      const program = r.code === 'TRADE_REMEDY_301' ? '301' : '232';
+      const origin = r.origin ?? 'ALL';
+      const hs = r.hs6 ?? 'ALL';
+      const ef = r.effectiveFrom instanceof Date ? r.effectiveFrom.toISOString().slice(0, 10) : '';
+      return `usitc:hts:program=${program}:origin=${origin}:hs6=${hs}:ef=${ef}`;
+    },
+  });
+
+  const inserted = res.inserted ?? 0;
+  return { ok: true as const, inserted, count: inserted };
 }

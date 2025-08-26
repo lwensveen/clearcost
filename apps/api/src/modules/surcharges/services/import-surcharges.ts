@@ -66,8 +66,8 @@ export async function importSurcharges(rows: SurchargeInsert[]) {
           code: r.code,
           fixedAmt: r.fixedAmt,
           pctAmt: r.pctAmt,
-          effectiveFrom: r.effectiveFrom, // may be undefined → DB defaultNow()
-          effectiveTo: r.effectiveTo, // may be undefined (omit)
+          effectiveFrom: r.effectiveFrom,
+          effectiveTo: r.effectiveTo,
           notes: r.notes,
         } as (typeof surchargesTable)['$inferInsert'])
         .onConflictDoUpdate({
