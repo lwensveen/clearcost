@@ -6,9 +6,9 @@ import { resolveHs6 } from '../../hs-codes/services/resolve-hs6.js';
 import { convertCurrency } from '../../fx/services/convert-currency.js';
 import { getDeMinimis } from '../../de-minimis/services/get-de-minimis.js';
 import { getActiveDutyRate } from '../../duty-rates/services/get-active-duty-rate.js';
-import { getSurcharges } from '../../surcharges/services/get-surcharges.js';
+import { getSurchargesScoped } from '../../surcharges/services/get-surcharges.js';
 import { getFreight } from '../../freight/services/get-freight.js';
-import { getVat } from '../../vat/services/get-vat.js';
+import { getVatForHs6 } from '../../vat/services/get-vat-for-hs6.js';
 
 type Unit = 'kg' | 'm3';
 const BASE_CCY = process.env.CURRENCY_BASE ?? 'USD';
@@ -83,9 +83,10 @@ export async function quoteLandedCost(input: QuoteInput & { merchantId?: string 
   const underDeMinimis = demValueDest != null ? CIF <= demValueDest : false;
 
   const dutyRow = await getActiveDutyRate(input.dest, hs6, now);
-  const vatRow = await getVat(input.dest, now);
+  const vatInfo = await getVatForHs6(input.dest, hs6, now); // { ratePct, base, source, effectiveFrom }
 
   let duty = 0;
+  // De minimis for duty when appliesTo === 'DUTY' or 'DUTY_VAT'
   if (!(underDeMinimis && (dem?.appliesTo === 'DUTY' || dem?.appliesTo === 'DUTY_VAT'))) {
     const rate = dutyRow ? Number(dutyRow.ratePct) : 0;
     duty = (rate / 100) * CIF;
@@ -98,19 +99,29 @@ export async function quoteLandedCost(input: QuoteInput & { merchantId?: string 
   let checkoutVAT = 0;
 
   if (iossEligible) {
-    const checkoutRate = (vatRow ? Number(vatRow.ratePct) : 0) / 100;
+    // IOSS: VAT collected at checkout on goods (and optionally shipping)
+    const checkoutRate = (vatInfo ? Number(vatInfo.ratePct) : 0) / 100;
     const chargeShippingAtCheckout = profile?.chargeShippingAtCheckout ?? false;
     const checkoutVatBase = itemValDest + (chargeShippingAtCheckout ? freightInDest : 0);
     checkoutVAT = checkoutRate * checkoutVatBase;
   } else {
-    if (!(underDeMinimis && dem?.appliesTo === 'DUTY_VAT')) {
-      const base = (vatRow?.base as 'CIF' | 'CIF_PLUS_DUTY') ?? 'CIF_PLUS_DUTY';
+    // Import VAT at border unless de minimis applies to VAT (or both)
+    const dmBlocksVat =
+      underDeMinimis && (dem?.appliesTo === 'VAT' || dem?.appliesTo === 'DUTY_VAT');
+    if (!dmBlocksVat) {
+      const base = (vatInfo?.base as 'CIF' | 'CIF_PLUS_DUTY') ?? 'CIF_PLUS_DUTY';
       const vatBase = base === 'CIF_PLUS_DUTY' ? CIF + duty : CIF;
-      vat = ((vatRow ? Number(vatRow.ratePct) : 0) / 100) * vatBase;
+      const vatRate = (vatInfo ? Number(vatInfo.ratePct) : 0) / 100;
+      vat = vatRate * vatBase;
     }
   }
 
-  const sur = await getSurcharges(input.dest, now);
+  const sur = await getSurchargesScoped({
+    dest: input.dest,
+    origin: input.origin,
+    hs6,
+    on: now,
+  });
   const feesFixed = sur.reduce((s, r) => s + (r.fixedAmt ?? 0), 0);
   const feesPct = sur.reduce((s, r) => s + (r.pctAmt ?? 0), 0) * (CIF / 100);
   const fees = feesFixed + feesPct;
