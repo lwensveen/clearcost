@@ -17,6 +17,7 @@ import vatRoutes from './modules/vat/routes.js';
 import webhookRoutes from './modules/webhooks/routes.js';
 import { apiKeyAuthPlugin } from './plugins/api-key-auth.js';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
+import tasksRoutes from './modules/tasks/routes.js';
 
 export async function buildServer() {
   const app = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
@@ -48,6 +49,7 @@ export async function buildServer() {
   app.register(surchargesRoutes, { prefix: '/v1/surcharges' });
   app.register(vatRoutes, { prefix: '/v1/vat' });
   app.register(webhookRoutes, { prefix: '/v1/webhooks' });
+  app.register(tasksRoutes);
 
   return app;
 }
