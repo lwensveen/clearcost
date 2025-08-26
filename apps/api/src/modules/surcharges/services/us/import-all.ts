@@ -1,6 +1,7 @@
 import { streamMpfRows } from './static-mpf.js';
 import { streamHmfRows } from './static-hmf.js';
 import { batchUpsertSurchargesFromStream } from '../../utils/batch-upsert.js';
+import type { SurchargeInsert } from '@clearcost/types';
 
 type Opts = {
   batchSize?: number;
@@ -19,26 +20,29 @@ function ymd(d: Date | string | null | undefined) {
  * - HMF (env-configured)
  * You can append 301/232 and AD/CVD streams later without changing callers.
  */
-export async function importAllUsSurcharges(opts: Opts = {}) {
-  let inserted = 0;
+export async function importAllUsSurcharges(opts: Opts = {}): Promise<{ ok: true; count: number }> {
+  const batchSize = opts.batchSize;
+  let count = 0;
 
   // MPF
-  inserted += (
+  count += (
     await batchUpsertSurchargesFromStream(streamMpfRows(), {
-      batchSize: opts.batchSize,
+      batchSize,
       importId: opts.importId,
-      makeSourceRef: (r) => `static:mpf:dest=${r.dest ?? 'US'}:ef=${ymd(r.effectiveFrom)}`,
+      makeSourceRef: (r: SurchargeInsert) =>
+        `static:mpf:dest=${r.dest ?? 'US'}:ef=${ymd(r.effectiveFrom)}`,
     })
-  ).inserted;
+  ).count;
 
   // HMF
-  inserted += (
+  count += (
     await batchUpsertSurchargesFromStream(streamHmfRows(), {
-      batchSize: opts.batchSize,
+      batchSize,
       importId: opts.importId,
-      makeSourceRef: (r) => `static:hmf:dest=${r.dest ?? 'US'}:ef=${ymd(r.effectiveFrom)}`,
+      makeSourceRef: (r: SurchargeInsert) =>
+        `static:hmf:dest=${r.dest ?? 'US'}:ef=${ymd(r.effectiveFrom)}`,
     })
-  ).inserted;
+  ).count;
 
-  return { ok: true as const, inserted };
+  return { ok: true as const, count };
 }

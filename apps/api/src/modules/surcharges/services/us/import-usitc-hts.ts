@@ -142,6 +142,6 @@ export async function importUsTradeRemediesFromHTS(
     },
   });
 
-  const inserted = res.inserted ?? 0;
+  const inserted = res.count ?? 0;
   return { ok: true as const, inserted, count: inserted };
 }

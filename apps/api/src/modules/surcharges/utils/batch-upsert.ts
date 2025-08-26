@@ -13,6 +13,7 @@ type ProvOpts = {
 /**
  * Upsert surcharges from a stream or array in batches (default 5k),
  * optionally recording provenance rows.
+ * TODO add dry run
  */
 export async function batchUpsertSurchargesFromStream(
   source: AsyncIterable<SurchargeInsertRow> | SurchargeInsertRow[],
@@ -31,7 +32,7 @@ export async function batchUpsertSurchargesFromStream(
     // Upsert + return full typed rows so we have the row IDs for provenance.
     const rows = await db
       .insert(surchargesTable)
-      .values(buf as any)
+      .values(buf)
       .onConflictDoUpdate({
         target: [
           surchargesTable.dest,
@@ -73,7 +74,7 @@ export async function batchUpsertSurchargesFromStream(
           })
         ),
       }));
-      await db.insert(provenanceTable).values(provRows as any);
+      await db.insert(provenanceTable).values(provRows);
     }
 
     buf = [];
@@ -92,5 +93,5 @@ export async function batchUpsertSurchargesFromStream(
   }
   await flush();
 
-  return { ok: true as const, inserted: total };
+  return { ok: true as const, count: total };
 }

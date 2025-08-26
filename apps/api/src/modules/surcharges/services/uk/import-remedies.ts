@@ -109,7 +109,7 @@ async function* sourceUkRemedyRows(versionId: string, typeIds: string[]) {
  */
 export async function importUkTradeRemediesAsSurcharges(
   opts: ImportOpts = {}
-): Promise<{ ok: true; inserted: number }> {
+): Promise<{ ok: true; count: number }> {
   const versionId = await getLatestVersionId();
   const hs6Allow = new Set((opts.hs6List ?? []).map((s) => String(s).slice(0, 6)));
   const envTypes = (process.env.UK_REMEDY_MEASURE_TYPES ?? '')
@@ -162,7 +162,7 @@ export async function importUkTradeRemediesAsSurcharges(
     });
   }
 
-  if (!out.length) return { ok: true as const, inserted: 0 };
+  if (!out.length) return { ok: true as const, count: 0 };
 
   // Provenance-enabled upsert
   const res = await batchUpsertSurchargesFromStream(out, {
@@ -177,5 +177,5 @@ export async function importUkTradeRemediesAsSurcharges(
     },
   });
 
-  return { ok: true as const, inserted: res.inserted ?? 0 };
+  return { ok: true as const, count: res.count ?? 0 };
 }
