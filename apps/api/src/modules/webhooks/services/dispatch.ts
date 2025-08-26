@@ -24,10 +24,7 @@ export async function emitWebhook(ownerId: string, event: EventName, payload: Pa
     })
     .from(webhookEndpointsTable)
     .where(
-      and(
-        eq(webhookEndpointsTable.ownerId, ownerId as any),
-        eq(webhookEndpointsTable.isActive, true)
-      )
+      and(eq(webhookEndpointsTable.ownerId, ownerId), eq(webhookEndpointsTable.isActive, true))
     );
 
   const body = JSON.stringify({ type: event, data: payload });
@@ -41,13 +38,13 @@ export async function emitWebhook(ownerId: string, event: EventName, payload: Pa
     const deliveries = await db
       .insert(webhookDeliveriesTable)
       .values({
-        endpointId: ep.id as any,
+        endpointId: ep.id,
         event,
-        payload: { type: event, data: payload } as any,
+        payload: { type: event, data: payload },
         attempt: 0,
         status: 'pending',
         nextAttemptAt: now,
-      } as any)
+      })
       .returning({ id: webhookDeliveriesTable.id });
 
     const delivery = deliveries[0];
@@ -110,7 +107,7 @@ async function sendAttempt(
         responseBody: text.slice(0, 4000),
         deliveredAt: new Date(),
         updatedAt: new Date(),
-        nextAttemptAt: null as any,
+        nextAttemptAt: null,
       })
       .where(eq(webhookDeliveriesTable.id, deliveryId));
     return;
@@ -127,7 +124,7 @@ async function sendAttempt(
       status: shouldRetry ? 'pending' : 'failed',
       responseStatus: status,
       responseBody: text.slice(0, 4000),
-      nextAttemptAt: next as any,
+      nextAttemptAt: next,
       updatedAt: new Date(),
     })
     .where(eq(webhookDeliveriesTable.id, deliveryId));

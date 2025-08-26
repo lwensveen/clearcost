@@ -50,7 +50,7 @@ export async function classifyHS6(input: ClassifyInput) {
   const [best] = entries;
   if (!best) {
     // default to toy as lowest risk, tweak later
-    return { hs6: '950300', confidence: 0.2, candidates: [] as any[] };
+    return { hs6: '950300', confidence: 0.2, candidates: [] };
   }
 
   // enrich titles for top-3

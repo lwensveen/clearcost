@@ -76,12 +76,12 @@ export default function webhookRoutes(app: FastifyInstance) {
       const [row] = await db
         .insert(webhookEndpointsTable)
         .values({
-          ownerId: body.ownerId as any,
+          ownerId: body.ownerId,
           url: body.url,
-          events: body.events as any,
+          events: body.events,
           isActive: true,
           secret,
-        } as any)
+        })
         .returning({
           id: webhookEndpointsTable.id,
           ownerId: webhookEndpointsTable.ownerId,
