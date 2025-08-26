@@ -37,7 +37,7 @@ export async function importVatRules(rows: VatRuleInsert[], opts: ImportOpts = {
   // Upsert and capture columns we need for provenance
   const returned = await db
     .insert(vatRulesTable)
-    .values(normalized as any)
+    .values(normalized)
     .onConflictDoUpdate({
       target: [vatRulesTable.dest, vatRulesTable.kind, vatRulesTable.effectiveFrom],
       set: {
@@ -87,7 +87,7 @@ export async function importVatRules(rows: VatRuleInsert[], opts: ImportOpts = {
       ),
     }));
 
-    await db.insert(provenanceTable).values(provRows as any);
+    await db.insert(provenanceTable).values(provRows);
   }
 
   return { ok: true as const, count: returned.length };

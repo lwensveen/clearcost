@@ -40,7 +40,7 @@ export async function upsertFxRatesEUR(
   for (const row of rows) {
     const res = await db
       .insert(fxRatesTable)
-      .values(row as any)
+      .values(row)
       .onConflictDoNothing({ target: [fxRatesTable.base, fxRatesTable.quote, fxRatesTable.asOf] });
 
     inserted += 1;

@@ -40,8 +40,8 @@ export default function vatRoutes(app: FastifyInstance) {
       const where = and(
         dest ? eq(vatRulesTable.dest, dest) : sql`TRUE`,
         q ? ilike(vatRulesTable.dest, `%${q}%`) : sql`TRUE`,
-        from ? gte(vatRulesTable.effectiveFrom as any, from) : sql`TRUE`,
-        to ? lte(vatRulesTable.effectiveFrom as any, to) : sql`TRUE`
+        from ? gte(vatRulesTable.effectiveFrom, from) : sql`TRUE`,
+        to ? lte(vatRulesTable.effectiveFrom, to) : sql`TRUE`
       );
 
       return db
@@ -68,11 +68,11 @@ export default function vatRoutes(app: FastifyInstance) {
         .values({
           dest: body.dest,
           ratePct: String(body.ratePct),
-          base: body.base as any,
-          effectiveFrom: body.effectiveFrom as any,
-          effectiveTo: (body.effectiveTo ?? null) as any,
+          base: body.base,
+          effectiveFrom: body.effectiveFrom,
+          effectiveTo: body.effectiveTo ?? null,
           notes: body.notes ?? null,
-        } as any)
+        })
         .returning();
       return reply.code(201).send(row);
     }
@@ -92,15 +92,13 @@ export default function vatRoutes(app: FastifyInstance) {
         .set({
           ...(patch.dest ? { dest: patch.dest } : {}),
           ...(patch.ratePct !== undefined ? { ratePct: String(patch.ratePct) } : {}),
-          ...(patch.base ? { base: patch.base as any } : {}),
-          ...(patch.effectiveFrom ? { effectiveFrom: patch.effectiveFrom as any } : {}),
-          ...(patch.effectiveTo !== undefined
-            ? { effectiveTo: (patch.effectiveTo ?? null) as any }
-            : {}),
+          ...(patch.base ? { base: patch.base } : {}),
+          ...(patch.effectiveFrom ? { effectiveFrom: patch.effectiveFrom } : {}),
+          ...(patch.effectiveTo !== undefined ? { effectiveTo: patch.effectiveTo ?? null } : {}),
           ...(patch.notes !== undefined ? { notes: patch.notes ?? null } : {}),
-          updatedAt: new Date() as any,
-        } as any)
-        .where(eq(vatRulesTable.id, req.params.id as any))
+          updatedAt: new Date(),
+        })
+        .where(eq(vatRulesTable.id, req.params.id))
         .returning();
       if (!row) return reply.notFound('Not found');
       return row;
@@ -117,7 +115,7 @@ export default function vatRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const [row] = await db
         .delete(vatRulesTable)
-        .where(eq(vatRulesTable.id, req.params.id as any))
+        .where(eq(vatRulesTable.id, req.params.id))
         .returning();
       if (!row) return reply.notFound('Not found');
       return reply.code(204).send();
@@ -143,11 +141,11 @@ export default function vatRoutes(app: FastifyInstance) {
           .values({
             dest: r.dest,
             ratePct: String(r.ratePct),
-            base: r.base as any,
-            effectiveFrom: r.effectiveFrom as any,
-            effectiveTo: (r.effectiveTo ?? null) as any,
+            base: r.base,
+            effectiveFrom: r.effectiveFrom,
+            effectiveTo: r.effectiveTo ?? null,
             notes: r.notes ?? null,
-          } as any)
+          })
           .onConflictDoNothing();
         inserted++;
       }
