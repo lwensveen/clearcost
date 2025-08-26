@@ -1,0 +1,36 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: Clearcost Imports
+    folder: Clearcost
+    interval: 1m
+    rules:
+      - uid: no-recent-import
+        title: No Successful Import (24h)
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            queryType: timeSeriesQuery
+            relativeTimeRange: { from: 3600, to: 0 }
+            model:
+              expr: 'time() - max by (source,job,dest) (clearcost_import_last_run_timestamp) > 86400'
+              instant: true
+        annotations:
+          summary: 'No successful {{source}} {{job}} import for {{dest}} in 24h'
+        labels: { severity: warning }
+
+      - uid: import-errors
+        title: Import Errors > 0 (15m)
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            queryType: timeSeriesQuery
+            relativeTimeRange: { from: 900, to: 0 }
+            model:
+              expr: 'sum by (source,job,dest,stage) (increase(clearcost_import_errors_total[15m])) > 0'
+              instant: true
+        annotations:
+          summary: 'Errors in last 15m for {{source}} {{job}} {{dest}} (stage={{stage}})'
+        labels: { severity: critical }

@@ -1,0 +1,188 @@
+{
+  "title": "Clearcost Imports",
+  "uid": "clearcost-imports",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": ["clearcost", "imports"],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Last Successful Run Age",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 4
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "valueAndName"
+      },
+      "targets": [
+        {
+          "expr": "time() - max by (source,job,dest) (clearcost_import_last_run_timestamp)",
+          "legendFormat": "{{source}} {{job}} {{dest}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Errors (last 15m)",
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 4
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (source,job,dest,stage) (increase(clearcost_import_errors_total[15m]))",
+          "legendFormat": "{{source}} {{job}} {{dest}} {{stage}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Rows Inserted (last 1h)",
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 4
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (source,job,dest) (increase(clearcost_import_rows_inserted_total[1h]))",
+          "legendFormat": "{{source}} {{job}} {{dest}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Insert Throughput",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (source,job,dest) (rate(clearcost_import_rows_inserted_total[$__rate_interval]))",
+          "legendFormat": "{{source}} {{job}} {{dest}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Error Rate",
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (source,job,dest,stage) (rate(clearcost_import_errors_total[$__rate_interval]))",
+          "legendFormat": "{{source}} {{job}} {{dest}} {{stage}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Import Duration p95",
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le,source,job,dest) (rate(clearcost_import_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "{{source}} {{job}} {{dest}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Top Destinations (rows inserted last 24h)",
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "expr": "topk(20, sum by (dest) (increase(clearcost_import_rows_inserted_total[24h])))",
+          "legendFormat": "{{dest}}",
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "source",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(clearcost_import_rows_inserted_total, source)",
+        "refresh": 2,
+        "includeAll": true
+      },
+      {
+        "name": "job",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(clearcost_import_rows_inserted_total, job)",
+        "refresh": 2,
+        "includeAll": true
+      },
+      {
+        "name": "dest",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(clearcost_import_rows_inserted_total, dest)",
+        "refresh": 2,
+        "includeAll": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "title": "Clearcost API – HTTP",
+  "uid": "clearcost-api-http",
+  "schemaVersion": 39,
+  "tags": [
+    "clearcost",
+    "api",
+    "http"
+  ],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "5xx Rate (last 5m)",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_server_requests_total{status_code=~\"5..\"}[5m]))"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Request Rate (rps)",
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_server_requests_total[$__rate_interval]))"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency p95 by Route",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le,route) (rate(http_server_request_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "5xx by Route",
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (route) (rate(http_server_requests_total{status_code=~\"5..\"}[$__rate_interval]))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "route",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(http_server_requests_total, route)",
+        "refresh": 2,
+        "includeAll": true
+      }
+    ]
+  }
+}

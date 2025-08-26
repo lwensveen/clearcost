@@ -1,0 +1,9 @@
+apiVersion: 1
+providers:
+  - name: Clearcost Dashboards
+    type: file
+    folder: Clearcost
+    options:
+      path: /etc/grafana/provisioning/dashboards
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
