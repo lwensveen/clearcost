@@ -5,6 +5,7 @@ export * from './de-minimis.js';
 export * from './duty-rates.js';
 export * from './freight-rate-cards.js';
 export * from './freight-rate-steps.js';
+export * from './fx-rates.js';
 export * from './hs-codes.js';
 export * from './surcharges.js';
 export * from './vat-rules.js';

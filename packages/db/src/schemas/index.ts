@@ -16,6 +16,7 @@ import { sessionsTable } from './auth/sessions.js';
 import { surchargesTable } from './surcharges.js';
 import { taxRegistrationsTable } from './tax-registrations.js';
 import { usersTable } from './users/users.js';
+import { vatOverridesTable } from './vat-overrides.js';
 import { vatRulesTable } from './vat-rules.js';
 import { verificationsTable } from './auth/verifications.js';
 import { webhookDeliveriesTable, webhookEndpointsTable } from './webhooks.js';
@@ -39,6 +40,7 @@ export * from './merchant-profiles.js';
 export * from './surcharges.js';
 export * from './tax-registrations.js';
 export * from './users/users.js';
+export * from './vat-overrides.js';
 export * from './vat-rules.js';
 export * from './webhooks.js';
 
@@ -61,6 +63,7 @@ export const schema = {
   surchargesTable,
   taxRegistrationsTable,
   usersTable,
+  vatOverridesTable,
   vatRulesTable,
   verificationsTable,
   webhookDeliveriesTable,

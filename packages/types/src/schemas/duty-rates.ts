@@ -18,11 +18,12 @@ export const DutyRateByIdSchema = z.object({ id: z.string().uuid() });
 
 export const DutyRatesListQuerySchema = z.object({
   dest: z.string().length(2).optional(),
+  partner: z.string().length(2).optional(),
   hs6: z
     .string()
     .regex(/^\d{6}$/)
     .optional(),
-  rule: z.enum(['mfn', 'fta', 'other']).optional(),
+  rule: z.enum(['mfn', 'fta', 'anti_dumping', 'safeguard']).optional(),
   activeOn: z.coerce.date().optional(),
   limit: z.coerce.number().int().positive().max(500).optional(),
 });
