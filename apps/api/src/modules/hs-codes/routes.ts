@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
-import { db, hsCodesTable } from '@clearcost/db';
-import { ilike, or } from 'drizzle-orm';
+import { db, hsCodeAliasesTable, hsCodesTable } from '@clearcost/db';
+import { and, eq, ilike, or } from 'drizzle-orm';
 
 const HsSearchQuery = z.object({
   q: z.string().min(1).optional(),
@@ -22,7 +22,20 @@ const HsSearchResponse = z.array(
   })
 );
 
+const LookupQuerySchema = z.object({
+  system: z.enum(['CN8', 'HTS10', 'UK10', 'AHTN8']),
+  code: z.string().regex(/^\d{8,10}$/),
+});
+const LookupResponseSchema = z.object({
+  hs6: z.string(),
+  title: z.string(), // HS6 title
+  aliasTitle: z.string().nullable().optional(),
+  system: z.enum(['CN8', 'HTS10', 'UK10', 'AHTN8']),
+  code: z.string(),
+});
+
 export default function hsRoutes(app: FastifyInstance) {
+  // GET /v1/hs
   app.get<{ Querystring: z.infer<typeof HsSearchQuery>; Reply: z.infer<typeof HsSearchResponse> }>(
     '/',
     {
@@ -37,9 +50,6 @@ export default function hsRoutes(app: FastifyInstance) {
           .select({
             hs6: hsCodesTable.hs6,
             title: hsCodesTable.title,
-            ahtn8: hsCodesTable.ahtn8,
-            cn8: hsCodesTable.cn8,
-            hts10: hsCodesTable.hts10,
           })
           .from(hsCodesTable)
           .where(ilike(hsCodesTable.hs6, hs6))
@@ -52,9 +62,6 @@ export default function hsRoutes(app: FastifyInstance) {
         .select({
           hs6: hsCodesTable.hs6,
           title: hsCodesTable.title,
-          ahtn8: hsCodesTable.ahtn8,
-          cn8: hsCodesTable.cn8,
-          hts10: hsCodesTable.hts10,
         })
         .from(hsCodesTable)
         .where(
@@ -64,6 +71,44 @@ export default function hsRoutes(app: FastifyInstance) {
           )
         )
         .limit(limit);
+    }
+  );
+
+  // GET /v1/hs/lookup?system=HTS10&code=8517620090
+  app.get<{
+    Querystring: z.infer<typeof LookupQuerySchema>;
+    Reply: z.infer<typeof LookupResponseSchema>;
+  }>(
+    '/lookup',
+    {
+      preHandler: app.requireApiKey(['hs:read']),
+      schema: { querystring: LookupQuerySchema, response: { 200: LookupResponseSchema } },
+    },
+    async (req, reply) => {
+      const { system, code } = LookupQuerySchema.parse(req.query);
+
+      const [row] = await db
+        .select({
+          hs6: hsCodeAliasesTable.hs6,
+          aliasTitle: hsCodeAliasesTable.title,
+          system: hsCodeAliasesTable.system,
+          code: hsCodeAliasesTable.code,
+          title: hsCodesTable.title,
+        })
+        .from(hsCodeAliasesTable)
+        .innerJoin(hsCodesTable, eq(hsCodeAliasesTable.hs6, hsCodesTable.hs6))
+        .where(and(eq(hsCodeAliasesTable.system, system), eq(hsCodeAliasesTable.code, code)))
+        .limit(1);
+
+      if (!row) return reply.notFound('Alias not found');
+
+      return {
+        hs6: row.hs6,
+        title: row.title,
+        aliasTitle: row.aliasTitle ?? null,
+        system: row.system as 'CN8' | 'HTS10' | 'UK10' | 'AHTN8',
+        code: row.code,
+      };
     }
   );
 }
