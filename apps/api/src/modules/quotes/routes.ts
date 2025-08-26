@@ -21,6 +21,8 @@ export const QuoteResponseSchema = z.object({
   policy: z.string(),
 });
 
+type QuoteResponse = z.infer<typeof QuoteResponseSchema>;
+
 const ReplayQuery = z.object({
   key: z.string().min(1),
   scope: z.string().default('quotes'),
@@ -78,7 +80,7 @@ export default function quoteRoutes(app: FastifyInstance) {
                 hs6: out.hs6,
                 itemValue: String(req.body.itemValue.amount),
                 itemCurrency: req.body.itemValue.currency,
-                dimsCm: { l: req.body.dimsCm.l, w: req.body.dimsCm.w, h: req.body.dimsCm.h } as any,
+                dimsCm: { l: req.body.dimsCm.l, w: req.body.dimsCm.w, h: req.body.dimsCm.h },
                 weightKg: String(req.body.weightKg),
                 chargeableKg: String(out.chargeableKg),
                 freight: String(out.freight),
@@ -125,7 +127,7 @@ export default function quoteRoutes(app: FastifyInstance) {
   // GET /v1/quotes/by-key/:key — fetch cached response
   app.get<{
     Params: { key: string };
-    Reply: z.infer<typeof QuoteResponseSchema> | { error: unknown };
+    Reply: QuoteResponse | { error: unknown };
   }>(
     '/by-key/:key',
     {
@@ -146,13 +148,26 @@ export default function quoteRoutes(app: FastifyInstance) {
         return reply.notFound('Not found');
       }
 
+      const parsed = QuoteResponseSchema.safeParse(row.response);
+      if (!parsed.success) {
+        req.log.error({
+          key: req.params.key,
+          issues: parsed.error.issues,
+          msg: 'cached quote failed schema',
+        });
+        return reply.internalServerError('Cached response invalid');
+      }
+
       req.log.info({ key: req.params.key, msg: 'quote replay served' });
       reply.header('Idempotency-Key', req.params.key).header('Cache-Control', 'no-store');
-      return reply.send(row.response as any);
+      return reply.send(parsed.data);
     }
   );
 
-  app.get<{ Querystring: z.infer<typeof ReplayQuery> }>(
+  app.get<{
+    Querystring: z.infer<typeof ReplayQuery>;
+    Reply: QuoteResponse | { error: string };
+  }>(
     '/replay',
     {
       schema: {
@@ -183,7 +198,13 @@ export default function quoteRoutes(app: FastifyInstance) {
         return reply.code(409).send({ error: 'Processing or unavailable' });
       }
 
-      return reply.send(row.response as z.infer<typeof QuoteResponseSchema>);
+      const parsed = QuoteResponseSchema.safeParse(row.response);
+      if (!parsed.success) {
+        req.log.error({ key, issues: parsed.error.issues, msg: 'cached quote failed schema' });
+        return reply.code(409).send({ error: 'Cached response invalid' });
+      }
+
+      return reply.send(parsed.data);
     }
   );
 }

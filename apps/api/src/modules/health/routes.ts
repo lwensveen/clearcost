@@ -20,6 +20,23 @@ const ImportHealthSchema = z.object({
   ),
 });
 
+function toDate(v: unknown): Date | null {
+  if (v == null) return null;
+  if (v instanceof Date) return v;
+  if (typeof v === 'string' || typeof v === 'number') {
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
+type Row = {
+  import_id: string | null;
+  last_at: Date | string | null;
+  rows_24h: number | string | null;
+  total_rows: number | string | null;
+};
+
 export default function healthRoutes(app: FastifyInstance) {
   app.get(
     '/healthz',
@@ -53,13 +70,7 @@ export default function healthRoutes(app: FastifyInstance) {
     async (req) => {
       const { thresholdHours } = QS.parse(req.query);
 
-      // 👇 Type the row shape here; db.execute() will return this type.
-      const q = sql<{
-        import_id: string | null;
-        last_at: Date | string | null;
-        rows_24h: number | string;
-        total_rows: number | string;
-      }>`
+      const q = sql<Row>`
         SELECT
           import_id,
           MAX(created_at) AS last_at,
@@ -78,7 +89,7 @@ export default function healthRoutes(app: FastifyInstance) {
 
       const imports = rows.map((r) => {
         const id = String(r.import_id ?? 'unknown');
-        const lastAt = r.last_at ? new Date(r.last_at as any) : null;
+        const lastAt = toDate(r.last_at);
         return {
           id,
           lastAt,

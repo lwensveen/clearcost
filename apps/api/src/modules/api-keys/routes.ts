@@ -97,11 +97,11 @@ export default function apiKeyRoutes(app: FastifyInstance) {
         .insert(apiKeysTable)
         .values({
           name: body.name,
-          ownerId: body.ownerId as any,
+          ownerId: body.ownerId,
           tokenHash,
-          scopes: body.scopes as any,
+          scopes: body.scopes,
           isActive: true,
-        } as any)
+        })
         .returning({
           id: apiKeysTable.id,
           createdAt: apiKeysTable.createdAt,

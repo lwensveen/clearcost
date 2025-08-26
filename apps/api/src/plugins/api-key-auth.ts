@@ -4,22 +4,6 @@ import { and, eq } from 'drizzle-orm';
 import { createHash, randomBytes } from 'node:crypto';
 import fp from 'fastify-plugin';
 
-declare module 'fastify' {
-  interface FastifyRequest {
-    apiKey?: {
-      id: string;
-      ownerId: string;
-      scopes: string[];
-    };
-  }
-
-  interface FastifyInstance {
-    requireApiKey: (
-      scopes?: string[]
-    ) => (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
-  }
-}
-
 function hashToken(token: string, pepper?: string) {
   return createHash('sha256')
     .update(token + (pepper ?? ''))

@@ -3,47 +3,38 @@ import type { FastifyInstance } from 'fastify';
 import { apiUsageTable, db } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
 
-type UsageBag = { start: number; bytesIn: number; bytesOut: number };
-
-declare module 'fastify' {
-  interface FastifyRequest {
-    _usage?: UsageBag;
-  }
-}
-
-function todayUTC(): string {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+function dayStartUTC(d = new Date()): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
 
 export default fp(
   async function usagePlugin(app: FastifyInstance) {
-    // start timing / bytesIn
+    app.decorateRequest('_usage', undefined);
+
     app.addHook('onRequest', async (req) => {
       const bytesIn = Number(req.headers['content-length'] || 0);
       req._usage = { start: Date.now(), bytesIn, bytesOut: 0 };
     });
 
-    // capture response size if available
     app.addHook('onSend', async (req, _reply, payload) => {
       if (!req._usage) req._usage = { start: Date.now(), bytesIn: 0, bytesOut: 0 };
       if (typeof payload === 'string') req._usage.bytesOut = Buffer.byteLength(payload);
       else if (Buffer.isBuffer(payload)) req._usage.bytesOut = payload.length;
     });
 
-    // increment counters after response
     app.addHook('onResponse', async (req, reply) => {
       try {
         const apiKeyId = req.apiKey?.id;
-        if (!apiKeyId) return; // only meter authenticated API traffic
+        if (!apiKeyId) return;
 
         const u = req._usage!;
         const duration = Math.max(0, Date.now() - u.start);
-        const day = todayUTC();
-        const route = (
-          req.routeOptions && typeof req.routeOptions.url === 'string'
+
+        const day = dayStartUTC();
+        const route =
+          (req.routeOptions && typeof req.routeOptions.url === 'string'
             ? req.routeOptions.url
-            : (req.raw.url?.split('?')[0] ?? 'unknown')
-        ) as string;
+            : req.raw.url?.split('?')[0]) ?? 'unknown';
 
         const method = req.method;
 
@@ -51,7 +42,7 @@ export default fp(
           .insert(apiUsageTable)
           .values({
             apiKeyId,
-            day: day as any,
+            day,
             route,
             method,
             count: 1,
@@ -59,7 +50,7 @@ export default fp(
             sumBytesIn: u.bytesIn || 0,
             sumBytesOut: u.bytesOut || 0,
             lastAt: new Date(),
-          } as any)
+          })
           .onConflictDoUpdate({
             target: [
               apiUsageTable.apiKeyId,
