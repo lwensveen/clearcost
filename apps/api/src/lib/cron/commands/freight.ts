@@ -6,12 +6,13 @@ export const freightJson: Command = async (args) => {
   const url = args[0];
   if (!url) throw new Error('Pass URL to JSON (freight cards)');
 
-  const payload = await withRun<any>(
+  const payload = await withRun(
     { source: 'file', job: 'freight:json', params: { url } },
     async () => {
-      const rows = await fetchJSON<unknown>(url);
-      const res = await importFreightCards(rows as any);
-      const inserted = Number((res as any)?.count ?? 0);
+      const rows: any = await fetchJSON(url);
+      const res = await importFreightCards(rows);
+      const inserted = Number(res?.count ?? 0);
+
       return { inserted, payload: res };
     }
   );

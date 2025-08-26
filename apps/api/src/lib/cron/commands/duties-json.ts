@@ -33,8 +33,9 @@ export const dutiesJson: Command = async (args) => {
         effectiveTo: toDateOrNull(r.effectiveTo) ?? null,
         notes: r.notes ?? undefined,
       }));
-      const res = await importDutyRates(normalized as any);
-      const inserted = Number((res as any)?.count ?? normalized.length ?? 0);
+      const res = await importDutyRates(normalized);
+      const inserted = res?.count ?? normalized.length ?? 0;
+
       return { inserted, payload: res };
     }
   );

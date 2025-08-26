@@ -7,6 +7,7 @@ import { surchargesJson } from './commands/surcharges-json.js';
 import { surchargesUsAll, surchargesUsTradeRemedies } from './commands/surcharges-us.js';
 import { freightJson } from './commands/freight.js';
 import { hsAhtn, hsEuHs6, hsImportHs6, hsUk10, hsUsHts10 } from './commands/hs.js';
+import { runSweepStale } from './commands/sweep-stale.js';
 
 export const commands: Record<string, Command> = {
   'fx:refresh': fxRefresh,
@@ -26,4 +27,6 @@ export const commands: Record<string, Command> = {
   'import:hs:uk10': hsUk10,
   'import:hs:ahtn': hsAhtn,
   'import:hs/eu-hs6': hsEuHs6,
+
+  'imports:sweep-stale': runSweepStale,
 };

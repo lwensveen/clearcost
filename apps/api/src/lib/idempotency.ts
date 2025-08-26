@@ -12,7 +12,7 @@ function stableStringify(obj: unknown): string {
       return Object.fromEntries(
         Object.keys(v)
           .sort()
-          .map((k) => [k, norm((v as any)[k])])
+          .map((k) => [k, norm(v[k])])
       );
     }
     return v;
@@ -81,26 +81,29 @@ export async function withIdempotency<T extends Record<string, unknown>>(
 
       try {
         const data = await handler();
+
         await tx
           .update(idempotencyKeysTable)
           .set({
             status: 'completed',
-            response: data as any,
+            response: data,
             updatedAt: new Date(),
             lockedAt: null,
           })
           .where(and(eq(idempotencyKeysTable.scope, scope), eq(idempotencyKeysTable.key, key)));
+
         return data;
-      } catch (err) {
+      } catch (err: any) {
         await tx
           .update(idempotencyKeysTable)
           .set({
             status: 'failed',
-            response: { error: String((err as any)?.message ?? err) } as any,
+            response: { error: String(err?.message ?? err) },
             updatedAt: new Date(),
             lockedAt: null,
           })
           .where(and(eq(idempotencyKeysTable.scope, scope), eq(idempotencyKeysTable.key, key)));
+
         throw err;
       }
     }
@@ -126,11 +129,13 @@ export async function withIdempotency<T extends Record<string, unknown>>(
 
       if (options?.onReplay) {
         const maybe = await options.onReplay(resp);
+
         if (maybe) {
           await tx
             .update(idempotencyKeysTable)
-            .set({ response: maybe as any, updatedAt: new Date() })
+            .set({ response: maybe, updatedAt: new Date() })
             .where(and(eq(idempotencyKeysTable.scope, scope), eq(idempotencyKeysTable.key, key)));
+
           return maybe;
         }
       }
