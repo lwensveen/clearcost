@@ -6,36 +6,40 @@ import {
   setLastRunNow,
   startImportTimer,
 } from '../lib/metrics.js';
-import { finishImportRun, type ImportSource, startImportRun } from '../lib/provenance.js';
-
-type ImportMeta = { source: ImportSource; job: string };
-type ImportCtx = {
-  meta: ImportMeta;
-  runId: string;
-  endTimer: () => void;
-};
+import { finishImportRun, heartBeatImportRun, startImportRun } from '../lib/provenance.js';
 
 const plugin: FastifyPluginAsync = async (app) => {
-  app.decorateRequest('importCtx', undefined as unknown as ImportCtx | undefined);
+  app.decorateRequest('importCtx', undefined);
 
+  // Start timer + provenance if route declares config.importMeta
   app.addHook('preHandler', async (req) => {
-    const meta = (req.routeOptions.config as { importMeta?: ImportMeta } | undefined)?.importMeta;
+    const meta = req.routeOptions?.config?.importMeta;
     if (!meta) return;
 
     const end = startImportTimer(meta);
-
-    const params: Record<string, unknown> =
-      req.body && typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {};
-
     const run = await startImportRun({
       source: meta.source,
       job: meta.job,
-      params,
+      params: (req.body ?? {}) as Record<string, unknown>,
     });
 
+    // heartbeat every 30s so "stuck" runs can be detected
+    const hb = setInterval(() => {
+      heartBeatImportRun(run.id).catch(() => {});
+    }, 30_000);
+    hb.unref?.();
+
+    req._importHeartbeat = hb;
     req.importCtx = { meta, runId: run.id, endTimer: end };
   });
 
+  function stopHeartbeat(req: any) {
+    const hb = req?._importHeartbeat as NodeJS.Timeout | undefined;
+    if (hb) clearInterval(hb);
+    if (req) req._importHeartbeat = undefined;
+  }
+
+  // Finish on normal responses, infer {inserted|count} from JSON payload
   app.addHook('onSend', async (req, reply, payload) => {
     const ctx = req.importCtx;
     if (!ctx) return;
@@ -45,16 +49,12 @@ const plugin: FastifyPluginAsync = async (app) => {
 
       const ct = String(reply.getHeader('content-type') ?? '');
       if (ct.includes('application/json') && payload && typeof payload !== 'function') {
-        if (typeof payload === 'string' || Buffer.isBuffer(payload)) {
-          try {
-            const json = JSON.parse(Buffer.isBuffer(payload) ? payload.toString('utf8') : payload);
-            inserted = Number(json?.inserted ?? json?.count ?? 0);
-          } catch {
-            /* ignore parse errors */
-          }
-        } else if (typeof payload === 'object') {
-          const anyJson = payload as Record<string, unknown>;
-          inserted = Number((anyJson as any)?.inserted ?? (anyJson as any)?.count ?? 0);
+        const s = Buffer.isBuffer(payload) ? payload.toString('utf8') : String(payload);
+        try {
+          const json = JSON.parse(s);
+          inserted = Number(json?.inserted ?? json?.count ?? 0);
+        } catch {
+          /* ignore parse errors */
         }
       }
 
@@ -72,16 +72,22 @@ const plugin: FastifyPluginAsync = async (app) => {
       }
     } finally {
       ctx.endTimer();
+      stopHeartbeat(req);
       req.importCtx = undefined;
     }
   });
 
+  // Ensure failure paths still close provenance + timer
   app.addHook('onError', async (req, _reply, err) => {
     const ctx = req.importCtx;
     if (!ctx) return;
     importErrors.inc({ ...ctx.meta, stage: 'error' });
-    await finishImportRun(ctx.runId, { status: 'failed', error: String(err?.message ?? err) });
+    await finishImportRun(ctx.runId, {
+      status: 'failed',
+      error: String(err?.message ?? err),
+    });
     ctx.endTimer();
+    stopHeartbeat(req);
     req.importCtx = undefined;
   });
 };

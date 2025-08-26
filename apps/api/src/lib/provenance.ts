@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { db, importsTable } from '@clearcost/db';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 export function sha256Hex(buf: string | Uint8Array) {
   return crypto.createHash('sha256').update(buf).digest('hex');
@@ -23,6 +23,13 @@ export type ImportSource =
   | 'file'
   | 'OECD/IMF';
 
+export async function heartBeatImportRun(id: string) {
+  await db
+    .update(importsTable)
+    .set({ updatedAt: sql`now()` })
+    .where(eq(importsTable.id, id));
+}
+
 export async function startImportRun(params: {
   source: ImportSource;
   job: string;
@@ -39,7 +46,7 @@ export async function startImportRun(params: {
       sourceUrl: params.sourceUrl ?? null,
       params: params.params ? JSON.stringify(params.params) : null,
       status: 'running',
-    } as any)
+    })
     .returning();
 
   const row = rows[0];
@@ -69,9 +76,9 @@ export async function finishImportRun(
       fileHash: patch.fileHash ?? undefined,
       fileBytes: patch.fileBytes ?? undefined,
       error: patch.error ?? undefined,
-      finishedAt: new Date() as any,
-    } as any)
-    .where(eq(importsTable.id, id as any))
+      finishedAt: new Date(),
+    })
+    .where(eq(importsTable.id, id))
     .returning();
 
   const row = rows[0];
