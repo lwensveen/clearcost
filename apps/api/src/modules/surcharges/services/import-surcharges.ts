@@ -1,63 +1,93 @@
 import { db, surchargesTable } from '@clearcost/db';
-import { z } from 'zod/v4';
 import { sql } from 'drizzle-orm';
+import { type SurchargeInsert, SurchargeInsertSchema } from '@clearcost/types';
 
-const SURCHARGE_CODES = [
-  'CUSTOMS_PROCESSING',
-  'DISBURSEMENT',
-  'EXCISE',
-  'HANDLING',
-  'FUEL',
-  'SECURITY',
-  'REMOTE',
-  'OTHER',
-] as const;
-type SurchargeCode = (typeof SURCHARGE_CODES)[number];
+function normIso2(v?: string | null) {
+  return v ? v.trim().toUpperCase() : null;
+}
+function normHs6(v?: string | null) {
+  if (!v) return null;
+  const s = String(v).replace(/\D+/g, '').slice(0, 6);
+  return s.length === 6 ? s : null;
+}
+function toDbNumeric(n?: string | number | null) {
+  if (n == null || n === '') return undefined;
+  const num = typeof n === 'number' ? n : Number(n);
+  return Number.isFinite(num) ? String(num) : undefined;
+}
 
-export const SurchargeRow = z.object({
-  dest: z.string().length(2),
-  code: z.enum(SURCHARGE_CODES),
-  fixedAmt: z.coerce.number().optional(),
-  pctAmt: z.coerce.number().optional(),
-  effectiveFrom: z.coerce.date(),
-  effectiveTo: z.coerce.date().optional().nullable(),
-  notes: z.string().optional(),
-});
-export const SurchargeRows = z.array(SurchargeRow);
-export type SurchargeRowInput = z.infer<typeof SurchargeRow>;
+/**
+ * Upsert surcharges using table-derived schema/types.
+ * Accepts “insert-shape” rows (SurchargeInsert). Columns with DB defaults (e.g. effectiveFrom)
+ * may be omitted; we pass through when provided.
+ */
+export async function importSurcharges(rows: SurchargeInsert[]) {
+  const normalized = rows
+    .map((raw) => {
+      const parsed = SurchargeInsertSchema.safeParse(raw);
+      if (!parsed.success) return null;
 
-export async function importSurcharges(rows: SurchargeRowInput[]) {
-  const normalized = rows.map((row) => ({
-    ...row,
-    dest: row.dest.toUpperCase(),
-    effectiveTo: row.effectiveTo ?? null,
-  }));
+      const r = parsed.data;
+
+      return {
+        dest: normIso2(r.dest)!,
+        origin: normIso2(r.origin ?? null),
+        hs6: normHs6(r.hs6 ?? null),
+        code: r.code,
+        fixedAmt: toDbNumeric(r.fixedAmt as any),
+        pctAmt: toDbNumeric(r.pctAmt as any),
+        effectiveFrom: r.effectiveFrom ?? undefined,
+        effectiveTo: r.effectiveTo ?? undefined,
+        notes: r.notes ?? undefined,
+      } as const;
+    })
+    .filter(Boolean) as Array<{
+    dest: string;
+    origin: string | null;
+    hs6: string | null;
+    code: (typeof surchargesTable.$inferInsert)['code'];
+    fixedAmt?: string;
+    pctAmt?: string;
+    effectiveFrom?: Date;
+    effectiveTo?: Date;
+    notes?: string;
+  }>;
+
+  if (normalized.length === 0) return { ok: true as const, count: 0 };
 
   await db.transaction(async (trx) => {
-    for (const row of normalized) {
+    for (const r of normalized) {
       await trx
         .insert(surchargesTable)
         .values({
-          dest: row.dest,
-          code: row.code as SurchargeCode,
-          fixedAmt: row.fixedAmt != null ? String(row.fixedAmt) : undefined,
-          pctAmt: row.pctAmt != null ? String(row.pctAmt) : undefined,
-          effectiveFrom: row.effectiveFrom,
-          effectiveTo: row.effectiveTo ?? undefined,
-          notes: row.notes ?? undefined,
-        } as any)
+          dest: r.dest,
+          origin: r.origin ?? null,
+          hs6: r.hs6 ?? null,
+          code: r.code,
+          fixedAmt: r.fixedAmt,
+          pctAmt: r.pctAmt,
+          effectiveFrom: r.effectiveFrom, // may be undefined → DB defaultNow()
+          effectiveTo: r.effectiveTo, // may be undefined (omit)
+          notes: r.notes,
+        } as (typeof surchargesTable)['$inferInsert'])
         .onConflictDoUpdate({
-          target: [surchargesTable.dest, surchargesTable.code, surchargesTable.effectiveFrom],
+          target: [
+            surchargesTable.dest,
+            surchargesTable.origin,
+            surchargesTable.hs6,
+            surchargesTable.code,
+            surchargesTable.effectiveFrom,
+          ],
           set: {
-            fixedAmt: row.fixedAmt != null ? String(row.fixedAmt) : sql`NULL`,
-            pctAmt: row.pctAmt != null ? String(row.pctAmt) : sql`NULL`,
-            effectiveTo: row.effectiveTo ?? sql`NULL`,
-            notes: row.notes ?? sql`NULL`,
+            fixedAmt: r.fixedAmt ?? sql`NULL`,
+            pctAmt: r.pctAmt ?? sql`NULL`,
+            effectiveTo: r.effectiveTo ?? sql`NULL`,
+            notes: r.notes ?? sql`NULL`,
             updatedAt: new Date(),
           },
         });
     }
   });
 
-  return { ok: true, count: normalized.length };
+  return { ok: true as const, count: normalized.length };
 }
