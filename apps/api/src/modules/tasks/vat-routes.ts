@@ -1,0 +1,31 @@
+// apps/api/src/modules/tasks/vat.ts
+import { FastifyInstance } from 'fastify';
+import { adminGuard } from './common.js';
+import { fetchVatRowsFromOfficialSources } from '../vat/services/fetch-vat-official.js';
+import { importVatRules } from '../vat/services/import-vat.js';
+
+export default function vatRoutes(app: FastifyInstance) {
+  app.post(
+    '/internal/cron/import/vat/auto',
+    {
+      preHandler: adminGuard,
+      config: { importMeta: { source: 'OECD/IMF', job: 'vat:auto' } },
+    },
+    async (req, reply) => {
+      const rows = await fetchVatRowsFromOfficialSources();
+
+      const importId = (req as any).importRunId as string | undefined;
+
+      const res = await importVatRules(rows, {
+        importId,
+        makeSourceRef: (r) => {
+          const note = (r.notes ?? '').toLowerCase();
+          const src = note.includes('oecd') ? 'oecd' : note.includes('imf') ? 'imf' : 'oecd_imf';
+          return `${src}:vat:${r.dest}:${r.kind}`;
+        },
+      });
+
+      return reply.send(res);
+    }
+  );
+}
