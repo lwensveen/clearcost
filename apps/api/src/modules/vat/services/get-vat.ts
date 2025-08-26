@@ -1,26 +1,56 @@
 import { db, vatRulesTable } from '@clearcost/db';
 import { and, desc, eq, lte } from 'drizzle-orm';
+import { CountryVatRow, VatRateKind } from './utils.js';
 
-type VatBase = 'CIF' | 'CIF_PLUS_DUTY';
-export type VatRuleRow = {
-  ratePct: number;
-  base: VatBase;
-  effectiveFrom: Date | null;
-};
+/**
+ * Your calculator only uses these two bases today.
+ * If a country row ever stores something else (e.g., 'FOB'),
+ * we normalize to 'CIF_PLUS_DUTY' below to avoid surprising downstream math.
+ */
+export type VatBase = 'CIF' | 'CIF_PLUS_DUTY';
 
-export async function getVat(dest: string, on: Date): Promise<VatRuleRow | null> {
+/** Normalize any DB base value into a safe calculator base. */
+function normalizeBase(base: unknown): VatBase {
+  return base === 'CIF' ? 'CIF' : 'CIF_PLUS_DUTY';
+}
+
+/**
+ * Fetch the most recent VAT rule for a destination and kind that is active on `on`.
+ * - Defaults to kind = 'STANDARD'
+ * - Chooses the row with the greatest effectiveFrom <= `on`
+ * - Returns numeric fields coerced to numbers for convenience
+ */
+export async function getVat(
+  dest: string,
+  on: Date,
+  kind: VatRateKind = 'STANDARD'
+): Promise<CountryVatRow | null> {
+  const destISO2 = dest.toUpperCase();
+
   const [row] = await db
     .select({
       ratePct: vatRulesTable.ratePct,
       base: vatRulesTable.base,
+      kind: vatRulesTable.kind,
       effectiveFrom: vatRulesTable.effectiveFrom,
     })
     .from(vatRulesTable)
-    .where(and(eq(vatRulesTable.dest, dest), lte(vatRulesTable.effectiveFrom, on)))
+    .where(
+      and(
+        eq(vatRulesTable.dest, destISO2),
+        eq(vatRulesTable.kind, kind),
+        lte(vatRulesTable.effectiveFrom, on)
+      )
+    )
     .orderBy(desc(vatRulesTable.effectiveFrom))
     .limit(1);
 
-  return row
-    ? { ratePct: Number(row.ratePct), base: row.base as VatBase, effectiveFrom: row.effectiveFrom }
-    : null;
+  if (!row) return null;
+
+  return {
+    ratePct: Number(row.ratePct),
+    base: normalizeBase(row.base),
+    kind: row.kind as VatRateKind,
+    effectiveFrom: row.effectiveFrom ?? null,
+  };
 }
