@@ -12,9 +12,14 @@ import { hsCodeAliasesTable } from './hs-code-aliases.js';
 import { hsCodesTable } from './hs-codes.js';
 import { idempotencyKeysTable } from './idempotency-keys.js';
 import { importsTable } from './imports.js';
+import { manifestItemQuotesTable } from './manifest-item-quotes.js';
+import { manifestItemsTable } from './manifest-items.js';
+import { manifestQuotesTable } from './manifest-quotes.js';
+import { manifestsTable } from './manifests.js';
 import { merchantProfilesTable } from './merchant-profiles.js';
 import { passkeysTable } from './auth/passkeys.js';
 import { provenanceTable } from './provenance.js';
+import { quoteSnapshotsTable } from './quote-snapshots.js';
 import { sessionsTable } from './auth/sessions.js';
 import { surchargesTable } from './surcharges.js';
 import { taxRegistrationsTable } from './tax-registrations.js';
@@ -41,8 +46,13 @@ export * from './hs-code-aliases.js';
 export * from './hs-codes.js';
 export * from './idempotency-keys.js';
 export * from './imports.js';
+export * from './manifest-item-quotes.js';
+export * from './manifest-items.js';
+export * from './manifest-quotes.js';
+export * from './manifests.js';
 export * from './merchant-profiles.js';
 export * from './provenance.js';
+export * from './quote-snapshots.js';
 export * from './surcharges.js';
 export * from './tax-registrations.js';
 export * from './users/users.js';
@@ -65,9 +75,14 @@ export const schema = {
   hsCodesTable,
   idempotencyKeysTable,
   importsTable,
+  manifestItemQuotesTable,
+  manifestItemsTable,
+  manifestQuotesTable,
+  manifestsTable,
   merchantProfilesTable,
   passkeysTable,
   provenanceTable,
+  quoteSnapshotsTable,
   sessionsTable,
   surchargesTable,
   taxRegistrationsTable,

@@ -14,7 +14,7 @@ const HUBS = ['EUR', 'USD'] as const;
  * 5) triangulate via hubs (EUR / USD)
  * - Caches symmetric pairs on success.
  * - Uses `fetchRate(from,to,on)` which should return the latest rate
- *   with `asOf <= on` (or the latest available if `on` undefined).
+ *   with `fxAsOf <= on` (or the latest available if `on` undefined).
  */
 export async function convertCurrency(
   amount: number,

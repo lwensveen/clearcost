@@ -13,7 +13,7 @@ export default function fxRoutes(app: FastifyInstance) {
             type: 'object',
             properties: {
               base: { type: 'string' },
-              asOf: { type: 'string' },
+              fxAsOf: { type: 'string' },
               attemptedInserts: { type: 'number' },
             },
           },
@@ -22,7 +22,7 @@ export default function fxRoutes(app: FastifyInstance) {
     },
     async (_req, reply) => {
       const r = await refreshFx();
-      return reply.send({ base: r.base, asOf: r.asOf, attemptedInserts: r.inserted });
+      return reply.send({ base: r.base, fxAsOf: r.fxAsOf, attemptedInserts: r.inserted });
     }
   );
 }

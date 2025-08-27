@@ -1,6 +1,6 @@
 import { db, fxRatesTable } from '@clearcost/db';
 
-export type FxRefreshResult = { asOf: string; inserted: number; base: 'EUR' };
+export type FxRefreshResult = { fxAsOf: string; inserted: number; base: 'EUR' };
 
 export async function fetchEcbXml(): Promise<string> {
   const res = await fetch('https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml');
@@ -8,10 +8,10 @@ export async function fetchEcbXml(): Promise<string> {
   return await res.text();
 }
 
-export function parseEcb(xml: string): { asOf: string; rates: Record<string, number> } {
+export function parseEcb(xml: string): { fxAsOf: string; rates: Record<string, number> } {
   const dateMatch = xml.match(/time="(\d{4}-\d{2}-\d{2})"/);
   if (!dateMatch) throw new Error('No date in ECB XML');
-  const asOf = dateMatch[1]!;
+  const fxAsOf = dateMatch[1]!;
 
   const rates: Record<string, number> = {};
 
@@ -19,11 +19,11 @@ export function parseEcb(xml: string): { asOf: string; rates: Record<string, num
     rates[m[1]!] = Number(m[2]);
   }
   rates['EUR'] = 1;
-  return { asOf, rates };
+  return { fxAsOf, rates };
 }
 
 export async function upsertFxRatesEUR(
-  asOfIso: string,
+  fxAsOfIso: string,
   rates: Record<string, number>
 ): Promise<number> {
   const rows = Object.entries(rates)
@@ -32,7 +32,7 @@ export async function upsertFxRatesEUR(
       base: 'EUR' as const,
       quote,
       rate: String(rate),
-      asOf: new Date(asOfIso + 'T00:00:00Z'),
+      fxAsOf: new Date(fxAsOfIso + 'T00:00:00Z'),
     }));
 
   let inserted = 0;
@@ -41,7 +41,9 @@ export async function upsertFxRatesEUR(
     const res = await db
       .insert(fxRatesTable)
       .values(row)
-      .onConflictDoNothing({ target: [fxRatesTable.base, fxRatesTable.quote, fxRatesTable.asOf] });
+      .onConflictDoNothing({
+        target: [fxRatesTable.base, fxRatesTable.quote, fxRatesTable.fxAsOf],
+      });
 
     inserted += 1;
   }
@@ -51,7 +53,7 @@ export async function upsertFxRatesEUR(
 
 export async function refreshFx(): Promise<FxRefreshResult> {
   const xml = await fetchEcbXml();
-  const { asOf, rates } = parseEcb(xml);
-  const inserted = await upsertFxRatesEUR(asOf, rates);
-  return { asOf, inserted, base: 'EUR' };
+  const { fxAsOf, rates } = parseEcb(xml);
+  const inserted = await upsertFxRatesEUR(fxAsOf, rates);
+  return { fxAsOf, inserted, base: 'EUR' };
 }

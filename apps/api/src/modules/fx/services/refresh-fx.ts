@@ -17,11 +17,11 @@ type ProviderId = z.infer<typeof FxProviderSchema>;
  * - `eurMap`: EUR→Currency rate for each currency (includes EUR: 1).
  * - `providerByCurrency`: which provider supplied the EUR→Currency rate.
  * - `sourceRefByCurrency`: provider-specific reference (e.g. 'ecb:2025-08-22').
- * - `asOf`: canonical day (from ECB), used for all rows we insert.
+ * - `fxAsOf`: canonical day (from ECB), used for all rows we insert.
  * - `primarySourceRef`: the primary feed’s reference (for auditing).
  */
 type EurMapWithProvenance = {
-  asOf: Date;
+  fxAsOf: Date;
   eurMap: Record<string, number>;
   providerByCurrency: Record<string, ProviderId>;
   sourceRefByCurrency: Record<string, string>;
@@ -29,7 +29,7 @@ type EurMapWithProvenance = {
 };
 
 // ------------------------------------------------------------
-// Primary provider: ECB (EUR base, canonical "asOf")
+// Primary provider: ECB (EUR base, canonical "fxAsOf")
 // ------------------------------------------------------------
 type EcbDoc = {
   'gesmes:Envelope': {
@@ -52,7 +52,7 @@ async function fetchFromEcb(): Promise<EurMapWithProvenance> {
   }
 
   const ecbDateStr = dailyNode['@_time']; // e.g. "2025-08-22"
-  const canonicalAsOf = toMidnightUTC(ecbDateStr);
+  const canonicalfxAsOf = toMidnightUTC(ecbDateStr);
 
   const eurMap: Record<string, number> = { EUR: 1 };
   const providerByCurrency: Record<string, ProviderId> = { EUR: 'ecb' };
@@ -73,7 +73,7 @@ async function fetchFromEcb(): Promise<EurMapWithProvenance> {
   }
 
   return {
-    asOf: canonicalAsOf,
+    fxAsOf: canonicalfxAsOf,
     eurMap,
     providerByCurrency,
     sourceRefByCurrency,
@@ -92,7 +92,7 @@ async function fetchFromExchangerateHost(targetDate: Date): Promise<EurMapWithPr
 
   const json = await response.json();
   const reportedDateStr: string = json?.date ?? dateStr;
-  const asOf = toMidnightUTC(reportedDateStr);
+  const fxAsOf = toMidnightUTC(reportedDateStr);
   const rates: Record<string, number> | undefined = json?.rates;
   if (!rates) return null;
 
@@ -115,7 +115,7 @@ async function fetchFromExchangerateHost(targetDate: Date): Promise<EurMapWithPr
   if (!Number.isFinite(eurMap['USD'])) return null; // we need USD for cross rates
 
   return {
-    asOf,
+    fxAsOf,
     eurMap,
     providerByCurrency,
     sourceRefByCurrency,
@@ -143,7 +143,7 @@ async function fetchFromOpenExchangeRates(targetDate: Date): Promise<EurMapWithP
   const usdToEur = usdRates['EUR']!;
   if (!Number.isFinite(usdToEur) || usdToEur <= 0) return null;
 
-  const asOf = toMidnightUTC(dateStr);
+  const fxAsOf = toMidnightUTC(dateStr);
 
   // Convert USD->X to EUR->X by dividing by USD->EUR.
   const eurMap: Record<string, number> = { EUR: 1 };
@@ -167,7 +167,7 @@ async function fetchFromOpenExchangeRates(targetDate: Date): Promise<EurMapWithP
   }
 
   return {
-    asOf,
+    fxAsOf,
     eurMap,
     providerByCurrency,
     sourceRefByCurrency,
@@ -177,7 +177,7 @@ async function fetchFromOpenExchangeRates(targetDate: Date): Promise<EurMapWithP
 
 // ------------------------------------------------------------
 // Merge secondary into primary (fill only; never override primary)
-// - Keep ECB's `asOf` as the canonical day.
+// - Keep ECB's `fxAsOf` as the canonical day.
 // - Only add currencies not in the primary map.
 // - Preserve per-currency provider and sourceRef from secondary.
 // ------------------------------------------------------------
@@ -204,7 +204,7 @@ function mergeFillOnly(
   }
 
   return {
-    asOf: primary.asOf,
+    fxAsOf: primary.fxAsOf,
     eurMap: mergedEurMap,
     providerByCurrency: mergedProviderByCurrency,
     sourceRefByCurrency: mergedSourceRefByCurrency,
@@ -217,10 +217,10 @@ function mergeFillOnly(
 // - EUR↔X (provider/sourceRef of X)
 // - USD↔X (derived via EUR; inherits provider/sourceRef of X)
 // - EUR↔USD (force ECB as the provider to anchor USD)
-// Inserts are provider-scoped unique on (provider, base, quote, asOf).
+// Inserts are provider-scoped unique on (provider, base, quote, fxAsOf).
 // ------------------------------------------------------------
 function buildProviderScopedRows(
-  canonicalAsOf: Date,
+  canonicalfxAsOf: Date,
   eurMap: Record<string, number>,
   providerByCurrency: Record<string, ProviderId>,
   sourceRefByCurrency: Record<string, string>
@@ -239,7 +239,7 @@ function buildProviderScopedRows(
     if (!ISO_4217_REGEX.test(base) || !ISO_4217_REGEX.test(quote)) return;
     if (!Number.isFinite(rateNumber) || rateNumber <= 0) return;
 
-    const dedupeKey = `${provider}:${base}-${quote}-${formatISODate(canonicalAsOf)}`;
+    const dedupeKey = `${provider}:${base}-${quote}-${formatISODate(canonicalfxAsOf)}`;
     if (seen.has(dedupeKey)) return;
     seen.add(dedupeKey);
 
@@ -247,7 +247,7 @@ function buildProviderScopedRows(
       base,
       quote,
       rate: toNumeric8String(rateNumber),
-      asOf: canonicalAsOf,
+      fxAsOf: canonicalfxAsOf,
       provider,
       sourceRef,
       ingestedAt: new Date(),
@@ -267,22 +267,22 @@ function buildProviderScopedRows(
     if (currencyCode === 'EUR') continue;
     const provider = (providerByCurrency[currencyCode] ?? feedProvider) as ProviderId;
     const sourceRef =
-      sourceRefByCurrency[currencyCode] ?? `${provider}:${formatISODate(canonicalAsOf)}`;
+      sourceRefByCurrency[currencyCode] ?? `${provider}:${formatISODate(canonicalfxAsOf)}`;
 
     appendRow('EUR', currencyCode, eurToX, provider, sourceRef);
     appendRow(currencyCode, 'EUR', 1 / eurToX, provider, sourceRef);
   }
 
   // 2) EUR↔USD anchored to ECB
-  appendRow('EUR', 'USD', eurToUsd, 'ecb', `ecb:${formatISODate(canonicalAsOf)}`);
-  appendRow('USD', 'EUR', 1 / eurToUsd, 'ecb', `ecb:${formatISODate(canonicalAsOf)}`);
+  appendRow('EUR', 'USD', eurToUsd, 'ecb', `ecb:${formatISODate(canonicalfxAsOf)}`);
+  appendRow('USD', 'EUR', 1 / eurToUsd, 'ecb', `ecb:${formatISODate(canonicalfxAsOf)}`);
 
   // 3) USD↔X via EUR; inherit provider/sourceRef from the X leg (fallback to feed provider)
   for (const [currencyCode, eurToX] of Object.entries(eurMap)) {
     if (currencyCode === 'USD') continue;
     const provider = (providerByCurrency[currencyCode] ?? feedProvider) as ProviderId;
     const sourceRef =
-      sourceRefByCurrency[currencyCode] ?? `${provider}:${formatISODate(canonicalAsOf)}`;
+      sourceRefByCurrency[currencyCode] ?? `${provider}:${formatISODate(canonicalfxAsOf)}`;
 
     const usdToX = eurToX / eurToUsd;
     appendRow('USD', currencyCode, usdToX, provider, sourceRef);
@@ -294,7 +294,7 @@ function buildProviderScopedRows(
 
 // ------------------------------------------------------------
 // Public entry:
-// - Fetch ECB (primary) → get canonical "asOf" and EUR map.
+// - Fetch ECB (primary) → get canonical "fxAsOf" and EUR map.
 // - Optionally fetch secondary (env-controlled). If within lag tolerance,
 //   fill missing currencies (do not override primary).
 // - Build all pairs and insert with provider-scoped uniqueness.
@@ -311,19 +311,19 @@ export async function refreshFx(): Promise<number> {
     let secondary: EurMapWithProvenance | null = null;
 
     if (secondaryKind === 'exchangerate.host') {
-      secondary = await fetchFromExchangerateHost(primary.asOf);
+      secondary = await fetchFromExchangerateHost(primary.fxAsOf);
     } else if (secondaryKind === 'openexchangerates') {
-      secondary = await fetchFromOpenExchangeRates(primary.asOf);
+      secondary = await fetchFromOpenExchangeRates(primary.fxAsOf);
     }
 
-    if (secondary && calculateDaysBetween(secondary.asOf, primary.asOf) <= maxLagDays) {
+    if (secondary && calculateDaysBetween(secondary.fxAsOf, primary.fxAsOf) <= maxLagDays) {
       merged = mergeFillOnly(primary, secondary);
     }
     // If secondary is absent or outside lag tolerance, we silently skip it.
   }
 
   const insertRows = buildProviderScopedRows(
-    merged.asOf,
+    merged.fxAsOf,
     merged.eurMap,
     merged.providerByCurrency,
     merged.sourceRefByCurrency
@@ -331,13 +331,13 @@ export async function refreshFx(): Promise<number> {
 
   if (insertRows.length === 0) return 0;
 
-  // Provider-scoped idempotency: (provider, base, quote, asOf)
+  // Provider-scoped idempotency: (provider, base, quote, fxAsOf)
   return await db.transaction(async (tx) => {
     const inserted = await tx
       .insert(fxRatesTable)
       .values(insertRows)
       .onConflictDoNothing({
-        target: [fxRatesTable.provider, fxRatesTable.base, fxRatesTable.quote, fxRatesTable.asOf],
+        target: [fxRatesTable.provider, fxRatesTable.base, fxRatesTable.quote, fxRatesTable.fxAsOf],
       })
       .returning({ id: fxRatesTable.id });
 

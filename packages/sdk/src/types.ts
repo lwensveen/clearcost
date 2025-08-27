@@ -13,7 +13,7 @@ export type QuoteInput = {
   dimsCm: { l: number; w: number; h: number };
   weightKg: number;
   categoryKey: string;
-  userHs6?: string;
+  hs6?: string;
   mode: 'air' | 'sea';
 };
 
