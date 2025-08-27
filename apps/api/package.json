@@ -33,10 +33,25 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check-types": "tsc --noEmit",
+    "cron": "bun run src/lib/cron/index.ts",
     "dev": "bun --watch src/main.ts",
-    "fx:refresh": "bun run src/modules/fx/jobs/fx-refresh.ts",
+    "fx:refresh": "bun run src/lib/cron/index.ts fx:refresh",
+    "import:duties": "bun run src/lib/cron/index.ts import:duties",
+    "import:duties:wits": "bun run src/lib/cron/index.ts import:duties:wits",
+    "import:freight": "bun run src/lib/cron/index.ts import:freight",
+    "import:hs:ahtn": "bun run src/lib/cron/index.ts import:hs:ahtn",
+    "import:hs:uk10": "bun run src/lib/cron/index.ts import:hs:uk10",
+    "import:hs:us-hts10": "bun run src/lib/cron/index.ts import:hs:us-hts10",
+    "import:hs/eu-hs6": "bun run src/lib/cron/index.ts import:hs/eu-hs6",
+    "import:hs6": "bun run src/lib/cron/index.ts import:hs6",
+    "import:prune": "bun run src/lib/cron/index.ts imports:prune",
+    "import:surcharges": "bun run src/lib/cron/index.ts import:surcharges",
+    "import:surcharges:us-all": "bun run src/lib/cron/index.ts import:surcharges:us-all",
+    "import:surcharges:us-trade-remedies": "bun run src/lib/cron/index.ts import:surcharges:us-trade-remedies",
+    "import:sweep-stale": "bun run src/lib/cron/index.ts imports:sweep-stale",
+    "import:vat": "bun run src/lib/cron/index.ts import:vat",
     "start": "node dist/src/main.js",
-    "task": "bun run scripts/run-cron.ts"
+    "task": "bun run src/lib/cron/index.ts"
   },
   "type": "module"
 }
