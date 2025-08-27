@@ -1,0 +1,22 @@
+groups:
+  - name: imports
+    rules:
+      # Any import id whose last provenance row is older than 90 minutes
+      - alert: ImportRunStuck
+        expr: time() - clearcost_import_last_run_timestamp > 90 * 60
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "Import run stuck ({{ $labels.import_id }})"
+          description: "No provenance activity for >90m. Investigate job {{ $labels.import_id }}."
+
+      # Nightly FX: if no inserted rows in the last 36h
+      - alert: FxDailyMissed
+        expr: increase(clearcost_import_rows_inserted_total{job="fx:daily"}[36h]) == 0
+        for: 10m
+        labels:
+          severity: warn
+        annotations:
+          summary: "FX daily appears to have missed at least one run"
+          description: "No rows inserted by fx:daily in 36h."

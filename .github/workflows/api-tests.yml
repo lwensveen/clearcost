@@ -1,0 +1,72 @@
+name: API CI (tests + typecheck)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch: { }
+
+jobs:
+  api-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: clearcost_test
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      # Point the API (and tests) at the service DB
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/clearcost_test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Wait for Postgres
+        shell: bash
+        run: |
+          for i in {1..60}; do
+            (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          echo "Postgres did not become ready in time" >&2
+          exit 1
+
+      - name: Install deps (monorepo)
+        run: bun install --frozen-lockfile
+
+      - name: Run DB migrations (if available)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Try a workspace-level script first
+          if jq -e '.scripts["db:migrate"]' package.json >/dev/null 2>&1; then
+            echo "Running workspace script: db:migrate"
+            bun run db:migrate
+          # Try an app-local migrate script next
+          elif jq -e '.scripts["migrate"]' apps/api/package.json >/dev/null 2>&1; then
+            echo "Running apps/api script: migrate"
+            cd apps/api && bun run migrate
+          else
+            echo "No migrate script found; skipping schema migration"
+          fi
+
+      - name: Typecheck API
+        run: cd apps/api && bun run check-types
+
+      - name: Run API tests
+        run: cd apps/api && bun test

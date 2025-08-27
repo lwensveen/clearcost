@@ -1,0 +1,258 @@
+diff --git i/apps/api/package.json w/apps/api/package.json
+index bb72903..c0bc030 100644
+--- i/apps/api/package.json
++++ w/apps/api/package.json
+@@ -32,7 +32,7 @@
+   "private": true,
+   "scripts": {
+     "build": "tsc -p tsconfig.json",
+-    "check-types": "tsc --noEmit",
++    "check-types": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+     "cron": "bun run src/lib/cron/index.ts",
+     "dev": "bun --watch src/main.ts",
+     "fx:refresh": "bun run src/lib/cron/index.ts fx:refresh",
+@@ -51,7 +51,8 @@
+     "import:sweep-stale": "bun run src/lib/cron/index.ts imports:sweep-stale",
+     "import:vat": "bun run src/lib/cron/index.ts import:vat",
+     "start": "node dist/src/main.js",
+-    "task": "bun run src/lib/cron/index.ts"
++    "task": "bun run src/lib/cron/index.ts",
++    "test": "bun test"
+   },
+   "type": "module"
+ }
+diff --git i/apps/api/src/lib/run-lock.ts w/apps/api/src/lib/run-lock.ts
+index 273ab2b..bb11c69 100644
+--- i/apps/api/src/lib/run-lock.ts
++++ w/apps/api/src/lib/run-lock.ts
+@@ -1,12 +1,21 @@
+ import { db } from '@clearcost/db';
+ import { sql } from 'drizzle-orm';
+ 
+-export async function acquireLockOrThrow(key: string): Promise<void> {
+-  const rows = await db.execute(sql`SELECT pg_try_advisory_lock(hashtext(${key})) AS ok`);
+-  const ok = (rows as unknown as Array<{ ok: boolean }>)[0]?.ok;
+-  if (!ok) throw new Error(`Import already running: ${key}`);
++/** Default lock key if you don't set a custom one on the route. */
++export function makeLockKey(meta: { source: string; job: string }, extra?: string) {
++  return extra ? `${meta.source}:${meta.job}:${extra}` : `${meta.source}:${meta.job}`;
+ }
+ 
+-export async function releaseLock(key: string): Promise<void> {
++/** Try to acquire a PG advisory lock for this key. Returns true if lock acquired. */
++export async function acquireRunLock(key: string): Promise<boolean> {
++  const rows = await db.execute(
++    sql<{ locked: boolean | 't' | 'f' }>`SELECT pg_try_advisory_lock(hashtext(${key})) AS locked`
++  );
++  const locked = Array.isArray(rows) ? (rows[0]?.locked as any) : (rows as any)?.locked;
++  return locked === true || locked === 't';
++}
++
++/** Release the PG advisory lock for this key (no-op if not held). */
++export async function releaseRunLock(key: string): Promise<void> {
+   await db.execute(sql`SELECT pg_advisory_unlock(hashtext(${key}))`);
+ }
+diff --git i/apps/api/src/plugins/import-instrumentation.ts w/apps/api/src/plugins/import-instrumentation.ts
+index 2d4a0ab..f3c6d67 100644
+--- i/apps/api/src/plugins/import-instrumentation.ts
++++ w/apps/api/src/plugins/import-instrumentation.ts
+@@ -7,15 +7,27 @@ import {
+   startImportTimer,
+ } from '../lib/metrics.js';
+ import { finishImportRun, heartBeatImportRun, startImportRun } from '../lib/provenance.js';
++import { acquireRunLock, makeLockKey, releaseRunLock } from '../lib/run-lock.js'; // 👈 NEW
+ 
+ const plugin: FastifyPluginAsync = async (app) => {
+   app.decorateRequest('importCtx', undefined);
+ 
+   // Start timer + provenance if route declares config.importMeta
+-  app.addHook('preHandler', async (req) => {
++  app.addHook('preHandler', async (req, reply) => {
+     const meta = req.routeOptions?.config?.importMeta;
+     if (!meta) return;
+ 
++    const cfg = req.routeOptions?.config;
++    const custom =
++      typeof cfg?.importLockKey === 'function' ? cfg.importLockKey(req) : cfg?.importLockKey;
++    const lockKey = custom || makeLockKey(meta); // `${source}:${job}` by default
++
++    const ok = await acquireRunLock(lockKey);
++    if (!ok) {
++      return reply.code(409).send({ error: 'import already running', lockKey });
++    }
++
++    // 3) start metrics + provenance
+     const end = startImportTimer(meta);
+     const run = await startImportRun({
+       source: meta.source,
+@@ -23,14 +35,14 @@ const plugin: FastifyPluginAsync = async (app) => {
+       params: (req.body ?? {}) as Record<string, unknown>,
+     });
+ 
+-    // heartbeat every 30s so "stuck" runs can be detected
++    // 4) heartbeat every 30s so "stuck" runs can be detected
+     const hb = setInterval(() => {
+       heartBeatImportRun(run.id).catch(() => {});
+     }, 30_000);
+     hb.unref?.();
+ 
+     req._importHeartbeat = hb;
+-    req.importCtx = { meta, runId: run.id, endTimer: end };
++    req.importCtx = { meta, runId: run.id, endTimer: end, lockKey };
+   });
+ 
+   function stopHeartbeat(req: any) {
+@@ -46,7 +58,6 @@ const plugin: FastifyPluginAsync = async (app) => {
+ 
+     try {
+       let inserted = 0;
+-
+       const ct = String(reply.getHeader('content-type') ?? '');
+       if (ct.includes('application/json') && payload && typeof payload !== 'function') {
+         const s = Buffer.isBuffer(payload) ? payload.toString('utf8') : String(payload);
+@@ -65,29 +76,24 @@ const plugin: FastifyPluginAsync = async (app) => {
+         await finishImportRun(ctx.runId, { status: 'succeeded', inserted });
+       } else {
+         importErrors.inc({ ...ctx.meta, stage: 'response' });
+-        await finishImportRun(ctx.runId, {
+-          status: 'failed',
+-          error: `HTTP ${reply.statusCode}`,
+-        });
++        await finishImportRun(ctx.runId, { status: 'failed', error: `HTTP ${reply.statusCode}` });
+       }
+     } finally {
+       ctx.endTimer();
+       stopHeartbeat(req);
++      if (ctx.lockKey) await releaseRunLock(ctx.lockKey);
+       req.importCtx = undefined;
+     }
+   });
+ 
+-  // Ensure failure paths still close provenance + timer
+   app.addHook('onError', async (req, _reply, err) => {
+     const ctx = req.importCtx;
+     if (!ctx) return;
+     importErrors.inc({ ...ctx.meta, stage: 'error' });
+-    await finishImportRun(ctx.runId, {
+-      status: 'failed',
+-      error: String(err?.message ?? err),
+-    });
++    await finishImportRun(ctx.runId, { status: 'failed', error: String(err?.message ?? err) });
+     ctx.endTimer();
+     stopHeartbeat(req);
++    if (ctx.lockKey) await releaseRunLock(ctx.lockKey);
+     req.importCtx = undefined;
+   });
+ };
+diff --git i/apps/api/types/import-instrumentation.d.ts w/apps/api/types/import-instrumentation.d.ts
+index e8ddb03..cc1285e 100644
+--- i/apps/api/types/import-instrumentation.d.ts
++++ w/apps/api/types/import-instrumentation.d.ts
+@@ -1,5 +1,4 @@
+ import 'fastify';
+-
+ import type { ImportSource } from '../src/lib/provenance.js';
+ 
+ export type ImportMeta = { source: ImportSource; job: string };
+@@ -16,33 +15,27 @@ type UsageBag = { start: number; bytesIn: number; bytesOut: number };
+ declare module 'fastify' {
+   interface FastifyContextConfig {
+     importMeta?: ImportMeta;
++    /** Optional override; defaults to `${source}:${job}` */
++    importLockKey?: string | ((req: FastifyRequest) => string);
+   }
+ 
+   interface FastifyRouteConfig {
+     importMeta?: ImportMeta;
++    importLockKey?: string | ((req: FastifyRequest) => string);
+   }
+ 
+   interface FastifyRequest {
+-    // From your API key auth plugin
+-    apiKey?: {
+-      id: string;
+-      ownerId: string;
+-      scopes: string[];
+-    };
+-    // Prometheus HTTP timing helper (set by metrics plugin)
++    /** Prom-client histogram timer end() placed by the metrics plugin */
+     _prom_end?: (labels?: Record<string, string>) => void;
++    /** Heartbeat timer held by the import-instrumentation plugin */
++    _importHeartbeat?: NodeJS.Timeout;
+     // Simple usage/metering bag (set by usage plugin)
+     _usage?: UsageBag;
+-    // Import instrumentation context (set by import-instrumentation plugin)
+     importCtx?: ImportCtx;
+-    // Heartbeat interval held by the import plugin
+-    _importHeartbeat?: NodeJS.Timeout;
++    // your API key augmentation (already present in your repo):
++    apiKey?: { id: string; ownerId: string; scopes: string[] };
+   }
+ 
+-  /**
+-   * Helper your auth plugin decorates on the app instance
+-   * to enforce scoped API key access in routes.
+-   */
+   interface FastifyInstance {
+     requireApiKey: (
+       scopes?: string[]
+diff --git i/bun.lock w/bun.lock
+index 245903a..6081bdb 100644
+--- i/bun.lock
++++ w/bun.lock
+@@ -6,7 +6,9 @@
+       "devDependencies": {
+         "@commitlint/cli": "^19.8.1",
+         "@commitlint/config-conventional": "^19.8.1",
++        "@types/bun": "^1.2.21",
+         "@vitest/coverage-v8": "^3.2.4",
++        "bun-types": "^1.2.21",
+         "husky": "^9.1.7",
+         "prettier": "^3.6.2",
+         "turbo": "^2.5.6",
+@@ -643,6 +645,8 @@
+ 
+     "@tailwindcss/postcss": ["@tailwindcss/postcss@4.1.12", "", { "dependencies": { "@alloc/quick-lru": "^5.2.0", "@tailwindcss/node": "4.1.12", "@tailwindcss/oxide": "4.1.12", "postcss": "^8.4.41", "tailwindcss": "4.1.12" } }, "sha512-5PpLYhCAwf9SJEeIsSmCDLgyVfdBhdBpzX1OJ87anT9IVR0Z9pjM0FNixCAUAHGnMBGB8K99SwAheXrT0Kh6QQ=="],
+ 
++    "@types/bun": ["@types/bun@1.2.21", "", { "dependencies": { "bun-types": "1.2.21" } }, "sha512-NiDnvEqmbfQ6dmZ3EeUO577s4P5bf4HCTXtI6trMc6f6RzirY5IrF3aIookuSpyslFzrnvv2lmEWv5HyC1X79A=="],
++
+     "@types/chai": ["@types/chai@5.2.2", "", { "dependencies": { "@types/deep-eql": "*" } }, "sha512-8kB30R7Hwqf40JPiKhVzodJs2Qc1ZJ5zuT3uzw5Hq/dhNCl3G3l83jfpdI1e20BP348+fV7VIL/+FxaXkqBmWg=="],
+ 
+     "@types/conventional-commits-parser": ["@types/conventional-commits-parser@5.0.1", "", { "dependencies": { "@types/node": "*" } }, "sha512-7uz5EHdzz2TqoMfV7ee61Egf5y6NkcO4FB/1iCCQnbeiI1F3xzv3vK5dBCXUCLQgGYS+mUeigK1iKQzvED+QnQ=="],
+@@ -771,6 +775,8 @@
+ 
+     "buffer-from": ["buffer-from@1.1.2", "", {}, "sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ=="],
+ 
++    "bun-types": ["bun-types@1.2.21", "", { "dependencies": { "@types/node": "*" }, "peerDependencies": { "@types/react": "^19" } }, "sha512-sa2Tj77Ijc/NTLS0/Odjq/qngmEPZfbfnOERi0KRUYhT9R8M4VBioWVmMWE5GrYbKMc+5lVybXygLdibHaqVqw=="],
++
+     "cac": ["cac@6.7.14", "", {}, "sha512-b6Ilus+c3RrdDk+JhLKUAQfzzgLEPy6wcXqS7f/xe1EETvsDP6GORG7SFuOs6cID5YkqchW/LXZbX5bc8j7ZcQ=="],
+ 
+     "call-bind": ["call-bind@1.0.8", "", { "dependencies": { "call-bind-apply-helpers": "^1.0.0", "es-define-property": "^1.0.0", "get-intrinsic": "^1.2.4", "set-function-length": "^1.2.2" } }, "sha512-oKlSFMcMwpUg2ednkhQ454wfWiU/ul3CkJe/PEHcTKuiX6RpbehUiFMXu13HalGZxfUwCQzZG747YXBn1im9ww=="],
+diff --git i/ops/prometheus/prometheus.yml w/ops/prometheus/prometheus.yml
+index e335bda..47d21ac 100644
+--- i/ops/prometheus/prometheus.yml
++++ w/ops/prometheus/prometheus.yml
+@@ -1,5 +1,9 @@
+ global:
+   scrape_interval: 15s
++
++rule_files:
++  - rules/*.yml
++
+ scrape_configs:
+   - job_name: clearcost-api
+     metrics_path: /metrics
+diff --git i/package.json w/package.json
+index f42cc4d..c73f2fe 100644
+--- i/package.json
++++ w/package.json
+@@ -3,7 +3,9 @@
+   "devDependencies": {
+     "@commitlint/cli": "^19.8.1",
+     "@commitlint/config-conventional": "^19.8.1",
++    "@types/bun": "^1.2.21",
+     "@vitest/coverage-v8": "^3.2.4",
++    "bun-types": "^1.2.21",
+     "husky": "^9.1.7",
+     "prettier": "^3.6.2",
+     "turbo": "^2.5.6",
