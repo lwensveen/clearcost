@@ -1,8 +1,8 @@
 import { categoriesTable, db } from '@clearcost/db';
 import { eq } from 'drizzle-orm';
 
-export async function resolveHs6(categoryKey: string, userHs6?: string) {
-  if (userHs6) return userHs6;
+export async function resolveHs6(categoryKey: string, hs6?: string) {
+  if (hs6) return hs6;
 
   const row = await db
     .select({ defaultHs6: categoriesTable.defaultHs6 })
