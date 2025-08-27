@@ -3,241 +3,279 @@
 **Developer‑first landed cost API.** Transparent duties, tariffs, VAT/GST and fees — priced for startups and
 pooling‑friendly.
 
-> Stack: Turborepo • TypeScript • Next.js • Node.js • Bun • Zod • Drizzle ORM • PostgreSQL
+> Stack: Turborepo • TypeScript • Fastify • Bun • Zod • Drizzle ORM • PostgreSQL • Prometheus
 
 ---
 
 ## What is ClearCost?
 
-ClearCost is a standalone service (and SDK) that returns **all‑in landed cost quotes** at checkout time. Give it:origin,
-destination, item value, dimensions/weight, and category → get back: **freight share, duty, VAT, fees, and total**, with
-a **small variance guardrail** for real‑world accuracy.
+ClearCost is a standalone service (and TypeScript SDK, later) that returns **all‑in landed cost quotes** at checkout
+time. You post: **origin, destination, item value, dimensions/weight, category/HS hint** → you get back: **freight
+share, duty, VAT/GST, surcharges, and total**, plus a **variance guardrail** to absorb small under‑quotes.
 
 - **Pooling‑native**: supports per‑manifest/container pricing and multi‑consignee workflows.
 - **Cheap & predictable**: per‑API or per‑manifest pricing (no \$2 + 10% per parcel).
-- **Own your data**: Postgres tables you can tune; no vendor lock‑in.
+- **Own your data**: Postgres tables you can tune; no lock‑in.
 
 ---
 
-## Monorepo Layout (Turborepo)
+## Monorepo layout (Turborepo)
 
 ```
 clearcost/
   apps/
-    api/              # Node.js (Fastify/Express) REST API
-    docs/             # Next.js docs site (or dashboard)
+    api/                       # Fastify API service
+      src/
+        lib/                   # cron runtime, provenance, metrics, locks, etc.
+          cron/
+            commands/          # CLI commands (imports, fx, sweep, prune)
+          refresh-fx.ts
+          provenance.ts
+          run-lock.ts
+          sweep-stale-imports.ts
+        modules/
+          quotes/              # /v1/quotes (landed cost)
+          hs-codes/            # HS6 + alias importers (AHTN8, HTS10, UK10)
+          duty-rates/          # WITS, UK, EU, US importers
+          surcharges/          # US/EU/UK surcharges + helpers
+          vat/                 # VAT importers (OECD/IMF)
+          tasks/               # Internal cron HTTP routes
+          health/              # /healthz and import health
+          webhooks/            # outbound hooks (skeleton)
+        plugins/
+          prometheus/          # http metrics, imports-running gauges
+          api-key-auth.ts
+          api-usage.ts
+          import-instrumentation.ts
+      types/                   # Fastify module augmentations
+    docs/                      # Next.js docs site (skeleton)
+    web/                       # Web app placeholder
+
   packages/
-    db/               # Drizzle ORM schema + migrations
-    sdk/              # TypeScript client SDK
-    config/           # ESLint, TSConfig, Prettier shared
-    utils/            # shared calc + zod schemas
-  .github/
-  turbo.json
+    db/                        # Drizzle schema & migrations
+      src/schemas/
+        imports.ts             # import runs (provenance headers)
+        provenance.ts          # per-row provenance
+        hs-codes.ts            # canonical HS6 titles
+        hs-code-aliases.ts     # AHTN8/HTS10/UK10 aliases
+        duty-rates.ts
+        surcharges.ts
+        vat.ts
+        ...
+    types/                     # Shared Zod/TS types
+
+  ops/
+    prometheus/prometheus.yml  # local scrape config
+    grafana/dashboards/        # JSON dashboards (imports, http)
+
+  .github/workflows/
+    cron-hourly.yml            # stale sweep
+    cron-nightly.yml           # daily imports
+    cron-weekly.yml            # weekly deep jobs + prune
+    api-tests.yml              # CI tests for API
 ```
 
 ---
 
-## Quickstart
+## What’s already built
 
-1. **Clone & install**
+- **Quote API** — `/v1/quotes` with idempotency, auditing, Zod validation.
+  - Paths: `apps/api/src/modules/quotes/routes.ts` + `.../services/quote-landed-cost.ts`
 
-   ```bash
-   bun install
-   ```
+- **Data import pipelines** with provenance + metrics:
+  - **FX (ECB)**: `POST /internal/cron/fx/daily` → `lib/refresh-fx.ts`
+  - **VAT (OECD/IMF)**: `POST /internal/cron/import/vat/auto`
+  - **Duties**: WITS/UK/EU/US importers (streaming + batch upsert)
+  - **Surcharges**: US 301/232, MPF/HMF, EU/UK trade remedies
+  - **HS codes**: TARIC HS6 titles; AHTN8/HTS10/UK10 aliases
+  - All task routes live under `apps/api/src/modules/tasks/**` and are instrumented via
+    `plugins/import-instrumentation.ts`.
 
-2. **Environment**
-   Create `apps/api/.env` and `packages/db/.env`:
+- **Provenance store** (import runs + per-row provenance)
+  - Schema: `packages/db/src/schemas/imports.ts`, `.../provenance.ts`
+  - Plugin: `apps/api/src/plugins/import-instrumentation.ts` (sets up timers, heartbeats, metrics; auto-closes on
+    error/finish)
 
-   ```bash
-   # apps/api/.env
-   NODE_ENV=development
-   PORT=4000
-   DATABASE_URL=postgres://user:pass@localhost:5432/clearcost
-   CURRENCY_BASE=USD
-   VARIANCE_UNDERWRITE_BPS=50     # we absorb first 0.5% under-quote
-   VARIANCE_GUARDRAIL_BPS=200     # +/- 2% guardrail on quotes
+- **Locks & Sweeping**
+  - Run‑lock helper: `apps/api/src/lib/run-lock.ts` (pg_advisory lock wrapper)
+  - Stale sweep util + HTTP route: `lib/sweep-stale-imports.ts`, `modules/tasks/sweep-stale-routes.ts`
+  - Prune old imports/provenance: CLI command + HTTP route
 
-   # packages/db/.env
-   DATABASE_URL=postgres://user:pass@localhost:5432/clearcost
-   ```
+- **Observability**
+  - Prometheus HTTP metrics: `plugins/prometheus/metrics-http.ts` → `/metrics`
+  - Import‑focused gauges: `plugins/prometheus/imports-running.ts`, `imports-extra.ts`
+  - Example Prom scrape config: `ops/prometheus/prometheus.yml`
 
-3. **Run Postgres** (example)
+- **Auth & metering**
+  - API key auth + scoped guards: `plugins/api-key-auth.ts`
+  - Per‑key usage aggregation: `plugins/api-usage.ts` (writes to `api_usage`)
 
-   ```bash
-   docker run --name clearcost-pg -e POSTGRES_PASSWORD=postgres \
-     -e POSTGRES_DB=clearcost -p 5432:5432 -d postgres:16
-   ```
+- **Cron runners**
+  - **HTTP cron** via GitHub Actions: `cron-hourly.yml`, `cron-nightly.yml`, `cron-weekly.yml`
+  - **CLI cron** for manual/dev: `apps/api/src/lib/cron/runtime.ts` with commands in `lib/cron/commands/*`
 
-4. **Migrate & seed**
-
-   ```bash
-   bun run --cwd packages/db migrate
-   bun run --cwd packages/db seed
-   ```
-
-5. **Dev servers**
-
-   ```bash
-   bunx turbo run dev        # runs API and docs in parallel
-   ```
-
-> Use **Bun** as the package manager. If you prefer npm or pnpm, adjust `turbo.json` scripts accordingly.
+- **Tests & CI**
+  - Basic unit tests: `apps/api/src/lib/run-lock.test.ts`, `.../sweep-stale.test.ts`
+  - CI: `.github/workflows/api-tests.yml`
 
 ---
 
-## Database (Drizzle + PostgreSQL)
+## What’s left for the MVP
 
-**Initial tables** (minimal, extend later):
+**Backend**
 
-- `hs_codes` — `{ id, hs6, title, ahtn8?, cn8?, hts10? }`
-- `categories` — `{ id, key, default_hs6 }` (maps UI categories → HS6)
-- `duty_rates` — `{ id, dest, hs6, rate_pct, rule }`
-- `vat_rules` — `{ id, dest, rate_pct, base }` // base ∈ {CIF, CIF_PLUS_DUTY}
-- `de_minimis` — `{ id, dest, currency, value, applies_to }` // applies_to ∈ {DUTY, DUTY_VAT, NONE}
-- `freight_rates` — `{ id, origin, dest, mode, unit, breakpoint, price }` // mode ∈ {air, sea}; unit ∈ {kg, m3}
-- `surcharges` — `{ id, dest, code, fixed_amt?, pct_amt?, rule_expr? }`
-- `audit_quotes` — store input/output & drift for continuous tuning
+- [ ] Quote engine hardening (edge lanes; volumetric rules for sea; insurance option)
+- [ ] De‑minimis table & rules per destination
+- [ ] More surcharges & remedy carve‑outs (e.g., US 232 country exceptions)
+- [ ] Better error mapping → 4xx vs 5xx; consistent error schema
+- [ ] Cache layers (FX, WITS responses) + request timeout envelopes
 
-> Start with **HS6** + a small curated set of codes for your first lanes. Add AHTN8/CN8/HTS10 per lane when drift
-> demands it.
+**Data quality & ops**
 
----
+- [ ] Drift monitor: compare broker entries vs quoted totals per HS/lane
+- [ ] Simple admin endpoints to patch duties/VAT/freight rows
+- [ ] One‑shot backfills (commands + docs)
 
-## Calculation Model (MVP)
+**Docs & SDK**
 
-**Inputs (required):** origin, destination, value (amount+currency), dimensions (L×W×H), weight, category (→ HS6),
-optional user HS6.
+- [ ] Expand docs site with guides and schema reference
+- [ ] Publish minimal TypeScript SDK (`packages/types` exists; SDK package TBD)
 
-**Steps:**
+**Security**
 
-1. **Chargeable weight** = `max(realKg, (L*W*H)/5000)` (air). For sea use `volumeM3 = (L*W*H)/1e6`.
-2. **Freight** = lookup from `freight_rates` by lane + unit curve.
-3. **CIF** = item value (in dest currency) + freight (+ optional insurance).
-4. **De minimis** = if CIF ≤ threshold → waive per rule.
-5. **Duty** = `duty_rate% × CIF` _(or × value where applicable)_.
-6. **VAT** = `vat_rate% × (CIF + Duty)` _(or CIF)_.
-7. **Fees** = small fixed/percent surcharges if enabled.
-8. **Total** = `CIF + Duty + VAT + Fees`.
-9. **Guardrail**: show `±2%` band; absorb first `0.5%` under‑quote.
+- [ ] Rotate keys; rate limiting profiles; audit trails
 
 ---
 
-## API (REST, JSON)
+## Quickstart (local)
 
-### `POST /v1/quote`
+1. **Install deps**
 
-**Body**
-
-```json
-{
-  "origin": "JP",
-  "dest": "US",
-  "itemValue": {
-    "amount": 250,
-    "currency": "USD"
-  },
-  "dimsCm": {
-    "l": 30,
-    "w": 25,
-    "h": 20
-  },
-  "weightKg": 1.8,
-  "categoryKey": "collectibles.figure",
-  "userHs6": "950300"
-}
+```bash
+bun install
 ```
 
-**Response**
+2. **Run Postgres** (example)
 
-```json
-{
-  "hs6": "950300",
-  "chargeableKg": 3.0,
-  "freight": 12.4,
-  "components": {
-    "CIF": 262.4,
-    "duty": 5.25,
-    "vat": 17.9,
-    "fees": 0.8
-  },
-  "total": 286.35,
-  "guaranteedMax": 292.08,
-  "policy": "We absorb the first 0.5% under‑quote; beyond that we true‑up post‑delivery."
-}
+```bash
+docker run --name clearcost-pg -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=clearcost -p 5432:5432 -d postgres:16
 ```
 
-### `GET /v1/hs-codes/search?query=violin`
+3. **Environment**
 
-Returns HS candidates for quick selection.
+Create `apps/api/.env` and `packages/db/.env` minimally:
 
-### `POST /v1/classify` _(optional)_
+```ini
+# apps/api/.env
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/clearcost
+PORT=4000
+NODE_ENV=development
 
-Accepts title/description and returns `{ hs6, confidence }` from heuristic rules (ML later).
-
----
-
-## SDK (TypeScript)
-
-```ts
-import { createClient } from '@clearcost/sdk';
-
-const cc = createClient({
-  baseUrl: process.env.CLEARCOST_URL!,
-  apiKey: process.env.CLEARCOST_KEY!,
-});
-
-const quote = await cc.quote({
-  origin: 'JP',
-  dest: 'US',
-  itemValue: { amount: 250, currency: 'USD' },
-  dimsCm: { l: 30, w: 25, h: 20 },
-  weightKg: 1.8,
-  categoryKey: 'collectibles.figure',
-});
-console.log(quote.total);
+# packages/db/.env
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/clearcost
 ```
 
----
+4. **Migrate**
 
-## Validation & Safety (Zod)
+```bash
+bun run --cwd packages/db migrate
+```
 
-- Zod schemas on all endpoints (reject missing dims/weight).
-- Category → HS6 fallback; user HS override flagged for review.
-- Unsupported SKUs blocked early (hazmat, CE/FCC, IP‑restricted).
-
----
-
-## Ops Loop
-
-- **HS Audit Queue**: low‑confidence or high‑duty items reviewed pre‑cutoff.
-- **CFS re‑measure/repack**: auto‑adjust if >X% discrepancy.
-- **Reconciliation**: compare broker entry vs quote; log drift per lane/HS.
-- **Tuning**: edit duty/VAT/freight tables via admin UI weekly.
-
----
-
-## Scripts
+5. **Dev**
 
 ```bash
 bunx turbo run dev
-bun run --cwd packages/db migrate
-bun run --cwd packages/db seed
-bun run --cwd apps/api build && bun run --cwd apps/api start
+# or: bun run --cwd apps/api dev
 ```
 
 ---
 
-## Roadmap
+## Running imports
 
-- v0: HS6 + US/EU/TH/JP duty & VAT, basic lanes, REST API, SDK.
-- v0.1: Admin UI for tables; drift dashboard.
-- v0.2: AHTN8/CN8/HTS10 per lane; FTA rules on select origins.
-- v0.3: Heuristic HS classifier; quote caching; FX improvements.
-- v1.0: Manifest pricing mode; SLAs; audit exports.
+### Via HTTP routes (admin key required)
+
+```bash
+# FX (ECB)
+curl -X POST -H "x-admin-token: $ADMIN" \
+  "${API%/}/internal/cron/fx/daily"
+
+# VAT (OECD/IMF)
+curl -X POST -H "x-admin-token: $ADMIN" \
+  "${API%/}/internal/cron/import/vat/auto"
+
+# US surcharges (all)
+curl -X POST -H "x-admin-token: $ADMIN" -H 'content-type: application/json' \
+  -d '{"batchSize":5000}' \
+  "${API%/}/internal/cron/import/surcharges/us-all"
+```
+
+### Via CLI (local/manual)
+
+```bash
+cd apps/api
+bun run src/lib/cron/runtime.ts fx:refresh
+bun run src/lib/cron/runtime.ts import:vat
+bun run src/lib/cron/runtime.ts imports:sweep-stale --threshold 30
+bun run src/lib/cron/runtime.ts imports:prune --days 90
+```
+
+Commands are registered in `apps/api/src/lib/cron/registry.ts`.
 
 ---
 
-## 🤝 License
+## Observability
+
+- **Prometheus**: scrape `${API}/metrics` (see `ops/prometheus/prometheus.yml`).
+- Gauges & histograms:
+  - `http_server_request_duration_seconds`
+  - `http_server_requests_total`
+  - `clearcost_import_last_run_timestamp{import_id}`
+  - `clearcost_imports_running{age_bucket}` (if enabled)
+
+---
+
+## API overview
+
+- `POST /v1/quotes` — compute landed cost (idempotent; requires `quotes:write` scope)
+- `GET /v1/quotes/by-key/:key` — replay cached quote (requires `quotes:read`)
+- `GET /healthz` / `HEAD /healthz` — liveness & readiness
+- `GET /health/imports` — import activity snapshot (for dashboards)
+- `/internal/cron/**` — admin/protected import tasks
+
+Auth helpers and scopes live in `apps/api/src/plugins/api-key-auth.ts`.
+
+---
+
+## Development tips
+
+- Type augmentations for Fastify are in `apps/api/types/import-instrumentation.d.ts`.
+- Import routes can opt‑in to provenance + metrics by setting `config.importMeta`:
+
+```ts
+app.post(
+  '/internal/cron/…',
+  {
+    preHandler: adminGuard,
+    config: { importMeta: { source: 'USITC_HTS', job: 'duties:us-mfn' } },
+  },
+  handler
+);
+```
+
+The `import-instrumentation` plugin starts timers, creates the import run, heartbeats during work, and auto‑finishes (
+success/failure) based on the response.
+
+---
+
+## Testing & CI
+
+- **Local**: `bun test` (see `apps/api/tsconfig.test.json`)
+- **CI**: `.github/workflows/api-tests.yml`
+
+---
+
+## License
 
 MIT — see `LICENSE`.
 
@@ -245,4 +283,4 @@ MIT — see `LICENSE`.
 
 ## Credits
 
-Built by Lodewijk Wensveen. Designed for pooled, multi‑consignee cross‑border commerce.
+Built by Lodewijk Wensveen — designed for pooled, multi‑consignee cross‑border commerce.
