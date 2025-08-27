@@ -12,6 +12,7 @@ import surchargeUkRoutes from './surcharges/uk-routes.js';
 import surchargeJsonRoute from './surcharges/generic-json.js';
 import freightRoutes from './freight-routes.js';
 import hsRoutes from './hs-routes.js';
+import importsPruneRoutes from './prune-routes.js';
 
 export default function taskRoutes(app: FastifyInstance) {
   fxRoutes(app);
@@ -26,4 +27,5 @@ export default function taskRoutes(app: FastifyInstance) {
   surchargeJsonRoute(app);
   freightRoutes(app);
   hsRoutes(app);
+  importsPruneRoutes(app);
 }
