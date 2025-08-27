@@ -9,19 +9,22 @@ export function sha256Hex(buf: string | Uint8Array) {
 export type ImportRun = typeof importsTable.$inferSelect;
 
 export type ImportSource =
-  | 'WITS'
-  | 'TARIC'
-  | 'USITC_HTS'
-  | 'OECD'
+  | 'AHTN'
+  | 'BASELINE'
+  | 'ECB'
   | 'IMF'
   | 'MANUAL'
-  | 'AHTN'
+  | 'OECD'
+  | 'OECD/IMF'
+  | 'OFFICIAL'
+  | 'TARIC'
   | 'UK_OPS'
-  | 'ECB'
   | 'UK_TT'
   | 'US'
-  | 'file'
-  | 'OECD/IMF';
+  | 'USITC_HTS'
+  | 'WITS'
+  | 'ZONOS'
+  | 'file';
 
 export async function heartBeatImportRun(id: string) {
   await db

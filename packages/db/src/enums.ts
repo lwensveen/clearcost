@@ -2,12 +2,11 @@ import { pgEnum } from 'drizzle-orm/pg-core';
 
 export const vatBaseEnum = pgEnum('vat_base', ['CIF', 'CIF_PLUS_DUTY', 'FOB']);
 
-export const deMinimisAppliesEnum = pgEnum('de_minimis_applies', [
-  'NONE', // no exemption
-  'DUTY', // exempts duty only
-  'VAT', // exempts VAT only
-  'DUTY_VAT', // exempts both
-]);
+export const deMinimisKind = ['DUTY', 'VAT'] as const;
+export type DeMinimisKind = (typeof deMinimisKind)[number];
+
+export const deMinimisBasis = ['INTRINSIC', 'CIF'] as const;
+export type DeMinimisBasis = (typeof deMinimisBasis)[number];
 
 export const vatRateKindEnum = pgEnum('vat_rate_kind', [
   'STANDARD',
@@ -40,19 +39,22 @@ export const surchargeCodeEnum = pgEnum('surcharge_code', [
 ]);
 
 export const importSourceEnum = pgEnum('import_source', [
-  'WITS',
-  'TARIC',
-  'USITC_HTS',
-  'OECD',
+  'AHTN',
+  'BASELINE',
+  'ECB',
   'IMF',
   'MANUAL',
-  'AHTN',
+  'OECD',
+  'OECD/IMF',
+  'OFFICIAL',
+  'TARIC',
   'UK_OPS',
-  'ECB',
   'UK_TT',
   'US',
+  'USITC_HTS',
+  'WITS',
+  'ZONOS',
   'file',
-  'OECD/IMF',
 ]);
 
 export const importStatusEnum = pgEnum('import_status', ['running', 'succeeded', 'failed']);
@@ -65,3 +67,7 @@ export const resourceTypeEnum = pgEnum('resource_type', [
   'surcharge',
   'vat_rule',
 ]);
+
+export const shippingModeEnum = pgEnum('shipping_mode', ['air', 'sea']);
+export const pricingModeEnum = pgEnum('pricing_mode', ['cards', 'fixed']);
+export const incotermEnum = pgEnum('incoterm', ['DAP', 'DDP']); // optional on quotes

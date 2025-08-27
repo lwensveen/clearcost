@@ -8,6 +8,7 @@
     "@fastify/sensible": "^6.0.3",
     "@fastify/swagger": "^9.5.1",
     "@fastify/swagger-ui": "^5.2.3",
+    "cheerio": "^1.1.2",
     "dotenv": "^17.2.1",
     "drizzle-orm": "^0.44.4",
     "fast-xml-parser": "^5.2.5",

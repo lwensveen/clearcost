@@ -70,6 +70,26 @@ jobs:
             -H "x-api-key: $API_KEY" \
             "${API%/}/internal/cron/import/surcharges/uk-remedies"
 
+      - name: De Minimis thresholds (Zonos)
+        run: |
+          BODY='{}'
+          curl --fail-with-body --show-error --silent \
+            --retry 3 --retry-all-errors -X POST \
+            -H "x-admin-token: $ADMIN" \
+            -H "content-type: application/json" \
+            -d "$BODY" \
+            "${API%/}/internal/cron/de-minimis/import-zonos"
+
+      - name: De Minimis thresholds (Official)
+        run: |
+          BODY='{}'
+          curl --fail-with-body --show-error --silent \
+            --retry 3 --retry-all-errors -X POST \
+            -H "x-admin-token: $ADMIN" \
+            -H "content-type: application/json" \
+            -d "$BODY" \
+            "${API%/}/internal/cron/de-minimis/import-official"
+
       - name: Prune old imports & provenance (via internal route)
         env:
           PRUNE_DAYS: ${{ vars.IMPORTS_PRUNE_DAYS || 90 }}
