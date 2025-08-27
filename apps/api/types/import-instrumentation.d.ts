@@ -1,5 +1,4 @@
 import 'fastify';
-
 import type { ImportSource } from '../src/lib/provenance.js';
 
 export type ImportMeta = { source: ImportSource; job: string };
@@ -16,33 +15,27 @@ type UsageBag = { start: number; bytesIn: number; bytesOut: number };
 declare module 'fastify' {
   interface FastifyContextConfig {
     importMeta?: ImportMeta;
+    /** Optional override; defaults to `${source}:${job}` */
+    importLockKey?: string | ((req: FastifyRequest) => string);
   }
 
   interface FastifyRouteConfig {
     importMeta?: ImportMeta;
+    importLockKey?: string | ((req: FastifyRequest) => string);
   }
 
   interface FastifyRequest {
-    // From your API key auth plugin
-    apiKey?: {
-      id: string;
-      ownerId: string;
-      scopes: string[];
-    };
-    // Prometheus HTTP timing helper (set by metrics plugin)
+    /** Prom-client histogram timer end() placed by the metrics plugin */
     _prom_end?: (labels?: Record<string, string>) => void;
+    /** Heartbeat timer held by the import-instrumentation plugin */
+    _importHeartbeat?: NodeJS.Timeout;
     // Simple usage/metering bag (set by usage plugin)
     _usage?: UsageBag;
-    // Import instrumentation context (set by import-instrumentation plugin)
     importCtx?: ImportCtx;
-    // Heartbeat interval held by the import plugin
-    _importHeartbeat?: NodeJS.Timeout;
+    // your API key augmentation (already present in your repo):
+    apiKey?: { id: string; ownerId: string; scopes: string[] };
   }
 
-  /**
-   * Helper your auth plugin decorates on the app instance
-   * to enforce scoped API key access in routes.
-   */
   interface FastifyInstance {
     requireApiKey: (
       scopes?: string[]

@@ -7,15 +7,27 @@ import {
   startImportTimer,
 } from '../lib/metrics.js';
 import { finishImportRun, heartBeatImportRun, startImportRun } from '../lib/provenance.js';
+import { acquireRunLock, makeLockKey, releaseRunLock } from '../lib/run-lock.js'; // 👈 NEW
 
 const plugin: FastifyPluginAsync = async (app) => {
   app.decorateRequest('importCtx', undefined);
 
   // Start timer + provenance if route declares config.importMeta
-  app.addHook('preHandler', async (req) => {
+  app.addHook('preHandler', async (req, reply) => {
     const meta = req.routeOptions?.config?.importMeta;
     if (!meta) return;
 
+    const cfg = req.routeOptions?.config;
+    const custom =
+      typeof cfg?.importLockKey === 'function' ? cfg.importLockKey(req) : cfg?.importLockKey;
+    const lockKey = custom || makeLockKey(meta); // `${source}:${job}` by default
+
+    const ok = await acquireRunLock(lockKey);
+    if (!ok) {
+      return reply.code(409).send({ error: 'import already running', lockKey });
+    }
+
+    // 3) start metrics + provenance
     const end = startImportTimer(meta);
     const run = await startImportRun({
       source: meta.source,
@@ -23,14 +35,14 @@ const plugin: FastifyPluginAsync = async (app) => {
       params: (req.body ?? {}) as Record<string, unknown>,
     });
 
-    // heartbeat every 30s so "stuck" runs can be detected
+    // 4) heartbeat every 30s so "stuck" runs can be detected
     const hb = setInterval(() => {
       heartBeatImportRun(run.id).catch(() => {});
     }, 30_000);
     hb.unref?.();
 
     req._importHeartbeat = hb;
-    req.importCtx = { meta, runId: run.id, endTimer: end };
+    req.importCtx = { meta, runId: run.id, endTimer: end, lockKey };
   });
 
   function stopHeartbeat(req: any) {
@@ -46,7 +58,6 @@ const plugin: FastifyPluginAsync = async (app) => {
 
     try {
       let inserted = 0;
-
       const ct = String(reply.getHeader('content-type') ?? '');
       if (ct.includes('application/json') && payload && typeof payload !== 'function') {
         const s = Buffer.isBuffer(payload) ? payload.toString('utf8') : String(payload);
@@ -65,29 +76,24 @@ const plugin: FastifyPluginAsync = async (app) => {
         await finishImportRun(ctx.runId, { status: 'succeeded', inserted });
       } else {
         importErrors.inc({ ...ctx.meta, stage: 'response' });
-        await finishImportRun(ctx.runId, {
-          status: 'failed',
-          error: `HTTP ${reply.statusCode}`,
-        });
+        await finishImportRun(ctx.runId, { status: 'failed', error: `HTTP ${reply.statusCode}` });
       }
     } finally {
       ctx.endTimer();
       stopHeartbeat(req);
+      if (ctx.lockKey) await releaseRunLock(ctx.lockKey);
       req.importCtx = undefined;
     }
   });
 
-  // Ensure failure paths still close provenance + timer
   app.addHook('onError', async (req, _reply, err) => {
     const ctx = req.importCtx;
     if (!ctx) return;
     importErrors.inc({ ...ctx.meta, stage: 'error' });
-    await finishImportRun(ctx.runId, {
-      status: 'failed',
-      error: String(err?.message ?? err),
-    });
+    await finishImportRun(ctx.runId, { status: 'failed', error: String(err?.message ?? err) });
     ctx.endTimer();
     stopHeartbeat(req);
+    if (ctx.lockKey) await releaseRunLock(ctx.lockKey);
     req.importCtx = undefined;
   });
 };
