@@ -9,6 +9,7 @@ import { freightJson } from './commands/freight.js';
 import { hsAhtn, hsEuHs6, hsImportHs6, hsUk10, hsUsHts10 } from './commands/hs.js';
 import { runSweepStale } from './commands/sweep-stale.js';
 import { importsPrune } from './commands/prune.js';
+import { deMinimisOfficial, deMinimisSeedBaseline, deMinimisZonos } from './commands/de-minimis.js';
 
 export const commands: Record<string, Command> = {
   'fx:refresh': fxRefresh,
@@ -31,4 +32,8 @@ export const commands: Record<string, Command> = {
 
   'import:sweep-stale': runSweepStale,
   'import:prune': importsPrune,
+
+  'import:de-minimis:zonos': deMinimisZonos,
+  'import:de-minimis:official': deMinimisOfficial,
+  'import:de-minimis:seed-baseline': deMinimisSeedBaseline,
 };
