@@ -5,7 +5,7 @@ type QuoteBody = {
   dimsCm: { l: number; w: number; h: number };
   weightKg: number;
   categoryKey: string;
-  userHs6?: string;
+  hs6?: string;
   mode: 'air' | 'sea';
 };
 
@@ -104,7 +104,7 @@ function parseEl(el: HTMLElement): QuoteBody {
     dimsCm: { l: Number(g('data-l')), w: Number(g('data-w')), h: Number(g('data-h')) },
     weightKg: Number(g('data-weight')),
     categoryKey: g('data-category-key') || 'general',
-    userHs6: g('data-hs6') || undefined,
+    hs6: g('data-hs6') || undefined,
     mode: (g('data-mode') as 'air' | 'sea') || 'air',
   };
 }
