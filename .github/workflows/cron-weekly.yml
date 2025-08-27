@@ -12,90 +12,119 @@ concurrency:
 jobs:
   weekly:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     env:
       API: ${{ secrets.CLEARCOST_API_URL }}
       ADMIN: ${{ secrets.CLEARCOST_ADMIN_TOKEN }}
       API_KEY: ${{ secrets.CLEARCOST_API_KEY }}
       AHTN_URL: ${{ secrets.AHTN_SOURCE_URL }}
+      RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - name: EU HS6 titles (TARIC)
         run: |
-          curl -fS --retry 3 --retry-all-errors -X POST \
+          curl --fail-with-body --show-error --silent \
+            --retry 3 --retry-all-errors -X POST \
             -H "x-api-key: $API_KEY" \
-            "$API/internal/cron/import/hs/eu-hs6"
+            "${API%/}/internal/cron/import/hs/eu-hs6"
 
       - name: AHTN aliases (ASEAN 8-digit)
         run: |
           BODY='{}'
           if [ -n "$AHTN_URL" ]; then BODY="{\"url\":\"$AHTN_URL\"}"; fi
-          curl -fS --retry 3 --retry-all-errors -X POST \
+          curl --fail-with-body --show-error --silent \
+            --retry 3 --retry-all-errors -X POST \
             -H "x-admin-token: $ADMIN" \
             -H "content-type: application/json" \
             -d "$BODY" \
-            "$API/internal/cron/import/hs/ahtn"
+            "${API%/}/internal/cron/import/hs/ahtn"
 
       - name: WITS (ASEAN intra-preferential)
         run: |
-          curl -fS --retry 3 --retry-all-errors -X POST \
+          curl --fail-with-body --show-error --silent \
+            --retry 3 --retry-all-errors -X POST \
             -H "x-admin-token: $ADMIN" \
             -H "content-type: application/json" \
             -d '{"backfillYears":1,"concurrency":4}' \
-            "$API/internal/cron/import/duties/wits/asean"
+            "${API%/}/internal/cron/import/duties/wits/asean"
 
       - name: WITS (Japan MFN + FTA partners)
         run: |
-          curl -fS --retry 3 --retry-all-errors -X POST \
+          curl --fail-with-body --show-error --silent \
+            --retry 3 --retry-all-errors -X POST \
             -H "x-admin-token: $ADMIN" \
             -H "content-type: application/json" \
             -d '{"backfillYears":1,"concurrency":3}' \
-            "$API/internal/cron/import/duties/wits/japan"
+            "${API%/}/internal/cron/import/duties/wits/japan"
 
       - name: EU Trade Remedies → surcharges
         run: |
-          curl -fS --retry 3 --retry-all-errors -X POST \
+          curl --fail-with-body --show-error --silent \
+            --retry 3 --retry-all-errors -X POST \
             -H "x-api-key: $API_KEY" \
-            "$API/internal/cron/import/surcharges/eu-remedies"
+            "${API%/}/internal/cron/import/surcharges/eu-remedies"
 
       - name: UK Trade Remedies → surcharges
         run: |
-          curl -fS --retry 3 --retry-all-errors -X POST \
+          curl --fail-with-body --show-error --silent \
+            --retry 3 --retry-all-errors -X POST \
             -H "x-api-key: $API_KEY" \
-            "$API/internal/cron/import/surcharges/uk-remedies"
+            "${API%/}/internal/cron/import/surcharges/uk-remedies"
 
+      - name: Prune old imports & provenance (via internal route)
+        env:
+          PRUNE_DAYS: ${{ vars.IMPORTS_PRUNE_DAYS || 90 }}
+        run: |
+          BODY="{\"days\": ${PRUNE_DAYS:-90}}"
+          curl --fail-with-body --show-error --silent \
+            --retry 3 --retry-all-errors -X POST \
+            -H "x-admin-token: $ADMIN" \
+            -H "content-type: application/json" \
+            -d "$BODY" \ 
+            "${API%/}/internal/cron/imports/prune"
+
+      # Notifications (guarded so missing webhooks don't fail the run)
       - name: Slack (success)
         if: success()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          curl -fsS -X POST -H 'Content-type: application/json' \
-            --data "{\"text\":\"✅ ${{ github.workflow }} succeeded in ${{ github.repository }} on \\\`${{ github.ref_name }}\\\`\\n${{ env.RUN_URL }}\"}" \
-            "$SLACK_WEBHOOK_URL"
+          if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+            curl -fsS -X POST -H 'Content-type: application/json' \
+              --data "{\"text\":\"✅ ${{ github.workflow }} succeeded in ${{ github.repository }} on \\\`${{ github.ref_name }}\\\`\\n${RUN_URL}\"}" \
+              "$SLACK_WEBHOOK_URL"
+          fi
 
       - name: Slack (failure)
         if: failure()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          curl -fsS -X POST -H 'Content-type: application/json' \
-            --data "{\"text\":\"🚨 ${{ github.workflow }} failed in ${{ github.repository }} on \\\`${{ github.ref_name }}\\\`\\n${{ env.RUN_URL }}\"}" \
-            "$SLACK_WEBHOOK_URL"
+          if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+            curl -fsS -X POST -H 'Content-type: application/json' \
+              --data "{\"text\":\"🚨 ${{ github.workflow }} failed in ${{ github.repository }} on \\\`${{ github.ref_name }}\\\`\\n${RUN_URL}\"}" \
+              "$SLACK_WEBHOOK_URL"
+          fi
 
       - name: Discord (success)
         if: success()
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          content="✅ **${{ github.workflow }}** succeeded in **${{ github.repository }}** on \`${{ github.ref_name }}\`\n${{ env.RUN_URL }}"
-          curl -fsS -H "Content-Type: application/json" -X POST \
-            -d "{\"content\":\"$content\"}" \
-            "$DISCORD_WEBHOOK_URL"
+          if [ -n "${DISCORD_WEBHOOK_URL:-}" ]; then
+            content="✅ **${{ github.workflow }}** succeeded in **${{ github.repository }}** on \`${{ github.ref_name }}\`\n${RUN_URL}"
+            curl -fsS -H "Content-Type: application/json" -X POST \
+              -d "{\"content\":\"$content\"}" \
+              "$DISCORD_WEBHOOK_URL"
+          fi
 
       - name: Discord (failure)
         if: failure()
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          content="🚨 **${{ github.workflow }}** failed in **${{ github.repository }}** on \`${{ github.ref_name }}\`\n${{ env.RUN_URL }}"
-          curl -fsS -H "Content-Type: application/json" -X POST \
-            -d "{\"content\":\"$content\"}" \
-            "$DISCORD_WEBHOOK_URL"
+          if [ -n "${DISCORD_WEBHOOK_URL:-}" ]; then
+            content="🚨 **${{ github.workflow }}** failed in **${{ github.repository }}** on \`${{ github.ref_name }}\`\n${RUN_URL}"
+            curl -fsS -H "Content-Type: application/json" -X POST \
+              -d "{\"content\":\"$content\"}" \
+              "$DISCORD_WEBHOOK_URL"
+          fi
