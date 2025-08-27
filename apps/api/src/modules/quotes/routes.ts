@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
-import { auditQuotesTable, db, idempotencyKeysTable } from '@clearcost/db';
+import { auditQuotesTable, db, idempotencyKeysTable, quoteSnapshotsTable } from '@clearcost/db';
 import { quoteInputSchema } from './schemas.js';
 import { withIdempotency } from '../../lib/idempotency.js';
 import { quoteLandedCost } from './services/quote-landed-cost.js';
@@ -39,7 +39,7 @@ function getIdemKey(h: unknown) {
 }
 
 export default function quoteRoutes(app: FastifyInstance) {
-  // POST /v1/quotes — compute (idempotent) + audit on fresh compute
+  // POST /v1/quotes — compute (idempotent) + audit + snapshot on fresh compute
   app.post<{
     Body: z.infer<typeof quoteInputSchema>;
     Reply: z.infer<typeof QuoteResponseSchema> | { error: unknown };
@@ -71,8 +71,12 @@ export default function quoteRoutes(app: FastifyInstance) {
           idemKey,
           req.body,
           async () => {
-            const out = await quoteLandedCost({ ...req.body, merchantId: req.apiKey?.ownerId });
+            const { quote: out, fxAsOf } = await quoteLandedCost({
+              ...req.body,
+              merchantId: req.apiKey?.ownerId,
+            });
 
+            // 1) Audit record (best-effort)
             try {
               await db.insert(auditQuotesTable).values({
                 laneOrigin: req.body.origin,
@@ -89,14 +93,29 @@ export default function quoteRoutes(app: FastifyInstance) {
                 feesQuoted: String(out.components.fees),
                 totalQuoted: String(out.total),
                 notes: out.components['checkoutVAT'] ? 'IOSS checkout VAT included' : null,
-                lowConfidence: !req.body.userHs6,
+                lowConfidence: !req.body.hs6,
               });
             } catch (e) {
               req.log.warn({ err: e, msg: 'audit insert failed' });
             }
 
+            // 2) Quote snapshot (best-effort)
+            try {
+              await db.insert(quoteSnapshotsTable).values({
+                scope: 'quotes',
+                idemKey,
+                request: req.body,
+                response: out,
+                fxAsOf,
+                dataRuns: null,
+              });
+            } catch (e) {
+              req.log.warn({ err: e, msg: 'snapshot insert failed' });
+            }
+
             return out;
           },
+          // Replay: just return cached; no new snapshot to avoid noise
           { maxAgeMs: 86_400_000, onReplay: async (cached) => cached }
         );
 
@@ -164,6 +183,7 @@ export default function quoteRoutes(app: FastifyInstance) {
     }
   );
 
+  // GET /v1/quotes/replay?key=...&scope=quotes — same as :key, but generic scope/key
   app.get<{
     Querystring: z.infer<typeof ReplayQuery>;
     Reply: QuoteResponse | { error: string };

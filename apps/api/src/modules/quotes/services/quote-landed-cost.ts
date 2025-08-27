@@ -4,11 +4,12 @@ import { and, eq } from 'drizzle-orm';
 import { EU_ISO2, volumeM3, volumetricKg } from '../utils.js';
 import { resolveHs6 } from '../../hs-codes/services/resolve-hs6.js';
 import { convertCurrency } from '../../fx/services/convert-currency.js';
-import { getDeMinimis } from '../../de-minimis/services/get-de-minimis.js';
 import { getActiveDutyRate } from '../../duty-rates/services/get-active-duty-rate.js';
 import { getSurchargesScoped } from '../../surcharges/services/get-surcharges.js';
 import { getFreight } from '../../freight/services/get-freight.js';
 import { getVatForHs6 } from '../../vat/services/get-vat-for-hs6.js';
+import { getCanonicalFxAsOf } from '../../fx/services/get-canonical-fx-asof.js';
+import { evaluateDeMinimis } from '../../de-minimis/services/evaluate.js';
 
 type Unit = 'kg' | 'm3';
 const BASE_CCY = process.env.CURRENCY_BASE ?? 'USD';
@@ -19,8 +20,19 @@ const roundMoney = (n: number, ccy: string) => {
   return Math.round(n * f) / f;
 };
 
-export async function quoteLandedCost(input: QuoteInput & { merchantId?: string }) {
+export type QuoteCalcOpts = {
+  /** Inject a pre-allocated freight amount already in destination currency. */
+  freightInDestOverride?: number;
+  /** Pin all FX conversions to this date (e.g., manifest-wide “as of”). */
+  fxAsOf?: Date;
+};
+
+export async function quoteLandedCost(
+  input: QuoteInput & { merchantId?: string },
+  opts?: QuoteCalcOpts
+) {
   const now = new Date();
+  const fxAsOf = opts?.fxAsOf ?? (await getCanonicalFxAsOf());
 
   const [profile, regs] = await Promise.all([
     input.merchantId
@@ -49,7 +61,7 @@ export async function quoteLandedCost(input: QuoteInput & { merchantId?: string 
     EU_ISO2.has(input.dest) &&
     regs.some((r) => r.jurisdiction === 'EU' && r.scheme?.toUpperCase() === 'IOSS');
 
-  const hs6 = await resolveHs6(input.categoryKey, input.userHs6);
+  const hs6 = await resolveHs6(input.categoryKey, input.hs6);
 
   const volKg = volumetricKg(input.dimsCm);
   const chargeableKg = input.mode === 'air' ? Math.max(input.weightKg, volKg) : input.weightKg;
@@ -65,34 +77,43 @@ export async function quoteLandedCost(input: QuoteInput & { merchantId?: string 
     on: now,
   });
 
-  const freightInDest = await convertCurrency(freightRow?.price ?? 0, BASE_CCY, input.dest);
+  const freightInDest =
+    opts?.freightInDestOverride ??
+    (await convertCurrency(freightRow?.price ?? 0, BASE_CCY, input.dest, { on: fxAsOf }));
 
   const itemValDest = await convertCurrency(
     input.itemValue.amount,
     input.itemValue.currency,
-    input.dest
+    input.dest,
+    { on: fxAsOf }
   );
+
   const CIF = itemValDest + freightInDest;
 
-  const dem = await getDeMinimis(input.dest);
-  const demValueDest = dem
-    ? dem.currency === input.dest
-      ? Number(dem.value)
-      : await convertCurrency(Number(dem.value), dem.currency, input.dest)
-    : null;
-  const underDeMinimis = demValueDest != null ? CIF <= demValueDest : false;
+  // De minimis decision (FX-pinned and CIF-based)
+  const dem = await evaluateDeMinimis({
+    dest: input.dest,
+    goodsDest: itemValDest,
+    freightDest: freightInDest,
+    fxAsOf,
+  });
 
   const dutyRow = await getActiveDutyRate(input.dest, hs6, now);
   const vatInfo = await getVatForHs6(input.dest, hs6, now); // { ratePct, base, source, effectiveFrom }
 
+  // -----------------
+  // Duty (MFN first)
+  // -----------------
   let duty = 0;
-  // De minimis for duty when appliesTo === 'DUTY' or 'DUTY_VAT'
-  if (!(underDeMinimis && (dem?.appliesTo === 'DUTY' || dem?.appliesTo === 'DUTY_VAT'))) {
+  if (!dem.suppressDuty) {
     const rate = dutyRow ? Number(dutyRow.ratePct) : 0;
     duty = (rate / 100) * CIF;
   }
 
-  const itemValEUR = await convertCurrency(itemValDest, input.dest, 'EUR');
+  // -----------------
+  // VAT / IOSS logic
+  // -----------------
+  const itemValEUR = await convertCurrency(itemValDest, input.dest, 'EUR', { on: fxAsOf });
   const iossEligible = wantsCheckoutVAT && itemValEUR <= 150;
 
   let vat = 0;
@@ -104,18 +125,17 @@ export async function quoteLandedCost(input: QuoteInput & { merchantId?: string 
     const chargeShippingAtCheckout = profile?.chargeShippingAtCheckout ?? false;
     const checkoutVatBase = itemValDest + (chargeShippingAtCheckout ? freightInDest : 0);
     checkoutVAT = checkoutRate * checkoutVatBase;
-  } else {
-    // Import VAT at border unless de minimis applies to VAT (or both)
-    const dmBlocksVat =
-      underDeMinimis && (dem?.appliesTo === 'VAT' || dem?.appliesTo === 'DUTY_VAT');
-    if (!dmBlocksVat) {
-      const base = (vatInfo?.base as 'CIF' | 'CIF_PLUS_DUTY') ?? 'CIF_PLUS_DUTY';
-      const vatBase = base === 'CIF_PLUS_DUTY' ? CIF + duty : CIF;
-      const vatRate = (vatInfo ? Number(vatInfo.ratePct) : 0) / 100;
-      vat = vatRate * vatBase;
-    }
+  } else if (!dem.suppressVAT) {
+    // Import VAT at border unless de minimis suppresses VAT
+    const base = (vatInfo?.base as 'CIF' | 'CIF_PLUS_DUTY') ?? 'CIF_PLUS_DUTY';
+    const vatBase = base === 'CIF_PLUS_DUTY' ? CIF + duty : CIF;
+    const vatRate = (vatInfo ? Number(vatInfo.ratePct) : 0) / 100;
+    vat = vatRate * vatBase;
   }
 
+  // -----------------
+  // Surcharges/fees
+  // -----------------
   const sur = await getSurchargesScoped({
     dest: input.dest,
     origin: input.origin,
@@ -126,9 +146,12 @@ export async function quoteLandedCost(input: QuoteInput & { merchantId?: string 
   const feesPct = sur.reduce((s, r) => s + (r.pctAmt ?? 0), 0) * (CIF / 100);
   const fees = feesFixed + feesPct;
 
+  // -----------------
+  // Output assembly
+  // -----------------
   const incoterm = (profile?.defaultIncoterm ?? 'DAP').toUpperCase() as 'DDP' | 'DAP';
-
   const currency = input.dest;
+
   const components = {
     CIF: roundMoney(CIF, currency),
     duty: roundMoney(duty, currency),
@@ -136,6 +159,7 @@ export async function quoteLandedCost(input: QuoteInput & { merchantId?: string 
     fees: roundMoney(fees, currency),
     ...(checkoutVAT ? { checkoutVAT: roundMoney(checkoutVAT, currency) } : {}),
   };
+
   const total = roundMoney(
     components.CIF +
       components.duty +
@@ -145,17 +169,36 @@ export async function quoteLandedCost(input: QuoteInput & { merchantId?: string 
     currency
   );
 
+  // Policy text prioritizes de minimis messaging, then IOSS, then standard
+  const policy =
+    dem.suppressDuty || dem.suppressVAT
+      ? dem.suppressDuty && dem.suppressVAT
+        ? 'De minimis: duty & VAT not charged at import.'
+        : dem.suppressDuty
+          ? 'De minimis: duty not charged at import.'
+          : 'De minimis: VAT not charged at import.'
+      : iossEligible
+        ? 'IOSS: VAT collected at checkout; no import VAT due.'
+        : 'Standard import tax rules apply.';
+
   return {
-    hs6,
-    currency,
-    chargeableKg,
-    freight: components.CIF - itemValDest,
-    components,
-    total,
-    guaranteedMax: roundMoney(total * 1.02, currency),
-    policy: iossEligible
-      ? 'IOSS: VAT collected at checkout; no import VAT due.'
-      : 'Standard import tax rules apply.',
-    incoterm,
+    fxAsOf,
+    quote: {
+      hs6,
+      currency,
+      chargeableKg,
+      freight: components.CIF - itemValDest,
+      deMinimis: {
+        duty: dem.duty ?? null,
+        vat: dem.vat ?? null,
+        suppressDuty: dem.suppressDuty,
+        suppressVAT: dem.suppressVAT,
+      },
+      components,
+      total,
+      guaranteedMax: roundMoney(total * 1.02, currency),
+      policy,
+      incoterm,
+    },
   };
 }

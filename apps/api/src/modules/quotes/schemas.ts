@@ -14,7 +14,8 @@ export const quoteInputSchema = z.object({
   }),
   weightKg: z.number().positive(),
   categoryKey: z.string().min(1),
-  userHs6: z
+  incoterm: z.string().min(1),
+  hs6: z
     .string()
     .regex(/^\d{6}$/)
     .optional(),
