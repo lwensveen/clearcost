@@ -9,6 +9,7 @@ import healthRoutes from './modules/health/routes.js';
 import hsRoutes from './modules/hs-codes/routes.js';
 import importInstrumentationPlugin from './plugins/import-instrumentation.js';
 import importsRunning from './plugins/prometheus/imports-running.js';
+import manifestsRoutes from './modules/manifests/routes.js';
 import metricsHttp from './plugins/prometheus/metrics-http.js';
 import prometheusHttp from './plugins/prometheus/metrics-http.js';
 import metricsImportHealth from './plugins/prometheus/metrics-import-health.js';
@@ -18,7 +19,6 @@ import rateLimit from '@fastify/rate-limit';
 import sensible from '@fastify/sensible';
 import surchargesRoutes from './modules/surcharges/routes.js';
 import swaggerPlugin from './plugins/swagger.js';
-import sweepRoutes from './modules/ops/sweep-routes.js';
 import tasksRoutes from './modules/tasks/index.js';
 import usagePlugin from './plugins/api-usage.js';
 import vatRoutes from './modules/vat/routes.js';
@@ -58,12 +58,12 @@ export async function buildServer() {
   app.register(freightRoutes, { prefix: '/v1/freight' });
   app.register(fxRoutes, { prefix: '/v1/fx' });
   app.register(hsRoutes, { prefix: '/v1/hs-codes' });
+  app.register(manifestsRoutes, { prefix: '/v1/manifests' });
   app.register(quoteRoutes, { prefix: '/v1/quotes' });
   app.register(surchargesRoutes, { prefix: '/v1/surcharges' });
   app.register(tasksRoutes);
   app.register(vatRoutes, { prefix: '/v1/vat' });
   app.register(webhookRoutes, { prefix: '/v1/webhooks' });
-  app.register(sweepRoutes);
 
   return app;
 }

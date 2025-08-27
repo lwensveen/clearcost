@@ -1,5 +1,4 @@
 import type { FastifyInstance } from 'fastify';
-
 import fxRoutes from './fx-routes.js';
 import vatRoutes from './vat-routes.js';
 import ukDutyRoutes from './duties/uk-routes.js';
@@ -13,19 +12,23 @@ import surchargeJsonRoute from './surcharges/generic-json.js';
 import freightRoutes from './freight-routes.js';
 import hsRoutes from './hs-routes.js';
 import importsPruneRoutes from './prune-routes.js';
+import poolRoutes from './pool-routes.js';
+import sweepRoutes from './sweep-routes.js';
 
 export default function taskRoutes(app: FastifyInstance) {
-  fxRoutes(app);
-  vatRoutes(app);
-  ukDutyRoutes(app);
   euDutyRoutes(app);
-  usDutyRoutes(app);
-  witsDutyRoutes(app);
-  surchargeUsRoutes(app);
-  surchargeEuRoutes(app);
-  surchargeUkRoutes(app);
-  surchargeJsonRoute(app);
   freightRoutes(app);
+  fxRoutes(app);
   hsRoutes(app);
   importsPruneRoutes(app);
+  poolRoutes(app);
+  surchargeEuRoutes(app);
+  surchargeJsonRoute(app);
+  surchargeUkRoutes(app);
+  surchargeUsRoutes(app);
+  sweepRoutes(app);
+  ukDutyRoutes(app);
+  usDutyRoutes(app);
+  vatRoutes(app);
+  witsDutyRoutes(app);
 }

@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
-import { adminGuard } from '../tasks/common.js';
+import { adminGuard } from './common.js';
 import { sweepStaleImports } from '../../lib/sweep-stale-imports.js';
 
 export default function sweepRoutes(app: FastifyInstance) {
