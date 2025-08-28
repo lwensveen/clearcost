@@ -1,0 +1,123 @@
+name: Cron (Weekly — CLI / Direct DB)
+
+on:
+  schedule:
+    - cron: '13 4 * * 0' # Sundays 04:13 UTC
+  workflow_dispatch: {}
+
+concurrency:
+  group: cron-weekly-cli
+  cancel-in-progress: false
+
+jobs:
+  heavy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      NODE_ENV: production
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATA_REMOTE_BASE: ${{ secrets.DATA_REMOTE_BASE || '' }}
+      AHTN_SOURCE_URL: ${{ secrets.AHTN_SOURCE_URL || '' }}
+      TZ: UTC
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node & Bun (with cache)
+        uses: ./.github/actions/setup-node-bun
+        with:
+          node-version: '22'
+          bun-version: 'latest'
+
+      # ------------ HS ------------
+      - name: HS — EU HS6 titles (TARIC)
+        working-directory: apps/api
+        run: bun run src/lib/cron/runtime.ts import:hs/eu-hs6
+
+      - name: HS — US HTS10 aliases
+        working-directory: apps/api
+        run: bun run src/lib/cron/runtime.ts import:hs:us-hts10
+
+      - name: HS — UK 10-digit aliases
+        working-directory: apps/api
+        run: bun run src/lib/cron/runtime.ts import:hs:uk10
+
+      - name: HS — AHTN8 (if URL provided)
+        if: ${{ env.AHTN_SOURCE_URL != '' }}
+        working-directory: apps/api
+        run: bun run src/lib/cron/runtime.ts import:hs:ahtn --url "$AHTN_SOURCE_URL"
+
+      # ---------- Duties (WITS) ----------
+      - name: Duties — WITS (ASEAN)
+        working-directory: apps/api
+        run: |
+          bun run src/lib/cron/runtime.ts import:duties:wits \
+            --dests SG,MY,TH,ID,PH,VN,BN,KH,LA,MM \
+            --partners SG,MY,TH,ID,PH,VN,BN,KH,LA,MM \
+            --backfillYears 1 \
+            --concurrency 4
+
+      - name: Duties — WITS (Japan + partners)
+        working-directory: apps/api
+        run: |
+          bun run src/lib/cron/runtime.ts import:duties:wits \
+            --dests JP \
+            --partners CN,KR,AU,NZ,TH,MY,ID,PH,VN,LA,KH,BN,SG,CA,MX,EU,GB,US \
+            --backfillYears 1 \
+            --concurrency 3
+
+      # ----------- Surcharges -----------
+      - name: Surcharges — US trade remedies
+        working-directory: apps/api
+        run: bun run src/lib/cron/runtime.ts import:surcharges:us-trade-remedies
+
+      - name: Surcharges — US (all bundle)
+        working-directory: apps/api
+        run: bun run src/lib/cron/runtime.ts import:surcharges:us-all
+
+      - name: Slack (success)
+        if: success()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+            line1="✅ ${{ github.workflow }} succeeded in ${{ github.repository }} on \`${{ github.ref_name }}\`"
+            payload=$(jq -n --arg line1 "$line1" --arg run "$RUN_URL" '{text: ($line1 + "\n" + $run)}')
+            curl -fsS -X POST -H 'Content-type: application/json' --data "$payload" "$SLACK_WEBHOOK_URL"
+          fi
+
+      - name: Slack (failure)
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+            line1="🚨 ${{ github.workflow }} failed in ${{ github.repository }} on \`${{ github.ref_name }}\`"
+            payload=$(jq -n --arg line1 "$line1" --arg run "$RUN_URL" '{text: ($line1 + "\n" + $run)}')
+            curl -fsS -X POST -H 'Content-type: application/json' --data "$payload" "$SLACK_WEBHOOK_URL"
+          fi
+
+      - name: Discord (success)
+        if: success()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -n "${DISCORD_WEBHOOK_URL:-}" ]; then
+            content="✅ **${{ github.workflow }}** succeeded in **${{ github.repository }}** on \`${{ github.ref_name }}\`\n${RUN_URL}"
+            payload=$(jq -n --arg content "$content" '{content: $content}')
+            curl -fsS -H "Content-Type: application/json" -X POST -d "$payload" "$DISCORD_WEBHOOK_URL"
+          fi
+
+      - name: Discord (failure)
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -n "${DISCORD_WEBHOOK_URL:-}" ]; then
+            content="🚨 **${{ github.workflow }}** failed in **${{ github.repository }}** on \`${{ github.ref_name }}\`\n${RUN_URL}"
+            payload=$(jq -n --arg content "$content" '{content: $content}')
+            curl -fsS -H "Content-Type: application/json" -X POST -d "$payload" "$DISCORD_WEBHOOK_URL"
+          fi

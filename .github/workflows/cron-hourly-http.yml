@@ -1,0 +1,79 @@
+name: Cron (Hourly — HTTP)
+
+on:
+  schedule:
+    - cron: '0 * * * *' # hourly
+  workflow_dispatch: {}
+
+concurrency:
+  group: cron-hourly-http
+  cancel-in-progress: false
+
+jobs:
+  hourly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      API: ${{ secrets.CLEARCOST_API_URL }}
+      TASKS_KEY: ${{ secrets.CLEARCOST_TASKS_API_KEY }}
+      THRESHOLD_MINUTES: ${{ vars.IMPORTS_SWEEP_THRESHOLD_MINUTES || 30 }}
+    steps:
+      - name: Sweep stale imports
+        run: |
+          set -euo pipefail
+          BODY="{\"thresholdMinutes\": ${THRESHOLD_MINUTES}}"
+          curl --fail-with-body --show-error --silent \
+            --retry 3 --retry-all-errors \
+            -X POST \
+            -H "x-api-key: $TASKS_KEY" \
+            -H "content-type: application/json" \
+            -d "$BODY" \
+            "${API%/}/internal/cron/imports/sweep-stale" | jq .
+
+      - name: Slack (success)
+        if: success()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+            line1="✅ ${{ github.workflow }} succeeded in ${{ github.repository }} on \`${{ github.ref_name }}\`"
+            payload=$(jq -n --arg line1 "$line1" --arg run "$RUN_URL" '{text: ($line1 + "\n" + $run)}')
+            curl -fsS -X POST -H 'Content-type: application/json' --data "$payload" "$SLACK_WEBHOOK_URL"
+          fi
+
+      - name: Slack (failure)
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+            line1="🚨 ${{ github.workflow }} failed in ${{ github.repository }} on \`${{ github.ref_name }}\`"
+            payload=$(jq -n --arg line1 "$line1" --arg run "$RUN_URL" '{text: ($line1 + "\n" + $run)}')
+            curl -fsS -X POST -H 'Content-type: application/json' --data "$payload" "$SLACK_WEBHOOK_URL"
+          fi
+
+      - name: Discord (success)
+        if: success()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -n "${DISCORD_WEBHOOK_URL:-}" ]; then
+            content="✅ **${{ github.workflow }}** succeeded in **${{ github.repository }}** on \`${{ github.ref_name }}\`\n${RUN_URL}"
+            payload=$(jq -n --arg content "$content" '{content: $content}')
+            curl -fsS -H "Content-Type: application/json" -X POST -d "$payload" "$DISCORD_WEBHOOK_URL"
+          fi
+
+      - name: Discord (failure)
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -n "${DISCORD_WEBHOOK_URL:-}" ]; then
+            content="🚨 **${{ github.workflow }}** failed in **${{ github.repository }}** on \`${{ github.ref_name }}\`\n${RUN_URL}"
+            payload=$(jq -n --arg content "$content" '{content: $content}')
+            curl -fsS -H "Content-Type: application/json" -X POST -d "$payload" "$DISCORD_WEBHOOK_URL"
+          fi
