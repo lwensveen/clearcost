@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { db, webhookDeliveriesTable, webhookEndpointsTable } from '@clearcost/db';
 import crypto from 'node:crypto';
+import { decryptSecret } from '../utils.js';
 
 type EventName = 'quote.created';
 type Payload = Record<string, unknown>;
@@ -19,8 +20,10 @@ export async function emitWebhook(ownerId: string, event: EventName, payload: Pa
     .select({
       id: webhookEndpointsTable.id,
       url: webhookEndpointsTable.url,
-      secret: webhookEndpointsTable.secret,
       events: webhookEndpointsTable.events,
+      secretEnc: webhookEndpointsTable.secretEnc,
+      secretIv: webhookEndpointsTable.secretIv,
+      secretTag: webhookEndpointsTable.secretTag,
     })
     .from(webhookEndpointsTable)
     .where(
@@ -35,7 +38,8 @@ export async function emitWebhook(ownerId: string, event: EventName, payload: Pa
     const acceptsEvent = acceptsAll || ep.events.includes(event);
     if (!acceptsEvent) continue;
 
-    const deliveries = await db
+    // Create delivery record
+    const [delivery] = await db
       .insert(webhookDeliveriesTable)
       .values({
         endpointId: ep.id,
@@ -47,11 +51,30 @@ export async function emitWebhook(ownerId: string, event: EventName, payload: Pa
       })
       .returning({ id: webhookDeliveriesTable.id });
 
-    const delivery = deliveries[0];
+    if (!delivery) throw new Error('Failed to create delivery');
 
-    if (!delivery) throw Error('No deliveries');
+    // Decrypt per-endpoint; if it fails, mark as failed immediately
+    let secret: string;
+    try {
+      secret = decryptSecret(ep.secretEnc, ep.secretIv, ep.secretTag);
+    } catch (e: any) {
+      await db
+        .update(webhookDeliveriesTable)
+        .set({
+          attempt: 1,
+          status: 'failed',
+          responseStatus: 0,
+          responseBody: `secret decrypt error: ${String(e?.message ?? e)}`.slice(0, 4000),
+          deliveredAt: null,
+          updatedAt: new Date(),
+          nextAttemptAt: null,
+        })
+        .where(eq(webhookDeliveriesTable.id, delivery.id));
+      continue;
+    }
 
-    void sendAttempt(ep.id, ep.url, ep.secret, delivery.id, body);
+    // Fire-and-forget the attempt
+    void sendAttempt(ep.id, ep.url, secret, delivery.id, body);
   }
 }
 
@@ -130,7 +153,6 @@ async function sendAttempt(
     .where(eq(webhookDeliveriesTable.id, deliveryId));
 
   if (shouldRetry && next) {
-    // crude in-process timer; replace with  job runner later
     setTimeout(
       () => void sendAttempt(endpointId, url, secret, deliveryId, body),
       backoffMin * 60_000

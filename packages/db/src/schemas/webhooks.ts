@@ -17,7 +17,9 @@ export const webhookEndpointsTable = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     ownerId: uuid('owner_id').notNull(),
     url: text('url').notNull(),
-    secret: text('secret').notNull(),
+    secretEnc: text('secret_enc').notNull(),
+    secretIv: text('secret_iv').notNull(),
+    secretTag: text('secret_tag').notNull(),
     events: text('events')
       .array()
       .notNull()
