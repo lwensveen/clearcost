@@ -1,6 +1,5 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
-import { adminGuard } from './common.js';
 import { importEuHs6FromTaric } from '../hs-codes/services/aliases/eu/import-cn6-from-taric.js';
 import { importAhtnAliases } from '../hs-codes/services/aliases/import-ahtn.js';
 
@@ -9,7 +8,7 @@ export default function hsRoutes(app: FastifyInstance) {
   app.post(
     '/internal/cron/import/hs/eu-hs6',
     {
-      preHandler: app.requireApiKey(['admin:rates']),
+      preHandler: app.requireApiKey(['tasks:hs:eu-hs6']),
       config: { importMeta: { source: 'TARIC', job: 'hs:eu-hs6' } },
     },
     async (req, reply) => {
@@ -23,23 +22,29 @@ export default function hsRoutes(app: FastifyInstance) {
   app.post(
     '/internal/cron/import/hs/ahtn',
     {
-      preHandler: adminGuard,
+      preHandler: app.requireApiKey(['tasks:hs:ahtn']),
       config: { importMeta: { source: 'AHTN', job: 'hs:ahtn' } },
+      schema: {
+        body: z.object({
+          url: z.string().url().optional(),
+          batchSize: z.coerce.number().int().min(1).max(20000).optional(),
+        }),
+      },
     },
     async (req, reply) => {
-      const Body = z.object({
-        url: z.string().url().optional(),
-        batchSize: z.coerce.number().int().min(1).max(20000).optional(),
-      });
-      const b = Body.parse(req.body ?? {});
+      const { url, batchSize } = (req.body ?? {}) as {
+        url?: string;
+        batchSize?: number;
+      };
       const importId = req.importCtx?.runId;
 
       const res = await importAhtnAliases({
-        url: b.url,
-        batchSize: b.batchSize,
+        url,
+        batchSize,
         importId,
         makeSourceRef: (code8) => `ahtn8:${code8}`,
       });
+
       return reply.send(res);
     }
   );

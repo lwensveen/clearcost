@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
-import { adminGuard } from './common.js';
 import { db, importsTable, provenanceTable } from '@clearcost/db';
 import { lt } from 'drizzle-orm';
 
@@ -12,7 +11,7 @@ export default function importsPruneRoutes(app: FastifyInstance) {
   app.post<{ Body: z.infer<typeof Body> }>(
     '/internal/cron/imports/prune',
     {
-      preHandler: adminGuard,
+      preHandler: app.requireApiKey(['tasks:ops:prune']),
       config: { importMeta: { source: 'MANUAL', job: 'ops:prune' } },
       schema: { body: Body },
     },

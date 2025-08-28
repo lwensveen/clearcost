@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-import { adminGuard } from './common.js';
 import { fetchVatRowsFromOfficialSources } from '../vat/services/fetch-vat-official.js';
 import { importVatRules } from '../vat/services/import-vat.js';
 
@@ -7,7 +6,7 @@ export default function vatRoutes(app: FastifyInstance) {
   app.post(
     '/internal/cron/import/vat/auto',
     {
-      preHandler: adminGuard,
+      preHandler: app.requireApiKey(['tasks:vat:auto']),
       config: { importMeta: { source: 'OECD/IMF', job: 'vat:auto' } },
     },
     async (req, reply) => {

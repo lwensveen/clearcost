@@ -1,6 +1,5 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
-import { adminGuard } from './common.js';
 import { sweepStaleImports } from '../../lib/sweep-stale-imports.js';
 
 export default function sweepRoutes(app: FastifyInstance) {
@@ -17,15 +16,15 @@ export default function sweepRoutes(app: FastifyInstance) {
   app.post(
     '/internal/cron/imports/sweep-stale',
     {
-      preHandler: adminGuard,
+      preHandler: app.requireApiKey(['tasks:ops:sweep-stale']),
       config: { importMeta: { source: 'MANUAL', job: 'ops:sweep-stale' } },
       schema: { body: Body.optional() },
     },
     async (req, reply) => {
       const { thresholdMinutes, limit } = Body.parse(req.body ?? {});
-
       const res = await sweepStaleImports({ thresholdMinutes, limit });
 
+      // best-effort metric
       app.importsSwept?.inc(res.swept);
 
       return reply.send(res);

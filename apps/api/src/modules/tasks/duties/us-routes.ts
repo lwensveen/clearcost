@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-import { adminGuard } from '../common.js';
 import { importUsMfn } from '../../duty-rates/services/us/import-from-hts.js';
 import { importUsPreferential } from '../../duty-rates/services/us/import-preferential.js';
 
@@ -8,7 +7,7 @@ export default function usDutyRoutes(app: FastifyInstance) {
   app.post(
     '/internal/cron/import/duties/us-mfn',
     {
-      preHandler: adminGuard,
+      preHandler: app.requireApiKey(['tasks:duties:us:mfn']),
       config: { importMeta: { source: 'USITC_HTS', job: 'duties:us-mfn' } },
     },
     async (req, reply) => {
@@ -22,7 +21,7 @@ export default function usDutyRoutes(app: FastifyInstance) {
   app.post(
     '/internal/cron/import/duties/us-preferential',
     {
-      preHandler: adminGuard,
+      preHandler: app.requireApiKey(['tasks:duties:us:fta']),
       config: { importMeta: { source: 'USITC_HTS', job: 'duties:us-fta' } },
     },
     async (req, reply) => {

@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-import { adminGuard } from '../common.js';
 import { z } from 'zod/v4';
 import { fetchEuMfnDutyRates } from '../../duty-rates/services/eu/mfn.js';
 import { batchUpsertDutyRatesFromStream } from '../../duty-rates/utils/batch-upsert.js';
@@ -16,7 +15,8 @@ export default function euDutyRoutes(app: FastifyInstance) {
     app.post(
       '/internal/cron/import/duties/eu-mfn',
       {
-        preHandler: adminGuard,
+        preHandler: app.requireApiKey(['tasks:duties:eu']),
+        schema: { body: Body },
         config: { importMeta: { source: 'TARIC', job: 'duties:eu-mfn' } },
       },
       async (req, reply) => {
@@ -45,13 +45,14 @@ export default function euDutyRoutes(app: FastifyInstance) {
     app.post(
       '/internal/cron/import/duties/eu-fta',
       {
-        preHandler: adminGuard,
+        preHandler: app.requireApiKey(['tasks:duties:eu']),
+        schema: { body: Body },
         config: { importMeta: { source: 'TARIC', job: 'duties:eu-fta' } },
       },
       async (req, reply) => {
         const { hs6, partnerGeoIds, batchSize } = Body.parse(req.body ?? {});
-
         const rows = await fetchEuPreferentialDutyRates({ hs6List: hs6, partnerGeoIds });
+
         const res = await batchUpsertDutyRatesFromStream(rows, {
           batchSize,
           importId: req.importCtx?.runId,

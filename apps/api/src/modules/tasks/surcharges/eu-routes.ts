@@ -1,30 +1,32 @@
 import { FastifyInstance } from 'fastify';
-import { adminGuard } from '../common.js';
+import { z } from 'zod/v4';
 import { importEuTradeRemediesAsSurcharges } from '../../surcharges/services/eu/import-remedies.js';
 
 export default function surchargeEuRoutes(app: FastifyInstance) {
+  const Body = z.object({
+    // Optional override; if omitted we read from EU_TARIC_REMEDY_TYPES env (comma-separated)
+    measureTypeIds: z.array(z.string().min(1)).optional(),
+  });
+
   app.post(
     '/internal/cron/import/surcharges/eu-remedies',
     {
-      preHandler: adminGuard,
-
+      preHandler: app.requireApiKey(['tasks:surcharges:eu-remedies']),
+      schema: { body: Body },
       config: { importMeta: { source: 'TARIC', job: 'surcharges:eu-remedies' } },
     },
     async (req, reply) => {
-      // env → list of TARIC measure type ids that represent trade remedies
-      const raw = (process.env.EU_TARIC_REMEDY_TYPES ?? '').trim();
-      const measureTypeIds = raw
-        ? raw
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [];
-
-      const importId = req.importCtx?.runId;
+      const { measureTypeIds: override } = Body.parse(req.body ?? {});
+      const measureTypeIds =
+        override ??
+        (process.env.EU_TARIC_REMEDY_TYPES ?? '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
 
       const res = await importEuTradeRemediesAsSurcharges({
         measureTypeIds,
-        importId,
+        importId: req.importCtx?.runId,
       });
 
       return reply.send(res);

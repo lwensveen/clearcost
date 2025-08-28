@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { adminGuard, fetchJSON } from './common.js';
+import { fetchJSON } from './common.js';
 import { importFreightCards } from '../freight/services/import-cards.js';
 
 type FreightStep = { uptoQty: number; pricePerUnit: number };
@@ -22,8 +22,8 @@ export default function freightRoutes(app: FastifyInstance) {
   app.post(
     '/internal/cron/import/freight',
     {
-      preHandler: adminGuard,
-      config: { importMeta: { source: 'file', job: 'freight:json' } },
+      preHandler: app.requireApiKey(['tasks:freight:import-json']),
+      config: { importMeta: { source: 'FILE', job: 'freight:json' } },
     },
     async (req, reply) => {
       const rows = await fetchJSON<FreightCardRow[]>('freight/freight-cards.json');

@@ -14,21 +14,30 @@ import hsRoutes from './hs-routes.js';
 import importsPruneRoutes from './prune-routes.js';
 import poolRoutes from './pool-routes.js';
 import sweepRoutes from './sweep-routes.js';
+import deMinimisRoutes from './de-minimis-routes.js';
 
 export default function taskRoutes(app: FastifyInstance) {
+  // Duties
   euDutyRoutes(app);
-  freightRoutes(app);
-  fxRoutes(app);
-  hsRoutes(app);
-  importsPruneRoutes(app);
-  poolRoutes(app);
-  surchargeEuRoutes(app);
-  surchargeJsonRoute(app);
-  surchargeUkRoutes(app);
-  surchargeUsRoutes(app);
-  sweepRoutes(app);
   ukDutyRoutes(app);
   usDutyRoutes(app);
-  vatRoutes(app);
   witsDutyRoutes(app);
+
+  // Surcharges
+  surchargeEuRoutes(app);
+  surchargeUkRoutes(app);
+  surchargeUsRoutes(app);
+  surchargeJsonRoute(app);
+
+  // Other domains
+  fxRoutes(app);
+  vatRoutes(app);
+  freightRoutes(app);
+  hsRoutes(app);
+  deMinimisRoutes(app);
+
+  // Ops / utilities
+  importsPruneRoutes(app);
+  poolRoutes(app);
+  sweepRoutes(app);
 }

@@ -1,11 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
-import { adminGuard } from './common.js';
 import { computePool } from '../manifests/services/compute-pool.js';
 import { db, manifestItemQuotesTable, manifestQuotesTable } from '@clearcost/db';
 import { eq } from 'drizzle-orm';
 
-const Params = z.object({ manifestId: z.string().uuid() });
+const Params = z.object({ manifestId: z.uuid() });
 
 const BodySchema = z.object({
   allocation: z.enum(['chargeable', 'volumetric', 'weight']).default('chargeable').optional(),
@@ -19,7 +18,7 @@ export default function poolRoutes(app: FastifyInstance) {
   app.post<{ Params: z.infer<typeof Params>; Body: BodyT | undefined }>(
     '/internal/cron/pool/:manifestId/compute',
     {
-      preHandler: adminGuard,
+      preHandler: app.requireApiKey(['tasks:pool:compute']),
       config: { importMeta: { source: 'MANUAL', job: 'pool:compute' } },
       schema: { params: Params, body: BodySchema.optional() },
     },
@@ -35,7 +34,7 @@ export default function poolRoutes(app: FastifyInstance) {
   app.get<{ Params: z.infer<typeof Params> }>(
     '/internal/cron/pool/:manifestId/quotes',
     {
-      preHandler: adminGuard,
+      preHandler: app.requireApiKey(['tasks:pool:read']),
       schema: { params: Params },
     },
     async (req, reply) => {

@@ -1,65 +1,84 @@
 import { FastifyInstance } from 'fastify';
-import { adminGuard } from '../common.js';
 import { z } from 'zod/v4';
 import { importDutyRatesFromWITS } from '../../duty-rates/services/wits/import-from-wits.js';
 
+// ----------------------------
+// Shared schemas & defaults
+// ----------------------------
+const GenericBody = z.object({
+  dests: z.array(z.string().length(2)).min(1),
+  partners: z.array(z.string().length(2)).optional().default([]),
+  year: z.coerce.number().int().min(1990).max(2100).optional(),
+  backfillYears: z.coerce.number().int().min(0).max(5).default(1),
+  concurrency: z.coerce.number().int().min(1).max(6).default(3),
+  batchSize: z.coerce.number().int().min(1).max(20_000).default(5000),
+  hs6List: z.array(z.string().regex(/^\d{6}$/)).optional(),
+});
+type GenericBodyT = z.infer<typeof GenericBody>;
+
+const AseanBody = z.object({
+  year: z.coerce.number().int().min(1990).max(2100).optional(),
+  backfillYears: z.coerce.number().int().min(0).max(5).default(1),
+  concurrency: z.coerce.number().int().min(1).max(6).default(4),
+  hs6: z.array(z.string().regex(/^\d{6}$/)).optional(),
+  dests: z.array(z.string().length(2)).optional(),
+  partners: z.array(z.string().length(2)).optional(),
+});
+type AseanBodyT = z.infer<typeof AseanBody>;
+
+const JapanBody = z.object({
+  year: z.coerce.number().int().min(1990).max(2100).optional(),
+  backfillYears: z.coerce.number().int().min(0).max(5).default(1),
+  concurrency: z.coerce.number().int().min(1).max(6).default(3),
+  hs6: z.array(z.string().regex(/^\d{6}$/)).optional(),
+  partners: z.array(z.string().length(2)).optional(),
+});
+type JapanBodyT = z.infer<typeof JapanBody>;
+
 export default function witsDutyRoutes(app: FastifyInstance) {
+  // ----------------------------
   // WITS (MFN + Preferential): generic
+  // ----------------------------
   app.post(
     '/internal/cron/import/duties/wits',
     {
-      preHandler: adminGuard,
+      preHandler: app.requireApiKey(['tasks:duties:wits']),
+      schema: { body: GenericBody },
       config: { importMeta: { source: 'WITS', job: 'duties:wits' } },
     },
     async (req, reply) => {
-      const Body = z.object({
-        dests: z.array(z.string().length(2)).min(1),
-        partners: z.array(z.string().length(2)).optional(),
-        year: z.coerce.number().int().min(1990).max(2100).optional(),
-        backfillYears: z.coerce.number().int().min(0).max(5).optional(),
-        concurrency: z.coerce.number().int().min(1).max(6).optional(),
-        batchSize: z.coerce.number().int().min(1).max(20000).optional(),
-        hs6List: z.array(z.string().regex(/^\d{6}$/)).optional(),
-      });
-      const p = Body.parse(req.body ?? {});
-      const importId = req.importCtx?.runId;
+      const p: GenericBodyT = GenericBody.parse(req.body ?? {});
 
       const res = await importDutyRatesFromWITS({
-        dests: p.dests,
-        partners: p.partners ?? [],
+        dests: p.dests.map((s) => s.toUpperCase()),
+        partners: (p.partners ?? []).map((s) => s.toUpperCase()),
         year: p.year,
-        backfillYears: p.backfillYears ?? 1,
-        concurrency: p.concurrency ?? 3,
-        batchSize: p.batchSize ?? 5000,
+        backfillYears: p.backfillYears,
+        concurrency: p.concurrency,
+        batchSize: p.batchSize,
         hs6List: p.hs6List,
-        importId,
+        importId: req.importCtx?.runId,
       });
 
       return reply.send(res);
     }
   );
 
+  // ----------------------------
   // WITS: ASEAN preset
+  // ----------------------------
   app.post(
     '/internal/cron/import/duties/wits/asean',
     {
-      preHandler: adminGuard,
+      preHandler: app.requireApiKey(['tasks:duties:wits:asean']),
+      schema: { body: AseanBody },
       config: { importMeta: { source: 'WITS', job: 'duties:wits:asean' } },
     },
     async (req, reply) => {
-      const Body = z.object({
-        year: z.coerce.number().int().min(1990).max(2100).optional(),
-        backfillYears: z.coerce.number().int().min(0).max(5).default(1),
-        concurrency: z.coerce.number().int().min(1).max(6).default(4),
-        hs6: z.array(z.string().regex(/^\d{6}$/)).optional(),
-        dests: z.array(z.string().length(2)).optional(),
-        partners: z.array(z.string().length(2)).optional(),
-      });
-      const b = Body.parse(req.body ?? {});
+      const b: AseanBodyT = AseanBody.parse(req.body ?? {});
       const defaultDests = ['SG', 'MY', 'TH', 'ID', 'PH', 'VN', 'BN', 'KH', 'LA', 'MM'];
       const dests = (b.dests ?? defaultDests).map((s) => s.toUpperCase());
       const partners = (b.partners ?? defaultDests).map((s) => s.toUpperCase());
-      const importId = req.importCtx?.runId;
 
       const res = await importDutyRatesFromWITS({
         dests,
@@ -69,29 +88,25 @@ export default function witsDutyRoutes(app: FastifyInstance) {
         concurrency: b.concurrency,
         batchSize: 5000,
         hs6List: b.hs6,
-        importId,
+        importId: req.importCtx?.runId,
       });
 
       return reply.send(res);
     }
   );
 
+  // ----------------------------
   // WITS: Japan preset
+  // ----------------------------
   app.post(
     '/internal/cron/import/duties/wits/japan',
     {
-      preHandler: adminGuard,
+      preHandler: app.requireApiKey(['tasks:duties:wits:japan']),
+      schema: { body: JapanBody },
       config: { importMeta: { source: 'WITS', job: 'duties:wits:japan' } },
     },
     async (req, reply) => {
-      const Body = z.object({
-        year: z.coerce.number().int().min(1990).max(2100).optional(),
-        backfillYears: z.coerce.number().int().min(0).max(5).default(1),
-        concurrency: z.coerce.number().int().min(1).max(6).default(3),
-        hs6: z.array(z.string().regex(/^\d{6}$/)).optional(),
-        partners: z.array(z.string().length(2)).optional(),
-      });
-      const b = Body.parse(req.body ?? {});
+      const b: JapanBodyT = JapanBody.parse(req.body ?? {});
       const defaultPartners = [
         'CN',
         'KR',
@@ -113,7 +128,6 @@ export default function witsDutyRoutes(app: FastifyInstance) {
         'US',
       ];
       const partners = (b.partners ?? defaultPartners).map((s) => s.toUpperCase());
-      const importId = req.importCtx?.runId;
 
       const res = await importDutyRatesFromWITS({
         dests: ['JP'],
@@ -123,7 +137,7 @@ export default function witsDutyRoutes(app: FastifyInstance) {
         concurrency: b.concurrency,
         batchSize: 5000,
         hs6List: b.hs6,
-        importId,
+        importId: req.importCtx?.runId,
       });
 
       return reply.send(res);
