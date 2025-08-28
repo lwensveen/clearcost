@@ -4,14 +4,14 @@ codecov:
 coverage:
   precision: 2
   round: down
-  range: "70...100"
+  range: '70...100'
 
   ignore:
-    - "packages/**/dist/**"
-    - "coverage/**"
-    - "node_modules/**"
-    - "**/*.d.ts"
-    - "**/*.test.ts"
+    - 'packages/**/dist/**'
+    - 'coverage/**'
+    - 'node_modules/**'
+    - '**/*.d.ts'
+    - '**/*.test.ts'
 
   status:
     project:
@@ -24,6 +24,6 @@ coverage:
         threshold: 5%
 
 comment:
-  layout: "header, diff, footer"
+  layout: 'header, diff, footer'
   behavior: default
   require_changes: true
