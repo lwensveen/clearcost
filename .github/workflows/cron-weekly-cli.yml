@@ -20,7 +20,7 @@ jobs:
       AHTN_SOURCE_URL: ${{ secrets.AHTN_SOURCE_URL || '' }}
       TZ: UTC
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Node & Bun (with cache)
         uses: ./.github/actions/setup-node-bun
