@@ -2,9 +2,30 @@ import type { FastifyInstance } from 'fastify';
 import { registry } from '../../lib/metrics.js';
 
 export default function metricsRoutes(app: FastifyInstance) {
-  app.get('/metrics', async (_req, reply) => {
-    // If you want to guard, replace with your admin guard (or IP filter)
-    reply.header('Content-Type', registry.contentType);
-    return reply.send(await registry.metrics());
-  });
+  // Prometheus scrape (protected)
+  app.get(
+    '/metrics',
+    {
+      preHandler: app.requireApiKey(['ops:metrics']),
+      config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
+    },
+    async (_req, reply) => {
+      const body = await registry.metrics();
+      reply.header('content-type', registry.contentType).header('cache-control', 'no-store');
+      return reply.send(body);
+    }
+  );
+
+  // HEAD variant (auth + quick check)
+  app.head(
+    '/metrics',
+    {
+      preHandler: app.requireApiKey(['ops:metrics']),
+      config: { rateLimit: { max: 300, timeWindow: '1 minute' } },
+    },
+    async (_req, reply) => {
+      reply.header('content-type', registry.contentType).header('cache-control', 'no-store');
+      return reply.send();
+    }
+  );
 }
