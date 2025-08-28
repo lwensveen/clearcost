@@ -15,7 +15,7 @@ function normalizeBase(base: unknown): VatBase {
 }
 
 /**
- * Fetch the most recent VAT rule for a destination and kind that is active on `on`.
+ * Fetch the most recent VAT duty_rule for a destination and kind that is active on `on`.
  * - Defaults to kind = 'STANDARD'
  * - Chooses the row with the greatest effectiveFrom <= `on`
  * - Returns numeric fields coerced to numbers for convenience
@@ -30,15 +30,15 @@ export async function getVat(
   const [row] = await db
     .select({
       ratePct: vatRulesTable.ratePct,
-      base: vatRulesTable.base,
-      kind: vatRulesTable.kind,
+      vatBase: vatRulesTable.vatBase,
+      vatRateKind: vatRulesTable.vatRateKind,
       effectiveFrom: vatRulesTable.effectiveFrom,
     })
     .from(vatRulesTable)
     .where(
       and(
         eq(vatRulesTable.dest, destISO2),
-        eq(vatRulesTable.kind, kind),
+        eq(vatRulesTable.vatRateKind, kind),
         lte(vatRulesTable.effectiveFrom, on)
       )
     )
@@ -49,8 +49,8 @@ export async function getVat(
 
   return {
     ratePct: Number(row.ratePct),
-    base: normalizeBase(row.base),
-    kind: row.kind as VatRateKind,
+    vatBase: normalizeBase(row.vatBase),
+    vatRateKind: row.vatRateKind as VatRateKind,
     effectiveFrom: row.effectiveFrom ?? null,
   };
 }

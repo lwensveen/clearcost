@@ -102,7 +102,7 @@ export async function importEuTradeRemediesAsSurcharges(
 
     // Map TARIC measureTypeId to our surcharge code (AD/CVD/Safeguard).
     // You can refine/branch this if you pass separate type sets.
-    const code =
+    const surchargeCode =
       /dump/i.test(geoName ?? '') || /ad/i.test(m.measureTypeId)
         ? 'ANTIDUMPING'
         : /countervail|subsid/i.test(geoName ?? '')
@@ -113,7 +113,7 @@ export async function importEuTradeRemediesAsSurcharges(
       dest: 'EU',
       origin,
       hs6: toHs6(m.code10),
-      code,
+      surchargeCode: surchargeCode,
       pctAmt: toNumeric3String(c.pct),
       fixedAmt: null,
       effectiveFrom: start,

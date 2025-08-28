@@ -38,7 +38,7 @@ export async function batchUpsertSurchargesFromStream(
           surchargesTable.dest,
           surchargesTable.origin,
           surchargesTable.hs6,
-          surchargesTable.code,
+          surchargesTable.surchargeCode,
           surchargesTable.effectiveFrom,
         ],
         set: {
@@ -65,7 +65,7 @@ export async function batchUpsertSurchargesFromStream(
             dest: row.dest,
             origin: row.origin ?? null,
             hs6: row.hs6 ?? null,
-            code: row.code,
+            surchargeCode: row.surchargeCode,
             fixedAmt: row.fixedAmt ?? null,
             pctAmt: row.pctAmt ?? null,
             ef: row.effectiveFrom?.toISOString(),

@@ -2,8 +2,8 @@ import { db } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
 
 /** Default lock key if you don't set a custom one on the route. */
-export function makeLockKey(meta: { source: string; job: string }, extra?: string) {
-  return extra ? `${meta.source}:${meta.job}:${extra}` : `${meta.source}:${meta.job}`;
+export function makeLockKey(meta: { importSource: string; job: string }, extra?: string) {
+  return extra ? `${meta.importSource}:${meta.job}:${extra}` : `${meta.importSource}:${meta.job}`;
 }
 
 /** Try to acquire a PG advisory lock for this key. Returns true if lock acquired. */

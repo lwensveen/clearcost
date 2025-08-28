@@ -7,8 +7,8 @@ export type VatRateKind = 'STANDARD' | 'REDUCED' | 'SUPER_REDUCED' | 'ZERO';
 
 export type CountryVatRow = {
   ratePct: number; // VAT % (coerced from NUMERIC)
-  base: VatBase; // VAT base used for import VAT math
-  kind: VatRateKind; // which rate kind this row represents
+  vatBase: VatBase; // VAT base used for import VAT math
+  vatRateKind: VatRateKind; // which rate kind this row represents
   effectiveFrom: Date | null;
 };
 

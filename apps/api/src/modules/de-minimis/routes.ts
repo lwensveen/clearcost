@@ -21,14 +21,14 @@ const ThresholdResponse = z.object({
     .object({
       currency: z.string().length(3),
       value: z.number(),
-      basis: z.enum(['INTRINSIC', 'CIF']),
+      deMinimisBasis: z.enum(['INTRINSIC', 'CIF']),
     })
     .nullable(),
   vat: z
     .object({
       currency: z.string().length(3),
       value: z.number(),
-      basis: z.enum(['INTRINSIC', 'CIF']),
+      deMinimisBasis: z.enum(['INTRINSIC', 'CIF']),
     })
     .nullable(),
 });
@@ -37,14 +37,14 @@ const EvalResponse = z.object({
   duty: z
     .object({
       thresholdDest: z.number(),
-      basis: z.enum(['INTRINSIC', 'CIF']),
+      deMinimisBasis: z.enum(['INTRINSIC', 'CIF']),
       under: z.boolean(),
     })
     .optional(),
   vat: z
     .object({
       thresholdDest: z.number(),
-      basis: z.enum(['INTRINSIC', 'CIF']),
+      deMinimisBasis: z.enum(['INTRINSIC', 'CIF']),
       under: z.boolean(),
     })
     .optional(),

@@ -36,7 +36,7 @@ export async function* streamMpfRows(): AsyncGenerator<SurchargeInsert> {
     dest: 'US',
     origin: null,
     hs6: null,
-    code: 'MPF',
+    surchargeCode: 'MPF',
     pctAmt: pct,
     fixedAmt: null,
     effectiveFrom,

@@ -17,7 +17,7 @@ export default function surchargeUsRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:surcharges:us-trade-remedies']),
         schema: { body: Body.optional() },
-        config: { importMeta: { source: 'USITC_HTS', job: 'surcharges:us-trade-remedies' } },
+        config: { importMeta: { importSource: 'USITC_HTS', job: 'surcharges:us-trade-remedies' } },
       },
       async (req, reply) => {
         const { effectiveFrom, skipFree, batchSize } = Body.parse(req.body ?? {});
@@ -46,7 +46,7 @@ export default function surchargeUsRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:surcharges:us-all']),
         schema: { body: Body.optional() },
-        config: { importMeta: { source: 'US', job: 'surcharges:us-all' } },
+        config: { importMeta: { importSource: 'US', job: 'surcharges:us-all' } },
       },
       async (req, reply) => {
         const { batchSize } = Body.parse(req.body ?? {});

@@ -25,7 +25,7 @@ export const dutiesWits: Command = async (args) => {
 
   const payload = await withRun<any>(
     {
-      source: 'WITS',
+      importSource: 'WITS',
       job: 'duties:wits',
       params: { dests, partners, year, backfillYears, concurrency, batchSize, hs6List },
     },
@@ -39,8 +39,8 @@ export const dutiesWits: Command = async (args) => {
         batchSize,
         hs6List: hs6List.length ? hs6List : undefined,
         importId,
-        makeSourceRef: ({ dest, hs6, rule, effectiveFrom }) =>
-          `wits:${dest}:${rule}:${hs6}:${String(effectiveFrom).slice(0, 10)}`,
+        makeSourceRef: ({ dest, hs6, dutyRule, effectiveFrom }) =>
+          `wits:${dest}:${dutyRule}:${hs6}:${String(effectiveFrom).slice(0, 10)}`,
       });
       const inserted = res?.inserted ?? 0;
 

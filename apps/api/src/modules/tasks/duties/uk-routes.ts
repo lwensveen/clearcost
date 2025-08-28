@@ -16,7 +16,7 @@ export default function ukDutyRoutes(app: FastifyInstance) {
           batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
         }),
       },
-      config: { importMeta: { source: 'UK_TT', job: 'duties:uk-mfn' } },
+      config: { importMeta: { importSource: 'UK_TT', job: 'duties:uk-mfn' } },
     },
     async (req, reply) => {
       const Body = z.object({
@@ -48,7 +48,7 @@ export default function ukDutyRoutes(app: FastifyInstance) {
           batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
         }),
       },
-      config: { importMeta: { source: 'UK_TT', job: 'duties:uk-fta' } },
+      config: { importMeta: { importSource: 'UK_TT', job: 'duties:uk-fta' } },
     },
     async (req, reply) => {
       const Body = z.object({

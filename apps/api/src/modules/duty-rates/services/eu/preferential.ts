@@ -122,7 +122,7 @@ export async function fetchEuPreferentialDutyRates(
       partner: partnerCode ?? null,
       hs6: toHs6(measureRow.code10),
       ratePct: toNumeric3String(component.pct),
-      rule: 'fta',
+      dutyRule: 'fta',
       effectiveFrom: startDate,
       effectiveTo: endDate,
       notes:

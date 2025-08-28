@@ -44,7 +44,7 @@ export default function witsDutyRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:duties:wits']),
       schema: { body: GenericBody },
-      config: { importMeta: { source: 'WITS', job: 'duties:wits' } },
+      config: { importMeta: { importSource: 'WITS', job: 'duties:wits' } },
     },
     async (req, reply) => {
       const p: GenericBodyT = GenericBody.parse(req.body ?? {});
@@ -72,7 +72,7 @@ export default function witsDutyRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:duties:wits:asean']),
       schema: { body: AseanBody },
-      config: { importMeta: { source: 'WITS', job: 'duties:wits:asean' } },
+      config: { importMeta: { importSource: 'WITS', job: 'duties:wits:asean' } },
     },
     async (req, reply) => {
       const b: AseanBodyT = AseanBody.parse(req.body ?? {});
@@ -103,7 +103,7 @@ export default function witsDutyRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:duties:wits:japan']),
       schema: { body: JapanBody },
-      config: { importMeta: { source: 'WITS', job: 'duties:wits:japan' } },
+      config: { importMeta: { importSource: 'WITS', job: 'duties:wits:japan' } },
     },
     async (req, reply) => {
       const b: JapanBodyT = JapanBody.parse(req.body ?? {});

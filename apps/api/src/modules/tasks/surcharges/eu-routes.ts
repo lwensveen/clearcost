@@ -13,7 +13,7 @@ export default function surchargeEuRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:surcharges:eu-remedies']),
       schema: { body: Body },
-      config: { importMeta: { source: 'TARIC', job: 'surcharges:eu-remedies' } },
+      config: { importMeta: { importSource: 'TARIC', job: 'surcharges:eu-remedies' } },
     },
     async (req, reply) => {
       const { measureTypeIds: override } = Body.parse(req.body ?? {});

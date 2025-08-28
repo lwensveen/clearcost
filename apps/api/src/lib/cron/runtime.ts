@@ -62,25 +62,29 @@ export function buildImportId(kind: string, parts: Array<string | number | undef
 }
 
 export async function withRun<T>(
-  ctx: { source: ImportSource; job: string; params?: any },
+  ctx: { importSource: ImportSource; job: string; params?: any },
   work: (importId: string) => Promise<{ inserted: number; payload: T }>
 ): Promise<T> {
-  const end = startImportTimer({ source: ctx.source, job: ctx.job });
-  const run = await startImportRun({ source: ctx.source, job: ctx.job, params: ctx.params ?? {} });
+  const end = startImportTimer({ importSource: ctx.importSource, job: ctx.job });
+  const run = await startImportRun({
+    importSource: ctx.importSource,
+    job: ctx.job,
+    params: ctx.params ?? {},
+  });
   try {
     const { inserted, payload } = await work(run.id);
 
-    importRowsInserted.inc({ source: ctx.source, job: ctx.job }, inserted ?? 0);
-    setLastRunNow({ source: ctx.source, job: ctx.job });
+    importRowsInserted.inc({ source: ctx.importSource, job: ctx.job }, inserted ?? 0);
+    setLastRunNow({ importSource: ctx.importSource, job: ctx.job });
     end();
 
-    await finishImportRun(run.id, { status: 'succeeded', inserted });
+    await finishImportRun(run.id, { importStatus: 'succeeded', inserted });
 
     return payload;
   } catch (err: any) {
     end();
-    importErrors.inc({ source: ctx.source, job: ctx.job, stage: 'script' });
-    await finishImportRun(run.id, { status: 'failed', error: String(err?.message ?? err) });
+    importErrors.inc({ source: ctx.importSource, job: ctx.job, stage: 'script' });
+    await finishImportRun(run.id, { importStatus: 'failed', error: String(err?.message ?? err) });
     throw err;
   }
 }

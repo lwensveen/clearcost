@@ -10,7 +10,7 @@ export const dutyRatesTable = pgTable(
     partner: varchar('partner', { length: 2 }),
     hs6: varchar('hs6', { length: 6 }).notNull(),
     ratePct: numeric('rate_pct', { precision: 6, scale: 3 }).notNull(), // e.g., 16.500
-    rule: dutyRuleEnum('rule').default('mfn').notNull(), // MFN by default
+    dutyRule: dutyRuleEnum('duty_rule').default('mfn').notNull(), // MFN by default
     currency: varchar('currency', { length: 3 }).default('USD').notNull(), // display currency (optional)
     effectiveFrom: createTimestampColumn('effective_from', { defaultNow: true }),
     effectiveTo: createTimestampColumn('effective_to', { defaultNow: true }),

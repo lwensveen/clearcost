@@ -7,7 +7,7 @@ export default function fxRoutes(app: FastifyInstance) {
     '/internal/cron/fx/daily',
     {
       preHandler: app.requireApiKey(['tasks:fx:daily']),
-      config: { importMeta: { source: 'ECB', job: 'fx:daily' } },
+      config: { importMeta: { importSource: 'ECB', job: 'fx:daily' } },
     },
     async (_req, reply) => {
       const { base, fxAsOf, inserted } = await refreshFx();

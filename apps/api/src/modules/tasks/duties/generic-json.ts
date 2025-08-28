@@ -15,7 +15,7 @@ export default function dutyJsonRoute(app: FastifyInstance) {
           200: z.object({ ok: z.literal(true), count: z.number() }),
         },
       },
-      config: { importMeta: { source: 'FILE', job: 'duties:json' } },
+      config: { importMeta: { importSource: 'FILE', job: 'duties:json' } },
     },
     async (_req, reply) => {
       const rows = await fetchJSON<DutyRateInsert[]>('duties/duty-rates.json');
@@ -25,7 +25,7 @@ export default function dutyJsonRoute(app: FastifyInstance) {
           dest: String(r.dest).toUpperCase(),
           hs6: String(r.hs6).slice(0, 6),
           ratePct: r.ratePct,
-          rule: r.rule,
+          dutyRule: r.dutyRule,
           currency: r.currency,
           effectiveFrom: r.effectiveFrom,
           effectiveTo: r.effectiveTo,

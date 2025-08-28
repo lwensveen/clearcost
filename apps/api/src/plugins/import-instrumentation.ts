@@ -30,7 +30,7 @@ const plugin: FastifyPluginAsync = async (app) => {
     // 3) start metrics + provenance
     const end = startImportTimer(meta);
     const run = await startImportRun({
-      source: meta.source,
+      importSource: meta.importSource,
       job: meta.job,
       params: (req.body ?? {}) as Record<string, unknown>,
     });
@@ -73,10 +73,13 @@ const plugin: FastifyPluginAsync = async (app) => {
       if (ok) {
         importRowsInserted.inc(ctx.meta, inserted);
         setLastRunNow(ctx.meta);
-        await finishImportRun(ctx.runId, { status: 'succeeded', inserted });
+        await finishImportRun(ctx.runId, { importStatus: 'succeeded', inserted });
       } else {
         importErrors.inc({ ...ctx.meta, stage: 'response' });
-        await finishImportRun(ctx.runId, { status: 'failed', error: `HTTP ${reply.statusCode}` });
+        await finishImportRun(ctx.runId, {
+          importStatus: 'failed',
+          error: `HTTP ${reply.statusCode}`,
+        });
       }
     } finally {
       ctx.endTimer();
@@ -90,7 +93,10 @@ const plugin: FastifyPluginAsync = async (app) => {
     const ctx = req.importCtx;
     if (!ctx) return;
     importErrors.inc({ ...ctx.meta, stage: 'error' });
-    await finishImportRun(ctx.runId, { status: 'failed', error: String(err?.message ?? err) });
+    await finishImportRun(ctx.runId, {
+      importStatus: 'failed',
+      error: String(err?.message ?? err),
+    });
     ctx.endTimer();
     stopHeartbeat(req);
     if (ctx.lockKey) await releaseRunLock(ctx.lockKey);

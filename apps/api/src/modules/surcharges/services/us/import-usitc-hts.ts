@@ -105,7 +105,7 @@ export async function importUsTradeRemediesFromHTS(
       dest: 'US',
       origin: 'CN',
       hs6: null, // v2: map coverage into hs6 via U.S. Notes
-      code: 'TRADE_REMEDY_301',
+      surchargeCode: 'TRADE_REMEDY_301',
       pctAmt: b.maxPct.toFixed(3),
       fixedAmt: null,
       effectiveFrom,
@@ -119,7 +119,7 @@ export async function importUsTradeRemediesFromHTS(
       dest: 'US',
       origin: null,
       hs6: null,
-      code: 'TRADE_REMEDY_232',
+      surchargeCode: 'TRADE_REMEDY_232',
       pctAmt: b.maxPct.toFixed(3),
       fixedAmt: null,
       effectiveFrom,
@@ -134,7 +134,7 @@ export async function importUsTradeRemediesFromHTS(
     batchSize: opts.batchSize ?? 5000,
     importId: opts.importId,
     makeSourceRef: (r) => {
-      const program = r.code === 'TRADE_REMEDY_301' ? '301' : '232';
+      const program = r.surchargeCode === 'TRADE_REMEDY_301' ? '301' : '232';
       const origin = r.origin ?? 'ALL';
       const hs = r.hs6 ?? 'ALL';
       const ef = r.effectiveFrom instanceof Date ? r.effectiveFrom.toISOString().slice(0, 10) : '';

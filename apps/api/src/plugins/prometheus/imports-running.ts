@@ -27,7 +27,7 @@ export default fp(async (app) => {
     const rows = await db
       .select({ updatedAt: importsTable.updatedAt })
       .from(importsTable)
-      .where(eq(importsTable.status, 'running'));
+      .where(eq(importsTable.importStatus, 'running'));
 
     const items = rows as Array<{ updatedAt: Date | string }>;
     const now = Date.now();

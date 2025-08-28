@@ -24,7 +24,7 @@ export async function sweepStaleImports(
     const staleIds = await db
       .select({ id: importsTable.id })
       .from(importsTable)
-      .where(and(eq(importsTable.status, 'running'), lt(importsTable.updatedAt, cutoff)))
+      .where(and(eq(importsTable.importStatus, 'running'), lt(importsTable.updatedAt, cutoff)))
       .orderBy(asc(importsTable.updatedAt))
       .limit(opts.limit);
 
@@ -36,7 +36,7 @@ export async function sweepStaleImports(
     const rows = await db
       .update(importsTable)
       .set({
-        status: 'failed', // enum in schema
+        importStatus: 'failed', // enum in schema
         error: `stale heartbeat > ${thresholdMinutes}m`,
         finishedAt: sql`now()`,
         updatedAt: sql`now()`,
@@ -50,12 +50,12 @@ export async function sweepStaleImports(
   const rows = await db
     .update(importsTable)
     .set({
-      status: 'failed',
+      importStatus: 'failed',
       error: `stale heartbeat > ${thresholdMinutes}m`,
       finishedAt: sql`now()`,
       updatedAt: sql`now()`,
     })
-    .where(and(eq(importsTable.status, 'running'), lt(importsTable.updatedAt, cutoff)))
+    .where(and(eq(importsTable.importStatus, 'running'), lt(importsTable.updatedAt, cutoff)))
     .returning({ id: importsTable.id });
 
   return { ok: true as const, swept: rows.length, thresholdMinutes, cutoff };

@@ -12,7 +12,7 @@ export default function importsPruneRoutes(app: FastifyInstance) {
     '/internal/cron/imports/prune',
     {
       preHandler: app.requireApiKey(['tasks:ops:prune']),
-      config: { importMeta: { source: 'MANUAL', job: 'ops:prune' } },
+      config: { importMeta: { importSource: 'MANUAL', job: 'ops:prune' } },
       schema: { body: Body },
     },
     async (req, reply) => {

@@ -4,7 +4,7 @@ import { refreshFx } from '../../refresh-fx.js';
 
 export const fxRefresh: Command = async () => {
   const payload = await withRun<{ ok: true; inserted: number }>(
-    { source: 'ECB', job: 'fx:daily' },
+    { importSource: 'ECB', job: 'fx:daily' },
     async () => {
       const { inserted } = await refreshFx();
       return { inserted, payload: { ok: true, inserted } };

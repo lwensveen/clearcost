@@ -3,7 +3,7 @@ import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from 'prom
 export const registry = new Registry();
 collectDefaultMetrics({ register: registry, prefix: 'clearcost_' });
 
-type Labels = { source: string; job: string; dest?: string };
+type Labels = { importSource: string; job: string; dest?: string };
 
 export const importRowsFetched = new Counter({
   name: 'clearcost_import_rows_fetched_total',

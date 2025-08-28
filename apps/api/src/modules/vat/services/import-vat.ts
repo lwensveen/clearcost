@@ -21,8 +21,8 @@ export async function importVatRules(rows: VatRuleInsert[], opts: ImportOpts = {
   const validated = VatRuleInsertSchema.array().parse(rows);
 
   const normalized: VatRuleInsert[] = validated.map((r) => {
-    const kindInput = (r.kind ?? 'STANDARD') as string;
-    const kind = kindInput.toUpperCase() as VatRuleInsert['kind'];
+    const kindInput = (r.vatRateKind ?? 'STANDARD') as string;
+    const kind = kindInput.toUpperCase() as VatRuleInsert['vatRateKind'];
     return {
       ...r,
       dest: r.dest.toUpperCase(),
@@ -39,10 +39,10 @@ export async function importVatRules(rows: VatRuleInsert[], opts: ImportOpts = {
     .insert(vatRulesTable)
     .values(normalized)
     .onConflictDoUpdate({
-      target: [vatRulesTable.dest, vatRulesTable.kind, vatRulesTable.effectiveFrom],
+      target: [vatRulesTable.dest, vatRulesTable.vatRateKind, vatRulesTable.effectiveFrom],
       set: {
         ratePct: sql`excluded.rate_pct`,
-        base: sql`excluded.base`,
+        vatRateKind: sql`excluded.vatRateKind`,
         effectiveTo: sql`excluded.effective_to`,
         notes: sql`excluded.notes`,
         updatedAt: new Date(),
@@ -51,9 +51,9 @@ export async function importVatRules(rows: VatRuleInsert[], opts: ImportOpts = {
     .returning({
       id: vatRulesTable.id,
       dest: vatRulesTable.dest,
-      kind: vatRulesTable.kind,
+      vatRateKind: vatRulesTable.vatRateKind,
       ratePct: vatRulesTable.ratePct,
-      base: vatRulesTable.base,
+      vatBase: vatRulesTable.vatBase,
       effectiveFrom: vatRulesTable.effectiveFrom,
       effectiveTo: vatRulesTable.effectiveTo,
       notes: vatRulesTable.notes,
@@ -67,9 +67,9 @@ export async function importVatRules(rows: VatRuleInsert[], opts: ImportOpts = {
       resourceId: r.id,
       sourceRef: opts.makeSourceRef?.({
         dest: r.dest,
-        kind: r.kind,
+        vatRateKind: r.vatRateKind,
         ratePct: r.ratePct,
-        base: r.base,
+        vatBase: r.vatBase,
         effectiveFrom: r.effectiveFrom!,
         effectiveTo: r.effectiveTo ?? null,
         notes: r.notes ?? null,
@@ -77,9 +77,9 @@ export async function importVatRules(rows: VatRuleInsert[], opts: ImportOpts = {
       rowHash: sha256Hex(
         JSON.stringify({
           dest: r.dest,
-          kind: r.kind,
+          vatRateKind: r.vatRateKind,
           ratePct: r.ratePct,
-          base: r.base,
+          vatBase: r.vatBase,
           ef: r.effectiveFrom?.toISOString(),
           et: r.effectiveTo ? r.effectiveTo.toISOString() : null,
           notes: r.notes ?? null,

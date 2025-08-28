@@ -7,9 +7,9 @@ export const vatRulesTable = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     dest: varchar('dest', { length: 2 }).notNull(),
-    kind: vatRateKindEnum('kind').notNull().default('STANDARD'),
+    vatRateKind: vatRateKindEnum('vat_rate_kind').notNull().default('STANDARD'),
     ratePct: numeric('rate_pct', { precision: 6, scale: 3 }).notNull(),
-    base: vatBaseEnum('base').notNull().default('CIF_PLUS_DUTY'),
+    vatBase: vatBaseEnum('vat_base').notNull().default('CIF_PLUS_DUTY'),
     effectiveFrom: createTimestampColumn('effective_from', { defaultNow: true }),
     effectiveTo: createTimestampColumn('effective_to', { defaultNow: true }),
     notes: text('notes'),
@@ -17,7 +17,7 @@ export const vatRulesTable = pgTable(
     updatedAt: createTimestampColumn('updated_at', { defaultNow: true, onUpdate: true }),
   },
   (t) => [
-    uniqueIndex('vat_rules_dest_kind_from_uq').on(t.dest, t.kind, t.effectiveFrom),
-    index('vat_rules_dest_kind_idx').on(t.dest, t.kind),
+    uniqueIndex('vat_rules_dest_kind_from_uq').on(t.dest, t.vatRateKind, t.effectiveFrom),
+    index('vat_rules_dest_kind_idx').on(t.dest, t.vatRateKind),
   ]
 );

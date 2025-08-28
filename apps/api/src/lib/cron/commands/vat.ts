@@ -4,7 +4,7 @@ import { fetchVatRowsFromOfficialSources } from '../../../modules/vat/services/f
 import { importVatRules } from '../../../modules/vat/services/import-vat.js';
 
 export const vatAuto: Command = async () => {
-  const payload = await withRun({ source: 'OECD/IMF', job: 'vat:auto' }, async () => {
+  const payload = await withRun({ importSource: 'OECD/IMF', job: 'vat:auto' }, async () => {
     const rows = await fetchVatRowsFromOfficialSources();
     const res = await importVatRules(rows);
     const inserted = res?.count ?? rows.length ?? 0;

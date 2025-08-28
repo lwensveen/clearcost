@@ -8,7 +8,7 @@ export default function usDutyRoutes(app: FastifyInstance) {
     '/internal/cron/import/duties/us-mfn',
     {
       preHandler: app.requireApiKey(['tasks:duties:us:mfn']),
-      config: { importMeta: { source: 'USITC_HTS', job: 'duties:us-mfn' } },
+      config: { importMeta: { importSource: 'USITC_HTS', job: 'duties:us-mfn' } },
     },
     async (req, reply) => {
       const importId = req.importCtx?.runId;
@@ -22,7 +22,7 @@ export default function usDutyRoutes(app: FastifyInstance) {
     '/internal/cron/import/duties/us-preferential',
     {
       preHandler: app.requireApiKey(['tasks:duties:us:fta']),
-      config: { importMeta: { source: 'USITC_HTS', job: 'duties:us-fta' } },
+      config: { importMeta: { importSource: 'USITC_HTS', job: 'duties:us-fta' } },
     },
     async (req, reply) => {
       const importId = req.importCtx?.runId;

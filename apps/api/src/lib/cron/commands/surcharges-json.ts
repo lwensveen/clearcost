@@ -4,7 +4,7 @@ import { batchUpsertSurchargesFromStream } from '../../../modules/surcharges/uti
 
 type SurchargeWire = {
   dest: string;
-  code:
+  surchargeCode:
     | 'ANTIDUMPING'
     | 'COUNTERVAILING'
     | 'CUSTOMS_PROCESSING'
@@ -31,12 +31,12 @@ export const surchargesJson: Command = async (args) => {
   if (!url) throw new Error('Pass URL to JSON (surcharges)');
 
   const payload = await withRun(
-    { source: 'FILE', job: 'surcharges:json', params: { url } },
+    { importSource: 'FILE', job: 'surcharges:json', params: { url } },
     async (importId) => {
       const wire = await fetchJSON<SurchargeWire[]>(url);
       const mapped = wire.map((r) => ({
         dest: String(r.dest).toUpperCase(),
-        code: r.code,
+        surchargeCode: r.surchargeCode,
         fixedAmt: r.fixedAmt,
         pctAmt: r.pctAmt,
         effectiveFrom: ensureDate(r.effectiveFrom, 'effectiveFrom'),

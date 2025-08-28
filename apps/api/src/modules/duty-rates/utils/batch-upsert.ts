@@ -38,7 +38,7 @@ export async function batchUpsertDutyRatesFromStream(
         target: [
           dutyRatesTable.dest,
           dutyRatesTable.hs6,
-          dutyRatesTable.rule,
+          dutyRatesTable.dutyRule,
           dutyRatesTable.effectiveFrom,
         ],
         set: {
@@ -62,7 +62,7 @@ export async function batchUpsertDutyRatesFromStream(
           JSON.stringify({
             dest: row.dest,
             hs6: row.hs6,
-            rule: row.rule,
+            dutyRulet: row.dutyRule,
             ratePct: row.ratePct,
             ef: row.effectiveFrom?.toISOString(),
             et: row.effectiveTo ? row.effectiveTo.toISOString() : null,

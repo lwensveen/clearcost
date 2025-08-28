@@ -4,7 +4,7 @@ import { importAllUsSurcharges } from '../../../modules/surcharges/services/us/i
 import { importUsTradeRemediesFromHTS } from '../../../modules/surcharges/services/us/import-usitc-hts.js';
 
 export const surchargesUsAll: Command = async () => {
-  const payload = await withRun({ source: 'US', job: 'surcharges:us-all' }, async () => {
+  const payload = await withRun({ importSource: 'US', job: 'surcharges:us-all' }, async () => {
     const batchSize = process.env.BATCH_SIZE ? Number(process.env.BATCH_SIZE) : undefined;
     const res = await importAllUsSurcharges({ batchSize });
     const inserted = res?.count ?? res?.count ?? 0;
@@ -24,7 +24,7 @@ export const surchargesUsTradeRemedies: Command = async (args) => {
 
   const payload = await withRun(
     {
-      source: 'USITC_HTS',
+      importSource: 'USITC_HTS',
       job: 'surcharges:us-trade-remedies',
       params: { effectiveFrom, skipFree },
     },

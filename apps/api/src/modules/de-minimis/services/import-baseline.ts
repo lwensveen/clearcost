@@ -39,16 +39,16 @@ export async function seedDeMinimisBaseline(on = new Date()) {
       .insert(deMinimisTable)
       .values({
         dest: 'US',
-        kind: 'DUTY',
-        basis: 'INTRINSIC',
+        deMinimisKind: 'DUTY',
+        deMinimisBasis: 'INTRINSIC',
         currency: 'USD',
         value: '800',
         effectiveFrom,
         effectiveTo: null,
       })
       .onConflictDoUpdate({
-        target: [deMinimisTable.dest, deMinimisTable.kind, deMinimisTable.effectiveFrom],
-        set: { basis: 'INTRINSIC', currency: 'USD', value: '800', updatedAt: new Date() },
+        target: [deMinimisTable.dest, deMinimisTable.deMinimisKind, deMinimisTable.effectiveFrom],
+        set: { deMinimisBasis: 'INTRINSIC', currency: 'USD', value: '800', updatedAt: new Date() },
       });
 
     // EU: duty-only €150 intrinsic
@@ -57,16 +57,21 @@ export async function seedDeMinimisBaseline(on = new Date()) {
         .insert(deMinimisTable)
         .values({
           dest: cc,
-          kind: 'DUTY',
-          basis: 'INTRINSIC',
+          deMinimisKind: 'DUTY',
+          deMinimisBasis: 'INTRINSIC',
           currency: 'EUR',
           value: '150',
           effectiveFrom,
           effectiveTo: null,
         })
         .onConflictDoUpdate({
-          target: [deMinimisTable.dest, deMinimisTable.kind, deMinimisTable.effectiveFrom],
-          set: { basis: 'INTRINSIC', currency: 'EUR', value: '150', updatedAt: new Date() },
+          target: [deMinimisTable.dest, deMinimisTable.deMinimisKind, deMinimisTable.effectiveFrom],
+          set: {
+            deMinimisBasis: 'INTRINSIC',
+            currency: 'EUR',
+            value: '150',
+            updatedAt: new Date(),
+          },
         });
     }
 
@@ -75,16 +80,16 @@ export async function seedDeMinimisBaseline(on = new Date()) {
       .insert(deMinimisTable)
       .values({
         dest: 'GB',
-        kind: 'VAT',
-        basis: 'INTRINSIC',
+        deMinimisKind: 'VAT',
+        deMinimisBasis: 'INTRINSIC',
         currency: 'GBP',
         value: '135',
         effectiveFrom,
         effectiveTo: null,
       })
       .onConflictDoUpdate({
-        target: [deMinimisTable.dest, deMinimisTable.kind, deMinimisTable.effectiveFrom],
-        set: { basis: 'INTRINSIC', currency: 'GBP', value: '135', updatedAt: new Date() },
+        target: [deMinimisTable.dest, deMinimisTable.deMinimisKind, deMinimisTable.effectiveFrom],
+        set: { deMinimisBasis: 'INTRINSIC', currency: 'GBP', value: '135', updatedAt: new Date() },
       });
   });
 

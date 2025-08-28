@@ -17,7 +17,7 @@ export default function sweepRoutes(app: FastifyInstance) {
     '/internal/cron/imports/sweep-stale',
     {
       preHandler: app.requireApiKey(['tasks:ops:sweep-stale']),
-      config: { importMeta: { source: 'MANUAL', job: 'ops:sweep-stale' } },
+      config: { importMeta: { importSource: 'MANUAL', job: 'ops:sweep-stale' } },
       schema: { body: Body.optional() },
     },
     async (req, reply) => {

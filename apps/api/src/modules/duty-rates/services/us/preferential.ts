@@ -117,7 +117,7 @@ export async function fetchUsPreferentialDutyRates(
       dest: 'US',
       hs6: hs6FromKey,
       ratePct: toNumeric3String(value.pct),
-      rule: 'fta',
+      dutyRule: 'fta',
       partner: null,
       effectiveFrom,
       effectiveTo: null,

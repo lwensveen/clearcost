@@ -145,13 +145,15 @@ export async function importUkTradeRemediesAsSurcharges(
       row.geographical_area__description ??
       (row.geographical_area__id ? `geo:${row.geographical_area__id}` : 'partner:unknown');
 
-    const codeGuess = /countervail|subsid/i.test(partnerLabel) ? 'COUNTERVAILING' : 'ANTIDUMPING';
+    const surchargeCode = /countervail|subsid/i.test(partnerLabel)
+      ? 'COUNTERVAILING'
+      : 'ANTIDUMPING';
 
     out.push({
       dest: 'GB',
       origin,
       hs6: code6,
-      code: codeGuess,
+      surchargeCode: surchargeCode,
       pctAmt: pct.toFixed(3),
       fixedAmt: null,
       effectiveFrom: start,

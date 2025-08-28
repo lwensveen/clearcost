@@ -14,7 +14,7 @@ import { VatRateKind } from './utils.js';
  */
 export type VatOverrideRow = {
   ratePct?: number | null;
-  kind?: VatRateKind | null;
+  vatRateKind?: VatRateKind | null;
   effectiveFrom: Date | null;
 };
 
@@ -34,7 +34,7 @@ export async function getVatOverride(
   const [row] = await db
     .select({
       ratePct: vatOverridesTable.ratePct,
-      kind: vatOverridesTable.kind,
+      vatRateKind: vatOverridesTable.vatRateKind,
       effectiveFrom: vatOverridesTable.effectiveFrom,
     })
     .from(vatOverridesTable)
@@ -52,7 +52,7 @@ export async function getVatOverride(
 
   return {
     ratePct: row.ratePct == null ? null : Number(row.ratePct),
-    kind: (row.kind ?? null) as VatRateKind | null,
+    vatRateKind: (row.vatRateKind ?? null) as VatRateKind | null,
     effectiveFrom: row.effectiveFrom ?? null,
   };
 }

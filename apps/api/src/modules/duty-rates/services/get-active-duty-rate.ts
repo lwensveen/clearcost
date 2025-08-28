@@ -3,7 +3,7 @@ import { and, asc, desc, eq, gt, isNull, lte, or, sql, SQL } from 'drizzle-orm';
 
 export type DutyRateRow = {
   ratePct: number;
-  rule: 'mfn' | 'fta' | 'anti_dumping' | 'safeguard' | 'other' | null;
+  dutyRule: 'mfn' | 'fta' | 'anti_dumping' | 'safeguard' | 'other' | null;
   partner: string | null;
   effectiveFrom: Date | null;
   effectiveTo: Date | null;
@@ -26,7 +26,7 @@ function asDutyRateRow(
   row:
     | {
         ratePct: unknown;
-        rule: unknown;
+        dutyRule: unknown;
         partner: string | null;
         effectiveFrom: Date | null;
         effectiveTo: Date | null;
@@ -36,7 +36,7 @@ function asDutyRateRow(
   if (!row) return null;
   return {
     ratePct: row.ratePct != null ? Number(row.ratePct as number) : 0,
-    rule: (row.rule as DutyRateRow['rule']) ?? null,
+    dutyRule: (row.dutyRule as DutyRateRow['dutyRule']) ?? null,
     partner: row.partner ?? null,
     effectiveFrom: row.effectiveFrom ?? null,
     effectiveTo: row.effectiveTo ?? null,
@@ -51,7 +51,7 @@ function asDutyRateRow(
  *        1a) prefer exact partner column match,
  *        1b) else try notes-based match (fallback),
  *   2) Otherwise (or if no partner hit), pick by:
- *        - rule priority (FTA vs MFN depending on preferFTA),
+ *        - duty_rule priority (FTA vs MFN depending on preferFTA),
  *        - then LOWER rate first (cheapest),
  *        - then NEWER effectiveFrom (tie-break).
  */
@@ -76,7 +76,7 @@ export async function getActiveDutyRate(
   // Common column selection
   const cols = {
     ratePct: dutyRatesTable.ratePct,
-    rule: dutyRatesTable.rule,
+    dutyRule: dutyRatesTable.dutyRule,
     partner: dutyRatesTable.partner,
     effectiveFrom: dutyRatesTable.effectiveFrom,
     effectiveTo: dutyRatesTable.effectiveTo,
@@ -91,7 +91,7 @@ export async function getActiveDutyRate(
     const second = opts.preferFTA ? 'mfn' : 'fta';
 
     const rulePriority = sql<number>`
-      CASE ${dutyRatesTable.rule}
+      CASE ${dutyRatesTable.dutyRule}
         WHEN ${first} THEN 0
         WHEN ${second} THEN 1
         WHEN 'anti_dumping' THEN 2
@@ -141,14 +141,14 @@ export async function getActiveDutyRate(
   }
 
   // --------------------------------------------------------------------------
-  // 2) No partner constraint (or none found): general selection by rule priority,
+  // 2) No partner constraint (or none found): general selection by duty_rule priority,
   //    then CHEAPEST rate, then NEWEST effectiveFrom.
   // --------------------------------------------------------------------------
   const first = opts.preferFTA ? 'fta' : 'mfn';
   const second = opts.preferFTA ? 'mfn' : 'fta';
 
   const rulePriority = sql<number>`
-    CASE ${dutyRatesTable.rule}
+    CASE ${dutyRatesTable.dutyRule}
       WHEN ${first} THEN 0
       WHEN ${second} THEN 1
       WHEN 'anti_dumping' THEN 2

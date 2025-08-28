@@ -92,17 +92,21 @@ export async function importDeMinimisFromZonos(effectiveOn = new Date()) {
           .insert(deMinimisTable)
           .values({
             dest: iso,
-            kind: 'DUTY',
-            basis,
+            deMinimisKind: 'DUTY',
+            deMinimisBasis: basis,
             currency: duty.currency,
             value: String(duty.value),
             effectiveFrom,
             effectiveTo: null,
           })
           .onConflictDoUpdate({
-            target: [deMinimisTable.dest, deMinimisTable.kind, deMinimisTable.effectiveFrom],
+            target: [
+              deMinimisTable.dest,
+              deMinimisTable.deMinimisKind,
+              deMinimisTable.effectiveFrom,
+            ],
             set: {
-              basis,
+              deMinimisBasis: basis,
               currency: duty.currency,
               value: String(duty.value),
               updatedAt: new Date(),
@@ -116,16 +120,25 @@ export async function importDeMinimisFromZonos(effectiveOn = new Date()) {
           .insert(deMinimisTable)
           .values({
             dest: iso,
-            kind: 'VAT',
-            basis,
+            deMinimisKind: 'VAT',
+            deMinimisBasis: basis,
             currency: tax.currency,
             value: String(tax.value),
             effectiveFrom,
             effectiveTo: null,
           })
           .onConflictDoUpdate({
-            target: [deMinimisTable.dest, deMinimisTable.kind, deMinimisTable.effectiveFrom],
-            set: { basis, currency: tax.currency, value: String(tax.value), updatedAt: new Date() },
+            target: [
+              deMinimisTable.dest,
+              deMinimisTable.deMinimisKind,
+              deMinimisTable.effectiveFrom,
+            ],
+            set: {
+              deMinimisBasis: basis,
+              currency: tax.currency,
+              value: String(tax.value),
+              updatedAt: new Date(),
+            },
           });
       }
     }

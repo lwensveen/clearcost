@@ -3,8 +3,8 @@ import { and, desc, eq, gte, isNull, lte, or } from 'drizzle-orm';
 import { convertCurrency } from '../../fx/services/convert-currency.js';
 
 export type DeMinimisDecision = {
-  duty?: { thresholdDest: number; basis: 'INTRINSIC' | 'CIF'; under: boolean };
-  vat?: { thresholdDest: number; basis: 'INTRINSIC' | 'CIF'; under: boolean };
+  duty?: { thresholdDest: number; deMinimisBasis: 'INTRINSIC' | 'CIF'; under: boolean };
+  vat?: { thresholdDest: number; deMinimisBasis: 'INTRINSIC' | 'CIF'; under: boolean };
   suppressDuty: boolean;
   suppressVAT: boolean;
 };
@@ -29,8 +29,8 @@ export async function evaluateDeMinimis(opts: {
     )
     .orderBy(desc(deMinimisTable.effectiveFrom));
 
-  const dutyRow = rows.find((r) => r.kind === 'DUTY');
-  const vatRow = rows.find((r) => r.kind === 'VAT');
+  const dutyRow = rows.find((r) => r.deMinimisKind === 'DUTY');
+  const vatRow = rows.find((r) => r.deMinimisKind === 'VAT');
 
   async function toDest(
     row?: typeof dutyRow
@@ -40,7 +40,7 @@ export async function evaluateDeMinimis(opts: {
       row.currency === opts.dest
         ? Number(row.value)
         : await convertCurrency(Number(row.value), row.currency, opts.dest, { on: opts.fxAsOf });
-    return { thr, basis: (row.basis as 'INTRINSIC' | 'CIF') ?? 'INTRINSIC' };
+    return { thr, basis: (row.deMinimisBasis as 'INTRINSIC' | 'CIF') ?? 'INTRINSIC' };
   }
 
   const [duty, vat] = await Promise.all([toDest(dutyRow), toDest(vatRow)]);
@@ -52,8 +52,10 @@ export async function evaluateDeMinimis(opts: {
   const vatUnder = vat ? valueFor(vat.basis) <= vat.thr : false;
 
   return {
-    duty: duty ? { thresholdDest: duty.thr, basis: duty.basis, under: dutyUnder } : undefined,
-    vat: vat ? { thresholdDest: vat.thr, basis: vat.basis, under: vatUnder } : undefined,
+    duty: duty
+      ? { thresholdDest: duty.thr, deMinimisBasis: duty.basis, under: dutyUnder }
+      : undefined,
+    vat: vat ? { thresholdDest: vat.thr, deMinimisBasis: vat.basis, under: vatUnder } : undefined,
     suppressDuty: dutyUnder,
     suppressVAT: vatUnder,
   };

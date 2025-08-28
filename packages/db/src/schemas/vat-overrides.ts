@@ -7,7 +7,7 @@ export const vatOverridesTable = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     dest: varchar('dest', { length: 2 }).notNull(), // ISO-3166-1 alpha-2
-    kind: vatRateKindEnum('kind').notNull().default('STANDARD'),
+    vatRateKind: vatRateKindEnum('vat_rate_kind').notNull().default('STANDARD'),
     hs6: varchar('hs6', { length: 6 }).notNull(), // digits only
     ratePct: numeric('rate_pct', { precision: 6, scale: 3 }).notNull(), // e.g., 5.000
     effectiveFrom: createTimestampColumn('effective_from', { defaultNow: true }),

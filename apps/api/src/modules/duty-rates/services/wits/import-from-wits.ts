@@ -19,25 +19,18 @@ import { batchUpsertDutyRatesFromStream } from '../../utils/batch-upsert.js';
 const ParamsSchema = z.object({
   /** ISO2 reporter markets to ingest (e.g., ["US","GB","TH"]). */
   dests: z.array(z.string().length(2)).min(1),
-
   /** Optional ISO2 partner list for preferential (FTA) imports. Empty => MFN only. */
   partners: z.array(z.string().length(2)).default([]),
-
   /** WITS is often T-1; default to last UTC year if not provided. */
   year: z.number().int().min(1990).max(2100).optional(),
-
   /** Also fetch prior years (0..5). Default 1 (fetch targetYear and targetYear-1). */
   backfillYears: z.number().int().min(0).max(5).default(1),
-
   /** Limit concurrent HTTP jobs (1..6). Default 3. */
   concurrency: z.number().int().min(1).max(6).default(3),
-
   /** DB upsert batch size (rows/transaction). Default 5000. */
   batchSize: z.number().int().min(1).max(20000).default(5000),
-
   /** Optional HS6 allowlist to reduce scope across all jobs. */
   hs6List: z.array(z.string().regex(/^\d{6}$/)).optional(),
-
   /** OPTIONAL: provenance run id (useful for audit linking). */
   importId: z.string().optional(),
 });
@@ -50,10 +43,10 @@ type ProvCtx = { dest: string; partner?: string | null; year: number };
 /** Default sourceRef formatter if caller doesn't provide one. */
 function defaultMakeWitsSourceRef(row: DutyRateInsert, ctx: ProvCtx): string {
   const partner = row.partner ?? ctx.partner ?? null;
-  const rule = row.rule ?? 'mfn';
+  const dutyRule = row.dutyRule ?? 'mfn';
   const y = row.effectiveFrom instanceof Date ? row.effectiveFrom.getUTCFullYear() : ctx.year;
   const partnerToken = partner ?? 'ERGA';
-  return `wits:${ctx.dest}:${partnerToken}:${rule}:hs6=${row.hs6}:y=${y}`;
+  return `wits:${ctx.dest}:${partnerToken}:${dutyRule}:hs6=${row.hs6}:y=${y}`;
 }
 
 /** Public params type: core + optional makeSourceRef override. */

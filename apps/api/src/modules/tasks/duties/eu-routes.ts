@@ -17,7 +17,7 @@ export default function euDutyRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:eu']),
         schema: { body: Body },
-        config: { importMeta: { source: 'TARIC', job: 'duties:eu-mfn' } },
+        config: { importMeta: { importSource: 'TARIC', job: 'duties:eu-mfn' } },
       },
       async (req, reply) => {
         const { hs6, batchSize } = Body.parse(req.body ?? {});
@@ -47,7 +47,7 @@ export default function euDutyRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:eu']),
         schema: { body: Body },
-        config: { importMeta: { source: 'TARIC', job: 'duties:eu-fta' } },
+        config: { importMeta: { importSource: 'TARIC', job: 'duties:eu-fta' } },
       },
       async (req, reply) => {
         const { hs6, partnerGeoIds, batchSize } = Body.parse(req.body ?? {});

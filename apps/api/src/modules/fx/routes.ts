@@ -26,7 +26,7 @@ export default function fxRoutes(app: FastifyInstance) {
       },
       // Prometheus & provenance auto-wired
       config: {
-        importMeta: { source: 'ECB', job: 'fx:refresh' },
+        importMeta: { importSource: 'ECB', job: 'fx:refresh' },
         rateLimit: { max: 12, timeWindow: '1 minute' },
       },
     },

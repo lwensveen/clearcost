@@ -11,7 +11,7 @@ const VatBaseEnum = z.enum(['CIF', 'CIF_PLUS_DUTY']);
 const VatCreateSchema = z.object({
   dest: z.string().length(2), // ISO2
   ratePct: z.number().min(0).max(100),
-  base: VatBaseEnum.default('CIF_PLUS_DUTY'),
+  vatBase: VatBaseEnum.default('CIF_PLUS_DUTY'),
   effectiveFrom: z.coerce.date(),
   effectiveTo: z.coerce.date().optional().nullable(),
   notes: z.string().optional().nullable(),
@@ -33,7 +33,7 @@ const VatSelectSchema = z.object({
   id: z.string().uuid(),
   dest: z.string().length(2),
   ratePct: z.string(), // stored as numeric in DB
-  base: VatBaseEnum,
+  vatBase: VatBaseEnum,
   effectiveFrom: z.any(),
   effectiveTo: z.any().nullable(),
   notes: z.string().nullable().optional(),
@@ -89,7 +89,7 @@ export default function vatRoutes(app: FastifyInstance) {
         .values({
           dest: b.dest.toUpperCase(),
           ratePct: String(b.ratePct),
-          base: b.base,
+          vatBase: b.vatBase,
           effectiveFrom: b.effectiveFrom,
           effectiveTo: b.effectiveTo ?? null,
           notes: b.notes ?? null,
@@ -120,7 +120,7 @@ export default function vatRoutes(app: FastifyInstance) {
         .set({
           ...(b.dest ? { dest: b.dest.toUpperCase() } : {}),
           ...(b.ratePct !== undefined ? { ratePct: String(b.ratePct) } : {}),
-          ...(b.base ? { base: b.base } : {}),
+          ...(b.vatBase ? { base: b.vatBase } : {}),
           ...(b.effectiveFrom ? { effectiveFrom: b.effectiveFrom } : {}),
           ...(b.effectiveTo !== undefined ? { effectiveTo: b.effectiveTo ?? null } : {}),
           ...(b.notes !== undefined ? { notes: b.notes ?? null } : {}),
@@ -171,7 +171,7 @@ export default function vatRoutes(app: FastifyInstance) {
           .values({
             dest: r0.dest.toUpperCase(),
             ratePct: String(r0.ratePct),
-            base: r0.base,
+            vatBase: r0.vatBase,
             effectiveFrom: r0.effectiveFrom,
             effectiveTo: r0.effectiveTo ?? null,
             notes: r0.notes ?? null,

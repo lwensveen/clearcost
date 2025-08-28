@@ -4,8 +4,8 @@ import { and, desc, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
 export async function getFreight(opts: {
   origin: string;
   dest: string;
-  mode: 'air' | 'sea';
-  unit: 'kg' | 'm3';
+  freightMode: 'air' | 'sea';
+  freightUnit: 'kg' | 'm3';
   qty: number;
   on: Date;
 }) {
@@ -21,8 +21,8 @@ export async function getFreight(opts: {
       and(
         eq(freightRateCardsTable.origin, opts.origin),
         eq(freightRateCardsTable.dest, opts.dest),
-        eq(freightRateCardsTable.mode, opts.mode),
-        eq(freightRateCardsTable.unit, opts.unit),
+        eq(freightRateCardsTable.freightMode, opts.freightMode),
+        eq(freightRateCardsTable.freightUnit, opts.freightUnit),
         lte(freightRateCardsTable.effectiveFrom, opts.on),
         or(
           isNull(freightRateCardsTable.effectiveTo),
@@ -71,5 +71,5 @@ export async function getFreight(opts: {
     price = Math.round(price / r) * r;
   }
 
-  return { currency: card.currency, unit: opts.unit, qty: opts.qty, price };
+  return { currency: card.currency, unit: opts.freightUnit, qty: opts.qty, price };
 }

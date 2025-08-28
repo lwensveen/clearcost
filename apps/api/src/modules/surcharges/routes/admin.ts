@@ -31,11 +31,11 @@ export default function surchargesAdminRoutes(app: FastifyInstance) {
       config: { rateLimit: { max: 240, timeWindow: '1 minute' } },
     },
     async (req) => {
-      const { dest, code, activeOn, limit = 50, offset = 0 } = req.query;
+      const { dest, surchargeCode, activeOn, limit = 50, offset = 0 } = req.query;
 
       const where = and(
         dest ? eq(surchargesTable.dest, dest.toUpperCase()) : sql`TRUE`,
-        code ? eq(surchargesTable.code, code) : sql`TRUE`,
+        surchargeCode ? eq(surchargesTable.surchargeCode, surchargeCode) : sql`TRUE`,
         activeOn
           ? and(
               lte(surchargesTable.effectiveFrom, activeOn),

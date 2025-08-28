@@ -11,8 +11,8 @@ const Step = z.object({
 export const FreightCard = z.object({
   origin: z.string().length(2),
   dest: z.string().length(2),
-  mode: z.enum(['air', 'sea']),
-  unit: z.enum(['kg', 'm3']),
+  freightMode: z.enum(['air', 'sea']),
+  freightUnit: z.enum(['kg', 'm3']),
   currency: z.string().length(3).default('USD'),
   effectiveFrom: z.coerce.date(),
   effectiveTo: z.coerce.date().optional().nullable(),
@@ -51,8 +51,8 @@ export async function importFreightCards(cards: FreightCardInput[], opts: Import
         .values({
           origin: card.origin,
           dest: card.dest,
-          mode: card.mode,
-          unit: card.unit,
+          freightMode: card.freightMode,
+          freightUnit: card.freightUnit,
           currency: card.currency,
           effectiveFrom: card.effectiveFrom,
           effectiveTo: card.effectiveTo ?? undefined,
@@ -65,8 +65,8 @@ export async function importFreightCards(cards: FreightCardInput[], opts: Import
           target: [
             freightRateCardsTable.origin,
             freightRateCardsTable.dest,
-            freightRateCardsTable.mode,
-            freightRateCardsTable.unit,
+            freightRateCardsTable.freightMode,
+            freightRateCardsTable.freightUnit,
             freightRateCardsTable.effectiveFrom,
           ],
           set: {
@@ -104,8 +104,8 @@ export async function importFreightCards(cards: FreightCardInput[], opts: Import
         const canonical = {
           origin: card.origin,
           dest: card.dest,
-          mode: card.mode,
-          unit: card.unit,
+          freightMode: card.freightMode,
+          freightUnit: card.freightUnit,
           currency: card.currency,
           effectiveFrom: ymd(card.effectiveFrom),
           effectiveTo: ymd(card.effectiveTo ?? null),

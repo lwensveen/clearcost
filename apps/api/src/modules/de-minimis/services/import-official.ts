@@ -2,8 +2,8 @@ import { importDeMinimis } from './import-de-minimis.js';
 
 type Row = {
   dest: string; // ISO-3166-1 alpha-2
-  kind: 'DUTY' | 'VAT'; // per-type threshold
-  basis: 'INTRINSIC' | 'CIF'; // goods-only vs CIF
+  deMinimisKind: 'DUTY' | 'VAT'; // per-type threshold
+  deMinimisBasis: 'INTRINSIC' | 'CIF'; // goods-only vs CIF
   currency: string; // ISO-4217
   value: number | string; // threshold amount
   effectiveFrom: string; // YYYY-MM-DD
@@ -49,8 +49,8 @@ async function fetchUS(effectiveFrom: string): Promise<Row[]> {
   return [
     {
       dest: 'US',
-      kind: 'DUTY',
-      basis: 'INTRINSIC',
+      deMinimisKind: 'DUTY',
+      deMinimisBasis: 'INTRINSIC',
       currency: 'USD',
       value: 800,
       effectiveFrom,
@@ -64,8 +64,8 @@ async function fetchEU(effectiveFrom: string): Promise<Row[]> {
 
   return EU_DESTS.map((dest) => ({
     dest,
-    kind: 'DUTY',
-    basis: 'INTRINSIC',
+    deMinimisKind: 'DUTY',
+    deMinimisBasis: 'INTRINSIC',
     currency: 'EUR',
     value: 150,
     effectiveFrom,
@@ -78,8 +78,8 @@ async function fetchUK(effectiveFrom: string): Promise<Row[]> {
   return [
     {
       dest: 'GB',
-      kind: 'VAT',
-      basis: 'INTRINSIC',
+      deMinimisKind: 'VAT',
+      deMinimisBasis: 'INTRINSIC',
       currency: 'GBP',
       value: 135,
       effectiveFrom,
@@ -94,8 +94,8 @@ async function fetchCA(effectiveFrom: string): Promise<Row[]> {
   return [
     {
       dest: 'CA',
-      kind: 'VAT', // treat taxes as VAT-equivalent
-      basis: 'INTRINSIC',
+      deMinimisKind: 'VAT', // treat taxes as VAT-equivalent
+      deMinimisBasis: 'INTRINSIC',
       currency: 'CAD',
       value: 40,
       effectiveFrom,
@@ -103,8 +103,8 @@ async function fetchCA(effectiveFrom: string): Promise<Row[]> {
     },
     {
       dest: 'CA',
-      kind: 'DUTY',
-      basis: 'INTRINSIC',
+      deMinimisKind: 'DUTY',
+      deMinimisBasis: 'INTRINSIC',
       currency: 'CAD',
       value: 150,
       effectiveFrom,
@@ -135,8 +135,8 @@ export async function importDeMinimisFromOfficial(effectiveOn?: Date) {
 
   const rows = [...us, ...eu, ...uk, ...ca, ...au].map((r) => ({
     dest: r.dest,
-    kind: r.kind,
-    basis: r.basis,
+    deMinimisKind: r.deMinimisKind,
+    deMinimisBasis: r.deMinimisBasis,
     currency: r.currency,
     value: r.value,
     effectiveFrom: r.effectiveFrom,

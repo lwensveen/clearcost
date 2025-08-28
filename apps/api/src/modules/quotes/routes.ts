@@ -18,14 +18,14 @@ export const QuoteResponseSchema = z.object({
       duty: z
         .object({
           thresholdDest: z.number(),
-          basis: z.enum(['CIF', 'INTRINSIC']),
+          deMinimisBasis: z.enum(['CIF', 'INTRINSIC']),
           under: z.boolean(),
         })
         .nullable(),
       vat: z
         .object({
           thresholdDest: z.number(),
-          basis: z.enum(['CIF', 'INTRINSIC']),
+          deMinimisBasis: z.enum(['CIF', 'INTRINSIC']),
           under: z.boolean(),
         })
         .nullable(),
@@ -153,7 +153,7 @@ export default function quoteRoutes(app: FastifyInstance) {
           idemKey,
           origin: req.body.origin,
           dest: req.body.dest,
-          mode: req.body.mode,
+          shippingMode: req.body.shippingMode,
           total: result.total,
           ms: Date.now() - started,
         });

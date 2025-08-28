@@ -52,7 +52,7 @@ export async function computePool(manifestId: string, opts: ComputePoolOpts = {}
 
   const incoterm = (profile?.defaultIncoterm ?? 'DAP').toUpperCase() as 'DAP' | 'DDP';
 
-  const { origin, dest, mode } = manifest;
+  const { origin, dest, shippingMode } = manifest;
   const currency = dest; // MVP convention
   const fixedFreightTotal = Number(manifest.fixedFreightTotal ?? 0);
   if (!Number.isFinite(fixedFreightTotal) || fixedFreightTotal < 0) {
@@ -69,13 +69,14 @@ export async function computePool(manifestId: string, opts: ComputePoolOpts = {}
   }
 
   const allocation: AllocationMode =
-    opts.allocation ?? (mode === 'air' ? 'chargeable' : mode === 'sea' ? 'volumetric' : 'weight');
+    opts.allocation ??
+    (shippingMode === 'air' ? 'chargeable' : shippingMode === 'sea' ? 'volumetric' : 'weight');
 
   const enriched = items.map((it) => {
     const dims = it.dimsCm ?? { l: 0, w: 0, h: 0 };
     const wKg = Number(it.weightKg ?? 0);
     const volKg = volumetricKg(dims);
-    const chgKg = mode === 'air' ? Math.max(wKg, volKg) : wKg;
+    const chgKg = shippingMode === 'air' ? Math.max(wKg, volKg) : wKg;
     const m3 = volumeM3(dims);
 
     const basis = allocation === 'chargeable' ? chgKg : allocation === 'volumetric' ? m3 : wKg;
@@ -120,7 +121,7 @@ export async function computePool(manifestId: string, opts: ComputePoolOpts = {}
       {
         origin,
         dest,
-        mode: mode as 'air' | 'sea',
+        shippingMode: shippingMode as 'air' | 'sea',
         incoterm,
         itemValue: {
           amount: Number(it.itemValueAmount ?? 0),

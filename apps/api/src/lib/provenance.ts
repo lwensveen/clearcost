@@ -36,7 +36,7 @@ export async function heartBeatImportRun(id: string) {
 }
 
 export async function startImportRun(params: {
-  source: ImportSource;
+  importSource: ImportSource;
   job: string;
   version?: string;
   sourceUrl?: string;
@@ -45,12 +45,12 @@ export async function startImportRun(params: {
   const rows = await db
     .insert(importsTable)
     .values({
-      source: params.source,
+      importSource: params.importSource,
       job: params.job,
       version: params.version ?? null,
       sourceUrl: params.sourceUrl ?? null,
       params: params.params ? JSON.stringify(params.params) : null,
-      status: 'running',
+      importStatus: 'running',
     })
     .returning();
 
@@ -64,7 +64,7 @@ export async function startImportRun(params: {
 export async function finishImportRun(
   id: string,
   patch: {
-    status: 'succeeded' | 'failed';
+    importStatus: 'succeeded' | 'failed';
     inserted?: number;
     updated?: number;
     fileHash?: string | null;
@@ -75,7 +75,7 @@ export async function finishImportRun(
   const rows = await db
     .update(importsTable)
     .set({
-      status: patch.status,
+      importStatus: patch.importStatus,
       inserted: patch.inserted ?? undefined,
       updated: patch.updated ?? undefined,
       fileHash: patch.fileHash ?? undefined,

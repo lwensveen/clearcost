@@ -13,8 +13,8 @@ const CardCreate = z
   .object({
     origin: z.string().length(3),
     dest: z.string().length(3),
-    mode: ModeEnum,
-    unit: UnitEnum,
+    freightMode: ModeEnum,
+    freightUnit: UnitEnum,
     carrier: z.string().min(1).optional().nullable(),
     service: z.string().min(1).optional().nullable(),
     notes: z.string().optional().nullable(),
@@ -47,8 +47,8 @@ const CardsQuery = z
     q: z.string().optional(),
     origin: z.string().length(3).optional(),
     dest: z.string().length(3).optional(),
-    mode: ModeEnum.optional(),
-    unit: UnitEnum.optional(),
+    freightMode: ModeEnum.optional(),
+    freightUnit: UnitEnum.optional(),
     from: z.coerce.date().optional(),
     to: z.coerce.date().optional(),
     limit: z.coerce.number().int().positive().max(200).default(50),
@@ -109,8 +109,8 @@ export default function freightRoutes(app: FastifyInstance) {
       const where = and(
         q.origin ? eq(freightRateCardsTable.origin, q.origin) : sql`TRUE`,
         q.dest ? eq(freightRateCardsTable.dest, q.dest) : sql`TRUE`,
-        q.mode ? eq(freightRateCardsTable.mode, q.mode) : sql`TRUE`,
-        q.unit ? eq(freightRateCardsTable.unit, q.unit) : sql`TRUE`,
+        q.freightMode ? eq(freightRateCardsTable.freightMode, q.freightMode) : sql`TRUE`,
+        q.freightUnit ? eq(freightRateCardsTable.freightUnit, q.freightUnit) : sql`TRUE`,
         q.q ? ilike(freightRateCardsTable.carrier, `%${q.q}%`) : sql`TRUE`,
         overlapWhere({ from: q.from, to: q.to })
       );
@@ -133,7 +133,7 @@ export default function freightRoutes(app: FastifyInstance) {
       schema: { body: CardCreate, headers: HeaderSchema },
       config: {
         rateLimit: { max: 60, timeWindow: '1 minute' },
-        importMeta: { source: 'MANUAL', job: 'freight:card-create' },
+        importMeta: { importSource: 'MANUAL', job: 'freight:card-create' },
       },
     },
     async (req, reply) => {
@@ -152,8 +152,8 @@ export default function freightRoutes(app: FastifyInstance) {
             .values({
               origin: body.origin,
               dest: body.dest,
-              mode: body.mode,
-              unit: body.unit,
+              freightMode: body.freightMode,
+              freightUnit: body.freightUnit,
               carrier: body.carrier ?? null,
               service: body.service ?? null,
               notes: body.notes ?? null,
@@ -183,7 +183,7 @@ export default function freightRoutes(app: FastifyInstance) {
       schema: { params: z.object({ id: z.string() }), body: CardUpdate, headers: HeaderSchema },
       config: {
         rateLimit: { max: 120, timeWindow: '1 minute' },
-        importMeta: { source: 'MANUAL', job: 'freight:card-update' },
+        importMeta: { importSource: 'MANUAL', job: 'freight:card-update' },
       },
     },
     async (req, reply) => {
@@ -198,8 +198,8 @@ export default function freightRoutes(app: FastifyInstance) {
           .set({
             ...(b.origin ? { origin: b.origin } : {}),
             ...(b.dest ? { dest: b.dest } : {}),
-            ...(b.mode ? { mode: b.mode } : {}),
-            ...(b.unit ? { unit: b.unit } : {}),
+            ...(b.freightMode ? { mode: b.freightMode } : {}),
+            ...(b.freightUnit ? { unit: b.freightUnit } : {}),
             ...(b.carrier !== undefined ? { carrier: b.carrier ?? null } : {}),
             ...(b.service !== undefined ? { service: b.service ?? null } : {}),
             ...(b.notes !== undefined ? { notes: b.notes ?? null } : {}),
@@ -230,7 +230,7 @@ export default function freightRoutes(app: FastifyInstance) {
       schema: { params: z.object({ id: z.string() }), headers: HeaderSchema },
       config: {
         rateLimit: { max: 60, timeWindow: '1 minute' },
-        importMeta: { source: 'MANUAL', job: 'freight:card-delete' },
+        importMeta: { importSource: 'MANUAL', job: 'freight:card-delete' },
       },
     },
     async (req, reply) => {
@@ -285,7 +285,7 @@ export default function freightRoutes(app: FastifyInstance) {
       schema: { params: z.object({ id: z.string() }), body: StepCreate, headers: HeaderSchema },
       config: {
         rateLimit: { max: 120, timeWindow: '1 minute' },
-        importMeta: { source: 'MANUAL', job: 'freight:step-create' },
+        importMeta: { importSource: 'MANUAL', job: 'freight:step-create' },
       },
     },
     async (req, reply) => {
@@ -328,7 +328,7 @@ export default function freightRoutes(app: FastifyInstance) {
       },
       config: {
         rateLimit: { max: 180, timeWindow: '1 minute' },
-        importMeta: { source: 'MANUAL', job: 'freight:step-update' },
+        importMeta: { importSource: 'MANUAL', job: 'freight:step-update' },
       },
     },
     async (req, reply) => {
@@ -380,7 +380,7 @@ export default function freightRoutes(app: FastifyInstance) {
       schema: { params: z.object({ id: z.string(), stepId: z.string() }), headers: HeaderSchema },
       config: {
         rateLimit: { max: 120, timeWindow: '1 minute' },
-        importMeta: { source: 'MANUAL', job: 'freight:step-delete' },
+        importMeta: { importSource: 'MANUAL', job: 'freight:step-delete' },
       },
     },
     async (req, reply) => {
@@ -434,7 +434,7 @@ export default function freightRoutes(app: FastifyInstance) {
       },
       config: {
         rateLimit: { max: 12, timeWindow: '1 minute' },
-        importMeta: { source: 'MANUAL', job: 'freight:import-json' },
+        importMeta: { importSource: 'MANUAL', job: 'freight:import-json' },
       },
     },
     async (req) => {
@@ -454,8 +454,8 @@ export default function freightRoutes(app: FastifyInstance) {
               .values({
                 origin: c.origin,
                 dest: c.dest,
-                mode: c.mode,
-                unit: c.unit,
+                freightMode: c.freightMode,
+                freightUnit: c.freightUnit,
                 carrier: c.carrier ?? null,
                 service: c.service ?? null,
                 notes: c.notes ?? null,
@@ -503,7 +503,7 @@ export default function freightRoutes(app: FastifyInstance) {
       },
       config: {
         rateLimit: { max: 12, timeWindow: '1 minute' },
-        importMeta: { source: 'MANUAL', job: 'freight:cards-json' },
+        importMeta: { importSource: 'MANUAL', job: 'freight:cards-json' },
       },
     },
     async (req, reply) => {

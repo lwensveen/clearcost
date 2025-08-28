@@ -137,7 +137,7 @@ export async function* streamUkMfnDutyRates(opts: FetchOpts = {}): AsyncGenerato
       partner: null,
       hs6,
       ratePct: toNumeric3String(percent),
-      rule: 'mfn',
+      dutyRule: 'mfn',
       effectiveFrom: start,
       effectiveTo: end ?? null,
       notes,

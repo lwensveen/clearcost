@@ -14,7 +14,7 @@ export const deMinimisZonos: Command = async (args) => {
 
   const payload = await withRun(
     {
-      source: 'ZONOS',
+      importSource: 'ZONOS',
       job: 'de-minimis:import-zonos',
       params: { effectiveOn: effectiveOn.toISOString().slice(0, 10) },
     },
@@ -36,7 +36,7 @@ export const deMinimisOfficial: Command = async (args) => {
 
   const payload = await withRun(
     {
-      source: 'OFFICIAL',
+      importSource: 'OFFICIAL',
       job: 'de-minimis:official',
       params: { effectiveOn: effectiveOn.toISOString().slice(0, 10) },
     },
@@ -58,7 +58,7 @@ export const deMinimisSeedBaseline: Command = async (args) => {
 
   const payload = await withRun(
     {
-      source: 'BASELINE',
+      importSource: 'BASELINE',
       job: 'de-minimis:seed',
       params: { effectiveOn: effectiveOn.toISOString().slice(0, 10) },
     },

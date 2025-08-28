@@ -18,8 +18,8 @@ export const freightRateCardsTable = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     origin: varchar('origin', { length: 3 }).notNull(),
     dest: varchar('dest', { length: 3 }).notNull(),
-    mode: freightModeEnum('mode').notNull(),
-    unit: freightUnitEnum('unit').notNull(),
+    freightMode: freightModeEnum('freight_mode').notNull(),
+    freightUnit: freightUnitEnum('freight_unit').notNull(),
     currency: varchar('currency', { length: 3 }).notNull().default('USD'),
     minCharge: numeric('min_charge', { precision: 12, scale: 2 }).default('0').notNull(),
     priceRounding: numeric('price_rounding', { precision: 12, scale: 2 }),
@@ -36,11 +36,11 @@ export const freightRateCardsTable = pgTable(
     byLane: uniqueIndex('freight_cards_lane_uq').on(
       t.origin,
       t.dest,
-      t.mode,
-      t.unit,
+      t.freightMode,
+      t.freightUnit,
       t.effectiveFrom
     ),
-    idxLane: index('freight_cards_lane_idx').on(t.origin, t.dest, t.mode, t.unit),
+    idxLane: index('freight_cards_lane_idx').on(t.origin, t.dest, t.freightMode, t.freightUnit),
     idxCarrier: index('freight_cards_carrier_idx').on(t.carrier),
     idxService: index('freight_cards_service_idx').on(t.service),
   })

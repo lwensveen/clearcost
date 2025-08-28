@@ -22,7 +22,7 @@
 // • Effective dates are set to “today” (UTC) as a pragmatic default; these can
 //   be enhanced later by parsing metadata or publication dates from the sources.
 // • Import VAT base defaults to CIF_PLUS_DUTY; override later per-country
-//   or per-HS rule as you collect more granular data.
+//   or per-HS duty_rule as you collect more granular data.
 //
 // EXTENSION POINTS
 // ----------------
@@ -41,7 +41,7 @@ countries.registerLocale(en);
 type VatRateKind = 'STANDARD' | 'REDUCED' | 'SUPER_REDUCED' | 'ZERO';
 type SourceId = 'oecd' | 'imf';
 
-const DEFAULT_BASE: VatRuleInsert['base'] = 'CIF_PLUS_DUTY';
+const DEFAULT_BASE: VatRuleInsert['vatBase'] = 'CIF_PLUS_DUTY';
 const MAX_REASONABLE_RATE_PCT = 60;
 
 const OECD_XLSX_URL =
@@ -254,7 +254,7 @@ export async function fetchVatRowsFromOfficialSources(): Promise<VatRuleInsert[]
     effectiveTo: null,
     notes:
       source === 'oecd'
-        ? 'source: OECD Consumption Tax Trends (standard/reduced/super-reduced/zero)'
-        : 'source: IMF VAT rates (TPAF)',
+        ? 'importSource: OECD Consumption Tax Trends (standard/reduced/super-reduced/zero)'
+        : 'importSource: IMF VAT rates (TPAF)',
   }));
 }

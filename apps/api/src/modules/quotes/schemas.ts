@@ -19,7 +19,7 @@ export const quoteInputSchema = z.object({
     .string()
     .regex(/^\d{6}$/)
     .optional(),
-  mode: z.enum(['air', 'sea']),
+  shippingMode: z.enum(['air', 'sea']),
 });
 
 export const QuoteResponseSchema = z.object({

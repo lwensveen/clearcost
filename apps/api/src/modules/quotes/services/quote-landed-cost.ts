@@ -64,15 +64,16 @@ export async function quoteLandedCost(
   const hs6 = await resolveHs6(input.categoryKey, input.hs6);
 
   const volKg = volumetricKg(input.dimsCm);
-  const chargeableKg = input.mode === 'air' ? Math.max(input.weightKg, volKg) : input.weightKg;
-  const qty = input.mode === 'air' ? chargeableKg : volumeM3(input.dimsCm);
-  const unit: Unit = input.mode === 'air' ? 'kg' : 'm3';
+  const chargeableKg =
+    input.shippingMode === 'air' ? Math.max(input.weightKg, volKg) : input.weightKg;
+  const qty = input.shippingMode === 'air' ? chargeableKg : volumeM3(input.dimsCm);
+  const unit: Unit = input.shippingMode === 'air' ? 'kg' : 'm3';
 
   const freightRow = await getFreight({
     origin: input.origin,
     dest: input.dest,
-    mode: input.mode,
-    unit,
+    freightMode: input.shippingMode,
+    freightUnit: unit,
     qty,
     on: now,
   });
@@ -127,7 +128,7 @@ export async function quoteLandedCost(
     checkoutVAT = checkoutRate * checkoutVatBase;
   } else if (!dem.suppressVAT) {
     // Import VAT at border unless de minimis suppresses VAT
-    const base = (vatInfo?.base as 'CIF' | 'CIF_PLUS_DUTY') ?? 'CIF_PLUS_DUTY';
+    const base = (vatInfo?.vatBase as 'CIF' | 'CIF_PLUS_DUTY') ?? 'CIF_PLUS_DUTY';
     const vatBase = base === 'CIF_PLUS_DUTY' ? CIF + duty : CIF;
     const vatRate = (vatInfo ? Number(vatInfo.ratePct) : 0) / 100;
     vat = vatRate * vatBase;

@@ -65,7 +65,7 @@ export async function fetchUsMfnDutyRates(opts: FetchUsMfnOpts = {}): Promise<Du
       partner: null,
       hs6,
       ratePct: toNumeric3String(pct),
-      rule: 'mfn',
+      dutyRule: 'mfn',
       // currency stays your default ('USD'); omit to use DB default
       effectiveFrom,
       effectiveTo: null,

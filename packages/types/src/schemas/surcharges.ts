@@ -19,7 +19,7 @@ export const SurchargeByIdSchema = z.object({ id: z.string().uuid() });
 
 export const SurchargesListQuerySchema = z.object({
   dest: z.string().length(2).optional(),
-  code: z
+  surchargeCode: z
     .enum([
       'CUSTOMS_PROCESSING',
       'DISBURSEMENT',

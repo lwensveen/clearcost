@@ -33,7 +33,7 @@ export async function importSurcharges(rows: SurchargeInsert[]) {
         dest: normIso2(r.dest)!,
         origin: normIso2(r.origin ?? null),
         hs6: normHs6(r.hs6 ?? null),
-        code: r.code,
+        surchargeCode: r.surchargeCode,
         fixedAmt: toDbNumeric(r.fixedAmt),
         pctAmt: toDbNumeric(r.pctAmt),
         effectiveFrom: r.effectiveFrom ?? undefined,
@@ -45,7 +45,7 @@ export async function importSurcharges(rows: SurchargeInsert[]) {
     dest: string;
     origin: string | null;
     hs6: string | null;
-    code: (typeof surchargesTable.$inferInsert)['code'];
+    surchargeCode: (typeof surchargesTable.$inferInsert)['surchargeCode'];
     fixedAmt?: string;
     pctAmt?: string;
     effectiveFrom?: Date;
@@ -63,7 +63,7 @@ export async function importSurcharges(rows: SurchargeInsert[]) {
           dest: r.dest,
           origin: r.origin ?? null,
           hs6: r.hs6 ?? null,
-          code: r.code,
+          surchargeCode: r.surchargeCode,
           fixedAmt: r.fixedAmt,
           pctAmt: r.pctAmt,
           effectiveFrom: r.effectiveFrom,
@@ -75,7 +75,7 @@ export async function importSurcharges(rows: SurchargeInsert[]) {
             surchargesTable.dest,
             surchargesTable.origin,
             surchargesTable.hs6,
-            surchargesTable.code,
+            surchargesTable.surchargeCode,
             surchargesTable.effectiveFrom,
           ],
           set: {

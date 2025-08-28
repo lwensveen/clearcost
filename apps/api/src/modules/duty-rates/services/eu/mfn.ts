@@ -75,7 +75,7 @@ export async function fetchEuMfnDutyRates(options: FetchOptions = {}): Promise<D
           partner: null,
           hs6: toHs6(measure.code10),
           ratePct: toNumeric3String(comp.pct),
-          rule: 'mfn',
+          dutyRule: 'mfn',
           effectiveFrom: startDate,
           effectiveTo: endDate,
           notes: comp.compound

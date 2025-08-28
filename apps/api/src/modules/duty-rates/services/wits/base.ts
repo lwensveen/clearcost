@@ -122,7 +122,7 @@ export function flattenWitsSeries(
     Number.isInteger(dim) && dim >= 0 ? (coord[dim] ?? -1) : -1;
 
   const out: DutyRateInsert[] = [];
-  const ruleValue: DutyRateInsert['rule'] = dutyTypeWanted === 'prf' ? 'fta' : 'mfn';
+  const ruleValue: DutyRateInsert['dutyRule'] = dutyTypeWanted === 'prf' ? 'fta' : 'mfn';
 
   for (const [seriesKey, seriesData] of Object.entries(dataSet.series)) {
     const coord = seriesKey.split(':').map((t) => parseInt(t, 10));
@@ -147,14 +147,14 @@ export function flattenWitsSeries(
         partner: partnerIso2OrUnion ?? null,
         hs6: productId,
         ratePct: toNumeric3String(val),
-        rule: ruleValue,
+        dutyRule: ruleValue,
         currency: 'USD',
         effectiveFrom: jan1(year),
         effectiveTo: null,
         notes:
           dutyTypeWanted === 'prf'
-            ? 'source: WITS/UNCTAD TRAINS (Preferential-PRF, SimpleAverage, reported)'
-            : 'source: WITS/UNCTAD TRAINS (SimpleAverage, reported)',
+            ? 'importSource: WITS/UNCTAD TRAINS (Preferential-PRF, SimpleAverage, reported)'
+            : 'importSource: WITS/UNCTAD TRAINS (SimpleAverage, reported)',
       });
     }
   }

@@ -9,7 +9,7 @@ export default function hsRoutes(app: FastifyInstance) {
     '/internal/cron/import/hs/eu-hs6',
     {
       preHandler: app.requireApiKey(['tasks:hs:eu-hs6']),
-      config: { importMeta: { source: 'TARIC', job: 'hs:eu-hs6' } },
+      config: { importMeta: { importSource: 'TARIC', job: 'hs:eu-hs6' } },
     },
     async (req, reply) => {
       const importId = req.importCtx?.runId;
@@ -23,7 +23,7 @@ export default function hsRoutes(app: FastifyInstance) {
     '/internal/cron/import/hs/ahtn',
     {
       preHandler: app.requireApiKey(['tasks:hs:ahtn']),
-      config: { importMeta: { source: 'AHTN', job: 'hs:ahtn' } },
+      config: { importMeta: { importSource: 'AHTN', job: 'hs:ahtn' } },
       schema: {
         body: z.object({
           url: z.string().url().optional(),

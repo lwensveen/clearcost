@@ -25,7 +25,7 @@ export async function importDutyRates(rows: DutyRateInsert[]) {
           ],
           set: {
             ratePct: v.ratePct,
-            rule: v.rule,
+            dutyRule: v.dutyRule,
             currency: v.currency,
             effectiveTo: v.effectiveTo,
             notes: v.notes ?? null,

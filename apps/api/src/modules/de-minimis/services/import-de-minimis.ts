@@ -3,8 +3,8 @@ import { sql } from 'drizzle-orm';
 
 export type DeMinimisRow = {
   dest: string; // ISO-3166-1 alpha-2
-  kind: 'DUTY' | 'VAT'; // per-type threshold
-  basis: 'INTRINSIC' | 'CIF'; // goods-only vs CIF
+  deMinimisKind: 'DUTY' | 'VAT'; // per-type threshold
+  deMinimisBasis: 'INTRINSIC' | 'CIF'; // goods-only vs CIF
   currency: string; // ISO-4217
   value: string | number; // threshold amount in `currency`
   effectiveFrom: string; // YYYY-MM-DD
@@ -21,17 +21,17 @@ export async function importDeMinimis(rows: DeMinimisRow[]) {
         .insert(deMinimisTable)
         .values({
           dest: r.dest.toUpperCase(),
-          kind: r.kind,
-          basis: r.basis,
+          deMinimisKind: r.deMinimisKind,
+          deMinimisBasis: r.deMinimisBasis,
           currency: r.currency.toUpperCase(),
           value: String(r.value),
           effectiveFrom: new Date(r.effectiveFrom),
           effectiveTo: r.effectiveTo ? new Date(r.effectiveTo) : null,
         })
         .onConflictDoUpdate({
-          target: [deMinimisTable.dest, deMinimisTable.kind, deMinimisTable.effectiveFrom],
+          target: [deMinimisTable.dest, deMinimisTable.deMinimisKind, deMinimisTable.effectiveFrom],
           set: {
-            basis: sql`excluded.basis`,
+            deMinimisBasis: sql`excluded.deMinimisBasis`,
             currency: sql`excluded.currency`,
             value: sql`excluded.value`,
             effectiveTo: sql`excluded.effective_to`,

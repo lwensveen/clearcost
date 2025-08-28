@@ -192,7 +192,7 @@ export async function* streamUkPreferentialDutyRates(
       partner: partnerCode,
       hs6,
       ratePct: toNumeric3String(percent),
-      rule: 'fta',
+      dutyRule: 'fta',
       effectiveFrom: start,
       effectiveTo: end ?? null,
       notes:

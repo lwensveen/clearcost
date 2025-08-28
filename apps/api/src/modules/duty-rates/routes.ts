@@ -30,7 +30,7 @@ export default function dutyRoutes(app: FastifyInstance) {
         response: { 200: ReplySchema },
       },
       config: {
-        importMeta: { source: 'MANUAL', job: 'duties:json' },
+        importMeta: { importSource: 'MANUAL', job: 'duties:json' },
         rateLimit: { max: 30, timeWindow: '1 minute' },
       },
     },

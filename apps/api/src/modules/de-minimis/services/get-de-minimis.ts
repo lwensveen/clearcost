@@ -4,7 +4,7 @@ import { and, desc, eq, gte, isNull, lte, or } from 'drizzle-orm';
 export type DeMinimisThreshold = {
   currency: string; // ISO-4217
   value: number; // threshold amount in `currency`
-  basis: 'INTRINSIC' | 'CIF'; // goods-only vs CIF
+  deMinimisBasis: 'INTRINSIC' | 'CIF'; // goods-only vs CIF
 };
 
 export type DeMinimisBoth = {
@@ -32,7 +32,7 @@ export async function getDeMinimisForKind(
     .where(
       and(
         eq(deMinimisTable.dest, dest.toUpperCase()),
-        eq(deMinimisTable.kind, kind),
+        eq(deMinimisTable.deMinimisKind, kind),
         lte(deMinimisTable.effectiveFrom, day),
         or(isNull(deMinimisTable.effectiveTo), gte(deMinimisTable.effectiveTo, day))
       )
@@ -45,7 +45,7 @@ export async function getDeMinimisForKind(
   return {
     currency: row.currency,
     value: Number(row.value),
-    basis: (row.basis as 'INTRINSIC' | 'CIF') ?? 'INTRINSIC',
+    deMinimisBasis: (row.deMinimisBasis as 'INTRINSIC' | 'CIF') ?? 'INTRINSIC',
   };
 }
 
