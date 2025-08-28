@@ -6,15 +6,39 @@ import { withIdempotency } from '../../lib/idempotency.js';
 import { quoteLandedCost } from './services/quote-landed-cost.js';
 import { and, eq } from 'drizzle-orm';
 
+// Richer reply schema (keeps new fields optional for compatibility)
 export const QuoteResponseSchema = z.object({
   hs6: z.string().regex(/^\d{6}$/),
+  currency: z.string().optional(), // quote includes currency
+  incoterm: z.enum(['DAP', 'DDP']).optional(), // quote includes incoterm
   chargeableKg: z.number(),
   freight: z.number(),
+  deMinimis: z
+    .object({
+      duty: z
+        .object({
+          thresholdDest: z.number(),
+          basis: z.enum(['CIF', 'INTRINSIC']),
+          under: z.boolean(),
+        })
+        .nullable(),
+      vat: z
+        .object({
+          thresholdDest: z.number(),
+          basis: z.enum(['CIF', 'INTRINSIC']),
+          under: z.boolean(),
+        })
+        .nullable(),
+      suppressDuty: z.boolean(),
+      suppressVAT: z.boolean(),
+    })
+    .optional(),
   components: z.object({
     CIF: z.number(),
     duty: z.number(),
     vat: z.number(),
     fees: z.number(),
+    checkoutVAT: z.number().optional(),
   }),
   total: z.number(),
   guaranteedMax: z.number(),
@@ -25,6 +49,7 @@ type QuoteResponse = z.infer<typeof QuoteResponseSchema>;
 
 const ReplayQuery = z.object({
   key: z.string().min(1),
+  // kept for legacy, but ignored in favor of tenant-scoped lookup
   scope: z.string().default('quotes'),
 });
 
@@ -49,12 +74,17 @@ export default function quoteRoutes(app: FastifyInstance) {
       preHandler: app.requireApiKey(['quotes:write']),
       schema: {
         body: quoteInputSchema,
+        headers: IdemHeaderSchema,
         response: {
           200: QuoteResponseSchema,
           400: z.object({ error: z.unknown() }),
           409: z.object({ error: z.unknown() }),
           500: z.object({ error: z.unknown() }),
         },
+      },
+      config: {
+        rateLimit: { max: 120, timeWindow: '1 minute' },
+        importMeta: { source: 'API', job: 'quotes:compute' },
       },
     },
     async (req, reply) => {
@@ -65,9 +95,12 @@ export default function quoteRoutes(app: FastifyInstance) {
         return reply.badRequest('Idempotency-Key (or X-Idempotency-Key) header required');
       }
 
+      const ownerId = req.apiKey?.ownerId ?? 'anon';
+      const idemScope = `quotes:${ownerId}`; // tenant-scoped keys
+
       try {
         const result = await withIdempotency(
-          'quotes',
+          idemScope,
           idemKey,
           req.body,
           async () => {
@@ -77,8 +110,8 @@ export default function quoteRoutes(app: FastifyInstance) {
             });
 
             // 1) Audit record (best-effort)
-            try {
-              await db.insert(auditQuotesTable).values({
+            db.insert(auditQuotesTable)
+              .values({
                 laneOrigin: req.body.origin,
                 laneDest: req.body.dest,
                 hs6: out.hs6,
@@ -94,24 +127,20 @@ export default function quoteRoutes(app: FastifyInstance) {
                 totalQuoted: String(out.total),
                 notes: out.components['checkoutVAT'] ? 'IOSS checkout VAT included' : null,
                 lowConfidence: !req.body.hs6,
-              });
-            } catch (e) {
-              req.log.warn({ err: e, msg: 'audit insert failed' });
-            }
+              })
+              .catch((e) => req.log.warn({ err: e, msg: 'audit insert failed' }));
 
             // 2) Quote snapshot (best-effort)
-            try {
-              await db.insert(quoteSnapshotsTable).values({
-                scope: 'quotes',
+            db.insert(quoteSnapshotsTable)
+              .values({
+                scope: idemScope,
                 idemKey,
                 request: req.body,
                 response: out,
                 fxAsOf,
                 dataRuns: null,
-              });
-            } catch (e) {
-              req.log.warn({ err: e, msg: 'snapshot insert failed' });
-            }
+              })
+              .catch((e) => req.log.warn({ err: e, msg: 'snapshot insert failed' }));
 
             return out;
           },
@@ -121,6 +150,7 @@ export default function quoteRoutes(app: FastifyInstance) {
 
         req.log.info({
           msg: 'quote computed',
+          idemScope,
           idemKey,
           origin: req.body.origin,
           dest: req.body.dest,
@@ -143,7 +173,7 @@ export default function quoteRoutes(app: FastifyInstance) {
     }
   );
 
-  // GET /v1/quotes/by-key/:key — fetch cached response
+  // GET /v1/quotes/by-key/:key — fetch cached response (tenant-scoped)
   app.get<{
     Params: { key: string };
     Reply: QuoteResponse | { error: unknown };
@@ -155,12 +185,22 @@ export default function quoteRoutes(app: FastifyInstance) {
         params: z.object({ key: z.string().min(1) }),
         response: { 200: QuoteResponseSchema, 404: z.object({ error: z.unknown() }) },
       },
+      config: { rateLimit: { max: 600, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
-      const row = await db.query.idempotencyKeysTable.findFirst({
-        where: (t, { and, eq }) =>
-          and(eq(t.scope, 'quotes'), eq(t.key, req.params.key), eq(t.status, 'completed')),
-      });
+      const ownerId = req.apiKey!.ownerId;
+      const scoped = `quotes:${ownerId}`;
+
+      // Prefer tenant-scoped; fall back to legacy unscoped for pre-release data
+      const row =
+        (await db.query.idempotencyKeysTable.findFirst({
+          where: (t, { and, eq }) =>
+            and(eq(t.scope, scoped), eq(t.key, req.params.key), eq(t.status, 'completed')),
+        })) ??
+        (await db.query.idempotencyKeysTable.findFirst({
+          where: (t, { and, eq }) =>
+            and(eq(t.scope, 'quotes'), eq(t.key, req.params.key), eq(t.status, 'completed')),
+        }));
 
       if (!row || !row.response) {
         req.log.info({ key: req.params.key, msg: 'quote not found for key' });
@@ -177,19 +217,19 @@ export default function quoteRoutes(app: FastifyInstance) {
         return reply.internalServerError('Cached response invalid');
       }
 
-      req.log.info({ key: req.params.key, msg: 'quote replay served' });
       reply.header('Idempotency-Key', req.params.key).header('Cache-Control', 'no-store');
       return reply.send(parsed.data);
     }
   );
 
-  // GET /v1/quotes/replay?key=...&scope=quotes — same as :key, but generic scope/key
+  // GET /v1/quotes/replay?key=...&scope=quotes — tenant-scoped replay
   app.get<{
     Querystring: z.infer<typeof ReplayQuery>;
     Reply: QuoteResponse | { error: string };
   }>(
     '/replay',
     {
+      preHandler: app.requireApiKey(['quotes:read']),
       schema: {
         querystring: ReplayQuery,
         response: {
@@ -198,9 +238,12 @@ export default function quoteRoutes(app: FastifyInstance) {
           409: z.object({ error: z.string() }),
         },
       },
+      config: { rateLimit: { max: 600, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
-      const { key, scope } = ReplayQuery.parse(req.query);
+      const { key } = ReplayQuery.parse(req.query);
+      const ownerId = req.apiKey!.ownerId;
+      const scoped = `quotes:${ownerId}`;
 
       const [row] = await db
         .select({
@@ -209,7 +252,7 @@ export default function quoteRoutes(app: FastifyInstance) {
           response: idempotencyKeysTable.response,
         })
         .from(idempotencyKeysTable)
-        .where(and(eq(idempotencyKeysTable.scope, scope), eq(idempotencyKeysTable.key, key)))
+        .where(and(eq(idempotencyKeysTable.scope, scoped), eq(idempotencyKeysTable.key, key)))
         .limit(1);
 
       if (!row) return reply.code(404).send({ error: 'Unknown idempotency key' });
@@ -224,6 +267,7 @@ export default function quoteRoutes(app: FastifyInstance) {
         return reply.code(409).send({ error: 'Cached response invalid' });
       }
 
+      reply.header('Cache-Control', 'no-store');
       return reply.send(parsed.data);
     }
   );
