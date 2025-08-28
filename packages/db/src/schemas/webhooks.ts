@@ -10,12 +10,15 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { createTimestampColumn } from '../utils.js';
+import { orgsTable } from './auth/orgs.js';
 
 export const webhookEndpointsTable = pgTable(
   'webhook_endpoints',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    ownerId: uuid('owner_id').notNull(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => orgsTable.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
     url: text('url').notNull(),
     secretEnc: text('secret_enc').notNull(),
     secretIv: text('secret_iv').notNull(),

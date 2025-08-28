@@ -1,12 +1,15 @@
 import { char, index, numeric, pgTable, uuid, varchar } from 'drizzle-orm/pg-core';
 import { pricingModeEnum, shippingModeEnum } from '../enums.js';
 import { createTimestampColumn } from '../utils.js';
+import { orgsTable } from './auth/orgs.js';
 
 export const manifestsTable = pgTable(
   'manifests',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    ownerId: uuid('owner_id').notNull(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => orgsTable.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
     origin: char('origin', { length: 2 }).notNull(), // ISO-3166-1 alpha-2
     dest: char('dest', { length: 2 }).notNull(), // ISO-3166-1 alpha-2
     mode: shippingModeEnum('mode').notNull(), // 'air' | 'sea'

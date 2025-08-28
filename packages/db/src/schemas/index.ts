@@ -15,6 +15,7 @@ import { importsTable } from './imports.js';
 import { manifestItemQuotesTable } from './manifest-item-quotes.js';
 import { manifestItemsTable } from './manifest-items.js';
 import { manifestQuotesTable } from './manifest-quotes.js';
+import { manifestSnapshotsTable } from './manifest-snapshots.js';
 import { manifestsTable } from './manifests.js';
 import { merchantProfilesTable } from './merchant-profiles.js';
 import { passkeysTable } from './auth/passkeys.js';
@@ -59,6 +60,7 @@ export * from './users/users.js';
 export * from './vat-overrides.js';
 export * from './vat-rules.js';
 export * from './webhooks.js';
+export * from './manifest-snapshots.js';
 
 export const schema = {
   accountsTable,
@@ -78,6 +80,7 @@ export const schema = {
   manifestItemQuotesTable,
   manifestItemsTable,
   manifestQuotesTable,
+  manifestSnapshotsTable,
   manifestsTable,
   merchantProfilesTable,
   passkeysTable,
