@@ -39,17 +39,15 @@ clearcost/
           duty-rates/          # WITS, UK, EU, US importers
           surcharges/          # US/EU/UK surcharges + helpers
           vat/                 # VAT importers (OECD/IMF)
-          tasks/               # Internal cron HTTP routes
+          tasks/               # Internal cron HTTP routes (scoped)
           health/              # /healthz and import health
-          webhooks/            # outbound hooks (skeleton)
+          webhooks/            # Outbound webhooks (admin + dispatcher)
         plugins/
           prometheus/          # http metrics, imports-running gauges
           api-key-auth.ts
           api-usage.ts
           import-instrumentation.ts
       types/                   # Fastify module augmentations
-    docs/                      # Next.js docs site (skeleton)
-    web/                       # Web app placeholder
 
   packages/
     db/                        # Drizzle schema & migrations
@@ -61,12 +59,12 @@ clearcost/
         duty-rates.ts
         surcharges.ts
         vat.ts
-        ...
+        webhooks.ts
+        auth/api-keys.ts
     types/                     # Shared Zod/TS types
 
   ops/
     prometheus/prometheus.yml  # local scrape config
-    grafana/dashboards/        # JSON dashboards (imports, http)
 
   .github/workflows/
     cron-hourly.yml            # stale sweep
@@ -80,70 +78,21 @@ clearcost/
 ## What’s already built
 
 - **Quote API** — `/v1/quotes` with idempotency, auditing, Zod validation.
-  - Paths: `apps/api/src/modules/quotes/routes.ts` + `.../services/quote-landed-cost.ts`
+  - Code: `apps/api/src/modules/quotes/routes.ts` → `services/quote-landed-cost.ts`
 
 - **Data import pipelines** with provenance + metrics:
-  - **FX (ECB)**: `POST /internal/cron/fx/daily` → `lib/refresh-fx.ts`
-  - **VAT (OECD/IMF)**: `POST /internal/cron/import/vat/auto`
-  - **Duties**: WITS/UK/EU/US importers (streaming + batch upsert)
-  - **Surcharges**: US 301/232, MPF/HMF, EU/UK trade remedies
-  - **HS codes**: TARIC HS6 titles; AHTN8/HTS10/UK10 aliases
-  - All task routes live under `apps/api/src/modules/tasks/**` and are instrumented via
-    `plugins/import-instrumentation.ts`.
+  - **FX (ECB)** → `POST /internal/cron/fx/daily`
+  - **VAT (OECD/IMF)** → `POST /internal/cron/import/vat/auto`
+  - **Duties** → WITS/UK/EU/US importers
+  - **Surcharges** → US 301/232 + MPF/HMF; EU/UK trade remedies
+  - **HS** → TARIC HS6 titles; AHTN8/HTS10/UK10 aliases
+  - Task routes live in `apps/api/src/modules/tasks/**` and are instrumented by `plugins/import-instrumentation.ts`.
 
 - **Provenance store** (import runs + per-row provenance)
-  - Schema: `packages/db/src/schemas/imports.ts`, `.../provenance.ts`
-  - Plugin: `apps/api/src/plugins/import-instrumentation.ts` (sets up timers, heartbeats, metrics; auto-closes on
-    error/finish)
-
-- **Locks & Sweeping**
-  - Run‑lock helper: `apps/api/src/lib/run-lock.ts` (pg_advisory lock wrapper)
-  - Stale sweep util + HTTP route: `lib/sweep-stale-imports.ts`, `modules/tasks/sweep-stale-routes.ts`
-  - Prune old imports/provenance: CLI command + HTTP route
-
-- **Observability**
-  - Prometheus HTTP metrics: `plugins/prometheus/metrics-http.ts` → `/metrics`
-  - Import‑focused gauges: `plugins/prometheus/imports-running.ts`, `imports-extra.ts`
-  - Example Prom scrape config: `ops/prometheus/prometheus.yml`
-
-- **Auth & metering**
-  - API key auth + scoped guards: `plugins/api-key-auth.ts`
-  - Per‑key usage aggregation: `plugins/api-usage.ts` (writes to `api_usage`)
-
-- **Cron runners**
-  - **HTTP cron** via GitHub Actions: `cron-hourly.yml`, `cron-nightly.yml`, `cron-weekly.yml`
-  - **CLI cron** for manual/dev: `apps/api/src/lib/cron/runtime.ts` with commands in `lib/cron/commands/*`
-
-- **Tests & CI**
-  - Basic unit tests: `apps/api/src/lib/run-lock.test.ts`, `.../sweep-stale.test.ts`
-  - CI: `.github/workflows/api-tests.yml`
-
----
-
-## What’s left for the MVP
-
-**Backend**
-
-- [ ] Quote engine hardening (edge lanes; volumetric rules for sea; insurance option)
-- [ ] De‑minimis table & rules per destination
-- [ ] More surcharges & remedy carve‑outs (e.g., US 232 country exceptions)
-- [ ] Better error mapping → 4xx vs 5xx; consistent error schema
-- [ ] Cache layers (FX, WITS responses) + request timeout envelopes
-
-**Data quality & ops**
-
-- [ ] Drift monitor: compare broker entries vs quoted totals per HS/lane
-- [ ] Simple admin endpoints to patch duties/VAT/freight rows
-- [ ] One‑shot backfills (commands + docs)
-
-**Docs & SDK**
-
-- [ ] Expand docs site with guides and schema reference
-- [ ] Publish minimal TypeScript SDK (`packages/types` exists; SDK package TBD)
-
-**Security**
-
-- [ ] Rotate keys; rate limiting profiles; audit trails
+- **Locks & Sweeping** (`run-lock.ts`, `sweep-stale-imports.ts`)
+- **Observability**: Prometheus `/metrics` + import gauges
+- **Auth & metering**: API key auth (`plugins/api-key-auth.ts`) + per-key usage (`api-usage.ts`)
+- **Cron runners**: HTTP via GitHub Actions; local CLI commands
 
 ---
 
@@ -155,7 +104,7 @@ clearcost/
 bun install
 ```
 
-2. **Run Postgres** (example)
+2. **Run Postgres**
 
 ```bash
 docker run --name clearcost-pg -e POSTGRES_PASSWORD=postgres \
@@ -191,26 +140,137 @@ bunx turbo run dev
 
 ---
 
+## API overview
+
+### Public/Customer APIs
+
+- `POST /v1/quotes` — compute landed cost (**requires scope:** `quotes:write`)
+- `GET /v1/quotes/by-key/:key` — replay cached quote (**requires:** `quotes:read`)
+- `GET /healthz` / `HEAD /healthz` — liveness & readiness
+- `GET /health/imports` — import activity snapshot
+- `GET /metrics` — Prometheus metrics
+- `GET /v1/hs-codes` — HS6 search/lookup (**requires:** `hs:read`)
+- `GET /v1/hs-codes/lookup` — alias→HS6 (**requires:** `hs:read`)
+
+### Admin / Key management
+
+- `GET /v1/api-keys/self` — introspect current key
+- `POST /v1/api-keys/self/rotate` — rotate (returns plaintext once)
+- `POST /v1/api-keys/self/revoke` — revoke current key
+- `GET /v1/admin/api-keys?ownerId=…` — list
+- `POST /v1/admin/api-keys` — create (returns plaintext once)
+- `PATCH /v1/admin/api-keys/:id` — patch/revoke/reactivate
+- `POST /v1/admin/api-keys/:id/rotate` — admin rotate (plaintext once)
+
+### Internal cron routes (scoped)
+
+All mounted under `/internal/cron/**` and **require an API key** with the specific `tasks:*` scope. Highlights:
+
+```
+# FX
+POST /internal/cron/fx/daily                           (tasks:fx:daily)
+
+# VAT
+POST /internal/cron/import/vat/auto                    (tasks:vat:auto)
+
+# Duties
+POST /internal/cron/import/duties/uk-mfn               (tasks:duties:uk-mfn)
+POST /internal/cron/import/duties/uk-fta               (tasks:duties:uk-fta)
+POST /internal/cron/import/duties/eu-mfn               (tasks:duties:eu-mfn)
+POST /internal/cron/import/duties/eu-fta               (tasks:duties:eu-fta)
+POST /internal/cron/import/duties/us-mfn               (tasks:duties:us-mfn)
+POST /internal/cron/import/duties/us-preferential      (tasks:duties:us-fta)
+POST /internal/cron/import/duties/wits                 (tasks:duties:wits)
+POST /internal/cron/import/duties/wits/asean           (tasks:duties:wits:asean)
+POST /internal/cron/import/duties/wits/japan           (tasks:duties:wits:japan)
+
+# Surcharges
+POST /internal/cron/import/surcharges/us-trade-remedies (tasks:surcharges:us-trade-remedies)
+POST /internal/cron/import/surcharges/us-all            (tasks:surcharges:us-all)
+POST /internal/cron/import/surcharges                   (tasks:surcharges:json)
+POST /internal/cron/import/surcharges/eu-remedies       (tasks:surcharges:eu-remedies)
+POST /internal/cron/import/surcharges/uk-remedies       (tasks:surcharges:uk-remedies)
+
+# HS aliases & titles
+POST /internal/cron/import/hs/eu-hs6                    (tasks:hs:eu-hs6)
+POST /internal/cron/import/hs/ahtn                      (tasks:hs:ahtn)
+
+# De‑minimis
+POST /internal/cron/de-minimis/import-zonos             (tasks:de-minimis:import-zonos)
+POST /internal/cron/de-minimis/import-official          (tasks:de-minimis:import-official)
+
+# Ops
+POST /internal/cron/imports/sweep-stale                 (tasks:imports:sweep-stale)
+POST /internal/cron/imports/prune                       (tasks:imports:prune)
+```
+
+> Some legacy routes may still accept an **admin token**; prefer scoped API keys going forward.
+
+---
+
+## Cron key scopes (copy‑paste)
+
+Grant these scopes to the API key used by your GitHub Actions:
+
+```
+tasks:imports:sweep-stale,tasks:fx:daily,tasks:vat:auto,tasks:duties:uk-mfn,tasks:duties:uk-fta,tasks:duties:eu-mfn,tasks:duties:eu-fta,tasks:duties:us-mfn,tasks:duties:us-fta,tasks:surcharges:us-trade-remedies,tasks:surcharges:us-all,tasks:surcharges:json,tasks:freight:json,tasks:hs:eu-hs6,tasks:hs:ahtn,tasks:duties:wits,tasks:duties:wits:asean,tasks:duties:wits:japan,tasks:surcharges:eu-remedies,tasks:surcharges:uk-remedies,tasks:de-minimis:import-zonos,tasks:de-minimis:import-official,tasks:imports:prune
+```
+
+Set it in your repository secrets/vars (see `cron-nightly.yml` and `cron-weekly.yml`).
+
+---
+
+## Idempotency
+
+ClearCost endpoints that create/import data use **idempotency keys**.
+
+- Send `Idempotency-Key` (or `X-Idempotency-Key`) on POSTs.
+- If the same key is reused with a **different payload**, you’ll get a **409**.
+- Replays return the prior response (handlers may refresh if stale).
+
+Internals are implemented in `apps/api/src/lib/idempotency.ts`.
+
+---
+
+## Webhooks (admin)
+
+Admin endpoints allow managing webhook endpoints; secrets are stored as **salted hashes** (no plaintext persistence).
+
+- `POST /v1/webhooks/endpoints` _(admin scope)_ → returns `secret` **once**
+- `POST /v1/webhooks/endpoints/:id/rotate` → returns new `secret` **once**
+- `PATCH /v1/webhooks/endpoints/:id` → activate/deactivate
+- `GET /v1/webhooks/deliveries?endpointId=…` → recent deliveries
+
+**Signature**: requests include `clearcost-signature: t=<unix>,v1=<hex>` where
+
+```
+v1 = sha256_hmac(secret, `${t}.${body}`)
+```
+
+Verify by recomputing the HMAC over the exact raw body and checking timestamp skew.
+
+---
+
 ## Running imports
 
-### Via HTTP routes (admin key required)
+### Via HTTP routes (with scoped API key)
 
 ```bash
 # FX (ECB)
-curl -X POST -H "x-admin-token: $ADMIN" \
-  "${API%/}/internal/cron/fx/daily"
+curl --fail -X POST -H "x-api-key: $API_KEY" \
+  "$API/internal/cron/fx/daily"
 
 # VAT (OECD/IMF)
-curl -X POST -H "x-admin-token: $ADMIN" \
-  "${API%/}/internal/cron/import/vat/auto"
+curl --fail -X POST -H "x-api-key: $API_KEY" \
+  "$API/internal/cron/import/vat/auto"
 
 # US surcharges (all)
-curl -X POST -H "x-admin-token: $ADMIN" -H 'content-type: application/json' \
+curl --fail -X POST -H "x-api-key: $API_KEY" -H 'content-type: application/json' \
   -d '{"batchSize":5000}' \
-  "${API%/}/internal/cron/import/surcharges/us-all"
+  "$API/internal/cron/import/surcharges/us-all"
 ```
 
-### Via CLI (local/manual)
+### Via CLI (local/dev)
 
 ```bash
 cd apps/api
@@ -220,57 +280,22 @@ bun run src/lib/cron/runtime.ts imports:sweep-stale --threshold 30
 bun run src/lib/cron/runtime.ts imports:prune --days 90
 ```
 
-Commands are registered in `apps/api/src/lib/cron/registry.ts`.
-
 ---
 
 ## Observability
 
-- **Prometheus**: scrape `${API}/metrics` (see `ops/prometheus/prometheus.yml`).
-- Gauges & histograms:
+- **Prometheus**: scrape `GET /metrics` (see `ops/prometheus/prometheus.yml`).
+- Key metrics:
   - `http_server_request_duration_seconds`
   - `http_server_requests_total`
-  - `clearcost_import_last_run_timestamp{import_id}`
-  - `clearcost_imports_running{age_bucket}` (if enabled)
-
----
-
-## API overview
-
-- `POST /v1/quotes` — compute landed cost (idempotent; requires `quotes:write` scope)
-- `GET /v1/quotes/by-key/:key` — replay cached quote (requires `quotes:read`)
-- `GET /healthz` / `HEAD /healthz` — liveness & readiness
-- `GET /health/imports` — import activity snapshot (for dashboards)
-- `/internal/cron/**` — admin/protected import tasks
-
-Auth helpers and scopes live in `apps/api/src/plugins/api-key-auth.ts`.
-
----
-
-## Development tips
-
-- Type augmentations for Fastify are in `apps/api/types/import-instrumentation.d.ts`.
-- Import routes can opt‑in to provenance + metrics by setting `config.importMeta`:
-
-```ts
-app.post(
-  '/internal/cron/…',
-  {
-    preHandler: adminGuard,
-    config: { importMeta: { source: 'USITC_HTS', job: 'duties:us-mfn' } },
-  },
-  handler
-);
-```
-
-The `import-instrumentation` plugin starts timers, creates the import run, heartbeats during work, and auto‑finishes (
-success/failure) based on the response.
+  - `clearcost_import_last_run_timestamp{import_id="…"}`
+  - `clearcost_imports_running{age_bucket="…"}`
 
 ---
 
 ## Testing & CI
 
-- **Local**: `bun test` (see `apps/api/tsconfig.test.json`)
+- **Local**: `bun test`
 - **CI**: `.github/workflows/api-tests.yml`
 
 ---
