@@ -15,8 +15,7 @@ jobs:
     timeout-minutes: 45
     env:
       API: ${{ secrets.CLEARCOST_API_URL }}
-      ADMIN: ${{ secrets.CLEARCOST_ADMIN_TOKEN }}
-      API_KEY: ${{ secrets.CLEARCOST_API_KEY }}
+      API_KEY: ${{ secrets.CLEARCOST_TASKS_API_KEY }} # scoped tasks key
       AHTN_URL: ${{ secrets.AHTN_SOURCE_URL }}
       RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
@@ -33,7 +32,7 @@ jobs:
           if [ -n "$AHTN_URL" ]; then BODY="{\"url\":\"$AHTN_URL\"}"; fi
           curl --fail-with-body --show-error --silent \
             --retry 3 --retry-all-errors -X POST \
-            -H "x-admin-token: $ADMIN" \
+            -H "x-api-key: $API_KEY" \
             -H "content-type: application/json" \
             -d "$BODY" \
             "${API%/}/internal/cron/import/hs/ahtn"
@@ -42,7 +41,7 @@ jobs:
         run: |
           curl --fail-with-body --show-error --silent \
             --retry 3 --retry-all-errors -X POST \
-            -H "x-admin-token: $ADMIN" \
+            -H "x-api-key: $API_KEY" \
             -H "content-type: application/json" \
             -d '{"backfillYears":1,"concurrency":4}' \
             "${API%/}/internal/cron/import/duties/wits/asean"
@@ -51,7 +50,7 @@ jobs:
         run: |
           curl --fail-with-body --show-error --silent \
             --retry 3 --retry-all-errors -X POST \
-            -H "x-admin-token: $ADMIN" \
+            -H "x-api-key: $API_KEY" \
             -H "content-type: application/json" \
             -d '{"backfillYears":1,"concurrency":3}' \
             "${API%/}/internal/cron/import/duties/wits/japan"
@@ -72,37 +71,35 @@ jobs:
 
       - name: De Minimis thresholds (Zonos)
         run: |
-          BODY='{}'
           curl --fail-with-body --show-error --silent \
             --retry 3 --retry-all-errors -X POST \
-            -H "x-admin-token: $ADMIN" \
+            -H "x-api-key: $API_KEY" \
             -H "content-type: application/json" \
-            -d "$BODY" \
+            -d '{}' \
             "${API%/}/internal/cron/de-minimis/import-zonos"
 
       - name: De Minimis thresholds (Official)
         run: |
-          BODY='{}'
           curl --fail-with-body --show-error --silent \
             --retry 3 --retry-all-errors -X POST \
-            -H "x-admin-token: $ADMIN" \
+            -H "x-api-key: $API_KEY" \
             -H "content-type: application/json" \
-            -d "$BODY" \
+            -d '{}' \
             "${API%/}/internal/cron/de-minimis/import-official"
 
-      - name: Prune old imports & provenance (via internal route)
+      - name: Prune old imports & provenance
         env:
           PRUNE_DAYS: ${{ vars.IMPORTS_PRUNE_DAYS || 90 }}
         run: |
           BODY="{\"days\": ${PRUNE_DAYS:-90}}"
           curl --fail-with-body --show-error --silent \
             --retry 3 --retry-all-errors -X POST \
-            -H "x-admin-token: $ADMIN" \
+            -H "x-api-key: $API_KEY" \
             -H "content-type: application/json" \
-            -d "$BODY" \ 
+            -d "$BODY" \
             "${API%/}/internal/cron/imports/prune"
 
-      # Notifications (guarded so missing webhooks don't fail the run)
+      # Notifications (guarded)
       - name: Slack (success)
         if: success()
         env:
@@ -147,4 +144,3 @@ jobs:
             curl -fsS -H "Content-Type: application/json" -X POST \
               -d "{\"content\":\"$content\"}" \
               "$DISCORD_WEBHOOK_URL"
-          fi
