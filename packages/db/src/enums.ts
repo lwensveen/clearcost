@@ -40,9 +40,12 @@ export const surchargeCodeEnum = pgEnum('surcharge_code', [
 
 export const importSourceEnum = pgEnum('import_source', [
   'AHTN',
+  'API',
   'BASELINE',
   'ECB',
+  'FILE',
   'IMF',
+  'MANIFEST',
   'MANUAL',
   'OECD',
   'OECD/IMF',
@@ -54,7 +57,6 @@ export const importSourceEnum = pgEnum('import_source', [
   'USITC_HTS',
   'WITS',
   'ZONOS',
-  'file',
 ]);
 
 export const importStatusEnum = pgEnum('import_status', ['running', 'succeeded', 'failed']);
