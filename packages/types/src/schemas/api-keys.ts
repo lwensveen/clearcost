@@ -20,3 +20,13 @@ export const ApiKeyCreateSchema = z.object({
 export const ApiKeyCreateResponseSchema = ApiKeyRecordSchema.extend({
   token: z.string(),
 });
+
+export const HeaderSchema = z
+  .object({
+    'idempotency-key': z.string().min(1).optional(),
+    'x-idempotency-key': z.string().min(1).optional(),
+  })
+  .refine(
+    (h) => !!(h['idempotency-key'] || h['x-idempotency-key']),
+    'Idempotency-Key header required'
+  );
