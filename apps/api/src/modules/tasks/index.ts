@@ -12,7 +12,6 @@ import surchargeJsonRoute from './surcharges/generic-json.js';
 import freightRoutes from './freight-routes.js';
 import hsRoutes from './hs-routes.js';
 import importsPruneRoutes from './prune-routes.js';
-import poolRoutes from './pool-routes.js';
 import sweepRoutes from './sweep-routes.js';
 import deMinimisRoutes from './de-minimis-routes.js';
 
@@ -38,6 +37,5 @@ export default function taskRoutes(app: FastifyInstance) {
 
   // Ops / utilities
   importsPruneRoutes(app);
-  poolRoutes(app);
   sweepRoutes(app);
 }

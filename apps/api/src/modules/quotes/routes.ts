@@ -84,7 +84,6 @@ export default function quoteRoutes(app: FastifyInstance) {
       },
       config: {
         rateLimit: { max: 120, timeWindow: '1 minute' },
-        importMeta: { source: 'API', job: 'quotes:compute' },
       },
     },
     async (req, reply) => {
