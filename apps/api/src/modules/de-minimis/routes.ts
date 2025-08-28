@@ -1,71 +1,93 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
+import { getDeMinimis } from './services/get-de-minimis.js';
+import { evaluateDeMinimis } from './services/evaluate.js';
 
-import { acquireRunLock, makeLockKey, releaseRunLock } from '../../lib/run-lock.js';
-import { importDeMinimisFromZonos } from './services/import-from-zonos.js';
-import { adminGuard } from '../tasks/common.js';
-import { importDeMinimisFromOfficial } from './services/import-official.js';
+const ThresholdQuery = z.object({
+  dest: z.string().length(2), // ISO-2 country code
+  on: z.coerce.date().optional(), // defaults to today (UTC day window)
+});
 
-const toMidnightUTC = (d: Date) => new Date(d.toISOString().slice(0, 10));
+const EvalBody = z.object({
+  dest: z.string().length(2), // ISO-2 country code
+  // Values are already in destination currency (per your service contract)
+  goodsDest: z.number().nonnegative(),
+  freightDest: z.number().nonnegative().default(0),
+  fxAsOf: z.coerce.date().optional(), // defaults to now if omitted
+});
 
-export default function deMinimisTaskRoutes(app: FastifyInstance) {
-  const Body = z.object({
-    effectiveOn: z.coerce.date().optional(),
-  });
+const ThresholdResponse = z.object({
+  duty: z
+    .object({
+      currency: z.string().length(3),
+      value: z.number(),
+      basis: z.enum(['INTRINSIC', 'CIF']),
+    })
+    .nullable(),
+  vat: z
+    .object({
+      currency: z.string().length(3),
+      value: z.number(),
+      basis: z.enum(['INTRINSIC', 'CIF']),
+    })
+    .nullable(),
+});
 
-  // Zonos scraper
-  app.post<{ Body: z.infer<typeof Body> }>(
-    '/internal/cron/de-minimis/import-zonos',
+const EvalResponse = z.object({
+  duty: z
+    .object({
+      thresholdDest: z.number(),
+      basis: z.enum(['INTRINSIC', 'CIF']),
+      under: z.boolean(),
+    })
+    .optional(),
+  vat: z
+    .object({
+      thresholdDest: z.number(),
+      basis: z.enum(['INTRINSIC', 'CIF']),
+      under: z.boolean(),
+    })
+    .optional(),
+  suppressDuty: z.boolean(),
+  suppressVAT: z.boolean(),
+});
+
+export default function deMinimisRoutes(app: FastifyInstance) {
+  // GET /v1/de-minimis?dest=US&on=2025-01-31
+  app.get<{
+    Querystring: z.infer<typeof ThresholdQuery>;
+    Reply: z.infer<typeof ThresholdResponse>;
+  }>(
+    '/',
     {
-      preHandler: adminGuard,
-      config: { importMeta: { source: 'ZONOS', job: 'de-minimis:import-zonos' } },
-      schema: { body: Body },
+      preHandler: app.requireApiKey(['de-minimis:read']),
+      schema: { querystring: ThresholdQuery, response: { 200: ThresholdResponse } },
+      config: { rateLimit: { max: 240, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
-      const eff = toMidnightUTC(Body.parse(req.body ?? {}).effectiveOn ?? new Date());
-      const lockKey = makeLockKey(
-        { source: 'ZONOS', job: 'de-minimis:import-zonos' },
-        eff.toISOString().slice(0, 10)
-      );
-
-      const locked = await acquireRunLock(lockKey);
-      if (!locked)
-        return reply.code(409).send({ ok: false as const, reason: 'already_running', lockKey });
-
-      try {
-        const result = await importDeMinimisFromZonos(eff);
-        return reply.send({ ...result, lockKey });
-      } finally {
-        await releaseRunLock(lockKey);
-      }
+      const { dest, on } = ThresholdQuery.parse(req.query);
+      const data = await getDeMinimis(dest.toUpperCase(), on ?? new Date());
+      return reply.send(data);
     }
   );
 
-  // Official sources
-  app.post<{ Body: z.infer<typeof Body> }>(
-    '/internal/cron/de-minimis/import-official',
+  // POST /v1/de-minimis/evaluate
+  app.post<{ Body: z.infer<typeof EvalBody>; Reply: z.infer<typeof EvalResponse> }>(
+    '/evaluate',
     {
-      preHandler: adminGuard,
-      config: { importMeta: { source: 'OFFICIAL', job: 'de-minimis:official' } },
-      schema: { body: Body },
+      preHandler: app.requireApiKey(['de-minimis:write']),
+      schema: { body: EvalBody, response: { 200: EvalResponse } },
+      config: { rateLimit: { max: 240, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
-      const eff = toMidnightUTC(Body.parse(req.body ?? {}).effectiveOn ?? new Date());
-      const lockKey = makeLockKey(
-        { source: 'OFFICIAL', job: 'de-minimis:official' },
-        eff.toISOString().slice(0, 10)
-      );
-
-      const locked = await acquireRunLock(lockKey);
-      if (!locked)
-        return reply.code(409).send({ ok: false as const, reason: 'already_running', lockKey });
-
-      try {
-        const result = await importDeMinimisFromOfficial(eff);
-        return reply.send({ ...result, lockKey });
-      } finally {
-        await releaseRunLock(lockKey);
-      }
+      const { dest, goodsDest, freightDest, fxAsOf } = EvalBody.parse(req.body);
+      const out = await evaluateDeMinimis({
+        dest: dest.toUpperCase(),
+        goodsDest,
+        freightDest,
+        fxAsOf: fxAsOf ?? new Date(),
+      });
+      return reply.send(out);
     }
   );
 }
