@@ -10,9 +10,12 @@ export type ImportRun = typeof importsTable.$inferSelect;
 
 export type ImportSource =
   | 'AHTN'
+  | 'API'
   | 'BASELINE'
   | 'ECB'
+  | 'FILE'
   | 'IMF'
+  | 'MANIFEST'
   | 'MANUAL'
   | 'OECD'
   | 'OECD/IMF'
@@ -23,8 +26,7 @@ export type ImportSource =
   | 'US'
   | 'USITC_HTS'
   | 'WITS'
-  | 'ZONOS'
-  | 'file';
+  | 'ZONOS';
 
 export async function heartBeatImportRun(id: string) {
   await db
