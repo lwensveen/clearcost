@@ -26,53 +26,62 @@ function sha256(s: string) {
 
 type IdemOptions<T> = {
   /**
-   * If we’re returning a previously completed response, this hook can
-   * optionally produce a fresh response (e.g., when a Stripe Checkout Session
-   * has expired). Return `null` to keep the cached value.
+   * If returning a cached response, this hook may produce a refreshed one.
+   * Return `null` to keep the cached value.
    */
   onReplay?: (cached: T) => Promise<T | null>;
   /**
-   * Optional staleness threshold. If provided, we’ll invoke onReplay only when
-   * the cached row is older than this many ms. If omitted, onReplay can still
-   * decide based on the cached contents whether to refresh.
+   * If provided, only call onReplay when the cached row is older than this.
    */
   maxAgeMs?: number;
 };
 
 /**
- * Ensures an action is executed at most once for (scope, key) + requestHash.
- * - If completed before, returns stored response (or refreshed via onReplay).
- * - If key is reused with different body, throws 409 error.
- * - If pending and locked by someone else, throws 409 'processing'.
+ * Idempotency guard for (scope, key, requestHash).
+ * - If first time: runs `producer`, stores result, returns it.
+ * - If conflict (same key, different payload): throws 409.
+ * - If already completed: returns cached (optionally refreshes via onReplay/maxAgeMs).
+ * - If in-flight: throws 409 "Processing".
  */
 export async function withIdempotency<T extends Record<string, unknown>>(
   scope: string,
   key: string,
   requestBody: unknown,
-  handler: () => Promise<T>,
-  options?: IdemOptions<T>
+  producer: () => Promise<T>,
+  options: IdemOptions<T> = {}
 ): Promise<T> {
+  if (!key) {
+    throw Object.assign(new Error('Idempotency key required'), { statusCode: 400 });
+  }
+
   const requestHash = sha256(stableStringify(requestBody));
+  const now = new Date();
 
   return db.transaction(async (tx) => {
+    // 1) Ensure a row exists (pending) for this scope/key
     await tx
       .insert(idempotencyKeysTable)
       .values({ scope, key, requestHash, status: 'pending' })
       .onConflictDoNothing({ target: [idempotencyKeysTable.scope, idempotencyKeysTable.key] });
 
+    // 2) Try to claim ONLY "pending" rows (avoid grabbing completed/failed)
     const [claimed] = await tx
       .update(idempotencyKeysTable)
-      .set({ lockedAt: new Date(), updatedAt: new Date() })
+      .set({ status: 'processing', lockedAt: now, updatedAt: now })
       .where(
         and(
           eq(idempotencyKeysTable.scope, scope),
           eq(idempotencyKeysTable.key, key),
+          eq(idempotencyKeysTable.status, 'pending'),
           sql`${idempotencyKeysTable.lockedAt} IS NULL`
         )
       )
-      .returning();
+      .returning({
+        requestHash: idempotencyKeysTable.requestHash,
+      });
 
     if (claimed) {
+      // We successfully claimed the work
       if (claimed.requestHash !== requestHash) {
         throw Object.assign(new Error('Idempotency key reused with different payload'), {
           statusCode: 409,
@@ -80,7 +89,7 @@ export async function withIdempotency<T extends Record<string, unknown>>(
       }
 
       try {
-        const data = await handler();
+        const data = await producer();
 
         await tx
           .update(idempotencyKeysTable)
@@ -108,8 +117,14 @@ export async function withIdempotency<T extends Record<string, unknown>>(
       }
     }
 
+    // 3) Someone else created/claimed it; inspect existing row
     const [row] = await tx
-      .select()
+      .select({
+        status: idempotencyKeysTable.status,
+        requestHash: idempotencyKeysTable.requestHash,
+        response: idempotencyKeysTable.response,
+        updatedAt: idempotencyKeysTable.updatedAt,
+      })
       .from(idempotencyKeysTable)
       .where(and(eq(idempotencyKeysTable.scope, scope), eq(idempotencyKeysTable.key, key)))
       .limit(1);
@@ -125,25 +140,33 @@ export async function withIdempotency<T extends Record<string, unknown>>(
     }
 
     if (row.status === 'completed' && row.response) {
-      const resp = row.response as T;
+      const cached = row.response as T;
 
-      if (options?.onReplay) {
-        const maybe = await options.onReplay(resp);
+      // Respect staleness gate if provided
+      const stale =
+        typeof options.maxAgeMs === 'number' && row.updatedAt
+          ? now.getTime() - new Date(row.updatedAt).getTime() > options.maxAgeMs
+          : true; // if no maxAgeMs, let onReplay decide
 
+      if (options.onReplay && stale) {
+        const maybe = await options.onReplay(cached);
         if (maybe) {
           await tx
             .update(idempotencyKeysTable)
             .set({ response: maybe, updatedAt: new Date() })
             .where(and(eq(idempotencyKeysTable.scope, scope), eq(idempotencyKeysTable.key, key)));
-
           return maybe;
         }
       }
 
-      return resp;
+      return cached;
     }
 
-    // 3b) Not completed yet
+    // In-flight or failed
+    if (row.status === 'failed') {
+      throw Object.assign(new Error('Previous attempt failed; use a new key'), { statusCode: 409 });
+    }
+
     throw Object.assign(new Error('Processing'), { statusCode: 409 });
   });
 }
