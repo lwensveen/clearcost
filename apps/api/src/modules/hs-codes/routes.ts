@@ -1,10 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
 import { db, hsCodeAliasesTable, hsCodesTable } from '@clearcost/db';
-import { and, eq, ilike, or } from 'drizzle-orm';
+import { and, eq, ilike, or, sql } from 'drizzle-orm';
 
 const HsSearchQuery = z.object({
-  q: z.string().min(1).optional(),
+  q: z.string().trim().min(1).optional(),
   hs6: z
     .string()
     .regex(/^\d{6}$/)
@@ -41,36 +41,104 @@ export default function hsRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['hs:read']),
       schema: { querystring: HsSearchQuery, response: { 200: HsSearchResponse } },
+      config: { rateLimit: { max: 300, timeWindow: '1 minute' } },
     },
-    async (req) => {
-      const { q, hs6, limit } = req.query;
+    async (req, reply) => {
+      const { q, hs6, limit } = HsSearchQuery.parse(req.query);
 
+      // Fast path: exact HS6 lookup
       if (hs6) {
-        return db
+        const rows = await db
           .select({
             hs6: hsCodesTable.hs6,
             title: hsCodesTable.title,
+            ahtn8: sql<string | null>`
+              (SELECT ${hsCodeAliasesTable.code}
+               FROM ${hsCodeAliasesTable}
+               WHERE ${hsCodeAliasesTable.hs6} = ${hsCodesTable.hs6}
+                 AND ${hsCodeAliasesTable.system} = 'AHTN8'
+               ORDER BY ${hsCodeAliasesTable.code}
+               LIMIT 1)
+            `,
+            cn8: sql<string | null>`
+              (SELECT ${hsCodeAliasesTable.code}
+               FROM ${hsCodeAliasesTable}
+               WHERE ${hsCodeAliasesTable.hs6} = ${hsCodesTable.hs6}
+                 AND ${hsCodeAliasesTable.system} = 'CN8'
+               ORDER BY ${hsCodeAliasesTable.code}
+               LIMIT 1)
+            `,
+            hts10: sql<string | null>`
+              (SELECT ${hsCodeAliasesTable.code}
+               FROM ${hsCodeAliasesTable}
+               WHERE ${hsCodeAliasesTable.hs6} = ${hsCodesTable.hs6}
+                 AND ${hsCodeAliasesTable.system} = 'HTS10'
+               ORDER BY ${hsCodeAliasesTable.code}
+               LIMIT 1)
+            `,
           })
           .from(hsCodesTable)
-          .where(ilike(hsCodesTable.hs6, hs6))
+          .where(eq(hsCodesTable.hs6, hs6))
           .limit(1);
+
+        reply.header('cache-control', 'public, max-age=300, stale-while-revalidate=600');
+        return rows as any;
       }
 
-      const query = q ?? '';
+      const query = (q ?? '').trim();
+      const digits = query.replace(/\D/g, '');
 
-      return db
+      // Title contains OR numeric digits align to HS6 substring
+      const rows = await db
         .select({
           hs6: hsCodesTable.hs6,
           title: hsCodesTable.title,
+          ahtn8: sql<string | null>`
+            (SELECT ${hsCodeAliasesTable.code}
+             FROM ${hsCodeAliasesTable}
+             WHERE ${hsCodeAliasesTable.hs6} = ${hsCodesTable.hs6}
+               AND ${hsCodeAliasesTable.system} = 'AHTN8'
+             ORDER BY ${hsCodeAliasesTable.code}
+             LIMIT 1)
+          `,
+          cn8: sql<string | null>`
+            (SELECT ${hsCodeAliasesTable.code}
+             FROM ${hsCodeAliasesTable}
+             WHERE ${hsCodeAliasesTable.hs6} = ${hsCodesTable.hs6}
+               AND ${hsCodeAliasesTable.system} = 'CN8'
+             ORDER BY ${hsCodeAliasesTable.code}
+             LIMIT 1)
+          `,
+          hts10: sql<string | null>`
+            (SELECT ${hsCodeAliasesTable.code}
+             FROM ${hsCodeAliasesTable}
+             WHERE ${hsCodeAliasesTable.hs6} = ${hsCodesTable.hs6}
+               AND ${hsCodeAliasesTable.system} = 'HTS10'
+             ORDER BY ${hsCodeAliasesTable.code}
+             LIMIT 1)
+          `,
+          // cheap relevance hint: exact title prefix first, then contains, then HS6 numeric match
+          _rank: sql<number>`
+            (CASE
+               WHEN ${hsCodesTable.title} ILIKE ${query + '%'} THEN 1
+               WHEN ${hsCodesTable.title} ILIKE ${'%' + query + '%'} THEN 2
+               ${digits ? sql`WHEN ${hsCodesTable.hs6} ILIKE ${'%' + digits + '%'} THEN 3` : sql`ELSE 99`}
+             END)
+          `,
         })
         .from(hsCodesTable)
         .where(
           or(
             ilike(hsCodesTable.title, `%${query}%`),
-            ilike(hsCodesTable.hs6, `%${query.replace(/\D/g, '')}%`)
+            digits ? ilike(hsCodesTable.hs6, `%${digits}%`) : sql`FALSE`
           )
         )
+        .orderBy(sql`_rank ASC`, hsCodesTable.hs6)
         .limit(limit);
+
+      reply.header('cache-control', 'public, max-age=120, stale-while-revalidate=600');
+      // strip _rank before returning (TS-wise we typed it as part of select)
+      return rows.map(({ _rank, ...r }) => r) as any;
     }
   );
 
@@ -83,6 +151,7 @@ export default function hsRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['hs:read']),
       schema: { querystring: LookupQuerySchema, response: { 200: LookupResponseSchema } },
+      config: { rateLimit: { max: 300, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
       const { system, code } = LookupQuerySchema.parse(req.query);
@@ -102,6 +171,7 @@ export default function hsRoutes(app: FastifyInstance) {
 
       if (!row) return reply.notFound('Alias not found');
 
+      reply.header('cache-control', 'public, max-age=300, stale-while-revalidate=600');
       return {
         hs6: row.hs6,
         title: row.title,
