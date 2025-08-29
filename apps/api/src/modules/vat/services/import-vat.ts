@@ -1,6 +1,7 @@
 import { db, provenanceTable, vatRulesTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
-import { VatRuleInsert, VatRuleInsertSchema } from '@clearcost/types';
+import type { VatRuleInsert } from '@clearcost/types';
+import { VatRuleInsertSchema } from '@clearcost/types';
 import { toDateIfDefined, toDateOrNull, toNumeric3String } from './utils.js';
 import { sha256Hex } from '../../../lib/provenance.js';
 
@@ -10,42 +11,42 @@ type ImportOpts = {
 };
 
 /**
- * Import VAT rules (canonical shape only) with optional provenance.
- * - Upserts on (dest, kind, effective_from).
- * - On conflict: updates rate_pct, base, effective_to, notes, updated_at.
- * - Normalizes: dest/kind uppercased; ratePct → NUMERIC(6,3) string.
+ * Import VAT rules (canonical shape) with optional provenance.
+ * - Accepts { kind, base } or { vatRateKind, vatBase }.
+ * - Upsert key: (dest, vat_rate_kind, effective_from).
+ * - On conflict: updates rate_pct, vat_base, effective_to, notes, updated_at.
  */
-export async function importVatRules(rows: VatRuleInsert[], opts: ImportOpts = {}) {
-  if (!Array.isArray(rows) || rows.length === 0) return { ok: true, count: 0 };
+export async function importVatRules(rows: VatRuleInsert[] | Array<any>, opts: ImportOpts = {}) {
+  if (!Array.isArray(rows) || rows.length === 0) return { ok: true as const, count: 0 };
 
-  const validated = VatRuleInsertSchema.array().parse(rows);
+  // Normalize inputs to DB column names
+  const mapped = rows.map((r: any) => {
+    const dest = String(r.dest ?? '').toUpperCase();
+    const vatRateKind = String(r.vatRateKind ?? r.kind ?? 'STANDARD').toUpperCase();
+    const vatBase = String(r.vatBase ?? r.base ?? 'CIF_PLUS_DUTY');
+    const ratePct = toNumeric3String(r.ratePct);
+    const effectiveFrom = toDateIfDefined(r.effectiveFrom);
+    const effectiveTo = toDateOrNull(r.effectiveTo ?? null);
+    const notes = r.notes ?? null;
 
-  const normalized: VatRuleInsert[] = validated.map((r) => {
-    const kindInput = (r.vatRateKind ?? 'STANDARD') as string;
-    const kind = kindInput.toUpperCase() as VatRuleInsert['vatRateKind'];
-    return {
-      ...r,
-      dest: r.dest.toUpperCase(),
-      kind,
-      ratePct: toNumeric3String(r.ratePct),
-      effectiveFrom: toDateIfDefined(r.effectiveFrom),
-      effectiveTo: toDateOrNull(r.effectiveTo ?? null),
-      notes: r.notes ?? null,
-    };
+    return { dest, vatRateKind, ratePct, vatBase, effectiveFrom, effectiveTo, notes };
   });
 
-  // Upsert and capture columns we need for provenance
+  // Validate after mapping
+  const validated = VatRuleInsertSchema.array().parse(mapped);
+
+  // Upsert with correct EXCLUDED references (raw snake_case)
   const returned = await db
     .insert(vatRulesTable)
-    .values(normalized)
+    .values(validated)
     .onConflictDoUpdate({
       target: [vatRulesTable.dest, vatRulesTable.vatRateKind, vatRulesTable.effectiveFrom],
       set: {
         ratePct: sql`excluded.rate_pct`,
-        vatRateKind: sql`excluded.vatRateKind`,
+        vatBase: sql`excluded.vat_base`,
         effectiveTo: sql`excluded.effective_to`,
         notes: sql`excluded.notes`,
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       },
     })
     .returning({

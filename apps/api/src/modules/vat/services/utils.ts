@@ -1,8 +1,11 @@
 import countries from 'i18n-iso-countries';
+import en from 'i18n-iso-countries/langs/en.json' with { type: 'json' };
 import { VatBase } from './get-vat.js';
 
-const USER_AGENT = 'clearcost-importer';
+countries.registerLocale(en);
 
+export const USER_AGENT = 'clearcost-importer';
+const DEFAULT_HTTP_TIMEOUT_MS = Number(process.env.HTTP_TIMEOUT_MS ?? 15000);
 export type VatRateKind = 'STANDARD' | 'REDUCED' | 'SUPER_REDUCED' | 'ZERO';
 
 export type CountryVatRow = {
@@ -25,19 +28,50 @@ export function toNumeric3String(n: string | number): string {
   return Number(s) === 0 ? '0.000' : s;
 }
 
-/** Fetch helper with stable UA + helpful error messages. */
-export async function fetchArrayBuffer(url: string): Promise<ArrayBuffer> {
-  const res = await fetch(url, { headers: { 'user-agent': USER_AGENT } });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Fetch failed ${res.status} ${res.statusText} – ${url}\n${body}`);
+/**
+ * Robust fetch helper for binary files:
+ * - Stable UA
+ * - Timeout (default 45s, override via HTTP_TIMEOUT_MS)
+ * - Retries with exponential backoff
+ * - Follows redirects
+ */
+export async function fetchArrayBuffer(
+  url: string,
+  opts?: { timeoutMs?: number; attempts?: number }
+): Promise<ArrayBuffer> {
+  const timeoutMs = opts?.timeoutMs ?? DEFAULT_HTTP_TIMEOUT_MS;
+  const attempts = Math.max(1, opts?.attempts ?? 3);
+
+  let lastErr: unknown;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          'user-agent': `${USER_AGENT} (+https://clearcost.dev)`,
+          accept:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream,*/*',
+        },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(timeoutMs),
+        keepalive: false,
+      } as RequestInit);
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Fetch failed ${res.status} ${res.statusText} – ${url}\n${body}`);
+      }
+      return await res.arrayBuffer();
+    } catch (e) {
+      lastErr = e;
+      await new Promise((r) => setTimeout(r, i * 300));
+    }
   }
-  return res.arrayBuffer();
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 /**
- * Common aliases across datasets so ISO-2 resolution succeeds.
- * Left side is dataset label; right side is canonical English name used by the countries lib.
+ * Common aliases so ISO-2 resolution succeeds. Keys are case-insensitive.
+ * Left side: dataset label; right side: canonical English name used by the lib.
  */
 export const COUNTRY_ALIASES: Record<string, string> = {
   'Czech Republic': 'Czechia',
@@ -52,7 +86,15 @@ export const COUNTRY_ALIASES: Record<string, string> = {
   'United Kingdom': 'United Kingdom of Great Britain and Northern Ireland',
   'Hong Kong, China': 'Hong Kong',
   'Macau, China': 'Macao',
+  // Handy extras
+  'Ivory Coast': "Côte d'Ivoire",
+  'Cabo Verde': 'Cape Verde',
 };
+
+/** Precompute a lowercase alias map for case-insensitive lookups. */
+const COUNTRY_ALIASES_LC: Record<string, string> = Object.fromEntries(
+  Object.entries(COUNTRY_ALIASES).map(([k, v]) => [k.toLowerCase(), v])
+);
 
 /**
  * Map a country label (ISO2, ISO3, or English name with variant formatting) to ISO-2.
@@ -69,9 +111,9 @@ export function toIso2(nameOrCode: unknown): string | null {
     const a2 = countries.alpha3ToAlpha2(raw.toUpperCase());
     return a2 || null;
   }
-
-  // Resolve by country name (with a few aliases)
-  const canonical = (COUNTRY_ALIASES as Record<string, string>)[raw] ?? raw;
+  // Resolve by country name (with case-insensitive aliases)
+  const alias = COUNTRY_ALIASES_LC[raw.toLowerCase()];
+  const canonical = alias ?? raw;
 
   // Try exact name first
   const direct = countries.getAlpha2Code(canonical, 'en');
