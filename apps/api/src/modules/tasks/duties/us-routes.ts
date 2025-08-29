@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { importUsMfn } from '../../duty-rates/services/us/import-from-hts.js';
+import { importUsMfn } from '../../duty-rates/services/us/import-mfn.js';
 import { importUsPreferential } from '../../duty-rates/services/us/import-preferential.js';
 
 export default function usDutyRoutes(app: FastifyInstance) {
