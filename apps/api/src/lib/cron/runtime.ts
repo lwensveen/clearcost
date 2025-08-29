@@ -40,18 +40,55 @@ export const parseCSV = (s: string | undefined) =>
     .map((x) => x.trim())
     .filter(Boolean);
 
-export function parseFlags(argv: string[]) {
-  const flags: Record<string, string> = {};
+// ---- Flags parsing + typed accessors ---------------------------------------
+
+export type Flags = Record<string, string>; // values are always strings
+
+/** Parse --k=v and bare --k (as "true"). All values are strings. */
+export function parseFlags(argv: string[] = []): Flags {
+  const flags: Flags = {};
   for (const a of argv) {
-    const m = /^--([^=]+)=(.*)$/.exec(a);
+    if (!a.startsWith('--')) continue;
+    const m = /^--([^=]+)(?:=(.*))?$/.exec(a);
     if (!m) continue;
-
-    const key = m[1];
-    const value = m[2] ?? '';
-
-    if (key) flags[key] = value;
+    const key = m[1]!.trim();
+    const val = (m[2] ?? 'true').trim(); // bare --key => "true"
+    if (key) flags[key] = val;
   }
   return flags;
+}
+
+/** Get a string flag (empty/whitespace → undefined). */
+export function flagStr(flags: Flags, key: string): string | undefined {
+  const v = flags?.[key];
+  if (typeof v !== 'string') return undefined;
+  const s = v.trim();
+  return s ? s : undefined;
+}
+
+/** Get a boolean flag. Accepts true/false/1/0/yes/no/on/off (case-insensitive). */
+export function flagBool(flags: Flags, key: string): boolean {
+  const v = flagStr(flags, key);
+  if (v == null) return false;
+  return /^(?:1|true|t|yes|y|on)$/i.test(v);
+}
+
+/** Get a number flag. Returns undefined if NaN. */
+export function flagNum(flags: Flags, key: string): number | undefined {
+  const s = flagStr(flags, key);
+  if (s == null) return undefined;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** Split comma/space-separated flag into array of non-empty tokens. */
+export function flagCSV(flags: Flags, key: string): string[] {
+  const s = flagStr(flags, key);
+  if (!s) return [];
+  return s
+    .split(/[, \t\r\n]+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
 }
 
 export function buildImportId(kind: string, parts: Array<string | number | undefined> = []) {
@@ -74,7 +111,7 @@ export async function withRun<T>(
   try {
     const { inserted, payload } = await work(run.id);
 
-    importRowsInserted.inc({ source: ctx.importSource, job: ctx.job }, inserted ?? 0);
+    importRowsInserted.inc({ importSource: ctx.importSource, job: ctx.job }, inserted ?? 0);
     setLastRunNow({ importSource: ctx.importSource, job: ctx.job });
     end();
 
@@ -83,7 +120,7 @@ export async function withRun<T>(
     return payload;
   } catch (err: any) {
     end();
-    importErrors.inc({ source: ctx.importSource, job: ctx.job, stage: 'script' });
+    importErrors.inc({ importSource: ctx.importSource, job: ctx.job, stage: 'script' });
     await finishImportRun(run.id, { importStatus: 'failed', error: String(err?.message ?? err) });
     throw err;
   }
