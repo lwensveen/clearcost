@@ -1,8 +1,9 @@
 import { z } from 'zod/v4';
 
 export const DATASET_ID = 'uk-tariff-2021-01-01';
-export const TABLE_ID = 'measures-on-declarable-commodities';
-export const DATA_API_BASE = process.env.DB_DATA_API_BASE ?? 'https://data.api.trade.gov.uk';
+export const TABLE_ID = 'commodities';
+export const UK_10_DATA_API_BASE =
+  process.env.UK_10_DATA_API_BASE ?? 'https://data.api.trade.gov.uk';
 
 export const MEASURE_TYPE_MFN = '103'; // Third country duty (MFN)
 export const MEASURE_TYPE_PREF_STD = '142'; // Tariff preference
@@ -18,7 +19,7 @@ export async function httpGet(url: string, opts: RequestInit = {}) {
 
 /** Latest immutable dataset version id, e.g. "v4.0.1083". */
 export async function getLatestVersionId(): Promise<string> {
-  const url = `${DATA_API_BASE}/v1/datasets/${DATASET_ID}/versions?format=json`;
+  const url = `${UK_10_DATA_API_BASE}/v1/datasets/${DATASET_ID}/versions?format=json`;
   const res = await httpGet(url);
   if (!res.ok) throw new Error(`DBT versions failed: ${res.status} ${await res.text()}`);
   const j = (await res.json()) as { versions: Array<{ id: string }> };
@@ -86,7 +87,7 @@ export function pickStartEnd(row: z.infer<typeof UkRowSchema>) {
 
 /** S3-Select helper (returns array or null if unsupported). */
 export async function s3Select(versionId: string, query: string): Promise<any[] | null> {
-  const url = `${DATA_API_BASE}/v1/datasets/${DATASET_ID}/versions/${versionId}/data?format=json&query-s3-select=${encodeURIComponent(query)}`;
+  const url = `${UK_10_DATA_API_BASE}/v1/datasets/${DATASET_ID}/versions/${versionId}/data?format=json&query-s3-select=${encodeURIComponent(query)}`;
   const res = await httpGet(url);
   if (!res.ok) return null;
   try {

@@ -31,7 +31,7 @@ type UkRawRow = Record<string, string | undefined>;
  *  - description contains “European Union”/“EU” → "EU"
  *  - otherwise null (keep non-single-country groupings out of `partner`)
  */
-function resolvePartnerIso2OrUnion(geoId?: string, geoDesc?: string): string | null {
+function resolvePartnerIso2OrUnion(geoId?: string, geoDesc?: string): string {
   const id = (geoId ?? '').trim();
   if (/^[A-Z]{2}$/i.test(id)) return id.toUpperCase();
   if (id === '1013') return 'EU';
@@ -39,7 +39,7 @@ function resolvePartnerIso2OrUnion(geoId?: string, geoDesc?: string): string | n
   const desc = (geoDesc ?? '').toLowerCase();
   if (/\beuropean union\b|\b^eu\b/.test(desc)) return 'EU';
 
-  return null;
+  return '';
 }
 
 /** Partner filter: accepts numeric geo id, ISO2, or name fragment. */

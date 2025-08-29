@@ -72,7 +72,7 @@ export async function fetchEuMfnDutyRates(options: FetchOptions = {}): Promise<D
 
         euRows.push({
           dest: 'EU',
-          partner: null,
+          partner: '',
           hs6: toHs6(measure.code10),
           ratePct: toNumeric3String(comp.pct),
           dutyRule: 'mfn',
@@ -114,7 +114,7 @@ export async function fetchEuMfnDutyRates(options: FetchOptions = {}): Promise<D
 
     return {
       dest: 'EU',
-      partner: null,
+      partner: '',
       hs6: normalizedHs6,
       ratePct: toNumeric3String(Number(witsRow.ratePct)),
       rule: 'mfn',

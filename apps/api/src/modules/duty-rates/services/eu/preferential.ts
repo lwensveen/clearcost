@@ -119,7 +119,7 @@ export async function fetchEuPreferentialDutyRates(
 
     candidateRows.push({
       dest: 'EU',
-      partner: partnerCode ?? null,
+      partner: partnerCode ?? '',
       hs6: toHs6(measureRow.code10),
       ratePct: toNumeric3String(component.pct),
       dutyRule: 'fta',

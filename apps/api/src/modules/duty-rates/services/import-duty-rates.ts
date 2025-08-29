@@ -1,39 +1,51 @@
 import { db, dutyRatesTable } from '@clearcost/db';
-import { DutyRateInsert } from '@clearcost/types';
+import { sql } from 'drizzle-orm';
+import type { DutyRateInsert } from '@clearcost/types';
 
 export async function importDutyRates(rows: DutyRateInsert[]) {
-  if (!rows.length) return { ok: true, count: 0 };
+  if (!rows.length) return { ok: true as const, count: 0 };
 
   const values = rows.map((r) => ({
-    ...r,
+    id: r.id,
     dest: r.dest.toUpperCase(),
-    partner: r.partner ? r.partner.toUpperCase() : null,
+    partner: (r.partner ?? '').toUpperCase(),
+    hs6: r.hs6.slice(0, 6),
+    ratePct: r.ratePct,
+    dutyRule: r.dutyRule ?? 'mfn',
+    currency: r.currency ?? 'USD',
+    effectiveFrom: r.effectiveFrom ?? new Date(),
     effectiveTo: r.effectiveTo ?? null,
+    notes: r.notes ?? null,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
   }));
 
-  await db.transaction(async (tx) => {
-    for (const v of values) {
-      await tx
-        .insert(dutyRatesTable)
-        .values(v)
-        .onConflictDoUpdate({
-          target: [
-            dutyRatesTable.dest,
-            dutyRatesTable.partner,
-            dutyRatesTable.hs6,
-            dutyRatesTable.effectiveFrom,
-          ],
-          set: {
-            ratePct: v.ratePct,
-            dutyRule: v.dutyRule,
-            currency: v.currency,
-            effectiveTo: v.effectiveTo,
-            notes: v.notes ?? null,
-            updatedAt: new Date(),
-          },
-        });
-    }
-  });
+  const ret = await db
+    .insert(dutyRatesTable)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [
+        dutyRatesTable.dest,
+        dutyRatesTable.partner,
+        dutyRatesTable.hs6,
+        dutyRatesTable.dutyRule,
+        dutyRatesTable.effectiveFrom,
+      ],
+      set: {
+        ratePct: sql`EXCLUDED.rate_pct`,
+        currency: sql`EXCLUDED.currency`,
+        effectiveTo: sql`EXCLUDED.effective_to`,
+        notes: sql`EXCLUDED.notes`,
+        updatedAt: sql`now()`,
+      },
+      setWhere: sql`
+        ${dutyRatesTable.ratePct} IS DISTINCT FROM EXCLUDED.rate_pct
+        OR ${dutyRatesTable.currency} IS DISTINCT FROM EXCLUDED.currency
+        OR ${dutyRatesTable.effectiveTo} IS DISTINCT FROM EXCLUDED.effective_to
+        OR ${dutyRatesTable.notes} IS DISTINCT FROM EXCLUDED.notes
+      `,
+    })
+    .returning({ id: dutyRatesTable.id });
 
-  return { ok: true, count: values.length };
+  return { ok: true as const, count: ret.length };
 }
