@@ -144,7 +144,7 @@ export function flattenWitsSeries(
 
       out.push({
         dest: reporterA2,
-        partner: partnerIso2OrUnion ?? 'null',
+        partner: partnerIso2OrUnion ?? '',
         hs6: productId,
         ratePct: toNumeric3String(val),
         dutyRule: ruleValue,
