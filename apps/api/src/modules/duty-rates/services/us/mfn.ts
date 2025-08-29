@@ -2,9 +2,8 @@
 // Dest = 'US'. Only % lines are imported; compound/specific parts are ignored (flagged in notes).
 //
 // Official sources:
-// - HTS REST API "exportList": https://hts.usitc.gov/reststop (see External User Guide, Export). :contentReference[oaicite:0]{index=0}
-// - HTS archive & current exports (CSV/XLS/JSON): https://hts.usitc.gov/export and archive. :contentReference[oaicite:1]{index=1}
-
+// - HTS REST API "exportList": https://hts.usitc.gov/reststop (see External User Guide, Export)
+// - HTS archive & current exports (CSV/XLS/JSON): https://hts.usitc.gov/export and archive.
 import type { DutyRateInsert } from '@clearcost/types';
 import {
   exportChapterJson,
@@ -32,7 +31,6 @@ function jan1OfCurrentYearUTC(): Date {
 
 export async function fetchUsMfnDutyRates(opts: FetchUsMfnOpts = {}): Promise<DutyRateInsert[]> {
   const chapters = opts.chapters ?? Array.from({ length: 97 }, (_, i) => i + 1);
-  // If caller didn’t provide a revision/effective date, use Jan 1 (conservative single-year bucket).
   const effectiveFrom = opts.effectiveFrom ?? jan1OfCurrentYearUTC();
 
   // Aggregate the *maximum* ad-valorem % per HS6 across 10-digit lines (safer for landed cost).
@@ -62,11 +60,11 @@ export async function fetchUsMfnDutyRates(opts: FetchUsMfnOpts = {}): Promise<Du
   for (const [hs6, { pct, compound }] of byHs6) {
     out.push({
       dest: 'US',
-      partner: null,
+      partner: '',
       hs6,
       ratePct: toNumeric3String(pct),
       dutyRule: 'mfn',
-      // currency stays your default ('USD'); omit to use DB default
+      currency: 'USD',
       effectiveFrom,
       effectiveTo: null,
       notes: compound
