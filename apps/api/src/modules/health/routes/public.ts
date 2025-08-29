@@ -16,17 +16,6 @@ export default function healthPublicRoutes(app: FastifyInstance) {
     }
   );
 
-  // HEAD variant (public)
-  app.head(
-    '/healthz',
-    { config: { rateLimit: { max: 1200, timeWindow: '1 minute' } } },
-    async (_req, reply) => {
-      const report = await checkHealth();
-      reply.header('cache-control', 'no-store');
-      return reply.code(report.ok ? 200 : 503).send();
-    }
-  );
-
   // Readiness/details (public summary)
   app.get(
     '/health',
