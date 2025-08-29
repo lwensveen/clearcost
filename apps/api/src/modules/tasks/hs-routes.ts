@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
 import { importEuHs6FromTaric } from '../hs-codes/services/aliases/eu/import-cn6-from-taric.js';
-import { importAhtnAliases } from '../hs-codes/services/aliases/import-ahtn.js';
+import { importAhtnAliases } from '../hs-codes/services/aliases/asean/import-ahtn.js';
 
 export default function hsRoutes(app: FastifyInstance) {
   // EU HS6 from TARIC

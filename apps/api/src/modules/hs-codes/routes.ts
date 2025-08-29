@@ -169,7 +169,10 @@ export default function hsRoutes(app: FastifyInstance) {
         .where(and(eq(hsCodeAliasesTable.system, system), eq(hsCodeAliasesTable.code, code)))
         .limit(1);
 
-      if (!row) return reply.notFound('Alias not found');
+      if (!row || !row.hs6) {
+        reply.notFound('Alias not found');
+        return;
+      }
 
       reply.header('cache-control', 'public, max-age=300, stale-while-revalidate=600');
       return {
