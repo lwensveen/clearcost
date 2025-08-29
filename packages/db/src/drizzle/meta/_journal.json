@@ -1,0 +1,62 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1756368371538,
+      "tag": "0000_sturdy_bloodscream",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1756376425332,
+      "tag": "0001_material_black_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1756420347957,
+      "tag": "0002_stiff_major_mapleleaf",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1756421216265,
+      "tag": "0003_flashy_amphibian",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1756423672379,
+      "tag": "0004_clean_gamora",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1756441149809,
+      "tag": "0005_blushing_randall",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1756441450538,
+      "tag": "0006_demonic_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1756459211155,
+      "tag": "0007_reflective_thunderbolt_ross",
+      "breakpoints": true
+    }
+  ]
+}

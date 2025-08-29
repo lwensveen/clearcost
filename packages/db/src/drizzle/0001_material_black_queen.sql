@@ -1,0 +1,1 @@
+ALTER TABLE "vat_rules" ALTER COLUMN "effective_to" DROP NOT NULL;

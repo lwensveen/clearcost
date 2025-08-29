@@ -1,0 +1,1 @@
+ALTER TABLE "duty_rates" ALTER COLUMN "effective_to" DROP NOT NULL;
