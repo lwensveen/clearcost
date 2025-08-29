@@ -428,7 +428,7 @@ export default function freightRoutes(app: FastifyInstance) {
       schema: {
         headers: HeaderSchema,
         body: z.object({
-          cards: z.array(CardCreate.extend({ steps: z.array(StepCreate).optional() })).min(1),
+          cards: z.array(CardCreate.safeExtend({ steps: z.array(StepCreate).optional() })).min(1),
         }),
         response: { 200: z.object({ insertedCards: z.number(), insertedSteps: z.number() }) },
       },
