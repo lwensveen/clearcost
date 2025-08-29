@@ -3,13 +3,14 @@ import { parseFlags, withRun } from '../runtime.js';
 import { importDeMinimisFromZonos } from '../../../modules/de-minimis/services/import-from-zonos.js';
 import { importDeMinimisFromOfficial } from '../../../modules/de-minimis/services/import-official.js';
 import { seedDeMinimisBaseline } from '../../../modules/de-minimis/services/import-baseline.js';
+import { parseDateMaybe } from '../../parse-date-maybe.js';
 
 const toMidnightUTC = (d: Date) => new Date(d.toISOString().slice(0, 10));
 
 export const deMinimisZonos: Command = async (args) => {
   const flags = parseFlags(args);
-  const effArg = args[0] ?? flags.effectiveOn ?? flags.date;
-  const eff = effArg ? new Date(effArg) : new Date();
+  const effRaw = args[0] ?? flags.effectiveOn ?? flags.date;
+  const eff = parseDateMaybe(effRaw) ?? new Date();
   const effectiveOn = toMidnightUTC(eff);
 
   const payload = await withRun(
@@ -30,8 +31,8 @@ export const deMinimisZonos: Command = async (args) => {
 
 export const deMinimisOfficial: Command = async (args) => {
   const flags = parseFlags(args);
-  const effArg = args[0] ?? flags.effectiveOn ?? flags.date;
-  const eff = effArg ? new Date(effArg) : new Date();
+  const effRaw = args[0] ?? flags.effectiveOn ?? flags.date;
+  const eff = parseDateMaybe(effRaw) ?? new Date();
   const effectiveOn = toMidnightUTC(eff);
 
   const payload = await withRun(
@@ -52,8 +53,8 @@ export const deMinimisOfficial: Command = async (args) => {
 
 export const deMinimisSeedBaseline: Command = async (args) => {
   const flags = parseFlags(args);
-  const effArg = args[0] ?? flags.effectiveOn ?? flags.date;
-  const eff = effArg ? new Date(effArg) : new Date();
+  const effRaw = args[0] ?? flags.effectiveOn ?? flags.date;
+  const eff = parseDateMaybe(effRaw) ?? new Date();
   const effectiveOn = toMidnightUTC(eff);
 
   const payload = await withRun(

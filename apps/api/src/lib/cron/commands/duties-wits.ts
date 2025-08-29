@@ -2,21 +2,33 @@ import type { Command } from '../runtime.js';
 import { buildImportId, parseCSV, parseFlags, withRun } from '../runtime.js';
 import { importDutyRatesFromWITS } from '../../../modules/duty-rates/services/wits/import-from-wits.js';
 
+const strFlag = (v: unknown): string | undefined =>
+  typeof v === 'string' && v.length ? v : undefined;
+
+const numFlag = (v: unknown): number | undefined => {
+  if (typeof v !== 'string' || v.trim() === '') return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+};
+
 export const dutiesWits: Command = async (args) => {
   const list = (args[0] ?? '').trim();
   if (!list) throw new Error('Pass comma-separated ISO2 list, e.g., "US,GB,TH"');
 
   const dests = parseCSV(list).map((s) => s.toUpperCase());
   const flags = parseFlags(args.slice(1));
-  const year = flags.year ? Number(flags.year) : undefined;
-  const partners = parseCSV(flags.partners).map((s) => s.toUpperCase());
-  const backfillYears = flags.backfill ? Number(flags.backfill) : 1;
-  const concurrency = flags.concurrency ? Number(flags.concurrency) : 3;
-  const batchSize = flags.batch ? Number(flags.batch) : 5000;
-  const hs6List = parseCSV(flags.hs6).map((s) => s.slice(0, 6));
+  const year = numFlag(flags.year);
+  const partners = strFlag(flags.partners)
+    ? parseCSV(strFlag(flags.partners)!).map((s) => s.toUpperCase())
+    : [];
+  const backfillYears = numFlag(flags.backfill) ?? 1;
+  const concurrency = numFlag(flags.concurrency) ?? 3;
+  const batchSize = numFlag(flags.batch) ?? 5000;
+  const hs6List = strFlag(flags.hs6) ? parseCSV(strFlag(flags.hs6)!).map((s) => s.slice(0, 6)) : [];
 
+  const explicitImportId = strFlag(flags.importId);
   const importId =
-    flags.importId ||
+    explicitImportId ||
     buildImportId('duties:wits', [
       dests.join('+'),
       partners.length ? `p=${partners.join('+')}` : undefined,
