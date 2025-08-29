@@ -1,4 +1,4 @@
-import { DATA_API_BASE, DATASET_ID, httpGet, TABLE_ID } from '../services/uk/base.js';
+import { DATASET_ID, httpGet, TABLE_ID, UK_10_DATA_API_BASE } from '../services/uk/base.js';
 
 /**
  * Async generator that yields CSV records (array of strings) from a byte stream.
@@ -113,7 +113,7 @@ export async function* iterateCsvRecords(
 
 /** Download a table CSV as a byte stream. */
 export async function fetchTableCsvStream(versionId: string): Promise<ReadableStream<Uint8Array>> {
-  const url = `${DATA_API_BASE}/v1/datasets/${DATASET_ID}/versions/${versionId}/tables/${TABLE_ID}/data?format=csv`;
+  const url = `${UK_10_DATA_API_BASE}/v1/datasets/${DATASET_ID}/versions/${versionId}/tables/${TABLE_ID}/data?format=csv`;
   const res = await httpGet(url);
   if (!res.ok) throw new Error(`DBT table CSV failed: ${res.status} ${await res.text()}`);
   const body = res.body;
