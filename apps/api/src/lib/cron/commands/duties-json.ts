@@ -24,7 +24,7 @@ export const dutiesJson: Command = async (args) => {
       const wire = await fetchJSON<DutyRateWire[]>(url);
       const normalized = wire.map((r) => ({
         dest: String(r.dest).toUpperCase(),
-        partner: r.partner ?? null,
+        partner: r.partner ?? '',
         hs6: String(r.hs6).slice(0, 6),
         ratePct: typeof r.ratePct === 'string' ? r.ratePct : toNumeric3String(r.ratePct),
         rule: r.rule,

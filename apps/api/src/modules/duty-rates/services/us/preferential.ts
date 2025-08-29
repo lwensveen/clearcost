@@ -1,8 +1,7 @@
 // Preferential (FTA) ad-valorem from USITC HTS “Special” column.
 // - Parses Column 1 “Special” into (percent, partner-programs) segments.
-// - Aggregates to HS6 by keeping the MAX percent per (HS6, partner-set, percent) segment
-//   across all 10-digit lines (safety-first).
-// - Leaves partner program codes (e.g., "A,AU,CA") in `notes`; you can map them to ISO2 later.
+// - Explodes program tokens to ISO2 members (from DB or CSV), supports owner-qualified lookups.
+// - Aggregates per (HS6, ISO2) with conservative MAX % across 10-digit lines.
 
 import type { DutyRateInsert } from '@clearcost/types';
 import {
@@ -12,11 +11,15 @@ import {
   parseHts10,
   toNumeric3String,
 } from './hts-base.js';
+import { loadMembershipFromCsv, loadMembershipFromDb, membersOn } from './spi-membership.js';
 
 type FetchUsPrefOpts = {
-  chapters?: number[]; // 2-digit chapters; default: 1..97
-  effectiveFrom?: Date; // stamp; default: Jan 1 (UTC) of current year
-  skipFree?: boolean; // omit "Free" (0%) rows; default false
+  chapters?: number[];
+  effectiveFrom?: Date;
+  skipFree?: boolean;
+  membershipCsvUrl?: string;
+  conservativeMax?: boolean;
+  owner?: string; // e.g. 'US'
 };
 
 function jan1OfCurrentYearUTC(): Date {
@@ -24,14 +27,7 @@ function jan1OfCurrentYearUTC(): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
 }
 
-/**
- * Parse “Special” cell into segments of { pct, partners }.
- * Examples:
- *   "Free (AU,CA,MX)"        -> [{ pct: 0, partners: "AU,CA,MX" }]
- *   "5% (CA,MX) 3% (IL)"     -> [{ pct: 5, partners: "CA,MX" }, { pct: 3, partners: "IL" }]
- *   "3% (A,AU) Free (CA)"    -> [{ pct: 3, partners: "A,AU" }, { pct: 0, partners: "CA" }]
- *   "Free"                   -> [{ pct: 0, partners: "" }]
- */
+/** Parse “Special” cell into segments of { pct, partnersCSV }. */
 function parseSpecialSegments(
   cell: string | null | undefined
 ): Array<{ pct: number; partners: string }> {
@@ -40,12 +36,12 @@ function parseSpecialSegments(
   const segments: Array<{ pct: number; partners: string }> = [];
 
   const re = /(?:(Free)|(\d+(?:\.\d+)?)\s*%)(?:\s*\(([^)]+)\))?/gi;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(normalized))) {
-    const isFree = !!match[1];
-    const pct = isFree ? 0 : Number(match[2]);
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(normalized))) {
+    const isFree = !!m[1];
+    const pct = isFree ? 0 : Number(m[2]);
     if (!Number.isFinite(pct) || pct < 0) continue;
-    const partnersRaw = (match[3] ?? '').trim(); // e.g., "AU,CA,MX" or ""
+    const partnersRaw = (m[3] ?? '').trim();
     segments.push({ pct, partners: partnersRaw });
   }
 
@@ -55,27 +51,34 @@ function parseSpecialSegments(
   return segments;
 }
 
-/**
- * Fetch US preferential (FTA) ad-valorem from HTS “Special”.
- * One output row per (HS6, partner-program set, percent) segment, percent kept as numeric(6,3) string.
- */
 export async function fetchUsPreferentialDutyRates(
   opts: FetchUsPrefOpts = {}
 ): Promise<DutyRateInsert[]> {
-  const chapters = opts.chapters ?? Array.from({ length: 97 }, (_, i) => i + 1); // 1..97
+  const chapters = opts.chapters ?? Array.from({ length: 97 }, (_, i) => i + 1);
   const effectiveFrom = opts.effectiveFrom ?? jan1OfCurrentYearUTC();
   const skipFree = !!opts.skipFree;
+  const conservativeMax = opts.conservativeMax ?? true;
+  const owner = (opts.owner ?? 'US').toUpperCase();
 
-  type BucketValue = { pct: number; compound: boolean };
-  // key: `${hs6}|${partnersNorm}|${pct}`
-  const bucket = new Map<string, BucketValue>();
+  // Load SPI membership (DB by default; CSV if provided).
+  const membership = opts.membershipCsvUrl
+    ? await loadMembershipFromCsv(opts.membershipCsvUrl)
+    : await loadMembershipFromDb();
+
+  type BucketVal = { pct: number; compound: boolean };
+  // key = `${hs6}|${iso2}`
+  const best: Map<string, BucketVal> = new Map();
+
+  const isIso2 = (t: string) => /^[A-Z]{2}$/.test(t);
+  const isHs6 = (t: string) => /^\d{6}$/.test(t);
 
   for (const chapter of chapters) {
     const rows = await exportChapterJson(chapter).catch(() => [] as Record<string, unknown>[]);
+
     for (const row of rows) {
       const hts10 = parseHts10(row);
       if (!hts10) continue;
-      const hs6 = hts10.slice(0, 6); // always 6 chars
+      const hs6 = hts10.slice(0, 6);
 
       const specialCell = getSpecialCell(row);
       if (!specialCell) continue;
@@ -87,43 +90,64 @@ export async function fetchUsPreferentialDutyRates(
       for (const { pct, partners } of segments) {
         if (skipFree && pct === 0) continue;
 
-        // Normalize partner token list for stable keys
-        const partnersNorm = partners
+        const tokens = partners
           .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean)
-          .join(',');
+          .map((s) => s.trim().toUpperCase())
+          .filter(Boolean);
 
-        const key = `${hs6}|${partnersNorm}|${pct}`;
-        const prev = bucket.get(key);
-        // Keep MAX pct for the same segment across multiple 10-digit lines
-        if (!prev || pct > prev.pct) {
-          bucket.set(key, { pct, compound: (prev?.compound ?? false) || compoundFlag });
+        if (tokens.length === 0) continue; // “Free” with no partners → not attributable
+
+        // Expand tokens to ISO2
+        const isoSet = new Set<string>();
+        for (const tok of tokens) {
+          if (isIso2(tok)) {
+            isoSet.add(tok);
+          } else {
+            const owned = membersOn(membership, `${owner}:${tok}`, effectiveFrom);
+            const bare = membersOn(membership, tok, effectiveFrom);
+            for (const iso of owned.length ? owned : bare) isoSet.add(iso);
+          }
+        }
+
+        for (const iso2 of isoSet) {
+          const key = `${hs6}|${iso2}`;
+          const prev = best.get(key);
+          const nextPct = pct;
+
+          if (!prev) {
+            best.set(key, { pct: nextPct, compound: compoundFlag });
+          } else {
+            const betterPct = conservativeMax
+              ? Math.max(prev.pct, nextPct)
+              : Math.min(prev.pct, nextPct);
+            best.set(key, { pct: betterPct, compound: prev.compound || compoundFlag });
+          }
         }
       }
     }
   }
 
-  // Materialize rows – parse key safely to avoid undefined types
   const out: DutyRateInsert[] = [];
-  for (const [key, value] of bucket) {
-    const parts = key.split('|');
-    const hs6FromKey = parts[0] ?? '';
-    const partnersNorm = parts[1] ?? '';
+  for (const [key, val] of best) {
+    const sep = key.indexOf('|');
+    if (sep <= 0 || sep === key.length - 1) continue;
 
-    if (!hs6FromKey) continue;
+    const hs6Key = key.slice(0, sep);
+    const iso2 = key.slice(sep + 1);
+    if (!isHs6(hs6Key) || !isIso2(iso2)) continue;
 
     out.push({
       dest: 'US',
-      hs6: hs6FromKey,
-      ratePct: toNumeric3String(value.pct),
+      partner: iso2,
+      hs6: hs6Key, // now guaranteed string
+      ratePct: toNumeric3String(val.pct),
       dutyRule: 'fta',
-      partner: null,
+      currency: 'USD',
       effectiveFrom,
       effectiveTo: null,
       notes:
-        `HTS Column 1 “Special” – partners: ${partnersNorm || 'programs:unspecified'}` +
-        (value.compound ? '; contains specific/compound components, using % only.' : ''),
+        `HTS Column 1 “Special” – exploded from ${owner} program tokens to ISO2` +
+        (val.compound ? '; contains specific/compound components, using % only.' : ''),
     });
   }
 
