@@ -1,23 +1,54 @@
 import { db, fxRatesTable } from '@clearcost/db';
+import { XMLParser } from 'fast-xml-parser';
 
 export type FxRefreshResult = { fxAsOf: string; inserted: number; base: 'EUR' };
 
 export async function fetchEcbXml(): Promise<string> {
-  const res = await fetch('https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml');
-  if (!res.ok) throw new Error(`ECB fetch failed: ${res.status}`);
+  const res = await fetch('https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml', {
+    headers: {
+      // ECB sometimes serves HTML when UA is weird; set a normal UA
+      'user-agent': 'ClearCost/1.0 (+https://clearcost.dev)',
+      accept: 'application/xml,text/xml;q=0.9,*/*;q=0.8',
+      'cache-control': 'no-cache',
+    },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`ECB fetch failed: ${res.status} ${res.statusText} – ${body.slice(0, 200)}`);
+  }
   return await res.text();
 }
 
 export function parseEcb(xml: string): { fxAsOf: string; rates: Record<string, number> } {
-  const dateMatch = xml.match(/time="(\d{4}-\d{2}-\d{2})"/);
-  if (!dateMatch) throw new Error('No date in ECB XML');
-  const fxAsOf = dateMatch[1]!;
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    // default prefix is "@_"; we'll read attributes via that
+  });
 
+  let doc: any;
+  try {
+    doc = parser.parse(xml);
+  } catch (e) {
+    throw new Error(`ECB XML parse error: ${(e as Error).message}`);
+  }
+
+  // Shape is usually: gesmes:Envelope -> Cube -> Cube(time=YYYY-MM-DD) -> Cube(currency=..., rate=...)
+  const daily = doc?.['gesmes:Envelope']?.Cube?.Cube;
+  if (!daily || !daily['@_time']) {
+    // helpful context
+    throw new Error(`No date in ECB XML (unexpected shape). Snippet: ${xml.slice(0, 200)}...`);
+  }
+
+  const fxAsOf: string = daily['@_time'];
   const rates: Record<string, number> = {};
 
-  for (const m of xml.matchAll(/currency="([A-Z]{3})"\s+rate="([\d.]+)"/g)) {
-    rates[m[1]!] = Number(m[2]);
+  const entries = Array.isArray(daily.Cube) ? daily.Cube : [];
+  for (const c of entries) {
+    const cur = c['@_currency'];
+    const rate = c['@_rate'];
+    if (cur && rate) rates[cur] = Number(rate);
   }
+
   rates['EUR'] = 1;
   return { fxAsOf, rates };
 }
@@ -38,7 +69,7 @@ export async function upsertFxRatesEUR(
   let inserted = 0;
 
   for (const row of rows) {
-    const res = await db
+    await db
       .insert(fxRatesTable)
       .values(row)
       .onConflictDoNothing({
