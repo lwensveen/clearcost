@@ -1,7 +1,10 @@
 import OpenAI from 'openai';
 import type { DeMinimisInsert } from '@clearcost/types';
 import { importDeMinimis } from '../import-de-minimis.js';
-import { deMinimisLlmDefaultUserPrompt, deMinimisLlmSystemPrompt, } from './prompts/de-minimis-llm.js';
+import {
+  deMinimisLlmDefaultUserPrompt,
+  deMinimisLlmSystemPrompt,
+} from './prompts/de-minimis-llm.js';
 import { PayloadSchema } from './schema.js';
 
 const isoDay = (d: Date) => d.toISOString().slice(0, 10);
