@@ -14,48 +14,70 @@ import { freightJson } from './commands/freight.js';
 import { hsAhtn, hsEuHs6, hsEuTaric, hsImportHs6, hsUk10, hsUsHts10 } from './commands/hs.js';
 import { runSweepStale } from './commands/sweep-stale.js';
 import { importsPrune } from './commands/prune.js';
-import { deMinimisOfficial, deMinimisSeedBaseline, deMinimisZonos } from './commands/de-minimis.js';
+import {
+  deMinimisOfficial,
+  deMinimisOpenAI,
+  deMinimisSeedBaseline,
+  deMinimisTradeGov,
+  deMinimisZonos,
+} from './commands/de-minimis.js';
 import { dutiesUsAll, dutiesUsFta, dutiesUsMfn } from './commands/duties-us.js';
 import { programsLoadMembersCsv, programsSeed } from './commands/trade-programs.js';
 import { seedCountriesBasic, seedTradeProgramsUS } from './commands/seed-trade-programs.js';
+import { dutiesLlmCrossCheck, dutiesLlmGrok, dutiesLlmOpenAI } from './commands/duties-llm.js';
+import {
+  surchargesLlmCrossCheck,
+  surchargesLlmGrok,
+  surchargesLlmOpenAI,
+} from './commands/surcharges-llm.js';
+import { vatLlmCrossCheck, vatLlmGrok, vatLlmOpenAI } from './commands/vat-llm.js';
 
 export const commands: Record<string, Command> = {
   'fx:refresh': fxRefresh,
-
-  'import:vat': vatAuto,
+  'import:de-minimis:official': deMinimisOfficial,
+  'import:de-minimis:openai': deMinimisOpenAI,
+  'import:de-minimis:seed-baseline': deMinimisSeedBaseline,
+  'import:de-minimis:trade-gov': deMinimisTradeGov,
+  'import:de-minimis:zonos': deMinimisZonos,
 
   'import:duties': dutiesJson,
-  'import:duties:wits': dutiesWits,
-  'import:duties:us-mfn': dutiesUsMfn,
-  'import:duties:us-fta': dutiesUsFta,
+  'import:duties:llm-crosscheck': dutiesLlmCrossCheck,
+  'import:duties:llm-grok': dutiesLlmGrok,
+  'import:duties:llm-openai': dutiesLlmOpenAI,
   'import:duties:us-all': dutiesUsAll,
-  // 'import:duties:us-all': dutiesUsAll,
-  // 'import:duties:us-all': dutiesUsAll,
-
-  'import:surcharges': surchargesJson,
-  'import:surcharges:us-all': surchargesUsAll,
-  'import:surcharges:us-trade-remedies': surchargesUsTradeRemedies,
-  'import:surcharges:us-aphis': surchargesUsAphis,
-  'import:surcharges:us-fda': surchargesUsFda,
+  'import:duties:us-fta': dutiesUsFta,
+  'import:duties:us-mfn': dutiesUsMfn,
+  'import:duties:wits': dutiesWits,
 
   'import:freight': freightJson,
 
   'import:hs6': hsImportHs6,
-  'import:hs:us-hts10': hsUsHts10,
-  'import:hs:uk10': hsUk10,
   'import:hs:ahtn': hsAhtn,
   'import:hs:eu-hs6': hsEuHs6,
   'import:hs:eu-taric': hsEuTaric,
+  'import:hs:uk10': hsUk10,
+  'import:hs:us-hts10': hsUsHts10,
 
-  'import:sweep-stale': runSweepStale,
+  'import:programs:load-members': programsLoadMembersCsv,
+  'import:programs:seed': programsSeed,
+
   'import:prune': importsPrune,
 
-  'import:de-minimis:zonos': deMinimisZonos,
-  'import:de-minimis:official': deMinimisOfficial,
-  'import:de-minimis:seed-baseline': deMinimisSeedBaseline,
+  'import:surcharges': surchargesJson,
+  'import:surcharges:llm-crosscheck': surchargesLlmCrossCheck,
+  'import:surcharges:llm-grok': surchargesLlmGrok,
+  'import:surcharges:llm-openai': surchargesLlmOpenAI,
+  'import:surcharges:us-all': surchargesUsAll,
+  'import:surcharges:us-aphis': surchargesUsAphis,
+  'import:surcharges:us-fda': surchargesUsFda,
+  'import:surcharges:us-trade-remedies': surchargesUsTradeRemedies,
 
-  'import:programs:seed': programsSeed,
-  'import:programs:load-members': programsLoadMembersCsv,
+  'import:sweep-stale': runSweepStale,
+
+  'import:vat': vatAuto,
+  'import:vat:llm-openai': vatLlmOpenAI,
+  'import:vat:llm-grok': vatLlmGrok,
+  'import:vat:llm-crosscheck': vatLlmCrossCheck,
 
   'seed:countries:basic': seedCountriesBasic,
   'seed:trade-programs:us': seedTradeProgramsUS,
