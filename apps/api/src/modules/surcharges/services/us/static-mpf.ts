@@ -1,5 +1,11 @@
 import type { SurchargeInsert } from '@clearcost/types';
 
+/** Jan 1 UTC of current year */
+function jan1UtcOfCurrentYear(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+}
+
 /**
  * Merchandise Processing Fee (MPF) – ad valorem for most formal entries,
  * subject to min/max per entry. Values are supplied via env so you can update
@@ -12,35 +18,44 @@ import type { SurchargeInsert } from '@clearcost/types';
  *  - US_MPF_EFFECTIVE    ISO date (YYYY-MM-DD), default = Jan 1 current UTC year
  *  - US_MPF_NOTES        extra note suffix
  */
-function jan1UtcOfCurrentYear(): Date {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
-}
-
 export async function* streamMpfRows(): AsyncGenerator<SurchargeInsert> {
-  const pctRaw = process.env.US_MPF_PCT ?? ''; // as plain number string, e.g. "0.3464"
+  const pctPercentRaw = process.env.US_MPF_PCT ?? ''; // e.g., "0.3464" (%)
+  const pctPercent = Number(pctPercentRaw);
+  const pctStr = Number.isFinite(pctPercent) && pctPercent >= 0 ? String(pctPercent / 100) : null;
   const minRaw = process.env.US_MPF_MIN ?? '';
   const maxRaw = process.env.US_MPF_MAX ?? '';
+  const minAmtStr = minRaw ? Number(minRaw).toFixed(2) : null;
+  const maxAmtStr = maxRaw ? Number(maxRaw).toFixed(2) : null;
   const effRaw = process.env.US_MPF_EFFECTIVE ?? '';
   const extra = process.env.US_MPF_NOTES ? ` ${process.env.US_MPF_NOTES}` : '';
-
-  // Store percent as numeric(6,3)-style string in our row (importer casts to SQL numeric)
-  // Our schema expects pctAmt as string | null.
-  const pct = pctRaw ? String(Number(pctRaw)) : null;
-
   const effectiveFrom = effRaw ? new Date(`${effRaw}T00:00:00Z`) : jan1UtcOfCurrentYear();
-
-  const thresholds = minRaw || maxRaw ? ` (min ${minRaw || 'n/a'}, max ${maxRaw || 'n/a'})` : '';
+  const thresholds =
+    minAmtStr || maxAmtStr ? ` (min ${minAmtStr ?? 'n/a'}, max ${maxAmtStr ?? 'n/a'})` : '';
+  const pctForNote =
+    Number.isFinite(pctPercent) && pctPercent >= 0 ? `${pctPercent.toFixed(4)}%` : 'unknown%';
+  const notes =
+    `US MPF ad valorem ${pctForNote}${thresholds}. CFR: 19 CFR §24.23(b)(1)(i)(A)-(B).${extra}`.trim();
 
   yield {
     dest: 'US',
     origin: null,
     hs6: null,
     surchargeCode: 'MPF',
-    pctAmt: pct,
+    rateType: 'ad_valorem',
+    applyLevel: 'entry',
+    valueBasis: 'customs',
+    transportMode: 'ALL',
+    currency: 'USD',
     fixedAmt: null,
+    pctAmt: pctStr,
+    minAmt: minAmtStr,
+    maxAmt: maxAmtStr,
+    unitAmt: null,
+    unitCode: null,
+    sourceUrl: null,
+    sourceRef: '19 CFR §24.23(b)(1)(i)',
+    notes,
     effectiveFrom,
     effectiveTo: null,
-    notes: `US MPF ad valorem${thresholds}.${extra}`.trim(),
   };
 }

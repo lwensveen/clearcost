@@ -23,7 +23,7 @@ function parsePercent(text: string | null | undefined): number | null {
   const m = /(\d+(?:\.\d+)?)\s*%/.exec(String(text));
   if (!m) return null;
   const v = Number(m[1]);
-  return Number.isFinite(v) && v >= 0 ? v : null;
+  return Number.isFinite(v) && v >= 0 ? v : null; // whole percent, e.g. 25 for "25%"
 }
 
 function getGeneralDutyCell(row: Record<string, unknown>): string | null {
@@ -66,10 +66,12 @@ function makeNotes(
 /**
  * Scan HTS Ch.99 and insert program-level surcharge rows (301, 232).
  * Writes provenance when `importId` is provided.
+ *
+ * NOTE: pctAmt stored as a fraction (0–1). We convert from “25%” → "0.250000".
  */
 export async function importUsTradeRemediesFromHTS(
   opts: ImportOpts = {}
-): Promise<{ ok: true; inserted: number; count: number }> {
+): Promise<{ ok: true; inserted: number; updated: number; count: number }> {
   const effectiveFrom = opts.effectiveFrom ?? jan1UTCOfCurrentYear();
 
   type Bucket = { maxPct: number; anyHts10: string; anyText?: string };
@@ -87,27 +89,59 @@ export async function importUsTradeRemediesFromHTS(
     if (!klass) continue;
 
     const general = getGeneralDutyCell(row);
-    const pct = parsePercent(general);
-    if (pct == null) continue;
-    if (opts.skipFree && pct === 0) continue;
+    const pctWhole = parsePercent(general); // e.g., 25 for "25%"
+    if (pctWhole == null) continue;
+    if (opts.skipFree && pctWhole === 0) continue;
 
     const code = klass === '301' ? 'TRADE_REMEDY_301' : 'TRADE_REMEDY_232';
     const prev = buckets[code];
-    if (!prev || pct > prev.maxPct) {
-      buckets[code] = { maxPct: pct, anyHts10: hts10, anyText: general ?? undefined };
+    if (!prev || pctWhole > prev.maxPct) {
+      buckets[code] = { maxPct: pctWhole, anyHts10: hts10, anyText: general ?? undefined };
     }
   }
 
   const out: SurchargeInsert[] = [];
+
+  // Shared defaults for schema fields we always set
+  const base: Pick<
+    SurchargeInsert,
+    | 'dest'
+    | 'origin'
+    | 'hs6'
+    | 'rateType'
+    | 'applyLevel'
+    | 'valueBasis'
+    | 'transportMode'
+    | 'currency'
+    | 'fixedAmt'
+    | 'minAmt'
+    | 'maxAmt'
+    | 'unitAmt'
+    | 'unitCode'
+  > = {
+    dest: 'US',
+    origin: null,
+    hs6: null,
+    rateType: 'ad_valorem',
+    applyLevel: 'entry',
+    valueBasis: 'customs',
+    transportMode: 'ALL',
+    currency: 'USD',
+    fixedAmt: null,
+    minAmt: null,
+    maxAmt: null,
+    unitAmt: null,
+    unitCode: null,
+  };
+
   if (buckets.TRADE_REMEDY_301) {
     const b = buckets.TRADE_REMEDY_301;
+    const fraction = (b.maxPct / 100).toFixed(6); // "0.250000"
     out.push({
-      dest: 'US',
-      origin: 'CN',
-      hs6: null, // v2: map coverage into hs6 via U.S. Notes
+      ...base,
+      origin: 'CN', // scope commonly CN; refine later if needed
       surchargeCode: 'TRADE_REMEDY_301',
-      pctAmt: b.maxPct.toFixed(3),
-      fixedAmt: null,
+      pctAmt: fraction,
       effectiveFrom,
       effectiveTo: null,
       notes: makeNotes('TRADE_REMEDY_301', b.anyHts10, b.anyText),
@@ -115,20 +149,19 @@ export async function importUsTradeRemediesFromHTS(
   }
   if (buckets.TRADE_REMEDY_232) {
     const b = buckets.TRADE_REMEDY_232;
+    const fraction = (b.maxPct / 100).toFixed(6);
     out.push({
-      dest: 'US',
-      origin: null,
-      hs6: null,
+      ...base,
+      origin: null, // global unless narrowed
       surchargeCode: 'TRADE_REMEDY_232',
-      pctAmt: b.maxPct.toFixed(3),
-      fixedAmt: null,
+      pctAmt: fraction,
       effectiveFrom,
       effectiveTo: null,
       notes: makeNotes('TRADE_REMEDY_232', b.anyHts10, b.anyText),
     });
   }
 
-  if (!out.length) return { ok: true as const, inserted: 0, count: 0 };
+  if (!out.length) return { ok: true as const, inserted: 0, updated: 0, count: 0 };
 
   const res = await batchUpsertSurchargesFromStream(out, {
     batchSize: opts.batchSize ?? 5000,
@@ -137,11 +170,18 @@ export async function importUsTradeRemediesFromHTS(
       const program = r.surchargeCode === 'TRADE_REMEDY_301' ? '301' : '232';
       const origin = r.origin ?? 'ALL';
       const hs = r.hs6 ?? 'ALL';
-      const ef = r.effectiveFrom instanceof Date ? r.effectiveFrom.toISOString().slice(0, 10) : '';
+      const ef =
+        r.effectiveFrom instanceof Date
+          ? r.effectiveFrom.toISOString().slice(0, 10)
+          : String(r.effectiveFrom).slice(0, 10);
       return `usitc:hts:program=${program}:origin=${origin}:hs6=${hs}:ef=${ef}`;
     },
   });
 
-  const inserted = res.count ?? 0;
-  return { ok: true as const, inserted, count: inserted };
+  return {
+    ok: true as const,
+    inserted: res.inserted ?? 0,
+    updated: res.updated ?? 0,
+    count: res.count ?? 0,
+  };
 }

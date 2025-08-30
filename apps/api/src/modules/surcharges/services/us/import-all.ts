@@ -1,48 +1,29 @@
-import { streamMpfRows } from './static-mpf.js';
-import { streamHmfRows } from './static-hmf.js';
-import { batchUpsertSurchargesFromStream } from '../../utils/batch-upsert.js';
-import type { SurchargeInsert } from '@clearcost/types';
+import { importAphisAqiSurcharges } from './import-aphis-aqi.js';
+import { importFdaFsmaSurcharges } from './import-fda-fsma.js';
+import { importUsTradeRemediesFromHTS } from './import-usitc-hts.js';
 
-type Opts = {
-  batchSize?: number;
-  importId?: string;
-};
+type Opts = { batchSize?: number; importId?: string };
 
-function ymd(d: Date | string | null | undefined) {
-  if (!d) return '';
-  const dt = typeof d === 'string' ? new Date(d) : d;
-  return Number.isNaN(dt.getTime()) ? '' : dt.toISOString().slice(0, 10);
-}
-
-/**
- * Import all “baseline” US surcharges we can source reliably & cheaply:
- * - MPF (env-configured)
- * - HMF (env-configured)
- * You can append 301/232 and AD/CVD streams later without changing callers.
- */
+/** US “other surcharges”: APHIS AQI, FDA FSMA/VQIP, and Trade Remedies. */
 export async function importAllUsSurcharges(opts: Opts = {}): Promise<{ ok: true; count: number }> {
   const batchSize = opts.batchSize;
   let count = 0;
 
-  // MPF
-  count += (
-    await batchUpsertSurchargesFromStream(streamMpfRows(), {
-      batchSize,
-      importId: opts.importId,
-      makeSourceRef: (r: SurchargeInsert) =>
-        `static:mpf:dest=${r.dest ?? 'US'}:ef=${ymd(r.effectiveFrom)}`,
-    })
-  ).count;
+  // APHIS AQI (carrier/arrival fees)
+  const aphis = await importAphisAqiSurcharges({ batchSize, importId: opts.importId });
+  count += aphis.count ?? 0;
 
-  // HMF
-  count += (
-    await batchUpsertSurchargesFromStream(streamHmfRows(), {
-      batchSize,
-      importId: opts.importId,
-      makeSourceRef: (r: SurchargeInsert) =>
-        `static:hmf:dest=${r.dest ?? 'US'}:ef=${ymd(r.effectiveFrom)}`,
-    })
-  ).count;
+  // FDA FSMA/VQIP
+  const fda = await importFdaFsmaSurcharges({ batchSize, importId: opts.importId });
+  count += fda.count ?? 0;
+
+  // Trade Remedies 301/232 (program-level)
+  const tr = await importUsTradeRemediesFromHTS({
+    importId: opts.importId,
+    batchSize,
+    skipFree: true,
+  });
+  count += tr.count ?? 0;
 
   return { ok: true as const, count };
 }
