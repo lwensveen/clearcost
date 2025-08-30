@@ -1,6 +1,22 @@
-import { index, numeric, pgTable, text, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  index,
+  numeric,
+  pgEnum,
+  pgTable,
+  text,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { dutyRuleEnum } from '../enums.js';
 import { createTimestampColumn } from '../utils.js';
+
+export const dutySourceEnum = pgEnum('duty_source', [
+  'official', // USITC, TARIC, etc. (authoritative)
+  'wits', // WITS baseline / comparison
+  'vendor', // third-party vendor, if ever
+  'manual', // operator-entered corrections
+]);
 
 export const dutyRatesTable = pgTable(
   'duty_rates',
@@ -9,6 +25,7 @@ export const dutyRatesTable = pgTable(
     dest: varchar('dest', { length: 2 }).notNull(), // destination ISO2
     partner: varchar('partner', { length: 2 }).notNull().default(''), // '' = MFN sentinel
     hs6: varchar('hs6', { length: 6 }).notNull(),
+    source: dutySourceEnum('source').notNull().default('official'),
     ratePct: numeric('rate_pct', { precision: 6, scale: 3 }).notNull(), // e.g., 16.500
     dutyRule: dutyRuleEnum('duty_rule').default('mfn').notNull(), // MFN by default
     currency: varchar('currency', { length: 3 }).default('USD').notNull(), // display currency (optional)
@@ -28,5 +45,6 @@ export const dutyRatesTable = pgTable(
       t.effectiveFrom
     ),
     idxDestHs6: index('duty_rates_dest_hs6_idx').on(t.dest, t.hs6),
+    idxSource: index('duty_rates_source_idx').on(t.source),
   })
 );
