@@ -9,8 +9,8 @@ export const deMinimisBasis = ['INTRINSIC', 'CIF'] as const;
 export type DeMinimisBasis = (typeof deMinimisBasis)[number];
 
 export const vatRateKindEnum = pgEnum('vat_rate_kind', [
-  'STANDARD',
   'REDUCED',
+  'STANDARD',
   'SUPER_REDUCED',
   'ZERO',
 ]);
@@ -23,10 +23,20 @@ export const dutyRuleEnum = pgEnum('duty_rule', ['mfn', 'fta', 'anti_dumping', '
 
 export const surchargeCodeEnum = pgEnum('surcharge_code', [
   'ANTIDUMPING',
+  'AQI_AIRCRAFT',
+  'AQI_BARGE',
+  'AQI_RAILCAR',
+  'AQI_TRUCK_SINGLE',
+  'AQI_TRUCK_TRANSPONDER',
+  'AQI_VESSEL',
   'COUNTERVAILING',
   'CUSTOMS_PROCESSING',
   'DISBURSEMENT',
   'EXCISE',
+  'FDA_FSMA_REINSPECTION_HOURLY_DOM',
+  'FDA_FSMA_REINSPECTION_HOURLY_FOR',
+  'FDA_VQIP_APPLICATION_FEE',
+  'FDA_VQIP_USER_FEE_ANNUAL',
   'FUEL',
   'HANDLING',
   'HMF',
@@ -36,16 +46,6 @@ export const surchargeCodeEnum = pgEnum('surcharge_code', [
   'SECURITY',
   'TRADE_REMEDY_232',
   'TRADE_REMEDY_301',
-  'AQI_VESSEL',
-  'AQI_AIRCRAFT',
-  'AQI_RAILCAR',
-  'AQI_TRUCK_SINGLE',
-  'AQI_TRUCK_TRANSPONDER',
-  'AQI_BARGE',
-  'FDA_VQIP_USER_FEE_ANNUAL',
-  'FDA_VQIP_APPLICATION_FEE',
-  'FDA_FSMA_REINSPECTION_HOURLY_DOM',
-  'FDA_FSMA_REINSPECTION_HOURLY_FOR',
 ]);
 
 export const surchargeRateTypeEnum = pgEnum('surcharge_rate_type', [
@@ -55,19 +55,19 @@ export const surchargeRateTypeEnum = pgEnum('surcharge_rate_type', [
 ]);
 
 export const surchargeApplyLevelEnum = pgEnum('surcharge_apply_level', [
+  'arrival',
   'entry', // whole entry / shipment arrival
   'line', // per HS line
-  'shipment', // transportation-level charge
   'program', // program enrollment/annual/etc.
-  'arrival',
+  'shipment', // transportation-level charge
 ]);
 
 export const surchargeValueBasisEnum = pgEnum('surcharge_value_basis', [
-  'customs', // customs value (transaction value)
-  'fob',
   'cif',
-  'entered', // entered value (if you prefer this naming)
+  'customs', // customs value (transaction value)
   'duty', // duty amount (rare, but some fees piggyback on duty)
+  'entered', // entered value (if you prefer this naming)
+  'fob',
   'other',
 ]);
 
@@ -88,14 +88,18 @@ export const importSourceEnum = pgEnum('import_source', [
   'ECB',
   'FDA',
   'FILE',
+  'GROK',
   'IMF',
+  'LLM_CROSSCHECK',
   'MANIFEST',
   'MANUAL',
   'OECD',
   'OECD/IMF',
   'OFFICIAL',
+  'OPENAI',
   'SEED',
   'TARIC',
+  'TRADE_GOV',
   'UK_OPS',
   'UK_TT',
   'US',
@@ -107,6 +111,7 @@ export const importSourceEnum = pgEnum('import_source', [
 export const importStatusEnum = pgEnum('import_status', ['running', 'succeeded', 'failed']);
 
 export const resourceTypeEnum = pgEnum('resource_type', [
+  'de_minimis',
   'duty_rate',
   'freight_card',
   'hs_code',

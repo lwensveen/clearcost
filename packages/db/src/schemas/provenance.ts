@@ -1,7 +1,8 @@
-import { index, pgTable, text, uuid, varchar } from 'drizzle-orm/pg-core';
+import { index, pgTable, text, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { createTimestampColumn } from '../utils.js';
 import { importsTable } from './imports.js';
 import { resourceTypeEnum } from '../enums.js';
+import { sql } from 'drizzle-orm';
 
 export const provenanceTable = pgTable(
   'provenance',
@@ -20,5 +21,8 @@ export const provenanceTable = pgTable(
   (t) => ({
     byResource: index('prov_resource_idx').on(t.resourceType, t.resourceId),
     byImport: index('prov_import_idx').on(t.importId),
+    uniquePerRun: uniqueIndex('prov_unique_per_run')
+      .on(t.importId, t.resourceType, t.resourceId, t.rowHash)
+      .where(sql`row_hash IS NOT NULL`),
   })
 );

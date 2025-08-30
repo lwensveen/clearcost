@@ -5,6 +5,7 @@ import { auditQuotesTable } from './audit-quotes.js';
 import { categoriesTable } from './categories.js';
 import { countriesTable } from './countries.js';
 import { deMinimisTable } from './de-minimis.js';
+import { dutyRateComponentsTable } from './duty-rate-components.js';
 import { dutyRatesTable } from './duty-rates.js';
 import { freightRateCardsTable } from './freight-rate-cards.js';
 import { freightRateStepsTable } from './freight-rate-steps.js';
@@ -49,6 +50,7 @@ export * from './auth/verifications.js';
 export * from './categories.js';
 export * from './countries.js';
 export * from './de-minimis.js';
+export * from './duty-rate-components.js';
 export * from './duty-rates.js';
 export * from './freight-rate-cards.js';
 export * from './freight-rate-steps.js';
@@ -83,6 +85,7 @@ export const schema = {
   categoriesTable,
   countriesTable,
   deMinimisTable,
+  dutyRateComponentsTable,
   dutyRatesTable,
   freightRateCardsTable,
   freightRateStepsTable,

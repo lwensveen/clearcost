@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "prov_unique_per_run" ON "provenance" USING btree ("import_id","resource_type","resource_id","row_hash") WHERE row_hash IS NOT NULL;

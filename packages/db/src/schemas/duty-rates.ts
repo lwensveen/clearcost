@@ -16,6 +16,7 @@ export const dutySourceEnum = pgEnum('duty_source', [
   'wits', // WITS baseline / comparison
   'vendor', // third-party vendor, if ever
   'manual', // operator-entered corrections
+  'llm',
 ]);
 
 export const dutyRatesTable = pgTable(
