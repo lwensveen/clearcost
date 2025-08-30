@@ -2,60 +2,103 @@ import type { Command } from '../runtime.js';
 import { buildImportId, parseCSV, parseFlags, withRun } from '../runtime.js';
 import { importDutyRatesFromWITS } from '../../../modules/duty-rates/services/wits/import-from-wits.js';
 
-const strFlag = (v: unknown): string | undefined =>
-  typeof v === 'string' && v.length ? v : undefined;
-
-const numFlag = (v: unknown): number | undefined => {
-  if (typeof v !== 'string' || v.trim() === '') return undefined;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : undefined;
-};
+const DEFAULT_DESTS = [
+  'AU',
+  'BH',
+  'CA',
+  'CL',
+  'CO',
+  'IL',
+  'JO',
+  'KR',
+  'MA',
+  'MX',
+  'OM',
+  'PA',
+  'PE',
+  'SG',
+  'EU',
+] as const;
 
 export const dutiesWits: Command = async (args) => {
-  const list = (args[0] ?? '').trim();
-  if (!list) throw new Error('Pass comma-separated ISO2 list, e.g., "US,GB,TH"');
+  const flags = parseFlags(args.slice(0)); // keep all flags
 
-  const dests = parseCSV(list).map((s) => s.toUpperCase());
-  const flags = parseFlags(args.slice(1));
-  const year = numFlag(flags.year);
-  const partners = strFlag(flags.partners)
-    ? parseCSV(strFlag(flags.partners)!).map((s) => s.toUpperCase())
-    : [];
-  const backfillYears = numFlag(flags.backfill) ?? 1;
-  const concurrency = numFlag(flags.concurrency) ?? 3;
-  const batchSize = numFlag(flags.batch) ?? 5000;
-  const hs6List = strFlag(flags.hs6) ? parseCSV(strFlag(flags.hs6)!).map((s) => s.slice(0, 6)) : [];
+  // --dests=US,GB or positional first arg (legacy)
+  const destsArg = (flags.dests ?? args[0] ?? '') as string | boolean;
+  const wantAll =
+    destsArg === true || // bare --dests
+    (typeof destsArg === 'string' && destsArg.trim().toUpperCase() === 'ALL') ||
+    (!destsArg && process.env.WITS_ALLOW_ALL === '1');
 
-  const explicitImportId = strFlag(flags.importId);
+  const dests: string[] = wantAll
+    ? [...DEFAULT_DESTS]
+    : parseCSV(typeof destsArg === 'string' ? destsArg : '')
+        .map((s) => s.toUpperCase())
+        .filter(Boolean);
+
+  // partners (optional)
+  const partners = parseCSV(flags.partners as string | undefined)
+    .map((s) => s.toUpperCase())
+    .filter(Boolean);
+
+  const year = flags.year ? Number(flags.year) : undefined;
+  const backfillYears = flags.backfill ? Number(flags.backfill) : 1;
+  const concurrency = flags.concurrency ? Number(flags.concurrency) : 3;
+  const batchSize = flags.batch ? Number(flags.batch) : 5000;
+  const hs6List = parseCSV(flags.hs6 as string | undefined).map((s) => s.slice(0, 6));
+
   const importId =
-    explicitImportId ||
+    (flags.importId as string | undefined) ??
     buildImportId('duties:wits', [
-      dests.join('+'),
+      wantAll ? `ALL(${dests.length})` : dests.join('+'),
       partners.length ? `p=${partners.join('+')}` : undefined,
-      year ?? new Date().getUTCFullYear() - 1,
+      String(year ?? new Date().getUTCFullYear() - 1),
+      new Date().toISOString(),
     ]);
 
-  const payload = await withRun<any>(
+  if (process.env.DEBUG === '1' || args.includes('--debug')) {
+    console.log('[duties:wits] plan', {
+      totalDests: dests.length,
+      sample: dests.slice(0, 10),
+      partners,
+      year,
+      backfillYears,
+      concurrency,
+      batchSize,
+      hs6List: hs6List.length ? hs6List : undefined,
+      importId,
+      wantAll,
+      exclude: [],
+    });
+  }
+
+  const payload = await withRun(
     {
       importSource: 'WITS',
       job: 'duties:wits',
       params: { dests, partners, year, backfillYears, concurrency, batchSize, hs6List },
     },
-    async () => {
+    async (runId) => {
       const res = await importDutyRatesFromWITS({
-        dests,
+        dests: dests.length ? dests : [...DEFAULT_DESTS],
         partners,
         year,
         backfillYears,
         concurrency,
         batchSize,
         hs6List: hs6List.length ? hs6List : undefined,
-        importId,
-        makeSourceRef: ({ dest, hs6, dutyRule, effectiveFrom }) =>
-          `wits:${dest}:${dutyRule}:${hs6}:${String(effectiveFrom).slice(0, 10)}`,
+        importId: runId,
+        makeSourceRef: (r) => {
+          const ef = r.effectiveFrom
+            ? new Date(r.effectiveFrom as any).toISOString().slice(0, 10)
+            : 'unknown';
+          const partner = r.partner && r.partner !== '' ? r.partner : 'ERGA';
+          const rule = r.dutyRule ?? 'mfn';
+          return `wits:${r.dest}:${partner}:${rule}:hs6=${r.hs6}:ef=${ef}`;
+        },
       });
-      const inserted = res?.inserted ?? 0;
 
+      const inserted = res?.inserted ?? 0;
       return { inserted, payload: res };
     }
   );
