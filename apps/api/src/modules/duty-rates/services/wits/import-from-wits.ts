@@ -1,58 +1,62 @@
-// WITS duty-rates import orchestrator (MFN + Preferential) with bounded concurrency
-// and batched upserts to keep memory flat.
-//
-// Why this version?
-// - Uses a small worker pool (p.concurrency) so we don't fire all HTTP jobs at once.
-// - Upserts each job's results immediately via batchUpsertDutyRatesFromStream (default 5k/txn).
-// - Avoids building one giant in-memory array.
-// - Adds provenance support via { importId, makeSourceRef }.
-//
-// Examples:
-//   await importDutyRatesFromWITS({ dests: ['US','GB'], partners: ['CA','MX'] });
-//   await importDutyRatesFromWITS({ dests: ['TH'], year: 2024, backfillYears: 0, batchSize: 2000, concurrency: 4 });
 import { z } from 'zod/v4';
 import type { DutyRateInsert } from '@clearcost/types';
 import { fetchWitsMfnDutyRates } from './mfn.js';
 import { fetchWitsPreferentialDutyRates } from './preferential.js';
 import { batchUpsertDutyRatesFromStream } from '../../utils/batch-upsert.js';
 
+const DEFAULT_DESTS = [
+  'US',
+  'EU',
+  'GB',
+  'AU',
+  'BH',
+  'CA',
+  'CL',
+  'CO',
+  'IL',
+  'JO',
+  'KR',
+  'MA',
+  'MX',
+  'OM',
+  'PA',
+  'PE',
+  'SG',
+];
+
 const ParamsSchema = z.object({
-  /** ISO2 reporter markets to ingest (e.g., ["US","GB","TH"]). */
-  dests: z.array(z.string().length(2)).min(1),
-  /** Optional ISO2 partner list for preferential (FTA) imports. Empty => MFN only. */
+  dests: z.array(z.string().length(2)).optional(),
   partners: z.array(z.string().length(2)).default([]),
-  /** WITS is often T-1; default to last UTC year if not provided. */
   year: z.number().int().min(1990).max(2100).optional(),
-  /** Also fetch prior years (0..5). Default 1 (fetch targetYear and targetYear-1). */
   backfillYears: z.number().int().min(0).max(5).default(1),
-  /** Limit concurrent HTTP jobs (1..6). Default 3. */
   concurrency: z.number().int().min(1).max(6).default(3),
-  /** DB upsert batch size (rows/transaction). Default 5000. */
   batchSize: z.number().int().min(1).max(20000).default(5000),
-  /** Optional HS6 allowlist to reduce scope across all jobs. */
   hs6List: z.array(z.string().regex(/^\d{6}$/)).optional(),
-  /** OPTIONAL: provenance run id (useful for audit linking). */
   importId: z.string().optional(),
+  exclude: z.array(z.string().length(2)).optional(),
 });
 
 export type ImportFromWitsCore = z.infer<typeof ParamsSchema>;
 
-/** Context for building a stable WITS source reference string. */
+/** Context used to build a stable provenance sourceRef. */
 type ProvCtx = { dest: string; partner?: string | null; year: number };
 
-/** Default sourceRef formatter if caller doesn't provide one. */
+/** Stable, short sourceRef: wits:DEST:PARTNER:rule:hs6=XXXXXX:ef=YYYY-MM-DD */
 function defaultMakeWitsSourceRef(row: DutyRateInsert, ctx: ProvCtx): string {
   const partner = row.partner ?? ctx.partner ?? null;
   const dutyRule = row.dutyRule ?? 'mfn';
-  const y = row.effectiveFrom instanceof Date ? row.effectiveFrom.getUTCFullYear() : ctx.year;
+  const efIso = row.effectiveFrom
+    ? new Date(row.effectiveFrom as any).toISOString().slice(0, 10)
+    : String(ctx.year);
   const partnerToken = partner ?? 'ERGA';
-  return `wits:${ctx.dest}:${partnerToken}:${dutyRule}:hs6=${row.hs6}:y=${y}`;
+  return `wits:${ctx.dest}:${partnerToken}:${dutyRule}:hs6=${row.hs6}:ef=${efIso}`;
 }
 
-/** Public params type: core + optional makeSourceRef override. */
 export type ImportFromWitsParams = ImportFromWitsCore & {
   makeSourceRef?: (row: DutyRateInsert, ctx: ProvCtx) => string;
 };
+
+const DEBUG = process.argv.includes('--debug') || process.env.DEBUG === '1';
 
 export async function importDutyRatesFromWITS(params: ImportFromWitsParams) {
   const p = ParamsSchema.parse(params);
@@ -60,13 +64,15 @@ export async function importDutyRatesFromWITS(params: ImportFromWitsParams) {
 
   const targetYear = p.year ?? new Date().getUTCFullYear() - 1;
 
-  type Job = {
-    ctx: ProvCtx;
-    run: () => Promise<DutyRateInsert[]>;
-  };
+  const destsInput = p.dests && p.dests.length > 0 ? p.dests : DEFAULT_DESTS;
+  const exclude = new Set((p.exclude ?? []).map((d) => d.toUpperCase()));
+  const dests = destsInput.map((d) => d.toUpperCase()).filter((d) => !exclude.has(d));
+  const partners = (p.partners ?? []).map((x) => x.toUpperCase());
+
+  type Job = { ctx: ProvCtx; run: () => Promise<DutyRateInsert[]> };
   const jobs: Job[] = [];
 
-  for (const dest of p.dests) {
+  for (const dest of dests) {
     // MFN
     jobs.push({
       ctx: { dest, year: targetYear },
@@ -79,8 +85,9 @@ export async function importDutyRatesFromWITS(params: ImportFromWitsParams) {
         }).catch(() => [] as DutyRateInsert[]),
     });
 
-    // Preferential per (dest, partner)
-    for (const partner of p.partners) {
+    // Preferential (if partners provided)
+    for (const partner of partners) {
+      if (partner === dest) continue;
       jobs.push({
         ctx: { dest, partner, year: targetYear },
         run: () =>
@@ -95,15 +102,12 @@ export async function importDutyRatesFromWITS(params: ImportFromWitsParams) {
     }
   }
 
-  if (jobs.length === 0) {
-    return { ok: true as const, inserted: 0 };
-  }
+  if (jobs.length === 0) return { ok: true as const, inserted: 0 };
 
   let nextIndex = 0;
 
   async function worker(): Promise<number> {
     let localInserted = 0;
-
     while (true) {
       const i = nextIndex++;
       const job = jobs[i];
@@ -116,22 +120,25 @@ export async function importDutyRatesFromWITS(params: ImportFromWitsParams) {
         rows = [];
       }
 
-      if (rows.length > 0) {
+      if (DEBUG) {
+        const tag = job.ctx.partner ? `${job.ctx.dest}-${job.ctx.partner}` : job.ctx.dest;
+        console.log(`[wits] job ${tag} ${job.ctx.year} -> rows=${rows.length}`);
+      }
+
+      if (rows.length) {
         const res = await batchUpsertDutyRatesFromStream(rows, {
           batchSize: p.batchSize,
           importId: p.importId,
-          makeSourceRef: (row) => makeSourceRef(row as DutyRateInsert, job.ctx),
+          source: 'wits',
+          makeSourceRef: (r) => makeSourceRef(r as DutyRateInsert, job.ctx),
         });
         localInserted += res.inserted;
       }
     }
-
     return localInserted;
   }
 
   const workers = Array.from({ length: p.concurrency }, () => worker());
   const counts = await Promise.all(workers);
-  const inserted = counts.reduce((a, b) => a + b, 0);
-
-  return { ok: true as const, inserted };
+  return { ok: true as const, inserted: counts.reduce((a, b) => a + b, 0) };
 }

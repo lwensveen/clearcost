@@ -7,10 +7,13 @@ type DutyRateSelectRow = typeof dutyRatesTable.$inferSelect;
 
 type ProvOpts = {
   importId?: string;
-  makeSourceRef?: (row: DutyRateSelectRow) => string | undefined; // e.g., 'WITS …#series=…'
+  makeSourceRef?: (row: DutyRateSelectRow) => string | undefined; // e.g., 'wits:US:ERGA:mfn:hs6=010121:y=2022'
 };
 
 const DEBUG = process.argv.includes('--debug') || process.env.DEBUG === '1';
+
+const clamp = (s: string | undefined | null, max = 255) =>
+  typeof s === 'string' ? s.slice(0, max) : undefined;
 
 function isoOrNull(d: Date | string | null | undefined): string | null {
   if (!d) return null;
@@ -23,10 +26,18 @@ function isoOrNull(d: Date | string | null | undefined): string | null {
  * Upsert duty rates from a stream or array in batches (default 5,000).
  * Optionally records provenance rows linked to an importId.
  * Returns inserted/updated counts separately.
+ *
+ * opts.source: tag rows as 'official' | 'wits' | 'vendor' | 'manual' (defaults to 'official')
+ * - WITS rows will not overwrite existing OFFICIAL rows.
+ * - OFFICIAL rows can overwrite WITS (and others).
  */
 export async function batchUpsertDutyRatesFromStream(
   source: AsyncIterable<DutyRateInsertRow> | DutyRateInsertRow[],
-  opts: { batchSize?: number; dryRun?: boolean } & ProvOpts = {}
+  opts: {
+    batchSize?: number;
+    dryRun?: boolean;
+    source?: DutyRateInsertRow['source'];
+  } & ProvOpts = {}
 ) {
   const batchSize = Math.max(1, opts.batchSize ?? 5000);
 
@@ -37,17 +48,20 @@ export async function batchUpsertDutyRatesFromStream(
   async function flush() {
     if (buf.length === 0) return;
 
-    // Normalize partner to '' (MFN sentinel) for NOT NULL + unique composite
-    const rows = buf.map((r) => ({ ...r, partner: r.partner ?? '' }));
+    // Normalize partner to '' (MFN sentinel) and apply source default
+    const rows = buf.map((r) => ({
+      ...r,
+      partner: r.partner ?? '',
+      source: r.source ?? opts.source ?? 'official',
+    }));
 
     if (opts.dryRun) {
       if (DEBUG) console.log(`[Duties] DRY-RUN: would upsert ${rows.length} rows`);
-      totalInserted += rows.length; // count hypothetical inserts
+      totalInserted += rows.length;
       buf = [];
       return;
     }
 
-    // Perform upsert with change-detection + inserted/updated split
     const ret = await db
       .insert(dutyRatesTable)
       .values(rows)
@@ -63,19 +77,28 @@ export async function batchUpsertDutyRatesFromStream(
           ratePct: sql`EXCLUDED.rate_pct`,
           effectiveTo: sql`EXCLUDED.effective_to`,
           notes: sql`EXCLUDED.notes`,
+          currency: sql`EXCLUDED.currency`,
+          source: sql`EXCLUDED.source`,
           updatedAt: sql`now()`,
         },
-        // Avoid pointless writes when nothing changed
+        // Block WITS from overwriting OFFICIAL; allow OFFICIAL to overwrite others; skip no-op writes
         setWhere: sql`
-          ${dutyRatesTable.ratePct} IS DISTINCT FROM EXCLUDED.rate_pct
-          OR ${dutyRatesTable.effectiveTo} IS DISTINCT FROM EXCLUDED.effective_to
-          OR ${dutyRatesTable.notes} IS DISTINCT FROM EXCLUDED.notes
+          (
+            ${dutyRatesTable.source} = EXCLUDED.source
+            OR ${dutyRatesTable.source} <> 'official'
+          )
+          AND (
+            ${dutyRatesTable.ratePct} IS DISTINCT FROM EXCLUDED.rate_pct
+            OR ${dutyRatesTable.effectiveTo} IS DISTINCT FROM EXCLUDED.effective_to
+            OR ${dutyRatesTable.notes} IS DISTINCT FROM EXCLUDED.notes
+            OR ${dutyRatesTable.currency} IS DISTINCT FROM EXCLUDED.currency
+            OR ${dutyRatesTable.source} IS DISTINCT FROM EXCLUDED.source
+          )
         `,
       })
       .returning({
         id: dutyRatesTable.id,
         inserted: sql<number>`(xmax = 0)::int`,
-        // fields for provenance hash / sourceRef builder
         dest: dutyRatesTable.dest,
         partner: dutyRatesTable.partner,
         hs6: dutyRatesTable.hs6,
@@ -84,6 +107,8 @@ export async function batchUpsertDutyRatesFromStream(
         effectiveFrom: dutyRatesTable.effectiveFrom,
         effectiveTo: dutyRatesTable.effectiveTo,
         notes: dutyRatesTable.notes,
+        source: dutyRatesTable.source,
+        currency: dutyRatesTable.currency,
       });
 
     let batchInserted = 0;
@@ -97,31 +122,47 @@ export async function batchUpsertDutyRatesFromStream(
 
     if (DEBUG) {
       console.log(
-        `[Duties] Upsert batch: inserted=${batchInserted}, updated=${batchUpdated}, total=${totalInserted + totalUpdated}`
+        `[Duties] Upsert batch: inserted=${batchInserted}, updated=${batchUpdated}, total=${
+          totalInserted + totalUpdated
+        }`
       );
     }
 
     // Provenance (only for actually written rows)
     if (opts.importId && ret.length) {
-      const provRows = ret.map((row) => ({
-        importId: opts.importId!,
-        resourceType: 'duty_rate' as const,
-        resourceId: row.id,
-        sourceRef: opts.makeSourceRef?.(row as unknown as DutyRateSelectRow),
-        rowHash: sha256Hex(
-          JSON.stringify({
-            dest: row.dest,
-            partner: row.partner ?? '',
-            hs6: row.hs6,
-            dutyRule: row.dutyRule,
-            ratePct: row.ratePct,
-            ef: isoOrNull(row.effectiveFrom),
-            et: isoOrNull(row.effectiveTo),
-            notes: row.notes ?? null,
-          })
-        ),
-      }));
-      await db.insert(provenanceTable).values(provRows);
+      const provRows = ret.map((row) => {
+        const built = opts.makeSourceRef?.(row as unknown as DutyRateSelectRow);
+        const sourceRef = clamp(built, 255); // keep within DB limits
+
+        return {
+          importId: opts.importId!,
+          resourceType: 'duty_rate' as const,
+          resourceId: row.id,
+          sourceRef,
+          rowHash: sha256Hex(
+            JSON.stringify({
+              dest: row.dest,
+              partner: row.partner ?? '',
+              hs6: row.hs6,
+              dutyRule: row.dutyRule,
+              ratePct: row.ratePct,
+              ef: isoOrNull(row.effectiveFrom),
+              et: isoOrNull(row.effectiveTo),
+              notes: row.notes ?? null,
+              source: row.source ?? 'official',
+              currency: row.currency ?? null,
+            })
+          ),
+        };
+      });
+
+      try {
+        await db.insert(provenanceTable).values(provRows);
+      } catch (e) {
+        if (DEBUG) {
+          console.warn('[Duties] provenance insert failed (non-fatal):', (e as Error).message);
+        }
+      }
     }
 
     buf = [];
