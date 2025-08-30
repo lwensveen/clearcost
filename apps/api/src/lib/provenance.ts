@@ -10,10 +10,12 @@ export type ImportRun = typeof importsTable.$inferSelect;
 
 export type ImportSource =
   | 'AHTN'
+  | 'APHIS'
   | 'API'
   | 'BASELINE'
   | 'CSV'
   | 'ECB'
+  | 'FDA'
   | 'FILE'
   | 'IMF'
   | 'MANIFEST'

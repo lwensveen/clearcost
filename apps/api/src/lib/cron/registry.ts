@@ -4,7 +4,12 @@ import { vatAuto } from './commands/vat.js';
 import { dutiesJson } from './commands/duties-json.js';
 import { dutiesWits } from './commands/duties-wits.js';
 import { surchargesJson } from './commands/surcharges-json.js';
-import { surchargesUsAll, surchargesUsTradeRemedies } from './commands/surcharges-us.js';
+import {
+  surchargesUsAll,
+  surchargesUsAphis,
+  surchargesUsFda,
+  surchargesUsTradeRemedies,
+} from './commands/surcharges-us.js';
 import { freightJson } from './commands/freight.js';
 import { hsAhtn, hsEuHs6, hsEuTaric, hsImportHs6, hsUk10, hsUsHts10 } from './commands/hs.js';
 import { runSweepStale } from './commands/sweep-stale.js';
@@ -30,6 +35,8 @@ export const commands: Record<string, Command> = {
   'import:surcharges': surchargesJson,
   'import:surcharges:us-all': surchargesUsAll,
   'import:surcharges:us-trade-remedies': surchargesUsTradeRemedies,
+  'import:surcharges:us-aphis': surchargesUsAphis,
+  'import:surcharges:us-fda': surchargesUsFda,
 
   'import:freight': freightJson,
 

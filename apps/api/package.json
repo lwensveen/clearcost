@@ -60,6 +60,8 @@
     "import:prune": "bun run src/lib/cron/index.ts import:prune",
     "import:surcharges": "bun run src/lib/cron/index.ts import:surcharges",
     "import:surcharges:us-all": "bun run src/lib/cron/index.ts import:surcharges:us-all",
+    "import:surcharges:us-aphis": "bun run src/lib/cron/index.ts import:surcharges:us-aphis",
+    "import:surcharges:us-fda": "bun run src/lib/cron/index.ts import:surcharges:us-fda",
     "import:surcharges:us-trade-remedies": "bun run src/lib/cron/index.ts import:surcharges:us-trade-remedies",
     "import:sweep-stale": "bun run src/lib/cron/index.ts import:sweep-stale",
     "import:vat": "bun run src/lib/cron/index.ts import:vat",
