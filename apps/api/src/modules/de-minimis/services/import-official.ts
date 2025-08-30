@@ -1,13 +1,14 @@
 import { importDeMinimis } from './import-de-minimis.js';
+import type { DeMinimisInsert } from '@clearcost/types';
 
 type Row = {
   dest: string; // ISO-3166-1 alpha-2
-  deMinimisKind: 'DUTY' | 'VAT'; // per-type threshold
-  deMinimisBasis: 'INTRINSIC' | 'CIF'; // goods-only vs CIF
+  deMinimisKind: 'DUTY' | 'VAT';
+  deMinimisBasis: 'INTRINSIC' | 'CIF';
   currency: string; // ISO-4217
   value: number | string; // threshold amount
   effectiveFrom: string; // YYYY-MM-DD
-  effectiveTo?: string | null; // optional
+  effectiveTo?: string | null;
   sourceUrl: string; // provenance (not stored)
 };
 
@@ -42,10 +43,11 @@ const EU_DESTS = [
 ];
 
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
+const toDate = (s: string | null | undefined) =>
+  s ? new Date(`${s.slice(0, 10)}T00:00:00Z`) : null;
 
-// ---------- Jurisdiction adapters (return typed rows) ----------
+// ---------- Jurisdiction adapters ----------
 async function fetchUS(effectiveFrom: string): Promise<Row[]> {
-  // CBP Section 321 (intrinsic value)
   return [
     {
       dest: 'US',
@@ -60,8 +62,6 @@ async function fetchUS(effectiveFrom: string): Promise<Row[]> {
 }
 
 async function fetchEU(effectiveFrom: string): Promise<Row[]> {
-  // EU duty relief €150 (intrinsic). VAT exemption removed (omit VAT rows).
-
   return EU_DESTS.map((dest) => ({
     dest,
     deMinimisKind: 'DUTY',
@@ -74,7 +74,6 @@ async function fetchEU(effectiveFrom: string): Promise<Row[]> {
 }
 
 async function fetchUK(effectiveFrom: string): Promise<Row[]> {
-  // UK VAT ≤ £135 (intrinsic, POS collection). Duty rules vary; omit for now.
   return [
     {
       dest: 'GB',
@@ -90,11 +89,10 @@ async function fetchUK(effectiveFrom: string): Promise<Row[]> {
 }
 
 async function fetchCA(effectiveFrom: string): Promise<Row[]> {
-  // CBSA CUSMA courier thresholds (intrinsic): CAD 40 tax, CAD 150 duty
   return [
     {
       dest: 'CA',
-      deMinimisKind: 'VAT', // treat taxes as VAT-equivalent
+      deMinimisKind: 'VAT',
       deMinimisBasis: 'INTRINSIC',
       currency: 'CAD',
       value: 40,
@@ -114,15 +112,17 @@ async function fetchCA(effectiveFrom: string): Promise<Row[]> {
 }
 
 async function fetchAU(_effectiveFrom: string): Promise<Row[]> {
-  // GST collected at POS on low-value goods; no border VAT relief -> omit rows.
   return [];
 }
 
 /**
- * Import official de minimis thresholds. If `effectiveOn` is provided, rows will
- * use that YYYY-MM-DD as their `effectiveFrom`; otherwise “today” (UTC).
+ * Import official de minimis thresholds.
+ * Optional: pass { importId } to record provenance via importDeMinimis.
  */
-export async function importDeMinimisFromOfficial(effectiveOn?: Date) {
+export async function importDeMinimisFromOfficial(
+  effectiveOn?: Date,
+  opts?: { importId?: string }
+) {
   const effectiveFrom = toISO(effectiveOn ?? new Date());
 
   const [us, eu, uk, ca, au] = await Promise.all([
@@ -133,16 +133,23 @@ export async function importDeMinimisFromOfficial(effectiveOn?: Date) {
     fetchAU(effectiveFrom),
   ]);
 
-  const rows = [...us, ...eu, ...uk, ...ca, ...au].map((r) => ({
+  const rows: DeMinimisInsert[] = [...us, ...eu, ...uk, ...ca, ...au].map((r) => ({
     dest: r.dest,
     deMinimisKind: r.deMinimisKind,
     deMinimisBasis: r.deMinimisBasis,
     currency: r.currency,
-    value: r.value,
-    effectiveFrom: r.effectiveFrom,
-    effectiveTo: r.effectiveTo ?? null,
+    value: String(r.value),
+    effectiveFrom: toDate(r.effectiveFrom)!,
+    effectiveTo: toDate(r.effectiveTo ?? null) ?? null,
   }));
 
-  const res = await importDeMinimis(rows);
+  const res = await importDeMinimis(rows, {
+    importId: opts?.importId,
+    makeSourceRef: (row) =>
+      `official:deminimis:dest=${row.dest}:kind=${row.deMinimisKind}:ef=${row.effectiveFrom
+        .toISOString()
+        .slice(0, 10)}`,
+  });
+
   return { ok: true as const, inserted: res.count, effectiveFrom };
 }

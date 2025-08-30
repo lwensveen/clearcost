@@ -9,13 +9,17 @@ export type DeMinimisDecision = {
   suppressVAT: boolean;
 };
 
+const toMidnightUTC = (d: Date) => new Date(d.toISOString().slice(0, 10));
+
 export async function evaluateDeMinimis(opts: {
-  dest: string;
-  goodsDest: number; // goods value in destination currency (INTRINSIC)
-  freightDest: number; // freight/insurance in destination currency (for CIF, use goods+freight)
-  fxAsOf: Date;
+  dest: string; // ISO country (for table filter)
+  destCurrency?: string; // ISO-4217 for destination currency (NEW, optional)
+  goodsDest: number; // goods value in destination currency (intrinsic)
+  freightDest: number; // freight/insurance in destination currency (for CIF add to goods)
+  fxAsOf: Date; // FX date for converting thresholds -> destCurrency
 }): Promise<DeMinimisDecision> {
-  const day = new Date(opts.fxAsOf.toISOString().slice(0, 10));
+  const day = toMidnightUTC(opts.fxAsOf);
+  const destCurrency = (opts.destCurrency ?? opts.dest).toUpperCase(); // fallback to old behavior
 
   const rows = await db
     .select()
@@ -33,14 +37,26 @@ export async function evaluateDeMinimis(opts: {
   const vatRow = rows.find((r) => r.deMinimisKind === 'VAT');
 
   async function toDest(
-    row?: typeof dutyRow
+    row?: (typeof rows)[number]
   ): Promise<{ thr: number; basis: 'INTRINSIC' | 'CIF' } | null> {
     if (!row) return null;
-    const thr =
-      row.currency === opts.dest
-        ? Number(row.value)
-        : await convertCurrency(Number(row.value), row.currency, opts.dest, { on: opts.fxAsOf });
-    return { thr, basis: (row.deMinimisBasis as 'INTRINSIC' | 'CIF') ?? 'INTRINSIC' };
+
+    const rowCurrency = String(row.currency).toUpperCase();
+    const rawVal = Number(row.value); // DB numeric -> string; coerce to number
+    if (!Number.isFinite(rawVal)) return null;
+
+    let thr = rawVal;
+    if (rowCurrency !== destCurrency) {
+      try {
+        thr = await convertCurrency(rawVal, rowCurrency, destCurrency, { on: day });
+      } catch {
+        // If FX fails, treat as no threshold (can't reliably compare)
+        return null;
+      }
+    }
+
+    const basis = (row.deMinimisBasis as 'INTRINSIC' | 'CIF') ?? 'INTRINSIC';
+    return { thr, basis };
   }
 
   const [duty, vat] = await Promise.all([toDest(dutyRow), toDest(vatRow)]);
