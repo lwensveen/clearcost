@@ -1,31 +1,18 @@
 import { z } from 'zod';
 import type { DeMinimisInsert } from '@clearcost/types';
 import { importDeMinimis } from '../import-de-minimis.js';
-
-const RowSchema = z.object({
-  country_code: z.string().length(2),
-  kind: z.enum(['DUTY', 'VAT']),
-  basis: z.enum(['INTRINSIC', 'CIF']).default('INTRINSIC'),
-  currency: z.string().length(3),
-  value: z.number().nonnegative(),
-  effective_from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  effective_to: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .nullable()
-    .optional(),
-  source_url: z.string().url(),
-  source_note: z.string().optional(),
-  confidence: z.number().min(0).max(1).optional(),
-});
-const PayloadSchema = z.object({ rows: z.array(RowSchema).max(2000) });
+import {
+  deMinimisLlmDefaultUserPrompt,
+  deMinimisLlmSystemPrompt,
+} from './prompts/de-minimis-llm.js';
+import { PayloadSchema, RowSchema } from './schema.js';
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const toDate = (s: string) => new Date(`${s}T00:00:00Z`);
 
 export async function importDeMinimisFromGrok(
   effectiveOn?: Date,
-  opts: { importId?: string; prompt?: string } = {}
+  opts: { importId?: string; prompt?: string; model?: string } = {}
 ): Promise<{
   ok: true;
   inserted: number;
@@ -42,30 +29,14 @@ export async function importDeMinimisFromGrok(
 
   // Grok (xAI) is OpenAI-compatible for chat completions at https://api.x.ai/v1/chat/completions
   const body = {
-    model: process.env.GROK_MODEL || 'grok-2-latest',
+    model: opts.model || process.env.GROK_MODEL || 'grok-2-latest',
     temperature: 0.1,
     response_format: { type: 'json_object' },
     messages: [
-      {
-        role: 'system',
-        content: `
-You are a compliance data agent. Produce de-minimis thresholds for cross-border ecommerce.
-
-RULES:
-- Output ONLY JSON: { "rows": Row[] } matching the schema provided implicitly by examples.
-- Prefer primary official sources (customs/tax authorities, EUR-Lex, GOV.UK, CBSA, CBP).
-- Each row MUST include a working "source_url".
-- Use "basis":"INTRINSIC" unless an official source explicitly indicates CIF.
-- If no clear official number exists, omit the country (do not guess).
-- "effective_from" should be "${efStr}" unless an official source provides a newer explicit start date.
-- ISO codes: country=alpha-2 (US, GB, DE...), currency=ISO-4217 (USD, EUR, GBP...).
-        `.trim(),
-      },
+      { role: 'system', content: deMinimisLlmSystemPrompt(efStr) },
       {
         role: 'user',
-        content:
-          (opts.prompt && opts.prompt.trim()) ||
-          'Return a broad global list where values are backed by official sources. Output only JSON.',
+        content: (opts.prompt && opts.prompt.trim()) || deMinimisLlmDefaultUserPrompt,
       },
     ],
   };

@@ -1,32 +1,15 @@
 import OpenAI from 'openai';
-import { z } from 'zod';
 import type { DeMinimisInsert } from '@clearcost/types';
 import { importDeMinimis } from '../import-de-minimis.js';
-
-const RowSchema = z.object({
-  country_code: z.string().length(2), // ISO-3166-1 alpha-2 (e.g. "US")
-  kind: z.enum(['DUTY', 'VAT']), // which threshold
-  basis: z.enum(['INTRINSIC', 'CIF']).default('INTRINSIC'), // goods-only vs CIF
-  currency: z.string().length(3), // ISO-4217 (e.g. "USD")
-  value: z.number().nonnegative(), // numeric threshold
-  effective_from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD
-  effective_to: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .nullable()
-    .optional(),
-  source_url: z.string().url(), // official source
-  source_note: z.string().optional(), // short quote/snippet
-  confidence: z.number().min(0).max(1).optional(), // model confidence
-});
-const PayloadSchema = z.object({ rows: z.array(RowSchema).max(2000) });
+import { deMinimisLlmDefaultUserPrompt, deMinimisLlmSystemPrompt, } from './prompts/de-minimis-llm.js';
+import { PayloadSchema } from './schema.js';
 
 const isoDay = (d: Date) => d.toISOString().slice(0, 10);
 const toDate = (s: string) => new Date(`${s}T00:00:00Z`);
 
 export async function importDeMinimisFromOpenAI(
   effectiveOn?: Date,
-  opts: { importId?: string; prompt?: string } = {}
+  opts: { importId?: string; prompt?: string; model?: string } = {}
 ): Promise<{ ok: true; inserted: number; updated: number; count: number; usedModel: string }> {
   const ef = effectiveOn ?? new Date();
   const efStr = isoDay(ef);
@@ -36,29 +19,11 @@ export async function importDeMinimisFromOpenAI(
 
   const openai = new OpenAI({ apiKey });
 
-  // System prompt: force JSON and sourcing discipline
-  const system = `
-You are a compliance data agent. Produce de-minimis thresholds for cross-border ecommerce.
-
-RULES:
-- Only output JSON that matches the provided schema.
-- Prefer primary, official sources (statutes, regulations, customs/tax authority pages, EUR-Lex, GOV.UK, CBSA, CBP).
-- Each row MUST include a working "source_url" backing the value claimed.
-- Use "basis":"INTRINSIC" unless the official source explicitly indicates CIF/transport-inclusive threshold.
-- If a country has no threshold, omit it (do not guess).
-- If multiple sources disagree, prefer the most recent official source; otherwise omit.
-- The "effective_from" you return should be "${efStr}" unless the official source provides a newer clearly applicable start date (then use that exact date).
-- Currencies must be ISO-4217 (e.g., USD, EUR, GBP, CAD).
-- Countries must be ISO-2 (e.g., US, GB, CA, DE).
-`;
-
-  const user =
-    opts.prompt?.trim() && opts.prompt!.trim().length > 0
-      ? opts.prompt!
-      : `Return as many countries as you can substantiate today. Output only JSON with key "rows".`;
+  const system = deMinimisLlmSystemPrompt(efStr);
+  const user = (opts.prompt && opts.prompt.trim()) || deMinimisLlmDefaultUserPrompt;
 
   const resp = await openai.chat.completions.create({
-    model: 'gpt-4o-mini', // small, cheap, JSON mode capable
+    model: opts.model || process.env.OPENAI_MODEL || 'gpt-4o-mini',
     temperature: 0.1,
     response_format: { type: 'json_object' },
     messages: [
@@ -67,15 +32,10 @@ RULES:
     ],
   });
 
-  const usedModel = resp.model ?? 'gpt-4o-mini';
-  const content = resp.choices[0]?.message?.content ?? '{}';
+  const usedModel = resp.model ?? String(opts.model || process.env.OPENAI_MODEL || 'gpt-4o-mini');
+  const content = resp.choices?.[0]?.message?.content ?? '{}';
 
-  let parsed;
-  try {
-    parsed = PayloadSchema.parse(JSON.parse(content));
-  } catch (e) {
-    throw new Error(`OpenAI JSON did not match schema: ${(e as Error).message}`);
-  }
+  const parsed = PayloadSchema.parse(JSON.parse(content));
 
   // Build a source map so provenance can write the URL into sourceRef.
   const sourceByKey = new Map<string, string>();
@@ -90,7 +50,6 @@ RULES:
     const effectiveFrom = toDate(r.effective_from);
     const effectiveTo = r.effective_to ? toDate(r.effective_to) : null;
 
-    // Keep a map key so makeSourceRef can look it up after upsert
     const key = `${dest}|${kind}|${isoDay(effectiveFrom)}`;
     sourceByKey.set(key, r.source_url);
 
