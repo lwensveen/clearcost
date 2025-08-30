@@ -24,6 +24,8 @@ export const commands: Record<string, Command> = {
   'import:duties:us-mfn': dutiesUsMfn,
   'import:duties:us-fta': dutiesUsFta,
   'import:duties:us-all': dutiesUsAll,
+  // 'import:duties:us-all': dutiesUsAll,
+  // 'import:duties:us-all': dutiesUsAll,
 
   'import:surcharges': surchargesJson,
   'import:surcharges:us-all': surchargesUsAll,
