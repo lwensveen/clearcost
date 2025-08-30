@@ -10,17 +10,59 @@ type ProvOpts = {
   makeSourceRef?: (row: SurchargeSelectRow) => string | undefined;
 };
 
+// ---------- helpers: normalize & coerce ----------
+const up = (v?: string | null) => (v ? v.trim().toUpperCase() : null);
+const low = (v?: string | null) => (v ? v.trim().toLowerCase() : null);
+
+const hs6 = (v?: string | null) => {
+  if (!v) return null;
+  const s = String(v).replace(/\D+/g, '').slice(0, 6);
+  return s.length === 6 ? s : null;
+};
+const toDbNumeric = (n?: string | number | null) => {
+  if (n == null || n === '') return sql`NULL`;
+  const num = typeof n === 'number' ? n : Number(n);
+  return Number.isFinite(num) ? String(num) : sql`NULL`; // send as text → numeric
+};
+const toDbNotes = (s?: string | null) => (s && s.trim() ? s.trim() : sql`NULL`);
+const toDbText = (s?: string | null) => (s && s.trim() ? s.trim() : sql`NULL`);
+const toDbFrom = (d?: Date | null) => (d instanceof Date ? d : undefined);
+/** Always open-ended unless you explicitly pass a Date */
+const toDbTo = (d?: Date | null) => (d instanceof Date ? d : sql`NULL`);
+
+function isoOrNull(d: Date | string | null | undefined): string | null {
+  if (!d) return null;
+  if (d instanceof Date) return d.toISOString();
+  const dd = new Date(d);
+  return Number.isNaN(+dd) ? null : dd.toISOString();
+}
+
+// Defaults that match DB enum labels
+const dfltRateType = (s?: string | null) =>
+  (low(s) ?? 'ad_valorem') as SurchargeInsertRow['rateType'];
+const dfltApplyLevel = (s?: string | null) =>
+  (low(s) ?? 'entry') as SurchargeInsertRow['applyLevel'];
+const dfltValueBasis = (s?: string | null) =>
+  (low(s) ?? 'customs') as SurchargeInsertRow['valueBasis'];
+const dfltTransport = (s?: string | null) =>
+  (up(s) ?? 'ALL') as SurchargeInsertRow['transportMode'];
+const dfltCurrency = (s?: string | null) => (up(s) ?? 'USD') as SurchargeInsertRow['currency'];
+
+// -------------------------------------------------
 /**
- * Upsert surcharges from a stream or array in batches (default 5k),
- * optionally recording provenance rows.
- * TODO add dry run
+ * Upsert surcharges in batches (default 5k) with strict normalization.
+ * Matches the unique index:
+ * (dest, origin, hs6, transport_mode, apply_level, surcharge_code, effective_from)
+ *
+ * Returns { inserted, updated, count }.
  */
 export async function batchUpsertSurchargesFromStream(
   source: AsyncIterable<SurchargeInsertRow> | SurchargeInsertRow[],
   opts: { batchSize?: number } & ProvOpts = {}
 ) {
   const batchSize = Math.max(1, opts.batchSize ?? 5000);
-  let total = 0;
+  let totalInserted = 0;
+  let totalUpdated = 0;
   let buf: SurchargeInsertRow[] = [];
 
   const isAsyncIterable = (s: any): s is AsyncIterable<SurchargeInsertRow> =>
@@ -29,52 +71,135 @@ export async function batchUpsertSurchargesFromStream(
   async function flush() {
     if (buf.length === 0) return;
 
-    // Upsert + return full typed rows so we have the row IDs for provenance.
-    const rows = await db
+    // Normalize rows → DB insert shape (no empty strings for numerics/dates).
+    const values = buf.map((r) => ({
+      dest: up(r.dest)!, // required ISO2 -> UPPER
+      origin: up(r.origin ?? null), // optional ISO2 -> UPPER
+      hs6: hs6(r.hs6 ?? null),
+      surchargeCode: r.surchargeCode, // enum already
+      // enums with lowercase labels in DB
+      rateType: dfltRateType(r.rateType),
+      applyLevel: dfltApplyLevel(r.applyLevel),
+      valueBasis: dfltValueBasis(r.valueBasis),
+      // enum with uppercase labels in DB
+      transportMode: dfltTransport(r.transportMode),
+      // 3-letter currency -> UPPER
+      currency: dfltCurrency(r.currency),
+      fixedAmt: toDbNumeric(r.fixedAmt),
+      pctAmt: toDbNumeric(r.pctAmt),
+      minAmt: toDbNumeric(r.minAmt),
+      maxAmt: toDbNumeric(r.maxAmt),
+      unitAmt: toDbNumeric(r.unitAmt),
+      unitCode: up(r.unitCode ?? null),
+      sourceUrl: toDbText(r.sourceUrl ?? null),
+      sourceRef: toDbText(r.sourceRef ?? null),
+      notes: toDbNotes(r.notes),
+      effectiveFrom: toDbFrom(r.effectiveFrom),
+      effectiveTo: toDbTo(r.effectiveTo),
+    })) as Array<(typeof surchargesTable)['$inferInsert']>;
+
+    const ret = await db
       .insert(surchargesTable)
-      .values(buf)
+      .values(values)
       .onConflictDoUpdate({
         target: [
           surchargesTable.dest,
           surchargesTable.origin,
           surchargesTable.hs6,
+          surchargesTable.transportMode,
+          surchargesTable.applyLevel,
           surchargesTable.surchargeCode,
           surchargesTable.effectiveFrom,
         ],
         set: {
+          // amounts & metadata
           fixedAmt: sql`EXCLUDED.fixed_amt`,
           pctAmt: sql`EXCLUDED.pct_amt`,
-          effectiveTo: sql`EXCLUDED.effective_to`,
+          minAmt: sql`EXCLUDED.min_amt`,
+          maxAmt: sql`EXCLUDED.max_amt`,
+          unitAmt: sql`EXCLUDED.unit_amt`,
+          unitCode: sql`EXCLUDED.unit_code`,
+          currency: sql`EXCLUDED.currency`,
+          rateType: sql`EXCLUDED.rate_type`,
+          valueBasis: sql`EXCLUDED.value_basis`,
+          sourceUrl: sql`EXCLUDED.source_url`,
+          sourceRef: sql`EXCLUDED.source_ref`,
           notes: sql`EXCLUDED.notes`,
-          updatedAt: new Date(),
+          effectiveTo: sql`EXCLUDED.effective_to`,
+          updatedAt: sql`now()`,
         },
       })
-      .returning(); // => SurchargeSelectRow[]
+      .returning({
+        id: surchargesTable.id,
+        inserted: sql<number>`(xmax = 0)::int`, // 1 if inserted, 0 if updated
+        dest: surchargesTable.dest,
+        origin: surchargesTable.origin,
+        hs6: surchargesTable.hs6,
+        surchargeCode: surchargesTable.surchargeCode,
+        rateType: surchargesTable.rateType,
+        applyLevel: surchargesTable.applyLevel,
+        valueBasis: surchargesTable.valueBasis,
+        transportMode: surchargesTable.transportMode,
+        currency: surchargesTable.currency,
+        fixedAmt: surchargesTable.fixedAmt,
+        pctAmt: surchargesTable.pctAmt,
+        minAmt: surchargesTable.minAmt,
+        maxAmt: surchargesTable.maxAmt,
+        unitAmt: surchargesTable.unitAmt,
+        unitCode: surchargesTable.unitCode,
+        effectiveFrom: surchargesTable.effectiveFrom,
+        effectiveTo: surchargesTable.effectiveTo,
+        notes: surchargesTable.notes,
+      });
 
-    total += rows.length;
+    // Tally inserted vs updated
+    let batchInserted = 0;
+    let batchUpdated = 0;
+    for (const r of ret) {
+      if (r.inserted === 1) batchInserted++;
+      else batchUpdated++;
+    }
+    totalInserted += batchInserted;
+    totalUpdated += batchUpdated;
 
-    // Optional provenance
-    if (opts.importId && rows.length) {
-      const provRows = rows.map((row) => ({
+    // Optional provenance (non-fatal if it fails)
+    if (opts.importId && ret.length) {
+      const provRows = ret.map((row) => ({
         importId: opts.importId!,
         resourceType: 'surcharge' as const,
         resourceId: row.id,
-        sourceRef: opts.makeSourceRef?.(row),
+        sourceRef: opts.makeSourceRef?.(row as unknown as SurchargeSelectRow),
         rowHash: sha256Hex(
           JSON.stringify({
             dest: row.dest,
             origin: row.origin ?? null,
             hs6: row.hs6 ?? null,
-            surchargeCode: row.surchargeCode,
-            fixedAmt: row.fixedAmt ?? null,
-            pctAmt: row.pctAmt ?? null,
-            ef: row.effectiveFrom?.toISOString(),
-            et: row.effectiveTo ? row.effectiveTo.toISOString() : null,
+            code: row.surchargeCode,
+            rateType: row.rateType,
+            applyLevel: row.applyLevel,
+            valueBasis: row.valueBasis,
+            transportMode: row.transportMode,
+            currency: row.currency,
+            fixedAmt: row.fixedAmt,
+            pctAmt: row.pctAmt,
+            minAmt: row.minAmt,
+            maxAmt: row.maxAmt,
+            unitAmt: row.unitAmt,
+            unitCode: row.unitCode ?? null,
+            ef: isoOrNull(row.effectiveFrom),
+            et: isoOrNull(row.effectiveTo),
             notes: row.notes ?? null,
           })
         ),
       }));
-      await db.insert(provenanceTable).values(provRows);
+
+      try {
+        await db.insert(provenanceTable).values(provRows);
+      } catch (e) {
+        if (process.env.DEBUG === '1') {
+          console.warn('[Surcharges] provenance insert failed (non-fatal):', (e as Error).message);
+        }
+      }
     }
 
     buf = [];
@@ -93,5 +218,10 @@ export async function batchUpsertSurchargesFromStream(
   }
   await flush();
 
-  return { ok: true as const, count: total };
+  return {
+    ok: true as const,
+    inserted: totalInserted,
+    updated: totalUpdated,
+    count: totalInserted + totalUpdated,
+  };
 }
