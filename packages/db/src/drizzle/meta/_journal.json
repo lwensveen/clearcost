@@ -64,6 +64,34 @@
       "when": 1756465913655,
       "tag": "0008_early_microbe",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1756521229289,
+      "tag": "0009_legal_devos",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1756521472181,
+      "tag": "0010_tough_lizard",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1756523817317,
+      "tag": "0011_uneven_shadowcat",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1756527605094,
+      "tag": "0012_lumpy_millenium_guard",
+      "breakpoints": true
     }
   ]
 }

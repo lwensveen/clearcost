@@ -36,14 +36,57 @@ export const surchargeCodeEnum = pgEnum('surcharge_code', [
   'SECURITY',
   'TRADE_REMEDY_232',
   'TRADE_REMEDY_301',
+  'AQI_VESSEL',
+  'AQI_AIRCRAFT',
+  'AQI_RAILCAR',
+  'AQI_TRUCK_SINGLE',
+  'AQI_TRUCK_TRANSPONDER',
+  'AQI_BARGE',
+  'FDA_VQIP_USER_FEE_ANNUAL',
+  'FDA_VQIP_APPLICATION_FEE',
+  'FDA_FSMA_REINSPECTION_HOURLY_DOM',
+  'FDA_FSMA_REINSPECTION_HOURLY_FOR',
 ]);
 
+export const surchargeRateTypeEnum = pgEnum('surcharge_rate_type', [
+  'ad_valorem', // percent (0–1) of a value basis
+  'fixed', // fixed currency amount
+  'per_unit', // amount per unit (unit_code/unit_amt)
+]);
+
+export const surchargeApplyLevelEnum = pgEnum('surcharge_apply_level', [
+  'entry', // whole entry / shipment arrival
+  'line', // per HS line
+  'shipment', // transportation-level charge
+  'program', // program enrollment/annual/etc.
+  'arrival',
+]);
+
+export const surchargeValueBasisEnum = pgEnum('surcharge_value_basis', [
+  'customs', // customs value (transaction value)
+  'fob',
+  'cif',
+  'entered', // entered value (if you prefer this naming)
+  'duty', // duty amount (rare, but some fees piggyback on duty)
+  'other',
+]);
+
+export const transportModeEnum = pgEnum('transport_mode', [
+  'ALL',
+  'AIR',
+  'OCEAN',
+  'TRUCK',
+  'RAIL',
+  'BARGE',
+]);
 export const importSourceEnum = pgEnum('import_source', [
   'AHTN',
+  'APHIS',
   'API',
   'BASELINE',
   'CSV',
   'ECB',
+  'FDA',
   'FILE',
   'IMF',
   'MANIFEST',
