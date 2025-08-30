@@ -13,8 +13,7 @@ export type DutyRateRow = {
  * Optional selection controls:
  * - preferFTA: if true, rank FTA rows above MFN (still falls back to MFN/others).
  * - partner:  ISO2 origin to prefer (e.g., "JP"). We first try an exact partner column match.
- *             If that fails (datasets without partner set), we fall back to a notes LIKE match
- *             (works with UK/EU/US importers that embed partner labels into `notes`).
+ *             If that fails (datasets without partner set), we fall back to a notes LIKE match.
  */
 export type GetActiveDutyRateOpts = {
   preferFTA?: boolean;
@@ -43,10 +42,37 @@ function asDutyRateRow(
   };
 }
 
+/** Order helpers shared by the queries */
+function makeRulePriority(preferFTA: boolean) {
+  const first = preferFTA ? 'fta' : 'mfn';
+  const second = preferFTA ? 'mfn' : 'fta';
+  return sql<number>`
+    CASE ${dutyRatesTable.dutyRule}
+      WHEN ${first} THEN 0
+      WHEN ${second} THEN 1
+      WHEN 'anti_dumping' THEN 2
+      WHEN 'safeguard' THEN 3
+      ELSE 9
+    END
+  `;
+}
+
+/** Prefer authoritative sources to baseline */
+const sourcePriority = sql<number>`
+  CASE ${dutyRatesTable.source}
+    WHEN 'official' THEN 0
+    WHEN 'manual'  THEN 1
+    WHEN 'vendor'  THEN 2
+    WHEN 'wits'    THEN 3
+    ELSE 9
+  END
+`;
+
 /**
  * Return the best active duty rate for (dest, hs6) on `on`.
  *
  * Ranking logic (when multiple rows are valid at time `on`):
+ *   0) Prefer authoritative source (official > manual > vendor > wits),
  *   1) If opts.partner provided:
  *        1a) prefer exact partner column match,
  *        1b) else try notes-based match (fallback),
@@ -73,7 +99,6 @@ export async function getActiveDutyRate(
     or(isNull(dutyRatesTable.effectiveTo), gt(dutyRatesTable.effectiveTo, on))
   );
 
-  // Common column selection
   const cols = {
     ratePct: dutyRatesTable.ratePct,
     dutyRule: dutyRatesTable.dutyRule,
@@ -84,30 +109,20 @@ export async function getActiveDutyRate(
 
   // --------------------------------------------------------------------------
   // 1) If caller provided a partner, first try an EXACT partner column match.
-  //    We still honor preferFTA when ordering, then pick the CHEAPEST rate.
+  //    Prefer authoritative source, then preferFTA, then cheapest/newest.
   // --------------------------------------------------------------------------
   if (partnerIso2) {
-    const first = opts.preferFTA ? 'fta' : 'mfn';
-    const second = opts.preferFTA ? 'mfn' : 'fta';
-
-    const rulePriority = sql<number>`
-      CASE ${dutyRatesTable.dutyRule}
-        WHEN ${first} THEN 0
-        WHEN ${second} THEN 1
-        WHEN 'anti_dumping' THEN 2
-        WHEN 'safeguard' THEN 3
-        ELSE 9
-      END
-    `;
+    const rulePriority = makeRulePriority(Boolean(opts.preferFTA));
 
     const [partnerRow] = await db
       .select(cols)
       .from(dutyRatesTable)
       .where(and(baseWhere, eq(dutyRatesTable.partner, partnerIso2)))
       .orderBy(
+        sourcePriority, // OFFICIAL > … > WITS (baseline)
         rulePriority, // honor preferFTA here
-        asc(dutyRatesTable.ratePct), // cheapest first
-        desc(dutyRatesTable.effectiveFrom)
+        asc(dutyRatesTable.ratePct), // cheapest
+        desc(dutyRatesTable.effectiveFrom) // newest
       )
       .limit(1);
 
@@ -115,9 +130,8 @@ export async function getActiveDutyRate(
     if (exact) return exact;
 
     // ----------------------------------------------------------------------
-    // 1b) Fallback: some sources don’t set `partner` (e.g., US "Special").
-    //     Try a case-insensitive substring match against `notes`.
-    //     We also accept "geo:<id>" style tokens present in UK import notes.
+    // 1b) Fallback: datasets without `partner` set (e.g., US “Special”),
+    //     try notes-based match. Keep source preference first.
     // ----------------------------------------------------------------------
     const needle = `%${opts.partner!.trim().toLowerCase()}%`;
     const notesMatch: SQL<boolean> = sql`
@@ -129,7 +143,7 @@ export async function getActiveDutyRate(
       .from(dutyRatesTable)
       .where(and(baseWhere, notesMatch))
       .orderBy(
-        // If we’re matching via notes, still prefer FTA (if requested), then cheapest/newest.
+        sourcePriority,
         rulePriority,
         asc(dutyRatesTable.ratePct),
         desc(dutyRatesTable.effectiveFrom)
@@ -141,34 +155,21 @@ export async function getActiveDutyRate(
   }
 
   // --------------------------------------------------------------------------
-  // 2) No partner constraint (or none found): general selection by duty_rule priority,
-  //    then CHEAPEST rate, then NEWEST effectiveFrom.
+  // 2) General selection: prefer authoritative source, then rule, price, recency.
   // --------------------------------------------------------------------------
-  const first = opts.preferFTA ? 'fta' : 'mfn';
-  const second = opts.preferFTA ? 'mfn' : 'fta';
+  const rulePriority = makeRulePriority(Boolean(opts.preferFTA));
 
-  const rulePriority = sql<number>`
-    CASE ${dutyRatesTable.dutyRule}
-      WHEN ${first} THEN 0
-      WHEN ${second} THEN 1
-      WHEN 'anti_dumping' THEN 2
-      WHEN 'safeguard' THEN 3
-      ELSE 9
-    END
-  `;
-
-  // If a partner was provided but nothing matched exactly/notes, we still give a
-  // slight preference to rows whose partner equals the requested one (in case an
-  // importer starts populating it later). This is a soft bias via ORDER BY.
+  // Soft bias: if a partner was requested, prefer rows that happen to match it.
   const partnerBias = partnerIso2
     ? asc(sql`CASE WHEN ${dutyRatesTable.partner} = ${partnerIso2} THEN 0 ELSE 1 END`)
     : undefined;
 
   const orderBys = [
-    ...(partnerBias ? [partnerBias] : []), // optional bias first
-    rulePriority, // FTA vs MFN ranking
-    asc(dutyRatesTable.ratePct), // lower % is better
-    desc(dutyRatesTable.effectiveFrom), // newest first
+    sourcePriority, // OFFICIAL > … > WITS baseline
+    ...(partnerBias ? ([partnerBias] as const) : []),
+    rulePriority,
+    asc(dutyRatesTable.ratePct),
+    desc(dutyRatesTable.effectiveFrom),
   ] as const;
 
   const [row] = await db
