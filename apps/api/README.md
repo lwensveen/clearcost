@@ -358,7 +358,7 @@ The plugin (`plugins/import-instrumentation.ts`) will:
 - **Runner:** `bun test`
 - **Config:** `tsconfig.test.json`
 - **Examples:**
-  - `src/lib/run-lock.test.ts`
+  - `src/lib/run-lock.unit.test.ts`
   - `src/lib/sweep-stale-imports.test.ts`
   - `src/modules/**/` (add integration tests under `test/`)
 
