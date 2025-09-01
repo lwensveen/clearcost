@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 
-function transformDates(obj: any): any {
+export function transformDates(obj: any): any {
   if (obj instanceof Date) {
     return obj.toISOString();
   }
