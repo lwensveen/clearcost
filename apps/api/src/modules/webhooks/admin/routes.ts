@@ -4,7 +4,7 @@ import { z } from 'zod/v4';
 import { db, webhookDeliveriesTable, webhookEndpointsTable } from '@clearcost/db';
 import { desc, eq } from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
-import { encryptSecret } from '../utils.js';
+import { encryptSecret } from '../services/secret-kms.js';
 
 const CreateBody = z.object({
   ownerId: z.string().uuid(),

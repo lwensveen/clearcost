@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { db, webhookDeliveriesTable, webhookEndpointsTable } from '@clearcost/db';
 import crypto from 'node:crypto';
-import { decryptSecret } from '../utils.js';
+import { decryptSecret } from './secret-kms.js';
 
 type EventName = 'quote.created';
 type Payload = Record<string, unknown>;
