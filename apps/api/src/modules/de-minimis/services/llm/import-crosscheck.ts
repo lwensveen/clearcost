@@ -157,6 +157,6 @@ export async function importDeMinimisCrossChecked(
     count: res.count,
     decided: decided.length,
     conflicts,
-    models: { openai: (oa as any).usedModel ?? 'openai', grok: (gx as any).usedModel ?? 'grok' },
+    models: { openai: oa.usedModel ?? 'openai', grok: gx.usedModel ?? 'grok' },
   };
 }
