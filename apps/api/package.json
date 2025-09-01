@@ -29,7 +29,8 @@
     "@types/node": "^24.3.0",
     "@types/sax": "^1.2.7",
     "@types/set-cookie-parser": "^2.4.10",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "vite-tsconfig-paths": "^5.1.4"
   },
   "exports": {
     ".": "./dist/main.js"
@@ -79,7 +80,9 @@
     "import:vat:llm-openai": "bun run src/lib/cron/index.ts import:vat:llm-openai",
     "seed:countries:basic": "bun run src/lib/cron/index.ts seed:countries:basic",
     "seed:trade-programs:us": "bun run src/lib/cron/index.ts seed:trade-programs:us",
-    "start": "node dist/src/main.js"
+    "start": "node dist/src/main.js",
+    "test": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "type": "module"
 }

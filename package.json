@@ -31,6 +31,10 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest"
   },
+  "trustedDependencies": [
+    "@clearcost/widget",
+    "@tailwindcss/oxide"
+  ],
   "workspaces": [
     "apps/*",
     "packages/*"

@@ -1,23 +1,25 @@
-/// <reference types='vitest' />
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
+import tsconfigPaths from 'vite-tsconfig-paths';
+import base from '../../vitest.config';
 
-export default defineConfig(() => ({
+export default defineConfig({
+  ...base,
   root: __dirname,
   cacheDir: '../../node_modules/.vite/apps/api',
-  plugins: [],
-  // Uncomment this if you are using workers.
-  // worker: {
-  //  plugins: [ nxViteTsPaths() ],
-  // },
+  plugins: [tsconfigPaths()],
   test: {
+    ...base.test,
     watch: false,
-    globals: true,
-    environment: 'jsdom',
-    include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    environment: 'node',
+    include: ['src/**/*.{test,spec}.ts'],
     reporters: ['default'],
     coverage: {
+      ...base.test?.coverage,
+      provider: 'v8',
       reportsDirectory: './test-output/vitest/coverage',
-      provider: 'v8' as const,
+      include: ['src/**/*.ts'],
+      exclude: ['**/*.d.ts', '**/*.test.ts', '**/__mocks__/**', '**/node_modules/**'],
     },
   },
-}));
+});
