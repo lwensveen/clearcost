@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { apiUsageTable, db } from '@clearcost/db';
 import { and, desc, eq, gte, lte } from 'drizzle-orm';
-import { normalizeRange, QueryRange, UsageResponseSchema } from './utils.js';
+import { normalizeRange, QueryRange, UsageResponseSchema } from '../services/usage-range.js';
 
 export default function usageRoutes(app: FastifyInstance) {
   // GET /v1/usage/my  — current key usage (default last 30 days, capped to 180)

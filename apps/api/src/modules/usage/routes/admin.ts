@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
 import { apiUsageTable, db } from '@clearcost/db';
 import { and, desc, eq, gte, lte } from 'drizzle-orm';
-import { normalizeRange, QueryRange, UsageResponseSchema } from './utils.js';
+import { normalizeRange, QueryRange, UsageResponseSchema } from '../services/usage-range.js';
 
 export default function usageRoutes(app: FastifyInstance) {
   // GET /v1/usage/by-key/:apiKeyId — admin view (same range behavior)
