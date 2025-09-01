@@ -46,7 +46,7 @@ function defaultMakeWitsSourceRef(row: DutyRateInsert, ctx: ProvCtx): string {
   const partner = row.partner ?? ctx.partner ?? null;
   const dutyRule = row.dutyRule ?? 'mfn';
   const efIso = row.effectiveFrom
-    ? new Date(row.effectiveFrom as any).toISOString().slice(0, 10)
+    ? new Date(row.effectiveFrom).toISOString().slice(0, 10)
     : String(ctx.year);
   const partnerToken = partner ?? 'ERGA';
   return `wits:${ctx.dest}:${partnerToken}:${dutyRule}:hs6=${row.hs6}:ef=${efIso}`;

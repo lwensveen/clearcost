@@ -82,7 +82,7 @@ export default function hsRoutes(app: FastifyInstance) {
           .limit(1);
 
         reply.header('cache-control', 'public, max-age=300, stale-while-revalidate=600');
-        return rows as any;
+        return rows;
       }
 
       const query = (q ?? '').trim();
@@ -138,7 +138,7 @@ export default function hsRoutes(app: FastifyInstance) {
 
       reply.header('cache-control', 'public, max-age=120, stale-while-revalidate=600');
       // strip _rank before returning (TS-wise we typed it as part of select)
-      return rows.map(({ _rank, ...r }) => r) as any;
+      return rows.map(({ _rank, ...r }) => r);
     }
   );
 

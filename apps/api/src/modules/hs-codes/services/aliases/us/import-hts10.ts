@@ -133,8 +133,8 @@ async function fetchAllRowsViaJSON(): Promise<Record<string, unknown>[]> {
   if (!HTS_JSON_URL) return [];
   const json = await client.getJson(HTS_JSON_URL);
   if (Array.isArray(json)) return json;
-  if (Array.isArray((json as any)?.data)) return (json as any).data;
-  if (Array.isArray((json as any)?.rows)) return (json as any).rows;
+  if (Array.isArray(json?.data)) return json.data;
+  if (Array.isArray(json?.rows)) return json.rows;
   return [];
 }
 
@@ -165,10 +165,10 @@ async function exportChapterJson(chapter: number): Promise<Record<string, unknow
         const json = await client.getJson(path);
         const arr = Array.isArray(json)
           ? json
-          : Array.isArray((json as any)?.data)
-            ? (json as any).data
-            : Array.isArray((json as any)?.rows)
-              ? (json as any).rows
+          : Array.isArray(json?.data)
+            ? json.data
+            : Array.isArray(json?.rows)
+              ? json.rows
               : null;
         if (Array.isArray(arr)) return arr as Record<string, unknown>[];
         throw new Error('Unexpected shape');

@@ -45,8 +45,7 @@ export function toNumericReporterOrUnion(a2OrUnion: string): { token: string; di
   if (!a3) throw new Error(`unknown ISO2: ${s}`);
 
   const numeric =
-    (countries as any).alpha3ToNumeric?.(a3) ??
-    (countries.getNumericCodes?.()[a3] as string | undefined);
+    countries.alpha3ToNumeric?.(a3) ?? (countries.getNumericCodes?.()[a3] as string | undefined);
 
   if (!numeric) throw new Error(`no numeric code for ${s}/${a3}`);
   return { token: numeric, display: s };
@@ -119,7 +118,7 @@ export async function fetchSdmx(
     try {
       const json = (await r.json()) as SdmxJson;
       const seriesCount = json?.dataSets?.[0]?.series
-        ? Object.keys(json.dataSets[0].series as any).length
+        ? Object.keys(json.dataSets[0].series).length
         : 0;
       if (DEBUG) console.log(' [wits] OK -> series count:', seriesCount);
       if (seriesCount === 0) continue; // empty → try next

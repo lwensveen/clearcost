@@ -195,10 +195,10 @@ export async function exportChapterJson(chapter: number): Promise<Record<string,
         const json = await client.getJson(path);
         const arr = Array.isArray(json)
           ? json
-          : Array.isArray((json as any)?.data)
-            ? (json as any).data
-            : Array.isArray((json as any)?.rows)
-              ? (json as any).rows
+          : Array.isArray(json?.data)
+            ? json.data
+            : Array.isArray(json?.rows)
+              ? json.rows
               : null;
 
         if (Array.isArray(arr)) {
