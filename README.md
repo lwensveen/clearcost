@@ -36,9 +36,9 @@ clearcost/
         modules/
           quotes/              # /v1/quotes (landed cost)
           hs-codes/            # HS6 + alias importers (AHTN8, HTS10, UK10)
-          duty-rates/          # WITS, UK, EU, US importers
-          surcharges/          # US/EU/UK surcharges + helpers
-          vat/                 # VAT importers (OECD/IMF)
+          duty-rates/          # WITS, UK, EU, US + LLM importers
+          surcharges/          # US/EU/UK surcharges + LLM importers
+          vat/                 # VAT importers (OECD/IMF) + LLM importers
           tasks/               # Internal cron HTTP routes (scoped)
           health/              # /healthz and import health
           webhooks/            # Outbound webhooks (admin + dispatcher)
@@ -83,15 +83,19 @@ clearcost/
 - **Data import pipelines** with provenance + metrics:
   - **FX (ECB)** → `POST /internal/cron/fx/daily`
   - **VAT (OECD/IMF)** → `POST /internal/cron/import/vat/auto`
-  - **Duties** → WITS/UK/EU/US importers
-  - **Surcharges** → US 301/232 + MPF/HMF; EU/UK trade remedies
+  - **Duties** → WITS/UK/EU/US importers + **LLM-assisted importers (OpenAI, Grok, cross‑check)**
+  - **Surcharges** → US 301/232 + MPF/HMF; EU/UK trade remedies + **LLM importers**
   - **HS** → TARIC HS6 titles; AHTN8/HTS10/UK10 aliases
   - Task routes live in `apps/api/src/modules/tasks/**` and are instrumented by `plugins/import-instrumentation.ts`.
 
 - **Provenance store** (import runs + per-row provenance)
+
 - **Locks & Sweeping** (`run-lock.ts`, `sweep-stale-imports.ts`)
+
 - **Observability**: Prometheus `/metrics` + import gauges
+
 - **Auth & metering**: API key auth (`plugins/api-key-auth.ts`) + per-key usage (`api-usage.ts`)
+
 - **Cron runners**: HTTP via GitHub Actions; local CLI commands
 
 ---
@@ -120,6 +124,12 @@ Create `apps/api/.env` and `packages/db/.env` minimally:
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/clearcost
 PORT=4000
 NODE_ENV=development
+
+# Optional (LLM importers)
+OPENAI_API_KEY=...
+XAI_API_KEY=...         # or GROK_API_KEY
+OPENAI_MODEL=gpt-4o-mini
+GROK_MODEL=grok-2-latest
 
 # packages/db/.env
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/clearcost
@@ -198,25 +208,45 @@ POST /internal/cron/import/hs/ahtn                      (tasks:hs:ahtn)
 # De‑minimis
 POST /internal/cron/de-minimis/import-zonos             (tasks:de-minimis:import-zonos)
 POST /internal/cron/de-minimis/import-official          (tasks:de-minimis:import-official)
-
-# Ops
-POST /internal/cron/imports/sweep-stale                 (tasks:imports:sweep-stale)
-POST /internal/cron/imports/prune                       (tasks:imports:prune)
 ```
 
 > Some legacy routes may still accept an **admin token**; prefer scoped API keys going forward.
 
 ---
 
-## Cron key scopes (copy‑paste)
+## LLM importers (OpenAI, Grok) & cross‑check
 
-Grant these scopes to the API key used by your GitHub Actions:
+LLM importers fetch structured JSON (schemas + prompts live under each module’s `services/llm/**`). We reconcile outputs
+across models when desired, preferentially selecting **officially‑sourced** rows.
 
+### CLI commands
+
+```bash
+# Duties
+bun run src/lib/cron/index.ts import:duties:llm-openai   -- --model gpt-4o-mini --prompt "..."
+bun run src/lib/cron/index.ts import:duties:llm-grok     -- --model grok-2-latest --prompt "..."
+bun run src/lib/cron/index.ts import:duties:llm-crosscheck -- --mode prefer_official
+
+# Surcharges
+bun run src/lib/cron/index.ts import:surcharges:llm-openai   -- --model gpt-4o-mini --prompt "..."
+bum run src/lib/cron/index.ts import:surcharges:llm-grok     -- --model grok-2-latest --prompt "..."
+bun run src/lib/cron/index.ts import:surcharges:llm-crosscheck -- --mode prefer_official
+
+# VAT
+bun run src/lib/cron/index.ts import:vat:llm-openai   -- --model gpt-4o-mini --prompt "..."
+bun run src/lib/cron/index.ts import:vat:llm-grok     -- --model grok-2-latest --prompt "..."
+bun run src/lib/cron/index.ts import:vat:llm-crosscheck -- --mode prefer_official
 ```
-tasks:imports:sweep-stale,tasks:fx:daily,tasks:vat:auto,tasks:duties:uk-mfn,tasks:duties:uk-fta,tasks:duties:eu-mfn,tasks:duties:eu-fta,tasks:duties:us-mfn,tasks:duties:us-fta,tasks:surcharges:us-trade-remedies,tasks:surcharges:us-all,tasks:surcharges:json,tasks:freight:json,tasks:hs:eu-hs6,tasks:hs:ahtn,tasks:duties:wits,tasks:duties:wits:asean,tasks:duties:wits:japan,tasks:surcharges:eu-remedies,tasks:surcharges:uk-remedies,tasks:de-minimis:import-zonos,tasks:de-minimis:import-official,tasks:imports:prune
-```
 
-Set it in your repository secrets/vars (see `cron-nightly.yml` and `cron-weekly.yml`).
+### Env vars
+
+- `OPENAI_API_KEY`, optional `OPENAI_MODEL` (default: `gpt-4o-mini`)
+- `XAI_API_KEY` (or `GROK_API_KEY`), optional `GROK_MODEL` (default: `grok-2-latest`)
+
+### Accuracy & provenance
+
+- Each row must include a `source_url`; provenance attaches it to stored rows.
+- Cross‑check compares amounts and structure; if sources disagree, we prefer **official** and flag conflicts.
 
 ---
 
