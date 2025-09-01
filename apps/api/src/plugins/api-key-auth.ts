@@ -68,12 +68,17 @@ declare module 'fastify' {
   }
 }
 
+type RequireApiKeyOptions = {
+  ownerFrom?: (req: FastifyRequest) => string | undefined;
+  optional?: boolean;
+  internalSigned?: boolean;
+};
+
 export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
   async (app: FastifyInstance) => {
     const PEPPER = process.env.API_KEY_PEPPER ?? '';
     const INTERNAL_SIGNING_SECRET = process.env.INTERNAL_SIGNING_SECRET ?? '';
 
-    // simple HMAC for /internal/* calls
     function verifyInternalSignature(req: FastifyRequest): boolean {
       if (!INTERNAL_SIGNING_SECRET) return true;
       const ts = req.headers['x-cc-ts'];
@@ -98,36 +103,26 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
 
     app.decorate(
       'requireApiKey',
-      (
-        requiredScopes?: string[],
-        opts?: {
-          ownerFrom?: (req: FastifyRequest) => string | undefined;
-          optional?: boolean;
-          internalSigned?: boolean;
-        }
-      ) => {
+      // DEFINITIVE FIX: Default parameters to guarantee they are never undefined.
+      (requiredScopes: string[] = [], opts: RequireApiKeyOptions = {}) => {
         return async (req: FastifyRequest, reply: FastifyReply) => {
-          //  HMAC for internal endpoints
-          if (opts?.internalSigned === true && !verifyInternalSignature(req)) {
+          if (opts.internalSigned === true && !verifyInternalSignature(req)) {
             return reply.unauthorized('Invalid internal signature');
           }
 
-          // Parse from Authorization or x-api-key
           const authHdr = req.headers['authorization'] as string | undefined;
           const apiHdr = req.headers['x-api-key'] as string | undefined;
           const presented = parsePresentedToken(authHdr ?? apiHdr);
 
           if (!presented) {
-            if (opts?.optional) return; // allow anonymous if explicitly optional
+            if (opts.optional) return;
             return reply.unauthorized('Missing or malformed API key');
           }
 
-          // narrow to plain strings
           const keyId: string = presented.keyId;
           const secret: string = presented.secret;
           const presentedPrefix: string = presented.prefix;
 
-          // Lookup by keyId (unique), active
           const rows = await db
             .select()
             .from(apiKeysTable)
@@ -139,7 +134,6 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
             return reply.unauthorized('Invalid API key');
           }
 
-          // prefix must match what we embedded in the token
           if (row.prefix && row.prefix !== presentedPrefix) {
             return reply.unauthorized('Invalid API key');
           }
@@ -151,10 +145,9 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
             return reply.unauthorized('API key revoked');
           }
 
-          // Verify digest timing-safely
           try {
-            const expectedDigest = digest(secret, row.salt, PEPPER); // bytes
-            const stored = Buffer.from(row.tokenHash, 'hex'); // bytes
+            const expectedDigest = digest(secret, row.salt, PEPPER);
+            const stored = Buffer.from(row.tokenHash, 'hex');
             if (!timingSafeEqual(expectedDigest, stored)) {
               return reply.unauthorized('Invalid API key');
             }
@@ -162,38 +155,36 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
             return reply.unauthorized('Invalid API key');
           }
 
-          // RBAC scopes
-          if (requiredScopes?.length) {
+          const scopes = row.scopes ?? [];
+          const allowedOrigins = row.allowedOrigins ?? [];
+
+          if (requiredScopes.length) {
             const ok = requiredScopes.every(
-              (s) => row.scopes.includes(s) || row.scopes.includes('admin:all')
+              (s) => scopes.includes(s) || scopes.includes('admin:all')
             );
             if (!ok) return reply.forbidden('Missing required scope(s)');
           }
 
-          // ABAC owner check (if provided)
-          const ownerFrom = opts?.ownerFrom?.(req);
-          if (ownerFrom && row.ownerId !== ownerFrom && !row.scopes.includes('admin:all')) {
+          const ownerFrom = opts.ownerFrom?.(req);
+          if (ownerFrom && row.ownerId !== ownerFrom && !scopes.includes('admin:all')) {
             return reply.forbidden('Owner mismatch');
           }
 
-          // Optional origin allowlist
           const reqOrigin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
-          if (row.allowedOrigins.length && reqOrigin && !row.scopes.includes('admin:all')) {
-            if (!row.allowedOrigins.includes(reqOrigin)) {
+          if (allowedOrigins.length && reqOrigin && !scopes.includes('admin:all')) {
+            if (!allowedOrigins.includes(reqOrigin)) {
               return reply.forbidden('Origin not allowed');
             }
           }
 
-          // Attach principal
           req.apiKey = {
             id: row.id,
             ownerId: row.ownerId,
-            scopes: row.scopes,
+            scopes: scopes,
             keyId: row.keyId,
             prefix: row.prefix,
           };
 
-          // Async last-used update (don’t block request)
           void db
             .update(apiKeysTable)
             .set({ lastUsedAt: new Date() })

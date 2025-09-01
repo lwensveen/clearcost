@@ -1,7 +1,7 @@
 import 'fastify';
 import type { ImportSource } from '../src/lib/provenance.js';
 
-export type ImportMeta = { importSource: ImportSource; job: string };
+export type ImportMeta = { importSource: ImportSource; job: string; source?: string };
 
 export type ImportCtx = {
   meta: ImportMeta;
