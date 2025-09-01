@@ -40,7 +40,7 @@ export default function dutyRoutes(app: FastifyInstance) {
       const rows = BodySchema.parse(req.body);
 
       if (source && req.routeOptions?.config?.importMeta) {
-        (req.routeOptions.config.importMeta as any).source = source;
+        req.routeOptions.config.importMeta.source = source;
       }
 
       const idem = headers['idempotency-key'] ?? headers['x-idempotency-key']!;
