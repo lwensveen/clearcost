@@ -1,8 +1,9 @@
 import type { Command } from '../runtime.js';
-import { parseFlags, withRun } from '../runtime.js';
+import { withRun } from '../runtime.js';
 import { importUsMfn } from '../../../modules/duty-rates/services/us/import-mfn.js';
 import { importUsPreferential } from '../../../modules/duty-rates/services/us/import-preferential.js';
 import { parseDateMaybe } from '../../parse-date-maybe.js';
+import { parseFlags } from '../utils.js';
 
 const boolParam = (b?: boolean) => (b ? '1' : undefined);
 

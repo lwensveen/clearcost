@@ -1,9 +1,10 @@
-import { Command, parseFlags, withRun } from '../runtime.js';
+import { Command, withRun } from '../runtime.js';
 import { importSurchargesCrossChecked } from '../../../modules/surcharges/services/llm/import-cross-check.js';
 import { importSurchargesFromGrok } from '../../../modules/surcharges/services/llm/import-grok.js';
 import { importSurchargesFromLLM } from '../../../modules/surcharges/services/llm/import-llm.js';
 import { importSurchargesFromOpenAI } from '../../../modules/surcharges/services/llm/import-openai.js';
 import { parseDateMaybe } from '../../parse-date-maybe.js';
+import { parseFlags } from '../utils.js';
 
 const toMidnightUTC = (d: Date) => new Date(d.toISOString().slice(0, 10));
 

@@ -1,5 +1,5 @@
 import type { Command } from '../runtime.js';
-import { parseFlags, withRun } from '../runtime.js';
+import { withRun } from '../runtime.js';
 import { importUsTradeRemediesFromHTS } from '../../../modules/surcharges/services/us/import-usitc-hts.js';
 import {
   fiscalYear,
@@ -7,6 +7,7 @@ import {
 } from '../../../modules/surcharges/services/us/us-cbp.js';
 import { importAphisAqiSurcharges } from '../../../modules/surcharges/services/us/import-aphis-aqi.js';
 import { importFdaFsmaSurcharges } from '../../../modules/surcharges/services/us/import-fda-fsma.js';
+import { parseFlags } from '../utils.js';
 
 const fyStartUTC = (fy: number) => new Date(Date.UTC(fy - 1, 9, 1));
 
@@ -53,7 +54,7 @@ export const surchargesUsAll: Command = async (args) => {
           effectiveFrom: fyStartUTC(fy),
           batchSize,
           importId,
-        } as any);
+        });
         inserted += aphis?.count ?? 0;
         results.aphis = aphis;
       }
@@ -65,7 +66,7 @@ export const surchargesUsAll: Command = async (args) => {
           effectiveFrom: fyStartUTC(fy),
           batchSize,
           importId,
-        } as any);
+        });
         inserted += fda?.count ?? 0;
         results.fda = fda;
       }
@@ -77,7 +78,7 @@ export const surchargesUsAll: Command = async (args) => {
           skipFree: true,
           batchSize,
           importId,
-        } as any);
+        });
         inserted += tr?.count ?? 0;
         results.tradeRemedies = tr;
       }
@@ -107,7 +108,7 @@ export const surchargesUsTradeRemedies: Command = async (args) => {
       params: { effectiveFrom, skipFree },
     },
     async (importId: string) => {
-      const res = await importUsTradeRemediesFromHTS({ effectiveFrom, skipFree, importId } as any);
+      const res = await importUsTradeRemediesFromHTS({ effectiveFrom, skipFree, importId });
       const inserted = res?.count ?? 0;
       return { inserted, payload: res };
     }

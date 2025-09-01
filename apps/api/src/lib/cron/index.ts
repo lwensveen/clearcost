@@ -1,43 +1,41 @@
-// tiny CLI harness
 import { commands } from './registry.js';
 
 function log(...args: any[]) {
   console.log(...args);
 }
 
+function end(code: number): never {
+  const bun = (globalThis as any).Bun;
+  if (bun && typeof bun.exit === 'function') {
+    bun.exit(code);
+  }
+  process.exit(code);
+}
+
 async function main() {
   const [cmd = '', ...args] = process.argv.slice(2);
-  const fn = commands[cmd];
+  const fn = commands[cmd as keyof typeof commands];
+
   if (!fn) {
     log(`Unknown command: ${cmd}\n\nAvailable:\n  ${Object.keys(commands).join('\n  ')}`);
-    // Try to force-exit in Bun or Node
-    if (typeof (globalThis as any).Bun?.exit === 'function') (globalThis as any).Bun.exit(1);
-    else process.exit(1);
-    return;
+    end(1);
   }
 
   const started = Date.now();
   log(`→ ${cmd} starting...`);
 
-  let exitCode = 0;
   try {
     await fn(args);
     const ms = Date.now() - started;
     log(`✔ ${cmd} finished in ${ms}ms`);
+    end(0);
   } catch (err) {
-    exitCode = 1;
     log(`✖ ${cmd} failed:\n`, err instanceof Error ? err.message : err);
-  } finally {
-    // Hard shutdown even if pools/timers remain
-    // Prefer Bun.exit when available
-    if (typeof (globalThis as any).Bun?.exit === 'function') (globalThis as any).Bun.exit(exitCode);
-    else process.exit(exitCode);
+    end(1);
   }
 }
 
 main().catch((e) => {
-  // last-resort exit
   console.error(e);
-  if (typeof (globalThis as any).Bun?.exit === 'function') (globalThis as any).Bun.exit(1);
-  else process.exit(1);
+  end(1);
 });

@@ -1,9 +1,10 @@
 import type { Command } from '../runtime.js';
-import { parseFlags, withRun } from '../runtime.js';
+import { withRun } from '../runtime.js';
 import { db, tradeProgramMembersTable, tradeProgramsTable } from '@clearcost/db';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { countriesTable } from '@clearcost/db/dist/schemas/countries.js';
 import { jurisdictionsTable } from '@clearcost/db/dist/schemas/jurisdictions.js';
+import { parseFlags } from '../utils.js';
 
 const DEBUG = process.argv.includes('--debug') || process.env.DEBUG === '1';
 

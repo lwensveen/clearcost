@@ -1,7 +1,8 @@
 import type { Command } from '../runtime.js';
-import { parseFlags, withRun } from '../runtime.js';
+import { withRun } from '../runtime.js';
 import { fetchVatRowsFromOfficialSources } from '../../../modules/vat/services/fetch-vat-official.js';
 import { importVatRules } from '../../../modules/vat/services/import-vat.js';
+import { parseFlags } from '../utils.js';
 
 const flagStr = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback);
 

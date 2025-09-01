@@ -1,11 +1,12 @@
 import type { Command } from '../runtime.js';
-import { parseFlags, withRun } from '../runtime.js';
+import { withRun } from '../runtime.js';
 import { importEuHs6FromTaric } from '../../../modules/hs-codes/services/aliases/eu/import-cn6-from-taric.js';
 import { importHs6FromWits } from '../../../modules/hs-codes/services/import-hs6-from-wits.js';
 import { importUsHts10Aliases } from '../../../modules/hs-codes/services/aliases/us/import-hts10.js';
 import { importUk10Aliases } from '../../../modules/hs-codes/services/aliases/uk/import-uk10.js';
 import { importAhtnAliases } from '../../../modules/hs-codes/services/aliases/asean/import-ahtn.js';
 import { importEuAliasesFromTaric } from '../../../modules/hs-codes/services/aliases/eu/import-aliases-from-taric.js';
+import { parseFlags } from '../utils.js';
 
 export const hsImportHs6: Command = async (args) => {
   const year = args?.[0] && !Number.isNaN(Number(args[0])) ? Number(args[0]) : undefined;

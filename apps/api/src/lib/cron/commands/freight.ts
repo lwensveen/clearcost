@@ -1,6 +1,7 @@
 import type { Command } from '../runtime.js';
-import { fetchJSON, withRun } from '../runtime.js';
+import { withRun } from '../runtime.js';
 import { importFreightCards } from '../../../modules/freight/services/import-cards.js';
+import { fetchJSON } from '../utils.js';
 
 export const freightJson: Command = async (args) => {
   const url = args[0];

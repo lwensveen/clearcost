@@ -1,5 +1,5 @@
 import type { Command } from '../runtime.js';
-import { parseFlags, withRun } from '../runtime.js';
+import { withRun } from '../runtime.js';
 import { importDeMinimisCrossChecked } from '../../../modules/de-minimis/services/llm/import-crosscheck.js';
 import { importDeMinimisFromGrok } from '../../../modules/de-minimis/services/llm/import-grok.js';
 import { importDeMinimisFromOfficial } from '../../../modules/de-minimis/services/import-official.js';
@@ -8,6 +8,7 @@ import { importDeMinimisFromTradeGov } from '../../../modules/de-minimis/service
 import { importDeMinimisFromZonos } from '../../../modules/de-minimis/services/import-from-zonos.js';
 import { parseDateMaybe } from '../../parse-date-maybe.js';
 import { seedDeMinimisBaseline } from '../../../modules/de-minimis/services/import-baseline.js';
+import { parseFlags } from '../utils.js';
 
 const toMidnightUTC = (d: Date) => new Date(d.toISOString().slice(0, 10));
 

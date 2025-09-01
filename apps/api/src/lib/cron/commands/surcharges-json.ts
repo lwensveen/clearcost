@@ -1,6 +1,7 @@
 import type { Command } from '../runtime.js';
-import { ensureDate, fetchJSON, toDateOrNull, withRun } from '../runtime.js';
+import { withRun } from '../runtime.js';
 import { batchUpsertSurchargesFromStream } from '../../../modules/surcharges/utils/batch-upsert.js';
+import { ensureDate, fetchJSON, toDateOrNull } from '../utils.js';
 
 type SurchargeWire = {
   dest: string;

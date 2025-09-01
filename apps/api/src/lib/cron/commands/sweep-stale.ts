@@ -1,5 +1,6 @@
-import { Command, parseFlags } from '../runtime.js';
+import { Command } from '../runtime.js';
 import { sweepStaleImports } from '../../sweep-stale-imports.js';
+import { parseFlags } from '../utils.js';
 
 export const runSweepStale: Command = async (argv) => {
   const flags = parseFlags(argv);

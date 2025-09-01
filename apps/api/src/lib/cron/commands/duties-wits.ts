@@ -1,6 +1,7 @@
 import type { Command } from '../runtime.js';
-import { buildImportId, parseCSV, parseFlags, withRun } from '../runtime.js';
+import { withRun } from '../runtime.js';
 import { importDutyRatesFromWITS } from '../../../modules/duty-rates/services/wits/import-from-wits.js';
+import { buildImportId, parseCSV, parseFlags } from '../utils.js';
 
 const DEFAULT_DESTS = [
   'AU',
@@ -90,7 +91,7 @@ export const dutiesWits: Command = async (args) => {
         importId: runId,
         makeSourceRef: (r) => {
           const ef = r.effectiveFrom
-            ? new Date(r.effectiveFrom as any).toISOString().slice(0, 10)
+            ? new Date(r.effectiveFrom).toISOString().slice(0, 10)
             : 'unknown';
           const partner = r.partner && r.partner !== '' ? r.partner : 'ERGA';
           const rule = r.dutyRule ?? 'mfn';
