@@ -205,8 +205,11 @@ export default function manifestsPublicRoutes(app: FastifyInstance) {
       });
       if (!row || !row.response) return reply.notFound('Not found');
 
+      const parsed = ComputeReply.safeParse(row.response);
+      if (!parsed.success) return reply.notFound('Not found');
+
       reply.header('Idempotency-Key', req.params.key).header('Cache-Control', 'no-store');
-      return reply.send(row.response as any);
+      return reply.send(parsed.data);
     }
   );
 
