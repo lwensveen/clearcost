@@ -217,7 +217,7 @@ export default function freightRoutes(app: FastifyInstance) {
       });
 
       // If we already replied above due to NOT_FOUND, stop here
-      if ((reply as any).sent) return;
+      if (reply.sent) return;
       return out;
     }
   );
@@ -250,7 +250,7 @@ export default function freightRoutes(app: FastifyInstance) {
         throw e;
       });
 
-      if ((reply as any).sent) return;
+      if (reply.sent) return;
       return reply.code(204).send();
     }
   );
@@ -364,7 +364,7 @@ export default function freightRoutes(app: FastifyInstance) {
         throw e;
       });
 
-      if ((reply as any).sent) return;
+      if (reply.sent) return;
       return out;
     }
   );
@@ -410,7 +410,7 @@ export default function freightRoutes(app: FastifyInstance) {
         throw e;
       });
 
-      if ((reply as any).sent) return;
+      if (reply.sent) return;
       return reply.code(204).send();
     }
   );
