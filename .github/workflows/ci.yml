@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
         run: bun run build
 
       - name: Lint & Type‑check
-        run: bun run lint typecheck
+        run: bun run lint check-types
 
       - name: Coverage
         run: bun run test:coverage
