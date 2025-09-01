@@ -67,7 +67,7 @@ export default function healthAdminRoutes(app: FastifyInstance) {
         ORDER BY import_id ASC
       `;
 
-      const rows = await db.execute(q);
+      const { rows } = await db.execute(q);
       const now = new Date();
       const threshold = new Date(now.getTime() - thresholdHours * 3600_000);
 
