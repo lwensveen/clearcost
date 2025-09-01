@@ -28,7 +28,7 @@ export async function importSurcharges(rows: SurchargeInsert[]) {
     .map((raw) => {
       const parsed = SurchargeInsertSchema.safeParse(raw);
       if (!parsed.success) return null;
-      const r = parsed.data as any;
+      const r = parsed.data;
 
       return {
         dest: normIso2(r.dest)!,

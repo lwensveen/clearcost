@@ -90,15 +90,12 @@ export async function getSurchargesScoped(
   const withMode = mode
     ? and(
         baseWhere,
-        or(
-          eq(surchargesTable.transportMode, 'ALL' as any),
-          eq(surchargesTable.transportMode, mode as any)
-        )
+        or(eq(surchargesTable.transportMode, 'ALL'), eq(surchargesTable.transportMode, mode))
       )
     : baseWhere;
 
   // If level supplied, require exact level match
-  const where = level ? and(withMode, eq(surchargesTable.applyLevel, level as any)) : withMode;
+  const where = level ? and(withMode, eq(surchargesTable.applyLevel, level)) : withMode;
 
   const rows = await db
     .select({
