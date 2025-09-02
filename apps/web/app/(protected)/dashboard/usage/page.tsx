@@ -1,5 +1,5 @@
 import { auth } from '@/auth';
-import { aggregate, fetchUsageByKey } from '@/lib/clearcost';
+import { aggregate, fetchUsageByKey } from '@/lib/billing';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { listKeys } from '@/lib/api-keys';
 

@@ -4,8 +4,8 @@ import { Footer } from '@/components/layout/footer';
 import { Header } from '@/components/layout/header';
 import CookieConsent from '@/components/cookies/cookie-consent';
 import { ThemeProvider } from '@/components/theme/provider';
-
 import { Inter, JetBrains_Mono, Space_Grotesk } from 'next/font/google';
+import { Toaster } from '@/components/ui/sonner';
 
 const fontHeading = Space_Grotesk({
   subsets: ['latin'],
@@ -53,6 +53,7 @@ export default function RootLayout({
           <main className="min-h-[calc(100vh-64px)]">{children}</main>
           <Footer />
           <CookieConsent />
+          <Toaster richColors closeButton />
         </ThemeProvider>
       </body>
     </html>

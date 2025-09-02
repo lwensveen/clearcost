@@ -1,4 +1,4 @@
-import { aggregate, fetchUsageByKey } from '@/lib/clearcost';
+import { aggregate, fetchBillingPlan, fetchUsageByKey } from '@/lib/billing';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { BillingButtons } from '@/app/(protected)/admin/billing/BillingButtons';
 
 function fmtBytes(n: number) {
   if (n < 1024) return `${n} B`;
@@ -31,12 +32,19 @@ function fmtMs(n: number) {
   return `${Math.round(n)} ms`;
 }
 
+function fmtDate(iso?: string | null) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
 export default async function Page({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const sp = await searchParams;
+  const plan = await fetchBillingPlan();
 
   const apiKeyId =
     typeof sp.apiKeyId === 'string'
@@ -72,6 +80,34 @@ export default async function Page({
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 p-6">
+      <div className="grid md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Current Plan</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            <div className="text-lg font-semibold capitalize">{plan.plan}</div>
+            <div className="text-sm text-muted-foreground">
+              Status: <span className="capitalize">{plan.status ?? 'free'}</span>
+              {plan.currentPeriodEnd && (
+                <>
+                  {' '}
+                  · Renews: <b>{fmtDate(plan.currentPeriodEnd)}</b>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Manage Subscription</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <BillingButtons />
+          </CardContent>
+        </Card>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Billing / Usage</CardTitle>
