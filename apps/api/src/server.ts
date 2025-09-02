@@ -1,34 +1,37 @@
 import Fastify from 'fastify';
-import helmet from '@fastify/helmet';
-import cors from '@fastify/cors';
-import rateLimit from '@fastify/rate-limit';
-import sensible from '@fastify/sensible';
-import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
-import swaggerPlugin from './plugins/swagger.js';
-import dateSerializer from './plugins/date-serializer.js';
-import importInstrumentationPlugin from './plugins/import-instrumentation.js';
-import usagePlugin from './plugins/api-usage.js';
-import metricsHttp from './plugins/prometheus/metrics-http.js';
-import metricsImportHealth from './plugins/prometheus/metrics-import-health.js';
-import importsRunning from './plugins/prometheus/imports-running.js';
-import { apiKeyAuthPlugin } from './plugins/api-key-auth.js';
+import apiKeyAdminRoutes from './modules/api-keys/routes/admin.js';
+import apiKeySelfRoutes from './modules/api-keys/routes/self.js';
+import billingRoutes from './modules/billing/routes.js';
 import classifyRoutes from './modules/classify/routes.js';
+import cors from '@fastify/cors';
+import dateSerializer from './plugins/date-serializer.js';
+import deMinimisRoutes from './modules/de-minimis/routes.js';
 import freightAdminRoutes from './modules/freight/routes/admin.js';
 import fxRoutes from './modules/fx/routes.js';
-import healthPublicRoutes from './modules/health/routes/public.js';
 import healthAdminRoutes from './modules/health/routes/admin.js';
+import healthPublicRoutes from './modules/health/routes/public.js';
+import helmet from '@fastify/helmet';
 import hsRoutes from './modules/hs-codes/routes.js';
-import manifestsPublicRoutes from './modules/manifests/routes/public.js';
+import importInstrumentation from './plugins/import-instrumentation.js';
+import importsRunning from './plugins/prometheus/imports-running.js';
+import manifestsRoutes from './modules/manifests/routes/index.js';
+import metricsHttp from './plugins/prometheus/metrics-http.js';
+import metricsImportHealth from './plugins/prometheus/metrics-import-health.js';
+import planEnforcement from './plugins/plan-enforcement.js';
+import planEntitlements from './plugins/plan-entitlements.js';
 import quoteRoutes from './modules/quotes/routes.js';
+import rateLimit from '@fastify/rate-limit';
+import sensible from '@fastify/sensible';
 import surchargesAdminRoutes from './modules/surcharges/routes/admin.js';
-import vatAdminRoutes from './modules/vat/routes/admin.js';
-import apiKeySelfRoutes from './modules/api-keys/routes/self.js';
-import apiKeyAdminRoutes from './modules/api-keys/routes/admin.js';
-import usagePublicRoutes from './modules/usage/routes/public.js';
-import usageAdminRoutes from './modules/usage/routes/admin.js';
-import webhookAdminRoutes from './modules/webhooks/admin/routes.js';
+import swaggerPlugin from './plugins/swagger.js';
 import tasksRoutes from './modules/tasks/index.js';
-import deMinimisRoutes from './modules/de-minimis/routes.js';
+import usage from './plugins/api-usage.js';
+import usageAdminRoutes from './modules/usage/routes/admin.js';
+import usagePublicRoutes from './modules/usage/routes/public.js';
+import vatAdminRoutes from './modules/vat/routes/admin.js';
+import webhookAdminRoutes from './modules/webhooks/admin/routes.js';
+import { apiKeyAuthPlugin } from './plugins/api-key-auth.js';
+import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
 
 export async function buildServer() {
   const app = Fastify({
@@ -74,11 +77,13 @@ export async function buildServer() {
   });
 
   // Metrics & import instrumentation
-  await app.register(usagePlugin);
+  await app.register(importInstrumentation);
+  await app.register(importsRunning);
   await app.register(metricsHttp);
   await app.register(metricsImportHealth);
-  await app.register(importInstrumentationPlugin);
-  await app.register(importsRunning);
+  await app.register(planEnforcement);
+  await app.register(planEntitlements);
+  await app.register(usage);
 
   // -----------------------
   // Public / low-scope API
@@ -86,11 +91,12 @@ export async function buildServer() {
   await app.register(healthPublicRoutes); // /healthz, /health
 
   await app.register(apiKeySelfRoutes, { prefix: '/v1/api-keys' });
+  await app.register(billingRoutes, { prefix: '/v1/billing' });
   await app.register(classifyRoutes, { prefix: '/v1/classify' });
   await app.register(deMinimisRoutes, { prefix: '/v1/de-minimis' });
   await app.register(fxRoutes, { prefix: '/v1/fx' });
   await app.register(hsRoutes, { prefix: '/v1/hs-codes' });
-  await app.register(manifestsPublicRoutes, { prefix: '/v1/manifests' });
+  await app.register(manifestsRoutes, { prefix: '/v1/manifests' });
   await app.register(quoteRoutes, { prefix: '/v1/quotes' });
   await app.register(usagePublicRoutes, { prefix: '/v1/usage' });
 

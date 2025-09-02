@@ -8,8 +8,8 @@ import {
   manifestsTable,
 } from '@clearcost/db';
 import { and, desc, eq } from 'drizzle-orm';
-import { withIdempotency } from '../../../lib/idempotency.js';
-import { computePool } from '../services/compute-pool.js';
+import { withIdempotency } from '../../../../lib/idempotency.js';
+import { computePool } from '../../services/compute-pool.js';
 import { HeaderSchema } from '@clearcost/types';
 
 const Params = z.object({ manifestId: z.string().uuid() });
@@ -22,7 +22,7 @@ type ComputeBody = z.infer<typeof ComputeBodySchema>;
 
 const HistoryItem = z.object({
   id: z.string().uuid(),
-  createdAt: z.coerce.date().nullable(), // DB column can be null
+  createdAt: z.coerce.date().nullable(),
   idemKey: z.string(),
   allocation: z.string(),
   dryRun: z.boolean(),
@@ -85,6 +85,7 @@ export default function manifestsPublicRoutes(app: FastifyInstance) {
         response: {
           200: ComputeReply,
           400: z.object({ error: z.string() }),
+          402: z.object({ error: z.string() }),
           403: z.object({ error: z.string() }),
           409: z.object({ error: z.string() }),
         },
@@ -94,6 +95,15 @@ export default function manifestsPublicRoutes(app: FastifyInstance) {
       },
     },
     async (req, reply) => {
+      const gate = await (req.server as any).enforceComputeLimit?.(req);
+      if (gate && gate.allowed === false) {
+        const msg =
+          typeof gate.limit === 'number' && typeof gate.used === 'number'
+            ? `Plan limit exceeded (${gate.used}/${gate.limit} compute calls today on plan "${gate.plan ?? 'unknown'}")`
+            : 'Plan limit exceeded';
+        return reply.code(402).send({ error: msg });
+      }
+
       const { manifestId } = Params.parse(req.params);
       const { allocation, dryRun } = ComputeBodySchema.parse(req.body ?? {});
       const ownerId = req.apiKey?.ownerId;
