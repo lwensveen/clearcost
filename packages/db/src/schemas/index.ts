@@ -2,6 +2,7 @@ import { accountsTable } from './auth/accounts.js';
 import { apiKeysTable } from './auth/api-keys.js';
 import { apiUsageTable } from './api-usage.js';
 import { auditQuotesTable } from './audit-quotes.js';
+import { billingAccountsTable } from './billing-accounts.js';
 import { categoriesTable } from './categories.js';
 import { countriesTable } from './countries.js';
 import { deMinimisTable } from './de-minimis.js';
@@ -47,6 +48,7 @@ export * from './auth/orgs.js';
 export * from './auth/passkeys.js';
 export * from './auth/sessions.js';
 export * from './auth/verifications.js';
+export * from './billing-accounts.js';
 export * from './categories.js';
 export * from './countries.js';
 export * from './de-minimis.js';
@@ -82,6 +84,7 @@ export const schema = {
   apiKeysTable,
   apiUsageTable,
   auditQuotesTable,
+  billingAccountsTable,
   categoriesTable,
   countriesTable,
   deMinimisTable,

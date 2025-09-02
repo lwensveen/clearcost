@@ -25,6 +25,7 @@ export const manifestItemsTable = pgTable(
     updatedAt: createTimestampColumn('updated_at', { defaultNow: true, onUpdate: true }),
   },
   (t) => ({
-    byManifest: index('manifest_items_by_manifest').on(t.manifestId),
+    byManifest: index('manifest_items_by_manifest_idx').on(t.manifestId),
+    byHs6: index('manifest_items_hs6_idx').on(t.hs6),
   })
 );

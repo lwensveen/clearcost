@@ -17,7 +17,7 @@ export const ManifestByIdSchema = z.object({ id: z.string().uuid() });
 export const ManifestsListQuerySchema = z.object({
   origin: z.string().length(2).optional(),
   dest: z.string().length(2).optional(),
-  mode: z.enum(['air', 'sea']).optional(),
+  shippingMode: z.enum(['air', 'sea']).optional(),
   pricingMode: z.enum(['cards', 'fixed']).optional(),
   limit: z.coerce.number().int().positive().max(500).optional(),
 });
