@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { TokenToast } from '@/components/api-keys/token-toast';
 
 export default async function Page({
   searchParams,
@@ -34,6 +35,8 @@ export default async function Page({
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
+      {token ? <TokenToast token={token} /> : null}
+
       <Card>
         <CardHeader>
           <CardTitle>API Keys</CardTitle>
@@ -50,6 +53,7 @@ export default async function Page({
               </Button>
             </div>
           </form>
+
           {token && (
             <div className="mt-4 rounded-md border p-3 text-sm">
               <div className="font-medium mb-1">New API Key (copy now):</div>
@@ -78,9 +82,7 @@ async function KeysTable({ ownerId }: { ownerId: string }) {
       <CardHeader className="flex items-center justify-between">
         <CardTitle>Keys for {ownerId}</CardTitle>
         <Button asChild variant="secondary">
-          <Link href={`/apps/web/app/(protected)/admin/api-keys/new?ownerId=${ownerId}`}>
-            Create Key
-          </Link>
+          <Link href={`/admin/api-keys/new?ownerId=${ownerId}`}>Create Key</Link>
         </Button>
       </CardHeader>
       <CardContent>

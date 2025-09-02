@@ -1,62 +1,78 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
-import Link from 'next/link';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { computeAction } from '../../app/(protected)/admin/manifests/[id]/actions';
-import { getDailyComputeLimit, todayKey } from '@/lib/plan';
+import { computeAction } from '@/app/(protected)/admin/manifests/[id]/actions';
 
-export function ComputeButton({ id, plan }: { id: string; plan?: string }) {
+type PlanResp = {
+  plan: string;
+  status?: string | null;
+  computeLimitPerDay?: number | null;
+  computeUsedToday?: number | null;
+};
+
+export function ComputeButton({ id, plan }: { id: string; plan?: string | null }) {
   const [pending, start] = useTransition();
-  const [used, setUsed] = useState<number>(0);
-
-  const limit = getDailyComputeLimit(plan);
-  const LS_KEY = `cc:computeUsed:${todayKey()}`;
+  const [p, setPlan] = useState<string | null>(plan ?? null);
+  const [limit, setLimit] = useState<number | null>(null);
+  const [used, setUsed] = useState<number | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const n = Number(localStorage.getItem(LS_KEY) ?? '0');
-      setUsed(Number.isFinite(n) ? n : 0);
-    } catch {
-      // ignore
-    }
-  }, [LS_KEY]);
-
-  const bumpUsed = () => {
-    try {
-      const n = Number(localStorage.getItem(LS_KEY) ?? '0');
-      const next = (Number.isFinite(n) ? n : 0) + 1;
-      localStorage.setItem(LS_KEY, String(next));
-      setUsed(next);
-    } catch {
-      // ignore
-    }
-  };
-
-  const onClick = () =>
-    start(async () => {
+    let cancel = false;
+    (async () => {
       try {
-        await computeAction(id);
-        bumpUsed();
-        toast.success('Computed');
+        const r = await fetch('/api/cc/billing/plan', { cache: 'no-store' });
+        if (!r.ok) throw new Error(await r.text());
+        const j: PlanResp = await r.json();
+        if (cancel) return;
+        setPlan(j.plan ?? null);
+        setLimit(typeof j.computeLimitPerDay === 'number' ? j.computeLimitPerDay : null);
+        setUsed(typeof j.computeUsedToday === 'number' ? j.computeUsedToday : null);
+        setErr(null);
       } catch (e: any) {
-        toast.error('Compute failed', { description: e?.message });
+        if (!cancel) setErr(e?.message ?? 'Failed to load plan');
       }
-    });
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, []);
+
+  const disabledReason = useMemo(() => {
+    if (err) return `Plan check failed`;
+    if (limit != null && used != null) {
+      if (used >= limit) return `Daily compute limit reached (${used}/${limit})`;
+      if (limit - used === 1) return `Almost out (${used}/${limit})`;
+    }
+    return null;
+  }, [limit, used, err]);
+
+  const disabled = !!disabledReason || pending;
 
   return (
-    <div className="flex items-center gap-3">
-      <Button disabled={pending} onClick={onClick}>
-        {pending ? 'Computing…' : 'Compute'}
-      </Button>
-      <div className="text-xs text-neutral-600">
-        Daily compute {used} / {limit}
-        <span className="mx-2">·</span>
-        <Link href="/admin/billing" className="underline">
-          Manage plan
-        </Link>
-      </div>
-    </div>
+    <Button
+      disabled={disabled}
+      title={disabledReason ?? undefined}
+      onClick={() =>
+        start(async () => {
+          try {
+            await computeAction(id, 'chargeable');
+            toast.success('Compute started', {
+              description:
+                used != null && limit != null
+                  ? `Count: ${Math.min(used + 1, limit)}/${limit}`
+                  : undefined,
+            });
+          } catch (e: any) {
+            const msg = e?.message || 'Compute failed';
+            toast.error('Compute failed', { description: msg });
+          }
+        })
+      }
+    >
+      {pending ? 'Computing…' : 'Compute'}
+    </Button>
   );
 }

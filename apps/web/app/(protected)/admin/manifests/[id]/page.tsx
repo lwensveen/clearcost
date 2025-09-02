@@ -1,11 +1,14 @@
-import { fetchManifestFull, fetchManifestQuote } from '@/lib/cc';
+import { fetchManifestFull, fetchManifestQuote } from '@/lib/manifest';
 import { ComputeButton } from '@/components/manifest/ComputeButton';
 import { ImportCsvForm } from '@/components/manifest/ImportCsvForm';
 import { ReplaceItemsPanel } from '@/components/manifest/ReplaceItemsPanel';
 import { fetchBillingPlan } from '@/lib/billing';
+import { ComputeQuotaHint } from '@/components/manifest/ComputeQuotaHint';
+import { ManifestHeaderActions } from '@/components/manifest/ManifestHeaderActions';
+import { FixedPricingInline } from '@/components/manifest/FixedPricingInline';
+import { InlineItemsTable } from '@/components/manifest/InlineItemsTable';
 
 type Props = { params: Promise<{ id: string }> };
-
 export const revalidate = 0;
 
 export default async function ManifestDetailPage({ params }: Props) {
@@ -15,21 +18,36 @@ export default async function ManifestDetailPage({ params }: Props) {
     fetchManifestQuote(id),
     fetchBillingPlan(),
   ]);
+
+  const m = full?.manifest;
   const items = full?.items ?? [];
   const s = quote?.summary;
 
   return (
     <main className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Manifest {full?.manifest?.name ?? id}</h1>
+        <h1 className="text-2xl font-semibold">{m?.name ?? `Manifest ${id}`}</h1>
 
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
           <a className="px-3 py-2 rounded border text-sm" href={`/api/cc/manifest/${id}/items-csv`}>
             Export CSV
           </a>
+          <ComputeQuotaHint />
           <ComputeButton id={id} plan={plan?.plan} />
+          <ManifestHeaderActions id={id} currentName={m?.name} />
         </div>
       </div>
+
+      {m?.pricingMode === 'fixed' && (
+        <section className="space-y-2">
+          <h2 className="text-lg font-medium">Fixed freight</h2>
+          <FixedPricingInline
+            id={id}
+            fixedFreightTotal={m.fixedFreightTotal as any}
+            fixedFreightCurrency={m.fixedFreightCurrency as any}
+          />
+        </section>
+      )}
 
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Summary</h2>
@@ -83,35 +101,10 @@ export default async function ManifestDetailPage({ params }: Props) {
 
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Items ({items.length})</h2>
-        <div className="overflow-x-auto border rounded">
-          <table className="min-w-full text-sm">
-            <thead className="bg-neutral-50">
-              <tr>
-                <th className="text-left p-2 border-r">Reference</th>
-                <th className="text-left p-2 border-r">HS6</th>
-                <th className="text-right p-2 border-r">Value</th>
-                <th className="text-right p-2 border-r">Weight (kg)</th>
-                <th className="text-left p-2">Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((it: any) => (
-                <tr key={it.id} className="odd:bg-white even:bg-neutral-50">
-                  <td className="p-2 border-r">{it.reference ?? ''}</td>
-                  <td className="p-2 border-r">{it.hs6 ?? ''}</td>
-                  <td className="p-2 border-r text-right">
-                    {it.itemValueAmount} {it.itemValueCurrency}
-                  </td>
-                  <td className="p-2 border-r text-right">{it.weightKg}</td>
-                  <td className="p-2">{it.notes ?? ''}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <section className="space-y-2">
-            <ReplaceItemsPanel id={id} items={items} />
-          </section>
-        </div>
+        <InlineItemsTable manifestId={id} items={items as any} />
+        <section className="space-y-2 mt-4">
+          <ReplaceItemsPanel id={id} items={items} />
+        </section>
       </section>
 
       <section className="space-y-2">

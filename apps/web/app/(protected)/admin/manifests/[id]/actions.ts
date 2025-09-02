@@ -176,3 +176,110 @@ export async function replaceItemsAction(
 export async function clearAllItemsAction(id: string) {
   return await replaceItemsAction(id, [], false);
 }
+
+export async function cloneManifestAction(id: string, name?: string): Promise<string> {
+  const r = await fetch(`${API}/v1/manifests/${id}/clone`, {
+    method: 'POST',
+    headers: { 'x-api-key': KEY, 'content-type': 'application/json' },
+    body: JSON.stringify(name ? { name } : {}),
+    cache: 'no-store',
+  });
+  if (!r.ok) throw new Error(await r.text().catch(() => 'Clone failed'));
+  const j = await r.json();
+  revalidateTag('manifests');
+  return j.id as string;
+}
+
+export async function deleteManifestAction(id: string) {
+  const r = await fetch(`${API}/v1/manifests/${id}`, {
+    method: 'DELETE',
+    headers: { 'x-api-key': KEY },
+    cache: 'no-store',
+  });
+  if (!r.ok) throw new Error(await r.text().catch(() => 'Delete failed'));
+  revalidateTag('manifests');
+}
+
+export async function patchManifestAction(
+  id: string,
+  patch: Partial<{
+    name: string;
+    origin: string;
+    dest: string;
+    shippingMode: 'air' | 'sea';
+    pricingMode: 'cards' | 'fixed';
+    fixedFreightTotal: string | number | null;
+    fixedFreightCurrency: string | null;
+    reference: string | null;
+  }>
+) {
+  const r = await fetch(`${API}/v1/manifests/${id}`, {
+    method: 'PATCH',
+    headers: { 'x-api-key': KEY, 'content-type': 'application/json' },
+    body: JSON.stringify(patch),
+    cache: 'no-store',
+  });
+  if (!r.ok) throw new Error(await r.text().catch(() => 'Update failed'));
+  revalidateTag(`manifest:${id}`);
+  revalidateTag('manifests');
+}
+
+export async function updateItemAction(
+  manifestId: string,
+  itemId: string,
+  patch: Partial<{
+    reference: string | null;
+    notes: string | null;
+    hs6: string | null;
+    categoryKey: string | null;
+    itemValueAmount: string | number;
+    itemValueCurrency: string;
+    weightKg: string | number;
+    dimsCm: { l?: number; w?: number; h?: number } | null;
+  }>
+) {
+  const r = await fetch(`${API}/v1/manifests/${manifestId}/items/${itemId}`, {
+    method: 'PATCH',
+    headers: { 'x-api-key': KEY, 'content-type': 'application/json' },
+    body: JSON.stringify(patch),
+    cache: 'no-store',
+  });
+  if (!r.ok) throw new Error(await r.text().catch(() => 'Update failed'));
+  revalidateTag(`manifest:${manifestId}`);
+  revalidateTag(`manifest:${manifestId}:quote`);
+}
+
+export async function deleteItemAction(manifestId: string, itemId: string) {
+  const r = await fetch(`${API}/v1/manifests/${manifestId}/items/${itemId}`, {
+    method: 'DELETE',
+    headers: { 'x-api-key': KEY },
+    cache: 'no-store',
+  });
+  if (!r.ok) throw new Error(await r.text().catch(() => 'Delete failed'));
+  revalidateTag(`manifest:${manifestId}`);
+  revalidateTag(`manifest:${manifestId}:quote`);
+}
+
+export async function updateManifestAction(
+  id: string,
+  patch: Partial<{
+    name: string;
+    origin: string;
+    dest: string;
+    shippingMode: 'air' | 'sea';
+    pricingMode: 'cards' | 'fixed';
+    fixedFreightTotal: string | number | null;
+    fixedFreightCurrency: string | null;
+    reference: string | null;
+  }>
+) {
+  const r = await fetch(`${API}/v1/manifests/${id}`, {
+    method: 'PATCH',
+    headers: { 'x-api-key': KEY, 'content-type': 'application/json' },
+    body: JSON.stringify(patch),
+    cache: 'no-store',
+  });
+  if (!r.ok) throw new Error(await r.text().catch(() => 'Update failed'));
+  revalidateTag(`manifest:${id}`);
+  revalidateTag('manifests');
+}

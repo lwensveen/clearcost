@@ -44,9 +44,7 @@ export default async function NewKeyPage({
             <div className="flex gap-2">
               <Button type="submit">Create</Button>
               <Button asChild variant="secondary">
-                <Link href={`/apps/web/app/(protected)/admin/api-keys?ownerId=${ownerId}`}>
-                  Cancel
-                </Link>
+                <Link href={`/admin/api-keys?ownerId=${ownerId}`}>Cancel</Link>
               </Button>
             </div>
           </form>
