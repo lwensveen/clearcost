@@ -307,4 +307,25 @@ export default async function billingRoutes(app: FastifyInstance) {
       return { plan, maxManifests, maxItemsPerManifest };
     }
   );
+
+  app.get(
+    '/v1/billing/compute-usage',
+    {
+      preHandler: app.requireApiKey(['billing:read']),
+      schema: {
+        response: {
+          200: z.object({
+            allowed: z.boolean(),
+            plan: z.string(),
+            limit: z.number().int(),
+            used: z.number().int(),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      const { allowed, plan, limit, used } = await req.server.enforceComputeLimit(req);
+      return { allowed, plan, limit, used };
+    }
+  );
 }
