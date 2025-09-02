@@ -98,11 +98,17 @@ export function rowsToCSV(rows: UsageRow[]) {
   return lines.join('\n');
 }
 
-export async function fetchEntitlements() {
-  const r = await fetch(`${process.env.CLEARCOST_API_URL}/v1/billing/entitlements`, {
-    headers: { 'x-api-key': process.env.CLEARCOST_WEB_SERVER_KEY! },
+export type Entitlements = {
+  plan: string;
+  maxManifests: number;
+  maxItemsPerManifest: number;
+};
+
+export async function fetchEntitlements(): Promise<Entitlements> {
+  const r = await fetch(`${API}/v1/billing/entitlements`, {
+    headers: { 'x-api-key': KEY },
     cache: 'no-store',
   });
-  if (!r.ok) throw new Error(`entitlements ${r.status}`);
-  return r.json() as Promise<{ plan: string; maxManifests: number; maxItemsPerManifest: number }>;
+  if (!r.ok) throw new Error(await r.text().catch(() => 'Failed to load entitlements'));
+  return r.json();
 }
