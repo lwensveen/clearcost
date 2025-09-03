@@ -4,12 +4,22 @@ import { createHash } from 'node:crypto';
 import { apiKeyAuthPlugin, generateApiKey } from '../api-key-auth.js';
 import sensible from '@fastify/sensible';
 
+const { resetEnv } = vi.hoisted(() => {
+  const OLD = { ...process.env };
+  process.env.API_KEY_PEPPER = 'pepper-xyz';
+  process.env.INTERNAL_SIGNING_SECRET = 'internal-secret-123';
+  return {
+    resetEnv: () => {
+      process.env = { ...OLD };
+    },
+  };
+});
+
 type Row = {
   id: string;
   ownerId: string;
   keyId: string;
-  tokenHash: string;
-  salt: string;
+  tokenPhc: string;
   prefix: 'live' | 'test' | string;
   isActive: boolean;
   scopes: string[];
@@ -41,8 +51,7 @@ vi.mock('@clearcost/db', () => {
     id: 'id',
     ownerId: 'ownerId',
     keyId: 'keyId',
-    tokenHash: 'tokenHash',
-    salt: 'salt',
+    tokenPhc: 'tokenPhc', // updated schema
     prefix: 'prefix',
     isActive: 'isActive',
     scopes: 'scopes',
@@ -70,12 +79,8 @@ vi.mock('@clearcost/db', () => {
   return { db, apiKeysTable, __state: dbState };
 });
 
-// helpers mirroring plugin hashing
+// helpers (only for internal signing)
 const sha256Hex = (buf: Buffer) => createHash('sha256').update(buf).digest('hex');
-const digestHex = (secret: string, salt: string, pepper: string) =>
-  createHash('sha256')
-    .update(Buffer.from(`${salt}|${secret}|${pepper}`, 'utf8'))
-    .digest('hex');
 
 async function makeApp() {
   const app = Fastify();
@@ -122,8 +127,7 @@ function signInternal(ts: number, method: string, url: string, body: unknown, se
   return { 'x-cc-ts': String(ts), 'x-cc-sig': sig };
 }
 
-// Seed a row that matches the plugin’s verification logic
-function seedKey({
+async function seedKey({
   prefix = 'test' as 'test' | 'live',
   scopes = ['read:things'] as string[],
   allowedOrigins = [] as string[],
@@ -131,16 +135,13 @@ function seedKey({
   expiresAt = null as Date | null,
   revokedAt = null as Date | null,
   ownerId = 'owner-1',
-  pepper = 'pepper-xyz',
 } = {}) {
-  const { token, keyId, secret, salt, prefix: px } = generateApiKey(prefix);
-  const tokenHash = digestHex(secret, salt, pepper);
+  const { token, keyId, tokenPhc, prefix: px } = await generateApiKey(prefix);
   dbState.rows.push({
     id: `id-${keyId}`,
     ownerId,
     keyId,
-    tokenHash,
-    salt,
+    tokenPhc,
     prefix: px,
     isActive,
     scopes,
@@ -148,21 +149,18 @@ function seedKey({
     expiresAt: expiresAt ?? undefined,
     revokedAt: revokedAt ?? undefined,
   });
-  return { token, keyId, secret, prefix: px, ownerId };
+  return { token, keyId, prefix: px, ownerId };
 }
 
 describe('apiKeyAuthPlugin (unit, DB mocked)', () => {
-  const OLD_ENV = { ...process.env };
-
   beforeEach(() => {
-    process.env = { ...OLD_ENV };
     process.env.API_KEY_PEPPER = 'pepper-xyz';
     process.env.INTERNAL_SIGNING_SECRET = 'internal-secret-123';
-    dbState.rows.length = 0; // clear
+    dbState.rows.length = 0;
   });
 
   afterEach(() => {
-    process.env = { ...OLD_ENV };
+    resetEnv();
   });
 
   it('401 when missing key', async () => {
@@ -173,7 +171,7 @@ describe('apiKeyAuthPlugin (unit, DB mocked)', () => {
   });
 
   it('200 with valid key and principal attached', async () => {
-    const { token } = seedKey();
+    const { token } = await seedKey();
     const app = await makeApp();
     const r = await app.inject({ method: 'GET', url: '/private', headers: bearer(token) });
     expect(r.statusCode).toBe(200);
@@ -192,17 +190,17 @@ describe('apiKeyAuthPlugin (unit, DB mocked)', () => {
   it('401 for inactive / expired / revoked', async () => {
     const app = await makeApp();
 
-    const { token: t1 } = seedKey({ isActive: false });
+    const { token: t1 } = await seedKey({ isActive: false });
     expect(
       (await app.inject({ method: 'GET', url: '/private', headers: bearer(t1) })).statusCode
     ).toBe(401);
 
-    const { token: t2 } = seedKey({ expiresAt: new Date(Date.now() - 60_000) });
+    const { token: t2 } = await seedKey({ expiresAt: new Date(Date.now() - 60_000) });
     expect(
       (await app.inject({ method: 'GET', url: '/private', headers: bearer(t2) })).statusCode
     ).toBe(401);
 
-    const { token: t3 } = seedKey({ revokedAt: new Date() });
+    const { token: t3 } = await seedKey({ revokedAt: new Date() });
     expect(
       (await app.inject({ method: 'GET', url: '/private', headers: bearer(t3) })).statusCode
     ).toBe(401);
@@ -211,7 +209,7 @@ describe('apiKeyAuthPlugin (unit, DB mocked)', () => {
   });
 
   it('401 on prefix mismatch', async () => {
-    const { token } = seedKey({ prefix: 'test' });
+    const { token } = await seedKey({ prefix: 'test' });
     const liveToken = token.replace(/^ck_test_/, 'ck_live_'); // mismatched
     const app = await makeApp();
     const r = await app.inject({ method: 'GET', url: '/private', headers: bearer(liveToken) });
@@ -220,7 +218,7 @@ describe('apiKeyAuthPlugin (unit, DB mocked)', () => {
   });
 
   it('403 when missing required scope', async () => {
-    const { token } = seedKey({ scopes: ['read:other'] });
+    const { token } = await seedKey({ scopes: ['read:other'] });
     const app = await makeApp();
     const r = await app.inject({ method: 'GET', url: '/private', headers: bearer(token) });
     expect(r.statusCode).toBe(403);
@@ -228,7 +226,7 @@ describe('apiKeyAuthPlugin (unit, DB mocked)', () => {
   });
 
   it('ABAC owner check: 403 mismatch, 200 match', async () => {
-    const { token } = seedKey({ ownerId: 'owner-1' });
+    const { token } = await seedKey({ ownerId: 'owner-1' });
     const app = await makeApp();
 
     const bad = await app.inject({
@@ -249,7 +247,7 @@ describe('apiKeyAuthPlugin (unit, DB mocked)', () => {
   });
 
   it('Origin allowlist enforced; admin bypass', async () => {
-    const { token } = seedKey({ allowedOrigins: ['https://a.example'] });
+    const { token } = await seedKey({ allowedOrigins: ['https://a.example'] });
     const app = await makeApp();
 
     const blocked = await app.inject({
@@ -266,7 +264,7 @@ describe('apiKeyAuthPlugin (unit, DB mocked)', () => {
     });
     expect(allowed.statusCode).toBe(200);
 
-    const { token: adminToken } = seedKey({ scopes: ['admin:all'] });
+    const { token: adminToken } = await seedKey({ scopes: ['admin:all'] });
     const bypass = await app.inject({
       method: 'GET',
       url: '/origin',
