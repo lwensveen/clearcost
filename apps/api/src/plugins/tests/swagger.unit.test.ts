@@ -57,8 +57,8 @@ describe('swagger plugin (unit)', () => {
     await app.register(plugin);
 
     // Assert that the swagger plugins were registered with the correct options
-    expect((state.swaggerOpts as any)?.openapi?.info?.title).toBe('clearcost-API');
-    expect((state.swaggerOpts as any)?.openapi?.info?.version).toBe('0.1.0');
+    expect((state.swaggerOpts as any)?.openapi?.info?.title).toBe('Clearcost API');
+    expect((state.swaggerOpts as any)?.openapi?.info?.version).toBe('1.0.0');
     expect((state.swaggerOpts as any)?.transform).toBeTruthy();
     expect(state.swaggerUiOpts?.routePrefix).toBe('/docs');
 

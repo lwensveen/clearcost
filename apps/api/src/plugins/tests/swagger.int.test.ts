@@ -11,8 +11,8 @@ describe('swagger plugin (integration)', () => {
     expect(r1.statusCode).toBe(200);
     const doc = r1.json();
     expect(doc?.openapi || doc?.swagger).toBeTruthy();
-    expect(doc?.info?.title).toBe('clearcost-API');
-    expect(doc?.info?.version).toBe('0.1.0');
+    expect(doc?.info?.title).toBe('Clearcost API');
+    expect(doc?.info?.version).toBe('1.0.0');
 
     const r2 = await app.inject({ method: 'GET', url: '/docs' });
     if (r2.statusCode === 301 || r2.statusCode === 302) {
