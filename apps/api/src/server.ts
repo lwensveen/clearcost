@@ -117,12 +117,5 @@ export async function buildServer() {
 
   await app.register(tasksRoutes);
 
-  app.setErrorHandler((err, req, reply) => {
-    req.log.error({ err }, 'request_error');
-    const status = err.statusCode ?? 500;
-    if (status >= 500) return reply.code(500).send({ error: 'Internal Server Error' });
-    reply.code(status).send({ error: err.message ?? 'Bad Request' });
-  });
-
   return app;
 }
