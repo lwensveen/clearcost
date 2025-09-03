@@ -57,12 +57,72 @@ for (const a of args) {
       .map((s) => s.trim())
       .filter(Boolean);
   } else if (a.startsWith('--exclude=')) {
-    const pat = a.replace(/^--exclude=/, '');
-    opts.exclude = new RegExp(pat);
+    const spec = a.replace(/^--exclude=/, '');
+    opts.exclude = makeExcludePredicate(spec);
   }
 }
 
-// ---------- Grouping (by nearest package.json) ----------
+const KEY_OK = /^[A-Z_][A-Z0-9_]*$/;
+const EXCLUDE_ALLOWED = /^[A-Z0-9_*?]+$/;
+
+/**
+ * Build a safe predicate for comma-separated globs, where:
+ * - Only A–Z 0–9 _ * ? are allowed (rejects any other metacharacters)
+ * - Matching is done without RegExp (no ReDoS surface)
+ */
+function makeExcludePredicate(spec) {
+  const parts = spec
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (!parts.length) return null;
+
+  const matchers = parts.map((glob) => {
+    if (glob.length > 64) throw new Error('exclude pattern too long (>64)');
+    if (!EXCLUDE_ALLOWED.test(glob)) {
+      throw new Error('exclude allows only A–Z, 0–9, _, *, ?');
+    }
+    return (key) => globMatch(glob, key);
+  });
+
+  return (key) => matchers.some((fn) => fn(key));
+}
+
+/**
+ * Minimal glob matcher supporting * and ? only, no regex.
+ * Case-sensitive, full-string match.
+ */
+function globMatch(pat, str) {
+  if (!KEY_OK.test(str)) return false;
+
+  let i = 0;
+  let j = 0;
+  let star = -1;
+  let match = 0;
+
+  while (j < str.length) {
+    if (i < pat.length && (pat[i] === '?' || pat[i] === str[j])) {
+      i++;
+      j++;
+      continue;
+    }
+    if (i < pat.length && pat[i] === '*') {
+      star = i++;
+      match = j;
+      continue;
+    }
+    if (star !== -1) {
+      i = star + 1;
+      j = ++match;
+      continue;
+    }
+    return false;
+  }
+  while (i < pat.length && pat[i] === '*') i++;
+  return i === pat.length;
+}
+
 const pkgCache = new Map(); // dir -> { dir, name, label }
 function findPackageRoot(startFile) {
   let dir = path.dirname(startFile);
@@ -120,11 +180,10 @@ const rx = {
 
 const union = new Map(); // key -> Set(tags)
 const groups = new Map(); // label -> Map(key -> Set(tags))
-const KEY_OK = /^[A-Z_][A-Z0-9_]*$/;
 
 function add(tag, key, label) {
   if (!key || !KEY_OK.test(key)) return;
-  if (opts.exclude && opts.exclude.test(key)) return;
+  if (opts.exclude && opts.exclude(key)) return;
 
   if (label) {
     if (!groups.has(label)) groups.set(label, new Map());
