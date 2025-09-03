@@ -1,6 +1,8 @@
 import { fetchDutyRatesFromGrok, LlmDutyRow } from './fetch-grok.js';
 import { fetchDutyRatesFromOpenAI } from './fetch-openai.js';
 import { importDutyRatesFromLLM } from './import-llm-ingest.js';
+import { hostIsOrSub } from '../../../surcharges/services/llm/import-cross-check.js';
+import { lastLabel } from '../../../de-minimis/services/llm/import-crosscheck.js';
 
 const iso = (d: Date | string) => {
   if (d instanceof Date) return d.toISOString().slice(0, 10);
@@ -13,23 +15,22 @@ const keyOf = (r: LlmDutyRow): Key =>
     r.duty_rule
   ).toLowerCase()}`;
 
-// Very conservative “official” heuristic
 function isOfficial(u?: string | null) {
   if (!u) return false;
   try {
-    const h = new URL(u).hostname.toLowerCase();
-    return (
-      h.endsWith('.gov') ||
-      h.includes('.gov.') ||
-      h.endsWith('europa.eu') ||
-      h.endsWith('eur-lex.europa.eu') ||
-      h.endsWith('gov.uk') ||
-      h.endsWith('cbp.gov') ||
-      h.endsWith('cbsa-asfc.gc.ca') ||
-      h.endsWith('gc.ca') || // Canada federal domains
-      /(^|.)customs\./.test(h) ||
-      /(^|.)tax\./.test(h)
-    );
+    const h = new URL(u).hostname.toLowerCase().replace(/\.+$/, '');
+
+    if (lastLabel(h) === 'gov') return true;
+
+    const bases = [
+      'gov.uk',
+      'europa.eu',
+      'eur-lex.europa.eu',
+      'cbp.gov',
+      'cbsa-asfc.gc.ca',
+      'gc.ca',
+    ];
+    return bases.some((base) => hostIsOrSub(h, base));
   } catch {
     return false;
   }
