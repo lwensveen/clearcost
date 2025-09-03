@@ -1,4 +1,3 @@
-// packages/db/src/schemas/api-keys.ts
 import {
   boolean,
   index,
@@ -18,18 +17,13 @@ export const apiKeysTable = pgTable(
   'api_keys',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    // Public, non-secret identifier embedded in the token (before the dot)
     keyId: text('key_id').notNull(),
-    // live/test (or others if you need)
     prefix: text('prefix').notNull().default('live'),
     name: text('name').notNull(),
     ownerId: uuid('owner_id')
       .notNull()
       .references(() => orgsTable.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
-    // Per-key random salt (base64url)
-    salt: text('salt').notNull(),
-    // Hex digest of sha256(salt || '|' || secret || '|' || pepper)
-    tokenHash: text('token_hash').notNull(),
+    tokenPhc: text('token_phc').notNull(),
     scopes: text('scopes')
       .array()
       .notNull()
@@ -37,7 +31,6 @@ export const apiKeysTable = pgTable(
     isActive: boolean('is_active').notNull().default(true),
     expiresAt: timestamp('expires_at'),
     revokedAt: timestamp('revoked_at'),
-    // ABAC/network controls
     allowedCidrs: text('allowed_cidrs')
       .array()
       .notNull()
@@ -46,7 +39,6 @@ export const apiKeysTable = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
-    // Per-key throttles (fall back to global)
     rateLimitPerMin: integer('rate_limit_per_min'),
     createdAt: createTimestampColumn('created_at'),
     updatedAt: createTimestampColumn('updated_at', { onUpdate: true }),
@@ -55,7 +47,7 @@ export const apiKeysTable = pgTable(
   },
   (t) => ({
     uxKeyId: uniqueIndex('ux_api_keys_keyid').on(t.keyId),
-    uxHash: uniqueIndex('ux_api_keys_hash').on(t.tokenHash),
+    uxPhc: uniqueIndex('ux_api_keys_phc').on(t.tokenPhc),
     byOwnerActive: index('idx_api_keys_owner_active').on(t.ownerId, t.isActive),
   })
 );
