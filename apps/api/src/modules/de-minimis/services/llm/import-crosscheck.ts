@@ -19,7 +19,7 @@ type RowLLM = {
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const toDate = (s: string) => new Date(`${s}T00:00:00Z`);
 
-function lastLabel(host: string): string {
+export function lastLabel(host: string): string {
   const parts = host.toLowerCase().replace(/\.+$/, '').split('.');
   return parts[parts.length - 1] || '';
 }
