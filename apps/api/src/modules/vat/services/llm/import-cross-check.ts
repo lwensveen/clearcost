@@ -2,6 +2,7 @@ import { importVatFromOpenAI } from './import-openai.js';
 import { importVatFromGrok } from './import-grok.js';
 import { importVatFromLLM } from './import-llm.js';
 import type { LlmVat } from './schema.js';
+import { hostHasLabel, hostIsOrSub } from '../../../surcharges/services/llm/import-cross-check.js';
 
 type Key = string;
 // Key rows WITHOUT date so OA/Grok can still agree even if dates differ slightly.
@@ -11,19 +12,34 @@ const keyOf = (r: LlmVat): Key =>
 const near = (a: number, b: number, tolAbs = 0.2, tolRel = 0.02) =>
   Math.abs(a - b) <= Math.max(tolAbs, Math.abs(a) * tolRel);
 
+const OFFICIAL_PARENTS = [
+  'gov', // US government TLD (*.gov)
+  'gov.uk', // UK government
+  'europa.eu', // EU institutions (covers eur-lex.europa.eu)
+] as const;
+
 const isOfficial = (u?: string | null) => {
   if (!u) return false;
   try {
-    const h = new URL(u).hostname.toLowerCase();
-    return (
-      h.endsWith('.gov') ||
-      h.includes('.gov.') ||
-      h.endsWith('europa.eu') ||
-      h.endsWith('eur-lex.europa.eu') ||
-      h.endsWith('gov.uk') ||
-      /(^|.)customs\./.test(h) ||
-      /(^|.)tax\./.test(h)
-    );
+    const url = new URL(u);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return false;
+
+    const host = url.hostname.toLowerCase();
+
+    // Exact or subdomain of known official parents
+    for (const parent of OFFICIAL_PARENTS) {
+      if (hostIsOrSub(host, parent)) return true;
+    }
+
+    // Heuristic: domains under official parents that include “customs” or “tax”
+    if (
+      (hostHasLabel(host, 'customs') || hostHasLabel(host, 'tax')) &&
+      (hostIsOrSub(host, 'gov') || hostIsOrSub(host, 'gov.uk') || hostIsOrSub(host, 'europa.eu'))
+    ) {
+      return true;
+    }
+
+    return false;
   } catch {
     return false;
   }

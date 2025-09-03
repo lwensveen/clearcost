@@ -41,20 +41,48 @@ const sameMeta = (a: LlmSurcharge, b: LlmSurcharge) =>
   a.value_basis === b.value_basis &&
   a.surcharge_code.toUpperCase() === b.surcharge_code.toUpperCase();
 
+export function hostIsOrSub(host: string, parent: string): boolean {
+  const h = host.toLowerCase();
+  const p = parent.toLowerCase();
+  return h === p || h.endsWith('.' + p);
+}
+
+export function hostHasLabel(host: string, label: string): boolean {
+  const lbl = label.toLowerCase();
+  return host
+    .toLowerCase()
+    .split('.')
+    .some((part) => part === lbl);
+}
+
+const OFFICIAL_PARENTS = [
+  'gov', // US federal/state/agency *.gov (restricted TLD)
+  'gov.uk', // UK government
+  'europa.eu', // EU institutions
+  'cbp.gov', // US Customs and Border Protection
+  'cbsa-asfc.gc.ca', // Canada Border Services Agency
+] as const;
+
 const isOfficial = (u?: string | null) => {
   if (!u) return false;
   try {
-    const h = new URL(u).hostname.toLowerCase();
-    return (
-      h.endsWith('.gov') ||
-      h.includes('.gov.') ||
-      h.endsWith('europa.eu') ||
-      h.endsWith('gov.uk') ||
-      /(^|.)customs\./.test(h) ||
-      /(^|.)tax\./.test(h) ||
-      h.endsWith('cbp.gov') ||
-      h.endsWith('cbsa-asfc.gc.ca')
-    );
+    const url = new URL(u);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return false;
+
+    const host = url.hostname.toLowerCase();
+
+    for (const parent of OFFICIAL_PARENTS) {
+      if (hostIsOrSub(host, parent)) return true;
+    }
+
+    if (
+      (hostHasLabel(host, 'customs') || hostHasLabel(host, 'tax')) &&
+      (hostIsOrSub(host, 'gov') || hostIsOrSub(host, 'gov.uk') || hostIsOrSub(host, 'europa.eu'))
+    ) {
+      return true;
+    }
+
+    return false;
   } catch {
     return false;
   }

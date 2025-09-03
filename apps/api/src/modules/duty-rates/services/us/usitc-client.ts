@@ -1,4 +1,5 @@
 import setCookie from 'set-cookie-parser';
+import { hostIsOrSub } from '../../../surcharges/services/llm/import-cross-check.js';
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127 Safari/537.36';
@@ -179,13 +180,17 @@ export class UsitcClient {
   private refererFor(url: string) {
     try {
       const u = new URL(url);
-      if (u.hostname === 'www.usitc.gov')
+      const host = u.hostname.toLowerCase();
+
+      if (host === 'hts.usitc.gov') {
+        return `${this.base}/export`;
+      }
+
+      if (hostIsOrSub(host, 'usitc.gov')) {
         return 'https://www.usitc.gov/harmonized_tariff_information';
-      if (u.hostname.endsWith('usitc.gov'))
-        return 'https://www.usitc.gov/harmonized_tariff_information';
-      if (u.hostname.endsWith('hts.usitc.gov')) return `${this.base}/export`;
+      }
     } catch {
-      /* empty */
+      /* ignore */
     }
     return undefined;
   }
@@ -194,9 +199,13 @@ export class UsitcClient {
     try {
       const target = new URL(url);
       const base = new URL(this.base);
+
       if (target.origin === base.origin) return 'same-origin';
-      if (target.hostname.endsWith('.usitc.gov') && base.hostname.endsWith('.usitc.gov'))
+
+      const registrable = 'usitc.gov';
+      if (hostIsOrSub(target.hostname, registrable) && hostIsOrSub(base.hostname, registrable)) {
         return 'same-site';
+      }
       return 'cross-site';
     } catch {
       return undefined;

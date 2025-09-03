@@ -33,6 +33,19 @@ function takeName(v: any): string {
   return String(v);
 }
 
+function sanitizeTitle(raw: string): string {
+  const noComments = raw.replace(/<!--[\s\S]*?-->/g, '');
+  const noTags = noComments.replace(/<[^>]*>/g, '');
+  const normalized = noTags.replace(/\s+/g, ' ').trim();
+  // HTML-escape
+  return normalized
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // 1) Try SDMX /data (JSON)
 async function fetchHs6ViaData(year: number) {
   const path = `A.842.0..reported`; // reporter=USA, partner=WLD, wildcard product
@@ -54,8 +67,8 @@ async function fetchHs6ViaData(year: number) {
   for (const v of values) {
     const code = v?.id;
     if (!isHS6(code)) continue;
-    const title = takeName(v?.name).trim() || '—';
-    if (!uniq.has(code)) uniq.set(code, title);
+    const title = sanitizeTitle(takeName(v?.name));
+    if (!uniq.has(code)) uniq.set(code, title || '—');
   }
   return Array.from(uniq, ([hs6, title]) => ({ hs6, title }));
 }
@@ -108,8 +121,8 @@ async function fetchHs6ViaDSD_JSON() {
   for (const it of items) {
     const code = it?.id ?? it?.value ?? it?.code;
     if (!isHS6(code)) continue;
-    const title = takeName(it?.name ?? it?.description ?? it?.label).trim() || '—';
-    if (!uniq.has(code)) uniq.set(code, title);
+    const title = sanitizeTitle(takeName(it?.name ?? it?.description ?? it?.label));
+    if (!uniq.has(code)) uniq.set(code, title || '—');
   }
   return Array.from(uniq, ([hs6, title]) => ({ hs6, title }));
 }
@@ -122,7 +135,6 @@ async function fetchHs6ViaURL_XML() {
   if (!r.ok) throw new Error(`WITS product/all fetch failed ${r.status} ${r.statusText}`);
   const xml = await r.text();
 
-  // Lightweight parse: <wits:product productcode="(\d{6})"> ... <wits:productdescription>...</...>
   const re =
     /<wits:product\s+productcode="(\d{6})"[\s\S]*?<wits:productdescription>([\s\S]*?)<\/wits:productdescription>/g;
   const uniq = new Map<string, string>();
@@ -130,11 +142,7 @@ async function fetchHs6ViaURL_XML() {
   while ((m = re.exec(xml))) {
     const hs6 = m[1]!;
     const raw = m[2] ?? '';
-    const title =
-      raw
-        .replace(/<[^>]+>/g, '')
-        .replace(/\s+/g, ' ')
-        .trim() || '—';
+    const title = sanitizeTitle(raw) || '—';
     if (!uniq.has(hs6)) uniq.set(hs6, title);
   }
   return Array.from(uniq, ([hs6, title]) => ({ hs6, title }));
