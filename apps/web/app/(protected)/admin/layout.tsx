@@ -1,51 +1,41 @@
 import { headers } from 'next/headers';
 import { auth } from '@/auth';
 import Link from 'next/link';
-import { Header } from '@/components/layout/header';
-import { Footer } from '@/components/layout/footer';
+import { AdminHeader } from '@/components/layout/admin-header';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth.api.getSession({ headers: await headers() });
-
-  // if (!session) {
-  //   redirect('/login');
-  // }
+  // if (!session) redirect('/login');
 
   return (
     <>
-      <Header />
+      <AdminHeader />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="grid gap-8 md:grid-cols-[220px_1fr]">
           <aside className="md:sticky md:top-20 md:h-[calc(100dvh-5rem)] md:py-2">
             <nav className="text-sm">
               <ul className="space-y-1">
                 <li>
-                  <Link className="block rounded-md px-2 py-1 hover:bg-muted" href="/dashboard">
+                  <Link className="block rounded-md px-2 py-1 hover:bg-muted" href="/admin">
                     Overview
                   </Link>
                 </li>
                 <li>
                   <Link
                     className="block rounded-md px-2 py-1 hover:bg-muted"
-                    href="/dashboard/api-keys"
+                    href="/admin/manifests"
                   >
-                    API keys
+                    Manifests
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    className="block rounded-md px-2 py-1 hover:bg-muted"
-                    href="/dashboard/usage"
-                  >
-                    Usage
+                  <Link className="block rounded-md px-2 py-1 hover:bg-muted" href="/admin/billing">
+                    Billing
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    className="block rounded-md px-2 py-1 hover:bg-muted"
-                    href="/dashboard/settings"
-                  >
-                    Settings
+                  <Link className="block rounded-md px-2 py-1 hover:bg-muted" href="/admin/imports">
+                    Imports
                   </Link>
                 </li>
               </ul>
@@ -54,7 +44,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <section>{children}</section>
         </div>
       </main>
-      <Footer />
     </>
   );
 }

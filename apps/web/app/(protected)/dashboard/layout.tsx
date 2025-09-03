@@ -1,19 +1,15 @@
 import { headers } from 'next/headers';
 import { auth } from '@/auth';
 import Link from 'next/link';
-import { Header } from '@/components/layout/header';
-import { Footer } from '@/components/layout/footer';
+import { DashboardHeader } from '@/components/layout/dashboard-header';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth.api.getSession({ headers: await headers() });
-
-  // if (!session) {
-  //   redirect('/login');
-  // }
+  // if (!session) redirect('/login');
 
   return (
     <>
-      <Header />
+      <DashboardHeader />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="grid gap-8 md:grid-cols-[220px_1fr]">
           <aside className="md:sticky md:top-20 md:h-[calc(100dvh-5rem)] md:py-2">
@@ -54,7 +50,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <section>{children}</section>
         </div>
       </main>
-      <Footer />
     </>
   );
 }
