@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createHash } from 'node:crypto';
 import { issueApiKey } from './issue-api-key.js';
 
 const { state, gen } = vi.hoisted(() => {
@@ -14,11 +13,10 @@ const { state, gen } = vi.hoisted(() => {
   };
 
   const gen = {
-    fn: vi.fn((prefix: 'live' | 'test' = 'live') => ({
+    fn: vi.fn(async (prefix: 'live' | 'test' = 'live') => ({
       token: `ck_${prefix}_kid-123.SECRET`,
       keyId: 'kid-123',
-      secret: 'sec-abc',
-      salt: 'salt-xyz',
+      tokenPhc: '$scrypt$ln=15,r=8,p=1$QUFBQUE$QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=',
       prefix,
     })),
   };
@@ -34,8 +32,7 @@ vi.mock('@clearcost/db', () => {
     prefix: 'prefix',
     name: 'name',
     ownerId: 'ownerId',
-    salt: 'salt',
-    tokenHash: 'tokenHash',
+    tokenPhc: 'tokenPhc', // updated schema field
     scopes: 'scopes',
     isActive: 'isActive',
     expiresAt: 'expiresAt',
@@ -66,13 +63,13 @@ describe('issueApiKey (unit)', () => {
   const OLD_ENV = { ...process.env };
 
   beforeEach(() => {
-    process.env = { ...OLD_ENV, API_KEY_PEPPER: 'pepper-xyz' };
+    process.env = { ...OLD_ENV };
     state.lastVals = null;
     state.returningRows = [{ id: 'row-1', createdAt: new Date('2025-02-03T00:00:00.000Z') }];
     gen.fn.mockClear();
   });
 
-  it('inserts hashed token with pepper and returns row data', async () => {
+  it('inserts PHC token and returns row data', async () => {
     const expiresAt = new Date('2030-01-01T00:00:00.000Z');
 
     const out = await issueApiKey({
@@ -90,16 +87,9 @@ describe('issueApiKey (unit)', () => {
     expect(v.name).toBe('My Key');
     expect(v.keyId).toBe('kid-123');
     expect(v.prefix).toBe('test');
-    expect(v.salt).toBe('salt-xyz');
-
-    const expectedHash = createHash('sha256')
-      .update(Buffer.from('salt-xyz|sec-abc|pepper-xyz', 'utf8'))
-      .digest('hex');
-    expect(v.tokenHash).toBe(expectedHash);
-
+    expect(v.tokenPhc).toMatch(/^\$scrypt\$/); // stored PHC string
     expect(v.scopes).toEqual(['read', 'write']);
     expect(v.isActive).toBe(true);
-
     expect(new Date(v.expiresAt).getTime()).toBe(expiresAt.getTime());
 
     expect(out).toMatchObject({

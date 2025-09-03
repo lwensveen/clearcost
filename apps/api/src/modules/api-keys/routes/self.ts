@@ -2,7 +2,6 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
 import { apiKeysTable, db } from '@clearcost/db';
 import { eq } from 'drizzle-orm';
-import { createHash } from 'node:crypto';
 import { generateApiKey } from '../../../plugins/api-key-auth.js';
 
 type Prefix = 'live' | 'test';
@@ -100,19 +99,18 @@ export default function apiKeySelfRoutes(app: FastifyInstance) {
       const baseScopes = currentRow?.scopes ?? curr.scopes ?? [];
       const basePrefix: Prefix = coercePrefix(currentRow?.prefix);
 
-      const { token, keyId, secret, salt, prefix } = generateApiKey(basePrefix);
-      const pepper = process.env.API_KEY_PEPPER ?? '';
-      const tokenHash = createHash('sha256').update(`${salt}|${secret}|${pepper}`).digest('hex');
+      const { token, keyId, tokenPhc, prefix } = await generateApiKey(basePrefix);
+
+      const rotatedName = `${baseName} (rotated ${new Date().toISOString().slice(0, 10)})`;
 
       const inserted = await db
         .insert(apiKeysTable)
         .values({
           keyId,
           prefix,
-          name: `${baseName} (rotated ${new Date().toISOString().slice(0, 10)})`,
+          name: rotatedName,
           ownerId,
-          salt,
-          tokenHash,
+          tokenPhc,
           scopes: baseScopes,
           isActive: true,
         })
@@ -129,7 +127,7 @@ export default function apiKeySelfRoutes(app: FastifyInstance) {
         token,
         keyId,
         prefix,
-        name: `${baseName} (rotated)`,
+        name: rotatedName,
         ownerId,
         scopes: baseScopes,
         isActive: true,

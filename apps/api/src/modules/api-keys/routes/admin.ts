@@ -2,7 +2,6 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
 import { apiKeysTable, db } from '@clearcost/db';
 import { and, eq, sql } from 'drizzle-orm';
-import { createHash } from 'node:crypto';
 import { generateApiKey } from '../../../plugins/api-key-auth.js';
 
 const CreateBody = z.object({
@@ -127,9 +126,7 @@ export default function apiKeyAdminRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const body = CreateBody.parse(req.body);
 
-      const { token, keyId, secret, salt, prefix } = generateApiKey(body.prefix);
-      const pepper = process.env.API_KEY_PEPPER ?? '';
-      const tokenHash = createHash('sha256').update(`${salt}|${secret}|${pepper}`).digest('hex');
+      const { token, keyId, tokenPhc, prefix } = await generateApiKey(body.prefix);
 
       const inserted = await db
         .insert(apiKeysTable)
@@ -138,8 +135,7 @@ export default function apiKeyAdminRoutes(app: FastifyInstance) {
           prefix,
           name: body.name,
           ownerId: body.ownerId,
-          salt,
-          tokenHash,
+          tokenPhc,
           scopes: body.scopes,
           isActive: true,
           expiresAt: body.expiresAt ?? null,
@@ -315,10 +311,8 @@ export default function apiKeyAdminRoutes(app: FastifyInstance) {
 
       const basePrefix: Prefix = coercePrefix(cur.prefix);
       const chosenPrefix: Prefix = body.prefix ?? basePrefix;
-      const { token, keyId, secret, salt } = generateApiKey(chosenPrefix);
 
-      const pepper = process.env.API_KEY_PEPPER ?? '';
-      const tokenHash = createHash('sha256').update(`${salt}|${secret}|${pepper}`).digest('hex');
+      const { token, keyId, tokenPhc } = await generateApiKey(chosenPrefix);
 
       const name = body.name ?? `${cur.name} (rotated ${new Date().toISOString().slice(0, 10)})`;
       const scopes = body.scopes ?? cur.scopes ?? [];
@@ -334,8 +328,7 @@ export default function apiKeyAdminRoutes(app: FastifyInstance) {
           prefix: chosenPrefix,
           name,
           ownerId: cur.ownerId,
-          salt,
-          tokenHash,
+          tokenPhc,
           scopes,
           isActive: true,
           expiresAt,

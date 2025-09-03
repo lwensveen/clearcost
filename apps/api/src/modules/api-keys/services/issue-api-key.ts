@@ -1,6 +1,5 @@
 import { apiKeysTable, db } from '@clearcost/db';
 import { generateApiKey } from '../../../plugins/api-key-auth.js';
-import { createHash } from 'node:crypto';
 
 export async function issueApiKey({
   ownerId,
@@ -15,11 +14,7 @@ export async function issueApiKey({
   prefix?: 'live' | 'test';
   expiresAt?: Date;
 }) {
-  const { token, keyId, secret, salt, prefix: pfx } = generateApiKey(prefix);
-  const pepper = process.env.API_KEY_PEPPER ?? '';
-  const tokenHash = createHash('sha256')
-    .update(Buffer.from(`${salt}|${secret}|${pepper}`, 'utf8'))
-    .digest('hex');
+  const { token, keyId, tokenPhc, prefix: pfx } = await generateApiKey(prefix);
 
   const rows = await db
     .insert(apiKeysTable)
@@ -28,8 +23,7 @@ export async function issueApiKey({
       prefix: pfx,
       name,
       ownerId,
-      salt,
-      tokenHash,
+      tokenPhc,
       scopes,
       isActive: true,
       expiresAt: expiresAt ?? null,
