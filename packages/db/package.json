@@ -5,12 +5,12 @@
   "dependencies": {
     "@neondatabase/serverless": "^1.0.1",
     "drizzle-kit": "^0.31.4",
-    "drizzle-orm": "^0.44.4",
+    "drizzle-orm": "^0.44.5",
     "drizzle-zod": "^0.8.3",
     "pg": "^8.16.3",
     "postgres": "^3.4.7",
     "ws": "^8.18.3",
-    "zod": "^4.1.1"
+    "zod": "^4.1.5"
   },
   "devDependencies": {
     "@clearcost/eslint-config": "workspace:*",
