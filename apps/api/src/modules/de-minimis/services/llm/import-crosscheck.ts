@@ -2,6 +2,7 @@ import type { DeMinimisInsert } from '@clearcost/types';
 import { importDeMinimisFromOpenAI } from './import-openai.js';
 import { importDeMinimisFromGrok } from './import-grok.js';
 import { importDeMinimis } from '../import-de-minimis.js';
+import { hostIsOrSub } from '../../../surcharges/services/llm/import-cross-check.js';
 
 type RowLLM = {
   country_code: string;
@@ -18,23 +19,30 @@ type RowLLM = {
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const toDate = (s: string) => new Date(`${s}T00:00:00Z`);
 
-// very conservative official-domain heuristic
+function lastLabel(host: string): string {
+  const parts = host.toLowerCase().replace(/\.+$/, '').split('.');
+  return parts[parts.length - 1] || '';
+}
+
 function isOfficial(url: string): boolean {
   try {
-    const u = new URL(url);
-    const h = u.hostname.toLowerCase();
-    return (
-      h.endsWith('.gov') ||
-      h.includes('.gov.') ||
-      h.endsWith('.gc.ca') ||
-      h.endsWith('cbsa-asfc.gc.ca') ||
-      h.endsWith('cbp.gov') ||
-      h.endsWith('gov.uk') ||
-      h.endsWith('europa.eu') || // eur-lex.europa.eu, ec.europa.eu
-      h.endsWith('eur-lex.europa.eu') ||
-      /(^|.)customs\./.test(h) ||
-      /(^|.)tax\./.test(h)
-    );
+    const h = new URL(url).hostname.toLowerCase().replace(/\.+$/, '');
+
+    if (lastLabel(h) === 'gov') return true;
+
+    const bases = [
+      'gov.uk',
+      'europa.eu',
+      'eur-lex.europa.eu',
+      'cbp.gov',
+      'cbsa-asfc.gc.ca',
+      'gc.ca',
+    ];
+    for (const base of bases) {
+      if (hostIsOrSub(h, base)) return true;
+    }
+
+    return false;
   } catch {
     return false;
   }

@@ -1,5 +1,7 @@
 import { db, hsCodesTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
+import sanitizeHtml from 'sanitize-html';
+import { decode as decodeEntities } from 'he';
 
 // SDMX endpoints (data + DSD)
 const SDMX_DATA_BASE = 'https://wits.worldbank.org/API/V1/SDMX/V21/rest/data/DF_WITS_Tariff_TRAINS';
@@ -34,16 +36,18 @@ function takeName(v: any): string {
 }
 
 function sanitizeTitle(raw: string): string {
-  const noComments = raw.replace(/<!--[\s\S]*?-->/g, '');
-  const noTags = noComments.replace(/<[^>]*>/g, '');
-  const normalized = noTags.replace(/\s+/g, ' ').trim();
-  // HTML-escape
-  return normalized
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+  const stripped = sanitizeHtml(String(raw ?? ''), {
+    allowedTags: [],
+    allowedAttributes: {},
+    disallowedTagsMode: 'discard',
+    nonTextTags: ['script', 'style', 'textarea', 'noscript'],
+  });
+
+  let text = decodeEntities(stripped);
+
+  text = text.replace(/\s+/g, ' ').trim();
+  if (text.length > 500) text = text.slice(0, 500);
+  return text;
 }
 
 // 1) Try SDMX /data (JSON)

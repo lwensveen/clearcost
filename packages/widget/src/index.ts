@@ -77,22 +77,51 @@ async function callQuote(body: QuoteBody, sdk: SDK): Promise<any> {
 function render(el: HTMLElement, quote: any, displayCurrency: string, locale: string) {
   const { components, total, incoterm } = quote;
   const cur = displayCurrency || (quote?.currency ?? 'USD');
-  el.innerHTML = `
-    <div style="font-family: ui-sans-serif, system-ui; border:1px solid #e5e7eb; border-radius:12px; padding:12px; box-shadow:0 1px 2px rgba(0,0,0,.06)">
-      <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-        <strong>Landed cost</strong>
-        <span style="font-weight:600">${formatMoney(total, cur, locale)}</span>
-      </div>
-      <div style="font-size:12px; color:#374151; line-height:1.4">
-        <div style="display:flex; justify-content:space-between;"><span>Freight</span><span>${formatMoney(components.CIF - (quote.itemValue ?? 0), cur, locale)}</span></div>
-        <div style="display:flex; justify-content:space-between;"><span>Duty</span><span>${formatMoney(components.duty, cur, locale)}</span></div>
-        <div style="display:flex; justify-content:space-between;"><span>VAT</span><span>${formatMoney(components.vat ?? 0, cur, locale)}</span></div>
-        ${components.checkoutVAT !== undefined ? `<div style="display:flex; justify-content:space-between;"><span>Checkout VAT (IOSS)</span><span>${formatMoney(components.checkoutVAT, cur, locale)}</span></div>` : ''}
-        <div style="display:flex; justify-content:space-between;"><span>Fees</span><span>${formatMoney(components.fees, cur, locale)}</span></div>
-        <div style="margin-top:6px; color:#6b7280">Incoterm: <strong>${incoterm ?? 'DAP'}</strong></div>
-      </div>
-    </div>
-  `;
+
+  const mk = (tag: string, style?: string, text?: string) => {
+    const n = document.createElement(tag);
+    if (style) n.setAttribute('style', style);
+    if (text != null) n.textContent = text;
+    return n;
+  };
+  const money = (x: number) => formatMoney(Number(x) || 0, cur, locale);
+  const row = (label: string, amount: number) => {
+    const d = mk('div', 'display:flex; justify-content:space-between;');
+    d.appendChild(mk('span', undefined, label));
+    d.appendChild(mk('span', undefined, money(amount)));
+    return d;
+  };
+
+  const freight = Number(components.CIF || 0) - Number(quote.itemValue || 0);
+
+  const wrap = mk(
+    'div',
+    'font-family: ui-sans-serif, system-ui; border:1px solid #e5e7eb; border-radius:12px; padding:12px; box-shadow:0 1px 2px rgba(0,0,0,.06)'
+  );
+
+  const header = mk('div', 'display:flex; justify-content:space-between; margin-bottom:8px;');
+  header.appendChild(mk('strong', undefined, 'Landed cost'));
+  header.appendChild(mk('span', 'font-weight:600', money(total)));
+  wrap.appendChild(header);
+
+  const list = mk('div', 'font-size:12px; color:#374151; line-height:1.4');
+  list.appendChild(row('Freight', freight));
+  list.appendChild(row('Duty', Number(components.duty || 0)));
+  list.appendChild(row('VAT', Number(components.vat || 0)));
+  if (components.checkoutVAT !== undefined) {
+    list.appendChild(row('Checkout VAT (IOSS)', Number(components.checkoutVAT || 0)));
+  }
+  list.appendChild(row('Fees', Number(components.fees || 0)));
+
+  const inc = mk('div', 'margin-top:6px; color:#6b7280', 'Incoterm: ');
+  const strong = mk('strong', undefined, (incoterm ?? 'DAP') + '');
+  inc.appendChild(strong);
+  list.appendChild(inc);
+
+  wrap.appendChild(list);
+
+  while (el.firstChild) el.removeChild(el.firstChild);
+  el.appendChild(wrap);
 }
 
 function parseEl(el: HTMLElement): QuoteBody {
