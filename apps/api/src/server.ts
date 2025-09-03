@@ -32,6 +32,8 @@ import vatAdminRoutes from './modules/vat/routes/admin.js';
 import webhookAdminRoutes from './modules/webhooks/admin/routes.js';
 import { apiKeyAuthPlugin } from './plugins/api-key-auth.js';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
+import metaRoutes from './modules/meta/routes.js';
+import errorHandler from './plugins/error-handler.js';
 
 export async function buildServer() {
   const app = Fastify({
@@ -84,11 +86,13 @@ export async function buildServer() {
   await app.register(planEnforcement);
   await app.register(planEntitlements);
   await app.register(usage);
+  await app.register(errorHandler);
 
   // -----------------------
   // Public / low-scope API
   // -----------------------
   await app.register(healthPublicRoutes); // /healthz, /health
+  await app.register(metaRoutes);
 
   await app.register(apiKeySelfRoutes, { prefix: '/v1/api-keys' });
   await app.register(billingRoutes, { prefix: '/v1/billing' });
