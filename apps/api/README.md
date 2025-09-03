@@ -80,6 +80,12 @@ DATABASE_URL=postgres://user:pass@localhost:5432/clearcost
 # Admin / ops
 ADMIN_TOKEN=dev-admin-token              # header: x-admin-token
 
+# Public API base (also used by Swagger servers[]):
+CLEARCOST_API_URL=http://localhost:4000
+
+# Internal signing (optional, for /internal/*)
+INTERNAL_SIGNING_SECRET=change-me
+
 # FX + data
 CURRENCY_BASE=USD
 
@@ -106,8 +112,9 @@ LLM_DUTY_SOURCE=llm                       # source tag for duty upserts
 IMPORT_STALE_MINUTES=30                   # sweeper
 ```
 
-> API keys are stored in DB (see `api-keys` module). Clients authenticate with `x-api-key`. Internal/ops routes can use
-> `x-admin-token` **or** scoped keys.
+> API keys are stored in DB (see `api-keys` module). Clients authenticate with `x-api-key`.
+> Internal/ops routes can use `x-admin-token` **or** scoped keys. Internal service-to-service can add `x-cc-ts` +
+> `x-cc-sig`.
 
 ---
 
@@ -130,105 +137,29 @@ bun run --cwd apps/api start
 
 ---
 
-## Scripts (package.json)
+## OpenAPI & Docs
 
-```jsonc
-{
-  "scripts": {
-    "dev": "bun --watch src/main.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/src/main.js",
-    "check-types": "tsc --noEmit",
-    "cron": "bun run src/lib/cron/index.ts",
+- **Spec:** `GET /openapi.json`
+- **UI:** `GET /docs` (Swagger UI; deep-linking + auth persistence enabled)
+- Default security scheme: `x-api-key`. Internal signing header (`x-cc-sig`) is documented as an additional scheme.
 
-    // FX
-    "fx:refresh": "bun run src/lib/cron/index.ts fx:refresh",
-
-    // VAT (official) + LLM
-    "import:vat": "bun run src/lib/cron/index.ts import:vat",
-    // (add LLM VAT commands when wired into registry)
-
-    // Duties (official + LLM)
-    "import:duties": "bun run src/lib/cron/index.ts import:duties",
-    "import:duties:wits": "bun run src/lib/cron/index.ts import:duties:wits",
-    "import:duties:us-mfn": "bun run src/lib/cron/index.ts import:duties:us-mfn",
-    "import:duties:us-fta": "bun run src/lib/cron/index.ts import:duties:us-fta",
-    "import:duties:us-all": "bun run src/lib/cron/index.ts import:duties:us-all",
-    "import:duties:llm-openai": "bun run src/lib/cron/index.ts import:duties:llm-openai",
-    "import:duties:llm-grok": "bun run src/lib/cron/index.ts import:duties:llm-grok",
-    "import:duties:llm-crosscheck": "bun run src/lib/cron/index.ts import:duties:llm-crosscheck",
-
-    // Surcharges (official + LLM)
-    "import:surcharges": "bun run src/lib/cron/index.ts import:surcharges",
-    "import:surcharges:us-all": "bun run src/lib/cron/index.ts import:surcharges:us-all",
-    "import:surcharges:us-trade-remedies": "bun run src/lib/cron/index.ts import:surcharges:us-trade-remedies",
-    "import:surcharges:us-aphis": "bun run src/lib/cron/index.ts import:surcharges:us-aphis",
-    "import:surcharges:us-fda": "bun run src/lib/cron/index.ts import:surcharges:us-fda",
-    "import:surcharges:llm-openai": "bun run src/lib/cron/index.ts import:surcharges:llm-openai",
-    "import:surcharges:llm-grok": "bun run src/lib/cron/index.ts import:surcharges:llm-grok",
-    "import:surcharges:llm-crosscheck": "bun run src/lib/cron/index.ts import:surcharges:llm-crosscheck",
-
-    // HS
-    "import:hs6": "bun run src/lib/cron/index.ts import:hs6",
-    "import:hs:us-hts10": "bun run src/lib/cron/index.ts import:hs:us-hts10",
-    "import:hs:uk10": "bun run src/lib/cron/index.ts import:hs:uk10",
-    "import:hs:ahtn": "bun run src/lib/cron/index.ts import:hs:ahtn",
-    "import:hs:eu-hs6": "bun run src/lib/cron/index.ts import:hs:eu-hs6",
-    "import:hs:eu-taric": "bun run src/lib/cron/index.ts import:hs:eu-taric",
-
-    // De‑minimis (official + LLM)
-    "import:de-minimis:zonos": "bun run src/lib/cron/index.ts import:de-minimis:zonos",
-    "import:de-minimis:official": "bun run src/lib/cron/index.ts import:de-minimis:official",
-    "import:de-minimis:seed-baseline": "bun run src/lib/cron/index.ts import:de-minimis:seed-baseline",
-    "import:de-minimis:trade-gov": "bun run src/lib/cron/index.ts import:de-minimis:trade-gov",
-    "import:de-minimis:openai": "bun run src/lib/cron/index.ts import:de-minimis:openai",
-
-    // Freight
-    "import:freight": "bun run src/lib/cron/index.ts import:freight",
-
-    // Ops
-    "import:sweep-stale": "bun run src/lib/cron/index.ts import:sweep-stale",
-    "import:prune": "bun run src/lib/cron/index.ts import:prune",
-  },
-}
-```
-
-### Cron/CLI usage
-
-The CLI wraps long-running imports in provenance + metrics.
+Example (curl):
 
 ```bash
-cd apps/api
-# list available commands
-bun run src/lib/cron/index.ts --help
-
-# examples
-bun run src/lib/cron/index.ts fx:refresh
-
-# official VAT
-bun run src/lib/cron/index.ts import:vat
-
-# LLM duties
-bun run src/lib/cron/index.ts import:duties:llm-openai --model gpt-4o-mini
-bun run src/lib/cron/index.ts import:duties:llm-grok --model grok-2-latest
-bun run src/lib/cron/index.ts import:duties:llm-crosscheck --mode prefer_official
-
-# LLM surcharges
-bun run src/lib/cron/index.ts import:surcharges:llm-openai
-bun run src/lib/cron/index.ts import:surcharges:llm-grok
-bun run src/lib/cron/index.ts import:surcharges:llm-crosscheck --mode strict
-
-# De‑minimis (LLM + official)
-bun run src/lib/cron/index.ts import:de-minimis:openai
-bun run src/lib/cron/index.ts import:de-minimis:official
-
-# HS & ops
-bun run src/lib/cron/index.ts import:hs:eu-hs6
-bun run src/lib/cron/index.ts import:sweep-stale --threshold 30
-bun run src/lib/cron/index.ts import:prune --days 90
+curl -s \
+  -H "x-api-key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: ck_idem_$(uuidgen | tr -d -)" \
+  -d '{"origin":"US","dest":"DE","itemValue":{"amount":120,"currency":"USD"},"dimsCm":{"l":20,"w":15,"h":10},"weightKg":1.2,"categoryKey":"general","mode":"air"}' \
+  $CLEARCOST_API_URL/v1/quotes | jq .
 ```
 
-Command registry lives at: `src/lib/cron/registry.ts` with implementations under `src/lib/cron/commands/*`.
+**Internal signing (optional):**
+
+```
+x-cc-ts: <epoch ms>
+x-cc-sig: sha256(hex) of "<ts>:<method>:<url>:<sha256(body)>" + '|' + INTERNAL_SIGNING_SECRET
+```
 
 ---
 
@@ -295,10 +226,33 @@ All require admin auth or a scoped API key. Invoked by GitHub Actions or ops man
 
 ---
 
+## Cron/CLI usage
+
+The CLI wraps long-running imports in provenance + metrics.
+
+```bash
+cd apps/api
+# list available commands
+bun run src/lib/cron/index.ts --help
+
+# examples
+bun run src/lib/cron/index.ts fx:refresh
+bun run src/lib/cron/index.ts import:vat
+bun run src/lib/cron/index.ts import:duties:llm-openai --model gpt-4o-mini
+bun run src/lib/cron/index.ts import:surcharges:llm-crosscheck --mode strict
+bun run src/lib/cron/index.ts import:hs:eu-hs6
+bun run src/lib/cron/index.ts import:sweep-stale --threshold 30
+```
+
+Command registry: `src/lib/cron/registry.ts` (implementations under `src/lib/cron/commands/*`).
+
+---
+
 ## Auth
 
 - **Client APIs:** `x-api-key` (row in DB), enforced by `plugins/api-key-auth.ts`.
 - **Admin /cron:** `x-admin-token` must match `ADMIN_TOKEN` (or use scoped keys).
+- **Internal signing:** `x-cc-ts` + `x-cc-sig` for server-to-server where enabled.
 - **Scopes:** routes declare scopes, e.g. `quotes:write`.
 
 ---
@@ -337,7 +291,7 @@ app.post(
 );
 ```
 
-The plugin (`plugins/import-instrumentation.ts`) will:
+The plugin will:
 
 - start a Prometheus timer and a DB `imports` row
 - heartbeat every 30s (so sweeper can detect stalls)
@@ -356,7 +310,6 @@ The plugin (`plugins/import-instrumentation.ts`) will:
 ## Testing
 
 - **Runner:** `bun test`
-- **Config:** `tsconfig.test.json`
 - **Examples:**
   - `src/lib/run-lock.unit.test.ts`
   - `src/lib/sweep-stale-imports.test.ts`
