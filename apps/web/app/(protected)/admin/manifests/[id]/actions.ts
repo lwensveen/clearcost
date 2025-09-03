@@ -5,7 +5,48 @@ import { revalidateTag } from 'next/cache';
 const API = process.env.CLEARCOST_API_URL!;
 const KEY = process.env.CLEARCOST_WEB_SERVER_KEY!;
 
-// Small helper: always send the server key; merge any extras (e.g., content-type)
+const API_BASE = new URL(API);
+const ALLOWED_HOSTS = new Set<string>([API_BASE.hostname]);
+
+const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
+function assertId(raw: string, label = 'id'): string {
+  const id = String(raw ?? '').trim();
+  if (!ID_RE.test(id)) throw new Error(`Invalid ${label}`);
+  return id;
+}
+
+function buildApiUrl(
+  path: string,
+  qs?: Record<string, string | number | boolean | null | undefined>
+): URL {
+  const url = new URL(path, API_BASE);
+  if (!ALLOWED_HOSTS.has(url.hostname)) throw new Error('Refused external API host');
+  if (qs) {
+    for (const [k, v] of Object.entries(qs)) {
+      if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+    }
+  }
+  return url;
+}
+
+async function safeApiError(r: Response, fallback: string): Promise<string> {
+  try {
+    const data = await r.json();
+    const msg = (data && (data.error || data.message)) || '';
+    if (typeof msg === 'string' && msg) return msg.slice(0, 300);
+  } catch {
+    // ignore
+  }
+  try {
+    const txt = await r.text();
+    if (txt) return txt.slice(0, 300);
+  } catch {
+    // ignore
+  }
+  return fallback;
+}
+
 function authHeaders(extra: Record<string, string> = {}): HeadersInit {
   return { 'x-api-key': KEY, ...extra };
 }
@@ -14,31 +55,32 @@ export async function computeAction(
   id: string,
   allocation: 'chargeable' | 'volumetric' | 'weight' = 'chargeable'
 ) {
-  const r = await fetch(`${API}/v1/manifests/${id}/compute`, {
+  const safeId = assertId(id, 'manifest id');
+  const allowedAlloc = new Set(['chargeable', 'volumetric', 'weight']);
+  const alloc = allowedAlloc.has(allocation) ? allocation : 'chargeable';
+
+  const url = buildApiUrl(`/v1/manifests/${encodeURIComponent(safeId)}/compute`);
+  const r = await fetch(url, {
     method: 'POST',
     headers: {
       ...authHeaders({ 'content-type': 'application/json' }),
       'idempotency-key': crypto.randomUUID(),
     },
-    body: JSON.stringify({ allocation, dryRun: false }),
+    body: JSON.stringify({ allocation: alloc, dryRun: false }),
     cache: 'no-store',
   });
 
   if (!r.ok) {
-    // Try JSON error first, fall back to text
-    let msg = '';
-    try {
-      const j = await r.json();
-      msg = j?.error || j?.message || '';
-    } catch {
-      msg = await r.text().catch(() => '');
-    }
-    if (r.status === 402) throw new Error(msg || 'Plan limit exceeded');
-    throw new Error(msg || `Compute failed (${r.status})`);
+    const msg = await safeApiError(
+      r,
+      r.status === 402 ? 'Plan limit exceeded' : `Compute failed (${r.status})`
+    );
+    if (r.status === 402) throw new Error(msg);
+    throw new Error(msg);
   }
 
-  revalidateTag(`manifest:${id}`);
-  revalidateTag(`manifest:${id}:quote`);
+  revalidateTag(`manifest:${safeId}`);
+  revalidateTag(`manifest:${safeId}:quote`);
 }
 
 export async function createManifestAction(input: {
@@ -48,13 +90,14 @@ export async function createManifestAction(input: {
   mode?: 'air' | 'sea' | string;
   pricingMode?: 'chargeable' | 'volumetric' | 'weight' | string;
 }) {
-  const r = await fetch(`${API}/v1/manifests`, {
+  const url = buildApiUrl('/v1/manifests');
+  const r = await fetch(url, {
     method: 'POST',
     headers: authHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify(input),
     cache: 'no-store',
   });
-  if (!r.ok) throw new Error(await r.text().catch(() => 'Failed to create manifest'));
+  if (!r.ok) throw new Error(await safeApiError(r, 'Failed to create manifest'));
   const { id } = await r.json();
   revalidateTag('manifests');
   return id as string;
@@ -84,30 +127,34 @@ export async function importCsvAction(
   try {
     const file = formData.get('file') as File | null;
     if (!file) return { ok: false, error: 'CSV file is required' };
-    const mode = (formData.get('mode') as 'append' | 'replace') ?? 'append';
+
+    const modeRaw = (formData.get('mode') as string) ?? 'append';
+    const mode = modeRaw === 'replace' ? 'replace' : 'append';
     const dryRun = formData.get('dryRun') === 'on';
 
     const csv = await file.text();
 
-    const r = await fetch(
-      `${API}/v1/manifests/${id}/items:import-csv?mode=${mode}&dryRun=${dryRun ? 'true' : 'false'}`,
-      {
-        method: 'POST',
-        headers: authHeaders({ 'content-type': 'text/csv' }),
-        body: csv,
-        cache: 'no-store',
-      }
-    );
+    const safeId = assertId(id, 'manifest id');
+    const url = buildApiUrl(`/v1/manifests/${encodeURIComponent(safeId)}/items:import-csv`, {
+      mode,
+      dryRun,
+    });
+
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: authHeaders({ 'content-type': 'text/csv' }),
+      body: csv,
+      cache: 'no-store',
+    });
 
     const json = await r.json().catch(() => ({}) as any);
     if (!r.ok) {
       const msg = (json && (json.error || json.message)) || `Import failed (${r.status})`;
-      return { ok: false, error: msg };
+      return { ok: false, error: String(msg).slice(0, 300) };
     }
 
-    // On non-dry runs, refresh manifest + items views
     if (!dryRun) {
-      revalidateTag(`manifest:${id}`);
+      revalidateTag(`manifest:${safeId}`);
     }
 
     return { ok: true, result: json };
@@ -137,6 +184,8 @@ export async function replaceItemsAction(
   dryRun = false
 ): Promise<{ ok: true; replaced: number } | { ok: false; error: string }> {
   try {
+    const safeId = assertId(id, 'manifest id');
+
     const items: ManifestItemInput[] = (itemsRaw ?? []).map((it: any) => ({
       reference: it.reference ?? null,
       notes: it.notes ?? null,
@@ -150,7 +199,8 @@ export async function replaceItemsAction(
         : { l: 0, w: 0, h: 0 },
     }));
 
-    const r = await fetch(`${API}/v1/manifests/${id}/items:replace`, {
+    const url = buildApiUrl(`/v1/manifests/${encodeURIComponent(safeId)}/items:replace`);
+    const r = await fetch(url, {
       method: 'POST',
       headers: authHeaders({ 'content-type': 'application/json' }),
       body: JSON.stringify({ items, dryRun }),
@@ -160,11 +210,11 @@ export async function replaceItemsAction(
     const json = await r.json().catch(() => ({}) as any);
     if (!r.ok) {
       const msg = (json && (json.error || json.message)) || `Replace failed (${r.status})`;
-      return { ok: false, error: msg };
+      return { ok: false, error: String(msg).slice(0, 300) };
     }
 
     if (!dryRun) {
-      revalidateTag(`manifest:${id}`);
+      revalidateTag(`manifest:${safeId}`);
     }
     return { ok: true, replaced: json.replaced ?? items.length };
   } catch (e: any) {
@@ -178,25 +228,29 @@ export async function clearAllItemsAction(id: string) {
 }
 
 export async function cloneManifestAction(id: string, name?: string): Promise<string> {
-  const r = await fetch(`${API}/v1/manifests/${id}/clone`, {
+  const safeId = assertId(id, 'manifest id');
+  const url = buildApiUrl(`/v1/manifests/${encodeURIComponent(safeId)}/clone`);
+  const r = await fetch(url, {
     method: 'POST',
-    headers: { 'x-api-key': KEY, 'content-type': 'application/json' },
+    headers: authHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify(name ? { name } : {}),
     cache: 'no-store',
   });
-  if (!r.ok) throw new Error(await r.text().catch(() => 'Clone failed'));
+  if (!r.ok) throw new Error(await safeApiError(r, 'Clone failed'));
   const j = await r.json();
   revalidateTag('manifests');
   return j.id as string;
 }
 
 export async function deleteManifestAction(id: string) {
-  const r = await fetch(`${API}/v1/manifests/${id}`, {
+  const safeId = assertId(id, 'manifest id');
+  const url = buildApiUrl(`/v1/manifests/${encodeURIComponent(safeId)}`);
+  const r = await fetch(url, {
     method: 'DELETE',
-    headers: { 'x-api-key': KEY },
+    headers: authHeaders(),
     cache: 'no-store',
   });
-  if (!r.ok) throw new Error(await r.text().catch(() => 'Delete failed'));
+  if (!r.ok) throw new Error(await safeApiError(r, 'Delete failed'));
   revalidateTag('manifests');
 }
 
@@ -213,14 +267,16 @@ export async function patchManifestAction(
     reference: string | null;
   }>
 ) {
-  const r = await fetch(`${API}/v1/manifests/${id}`, {
+  const safeId = assertId(id, 'manifest id');
+  const url = buildApiUrl(`/v1/manifests/${encodeURIComponent(safeId)}`);
+  const r = await fetch(url, {
     method: 'PATCH',
-    headers: { 'x-api-key': KEY, 'content-type': 'application/json' },
+    headers: authHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify(patch),
     cache: 'no-store',
   });
-  if (!r.ok) throw new Error(await r.text().catch(() => 'Update failed'));
-  revalidateTag(`manifest:${id}`);
+  if (!r.ok) throw new Error(await safeApiError(r, 'Update failed'));
+  revalidateTag(`manifest:${safeId}`);
   revalidateTag('manifests');
 }
 
@@ -238,26 +294,40 @@ export async function updateItemAction(
     dimsCm: { l?: number; w?: number; h?: number } | null;
   }>
 ) {
-  const r = await fetch(`${API}/v1/manifests/${manifestId}/items/${itemId}`, {
+  const safeManifestId = assertId(manifestId, 'manifest id');
+  const safeItemId = assertId(itemId, 'item id');
+
+  const url = buildApiUrl(
+    `/v1/manifests/${encodeURIComponent(safeManifestId)}/items/${encodeURIComponent(safeItemId)}`
+  );
+
+  const r = await fetch(url, {
     method: 'PATCH',
-    headers: { 'x-api-key': KEY, 'content-type': 'application/json' },
+    headers: authHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify(patch),
     cache: 'no-store',
   });
-  if (!r.ok) throw new Error(await r.text().catch(() => 'Update failed'));
-  revalidateTag(`manifest:${manifestId}`);
-  revalidateTag(`manifest:${manifestId}:quote`);
+  if (!r.ok) throw new Error(await safeApiError(r, 'Update failed'));
+  revalidateTag(`manifest:${safeManifestId}`);
+  revalidateTag(`manifest:${safeManifestId}:quote`);
 }
 
 export async function deleteItemAction(manifestId: string, itemId: string) {
-  const r = await fetch(`${API}/v1/manifests/${manifestId}/items/${itemId}`, {
+  const safeManifestId = assertId(manifestId, 'manifest id');
+  const safeItemId = assertId(itemId, 'item id');
+
+  const url = buildApiUrl(
+    `/v1/manifests/${encodeURIComponent(safeManifestId)}/items/${encodeURIComponent(safeItemId)}`
+  );
+
+  const r = await fetch(url, {
     method: 'DELETE',
-    headers: { 'x-api-key': KEY },
+    headers: authHeaders(),
     cache: 'no-store',
   });
-  if (!r.ok) throw new Error(await r.text().catch(() => 'Delete failed'));
-  revalidateTag(`manifest:${manifestId}`);
-  revalidateTag(`manifest:${manifestId}:quote`);
+  if (!r.ok) throw new Error(await safeApiError(r, 'Delete failed'));
+  revalidateTag(`manifest:${safeManifestId}`);
+  revalidateTag(`manifest:${safeManifestId}:quote`);
 }
 
 export async function updateManifestAction(
@@ -273,13 +343,15 @@ export async function updateManifestAction(
     reference: string | null;
   }>
 ) {
-  const r = await fetch(`${API}/v1/manifests/${id}`, {
+  const safeId = assertId(id, 'manifest id');
+  const url = buildApiUrl(`/v1/manifests/${encodeURIComponent(safeId)}`);
+  const r = await fetch(url, {
     method: 'PATCH',
-    headers: { 'x-api-key': KEY, 'content-type': 'application/json' },
+    headers: authHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify(patch),
     cache: 'no-store',
   });
-  if (!r.ok) throw new Error(await r.text().catch(() => 'Update failed'));
-  revalidateTag(`manifest:${id}`);
+  if (!r.ok) throw new Error(await safeApiError(r, 'Update failed'));
+  revalidateTag(`manifest:${safeId}`);
   revalidateTag('manifests');
 }
