@@ -23,6 +23,7 @@ import { manifestSnapshotsTable } from './manifest-snapshots.js';
 import { manifestsTable } from './manifests.js';
 import { merchantProfilesTable } from './merchant-profiles.js';
 import { orgMembershipsTable } from './auth/org-memberships.js';
+import { orgSettingsTable } from './auth/org-settings.js';
 import { orgsTable } from './auth/orgs.js';
 import { passkeysTable } from './auth/passkeys.js';
 import { provenanceTable } from './provenance.js';
@@ -44,6 +45,7 @@ export * from './audit-quotes.js';
 export * from './auth/accounts.js';
 export * from './auth/api-keys.js';
 export * from './auth/org-memberships.js';
+export * from './auth/org-settings.js';
 export * from './auth/orgs.js';
 export * from './auth/passkeys.js';
 export * from './auth/sessions.js';
@@ -105,6 +107,7 @@ export const schema = {
   manifestsTable,
   merchantProfilesTable,
   orgMembershipsTable,
+  orgSettingsTable,
   orgsTable,
   passkeysTable,
   provenanceTable,

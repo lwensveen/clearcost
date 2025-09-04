@@ -17,4 +17,6 @@ export type {
   ManifestSummary,
   ManifestDetail,
   ListManifestsResult,
+  ManifestItemQuote,
+  ManifestQuote,
 } from '@clearcost/types';
