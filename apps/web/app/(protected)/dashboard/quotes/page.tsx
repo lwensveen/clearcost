@@ -1,27 +1,14 @@
 import Link from 'next/link';
-
-async function fetchRecent() {
-  const r = await fetch(
-    `${process.env.NEXT_PUBLIC_BASE_URL}/api/clearcost/quotes/recent?limit=50`,
-    {
-      cache: 'no-store',
-    }
-  );
-  if (!r.ok) throw new Error('Failed to load quotes');
-  return r.json();
-}
+import { listRecent } from '@/lib/quotes';
 
 export default async function QuotesPage() {
-  const data = await fetchRecent();
+  const data = await listRecent(50);
 
   return (
     <div className="space-y-4">
       <div className="flex items-end justify-between">
         <h1 className="text-xl font-semibold">Quotes</h1>
-        <Link
-          href="/(protected)/dashboard/quotes/new"
-          className="rounded bg-black px-3 py-2 text-white"
-        >
+        <Link href="//dashboard/quotes/new" className="rounded bg-black px-3 py-2 text-white">
           New quote
         </Link>
       </div>
@@ -60,7 +47,7 @@ export default async function QuotesPage() {
                 <td className="px-3 py-2 font-mono text-xs">{r.idemKey}</td>
                 <td className="px-3 py-2 text-right">
                   <Link
-                    href={`/(protected)/dashboard/quotes/replay?key=${encodeURIComponent(r.idemKey)}`}
+                    href={`//dashboard/quotes/replay?key=${encodeURIComponent(r.idemKey)}`}
                     className="underline text-blue-600"
                   >
                     Replay
@@ -78,6 +65,7 @@ export default async function QuotesPage() {
           </tbody>
         </table>
       </div>
+
       <p className="text-xs text-gray-500">
         This table shows only <strong>fresh computations</strong> (billable). Replays don’t appear
         here.

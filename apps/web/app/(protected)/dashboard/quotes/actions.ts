@@ -2,72 +2,54 @@
 
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
-import { createQuoteServer, getQuoteByKeyServer } from '@/lib/clearcost-server';
-import type { QuoteInput } from '@clearcost/sdk';
+import { create, getByKey } from '@/lib/quotes';
+import type { QuoteInput } from '@clearcost/types';
 
 const RECENT_KEY = 'cc:recent-quotes';
 
-type RecentItem = { idem: string; at: number };
-
-async function readRecent(): Promise<RecentItem[]> {
-  const store = await cookies();
-  const raw = store.get(RECENT_KEY)?.value;
-
+function readRecentCookie(raw?: string | undefined) {
   try {
-    return (raw ? JSON.parse(raw) : []) as RecentItem[];
+    return raw ? (JSON.parse(raw) as { idem: string; at: number }[]) : [];
   } catch {
     return [];
   }
 }
 
-async function writeRecent(items: RecentItem[]) {
-  const store = await cookies();
-  const anyStore = store as unknown as { set?: (name: string, value: string, opts?: any) => void };
-
-  if (typeof anyStore.set === 'function') {
-    anyStore.set(RECENT_KEY, JSON.stringify(items.slice(0, 10)), {
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
-    });
-  }
-}
-
-export async function actionCreateQuote(formData: FormData) {
+export async function actionCreateQuote(fd: FormData) {
   const body: QuoteInput = {
-    origin: String(formData.get('origin') || 'US'),
-    dest: String(formData.get('dest') || 'DE'),
+    origin: String(fd.get('origin') || 'US'),
+    dest: String(fd.get('dest') || 'DE'),
     itemValue: {
-      amount: Number(formData.get('price') || 0),
-      currency: String(formData.get('currency') || 'USD'),
+      amount: Number(fd.get('price') || 0),
+      currency: String(fd.get('currency') || 'USD'),
     },
     dimsCm: {
-      l: Number(formData.get('l') || 0),
-      w: Number(formData.get('w') || 0),
-      h: Number(formData.get('h') || 0),
+      l: Number(fd.get('l') || 0),
+      w: Number(fd.get('w') || 0),
+      h: Number(fd.get('h') || 0),
     },
-    weightKg: Number(formData.get('weight') || 0),
-    categoryKey: String(formData.get('categoryKey') || 'general'),
-    hs6: (String(formData.get('hs6') || '') || undefined) as string | undefined,
-    mode: String(formData.get('mode') || 'air') as 'air' | 'sea',
+    weightKg: Number(fd.get('weight') || 0),
+    categoryKey: String(fd.get('categoryKey') || 'general'),
+    hs6: (String(fd.get('hs6') || '') || undefined) as string | undefined,
+    mode: String(fd.get('mode') || 'air') as 'air' | 'sea',
   };
 
-  const { quote, idempotencyKey } = await createQuoteServer(body);
+  const { quote, idempotencyKey } = await create(body);
 
-  const items = (await readRecent()).filter((x) => x.idem !== idempotencyKey);
-  items.unshift({ idem: idempotencyKey, at: Date.now() });
-  await writeRecent(items);
+  // put a lightweight “recent” breadcrumb in a cookie so UI feels instant
+  const jar = await cookies();
+  const existing = readRecentCookie(jar.get(RECENT_KEY)?.value);
+  const updated = [
+    { idem: idempotencyKey, at: Date.now() },
+    ...existing.filter((x) => x.idem !== idempotencyKey),
+  ].slice(0, 10);
+  jar.set?.(RECENT_KEY, JSON.stringify(updated), { httpOnly: true, sameSite: 'lax', path: '/' });
 
-  revalidatePath('/(protected)/dashboard/quotes');
+  revalidatePath('//dashboard/quotes');
   return { ok: true, quote, idempotencyKey };
 }
 
 export async function actionReplayByKey(idemKey: string) {
-  const quote = await getQuoteByKeyServer(idemKey);
-
+  const quote = await getByKey(idemKey);
   return { ok: true, quote };
-}
-
-export async function getRecent() {
-  return readRecent();
 }
