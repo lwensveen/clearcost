@@ -43,7 +43,7 @@ export default function NewVat() {
             <div className="flex gap-2">
               <Button type="submit">Create</Button>
               <Button asChild variant="secondary">
-                <Link href="/apps/web/app/(protected)/admin/vat">Cancel</Link>
+                <Link href="/admin/vat">Cancel</Link>
               </Button>
             </div>
           </form>

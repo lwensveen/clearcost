@@ -58,7 +58,7 @@ export default function NewCard() {
             <div className="flex gap-2">
               <Button type="submit">Create</Button>
               <Button asChild variant="secondary">
-                <Link href="/apps/web/app/(protected)/admin/freight">Cancel</Link>
+                <Link href="/admin/freight">Cancel</Link>
               </Button>
             </div>
           </form>

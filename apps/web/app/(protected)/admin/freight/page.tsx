@@ -20,10 +20,10 @@ export default function Page() {
         <h1 className="text-2xl font-semibold">Freight Rate Cards</h1>
         <div className="flex gap-2">
           <Button asChild variant="secondary">
-            <Link href="/apps/web/app/(protected)/admin/freight/import">Import JSON</Link>
+            <Link href="/admin/freight/import">Import JSON</Link>
           </Button>
           <Button asChild>
-            <Link href="/apps/web/app/(protected)/admin/freight/new">New Card</Link>
+            <Link href="/admin/freight/new">New Card</Link>
           </Button>
         </div>
       </div>
@@ -75,10 +75,7 @@ async function CardsTable() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex gap-2 justify-end">
-                    <Link
-                      className="underline text-sm"
-                      href={`/apps/web/app/(protected)/admin/freight/${r.id}`}
-                    >
+                    <Link className="underline text-sm" href={`/admin/freight/${r.id}`}>
                       Steps
                     </Link>
                     <form action={`/api/admin/freight/cards/${r.id}/delete`} method="post">

@@ -20,10 +20,10 @@ export default async function Page() {
         <h1 className="text-2xl font-semibold">VAT Rules</h1>
         <div className="flex gap-2">
           <Button asChild variant="secondary">
-            <Link href="/apps/web/app/(protected)/admin/vat/import">Import CSV</Link>
+            <Link href="/admin/vat/import">Import CSV</Link>
           </Button>
           <Button asChild>
-            <Link href="/apps/web/app/(protected)/admin/vat/new">New</Link>
+            <Link href="/admin/vat/new">New</Link>
           </Button>
         </div>
       </div>

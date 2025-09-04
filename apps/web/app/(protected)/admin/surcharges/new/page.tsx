@@ -44,7 +44,7 @@ export default function NewSurcharge() {
             <div className="flex gap-2">
               <Button type="submit">Create</Button>
               <Button asChild variant="secondary">
-                <Link href="/apps/web/app/(protected)/admin/surcharges">Cancel</Link>
+                <Link href="/admin/surcharges">Cancel</Link>
               </Button>
             </div>
           </form>

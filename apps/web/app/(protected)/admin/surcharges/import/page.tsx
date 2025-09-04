@@ -23,7 +23,7 @@ export default function ImportSurcharges() {
             <div className="flex gap-2">
               <Button type="submit">Import</Button>
               <Button asChild variant="secondary">
-                <Link href="/apps/web/app/(protected)/admin/surcharges">Back</Link>
+                <Link href="/admin/surcharges">Back</Link>
               </Button>
             </div>
           </form>

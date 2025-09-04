@@ -19,10 +19,10 @@ export default function Page() {
         <h1 className="text-2xl font-semibold">Surcharges</h1>
         <div className="flex gap-2">
           <Button asChild variant="secondary">
-            <Link href="/apps/web/app/(protected)/admin/surcharges/import">Import</Link>
+            <Link href="/admin/surcharges/import">Import</Link>
           </Button>
           <Button asChild>
-            <Link href="/apps/web/app/(protected)/admin/surcharges/new">New</Link>
+            <Link href="/admin/surcharges/new">New</Link>
           </Button>
         </div>
       </div>

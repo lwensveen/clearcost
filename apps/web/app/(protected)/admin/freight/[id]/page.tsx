@@ -22,7 +22,7 @@ export default async function StepsPage({ params }: { params: Promise<{ id: stri
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Card {id} — Steps</h1>
         <Button asChild variant="secondary">
-          <Link href="/apps/web/app/(protected)/admin/freight">Back</Link>
+          <Link href="/admin/freight">Back</Link>
         </Button>
       </div>
 
