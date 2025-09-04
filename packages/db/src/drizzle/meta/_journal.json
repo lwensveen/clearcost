@@ -127,6 +127,13 @@
       "when": 1756873307667,
       "tag": "0017_odd_argent",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1756959927476,
+      "tag": "0018_soft_jocasta",
+      "breakpoints": true
     }
   ]
 }

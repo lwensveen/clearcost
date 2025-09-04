@@ -1,27 +1,26 @@
-import { index, jsonb, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { index, jsonb, pgTable, uuid, varchar } from 'drizzle-orm/pg-core';
+import { apiKeysTable } from './auth/api-keys.js';
 import { createTimestampColumn } from '../utils.js';
 
 export const quoteSnapshotsTable = pgTable(
   'quote_snapshots',
   {
-    id: uuid('id').defaultRandom().primaryKey(),
-    /** logical scope, keep 'quotes' for now to allow future snapshot kinds */
-    scope: text('scope').notNull().default('quotes'),
-    /** idempotency key used for this quote */
-    idemKey: text('idem_key').notNull(),
-    /** raw request body used to compute the quote */
+    id: uuid('id').primaryKey().defaultRandom(),
+    scope: varchar('scope', { length: 128 }).notNull(),
+    idemKey: varchar('idem_key', { length: 128 }).notNull(),
     request: jsonb('request').notNull(),
-    /** full response we returned to the caller */
     response: jsonb('response').notNull(),
-    /** FX as-of date used in compute (optional/null if unknown) */
     fxAsOf: createTimestampColumn('fx_as_of', { defaultNow: true }),
-    /** optional “data runs” you want to pin (import runs, etc.) */
     dataRuns: jsonb('data_runs'),
+    ownerId: uuid('owner_id').notNull(),
+    apiKeyId: uuid('api_key_id')
+      .notNull()
+      .references(() => apiKeysTable.id),
     createdAt: createTimestampColumn('created_at', { defaultNow: true }),
     updatedAt: createTimestampColumn('updated_at', { defaultNow: true, onUpdate: true }),
   },
   (t) => ({
-    byScopeKey: uniqueIndex('quote_snapshots_scope_key_uq').on(t.scope, t.idemKey),
-    createdAtIdx: index('quote_snapshots_created_at_idx').on(t.createdAt),
+    idxScopeKey: index('quote_snapshots_scope_key_idx').on(t.scope, t.idemKey),
+    idxOwnerCreated: index('quote_snapshots_owner_created_idx').on(t.ownerId, t.createdAt),
   })
 );
