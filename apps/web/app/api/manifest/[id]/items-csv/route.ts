@@ -1,22 +1,22 @@
-import { type NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { exportManifestItemsCsv } from '@clearcost/sdk';
 
-const API = process.env.CLEARCOST_API_URL!;
-const KEY = process.env.CLEARCOST_WEB_SERVER_KEY!;
+function sdk() {
+  const baseUrl = process.env.CLEARCOST_API_URL!;
+  const apiKey = process.env.CLEARCOST_WEB_SERVER_KEY!;
+  if (!baseUrl || !apiKey) throw new Error('Missing CLEARCOST_API_URL / CLEARCOST_WEB_SERVER_KEY');
+  return { baseUrl, apiKey };
+}
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  const csv = await exportManifestItemsCsv(sdk(), id);
 
-  const r = await fetch(`${API}/v1/manifests/${id}/items.csv`, {
-    headers: { 'x-api-key': KEY },
-    cache: 'no-store',
-  });
-
-  const body = await r.text();
-  return new NextResponse(body, {
-    status: r.status,
+  return new NextResponse(csv, {
     headers: {
       'content-type': 'text/csv; charset=utf-8',
       'content-disposition': `attachment; filename="manifest-${id}-items.csv"`,
+      'cache-control': 'no-store',
     },
   });
 }
