@@ -15,10 +15,20 @@ export function Header() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
+  useEffect(() => {
+    const { body } = document;
+    if (!body) return;
+    const prev = body.style.overflow;
+    body.style.overflow = open ? 'hidden' : prev || '';
+    return () => {
+      body.style.overflow = prev || '';
+    };
+  }, [open]);
+
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2" aria-label="ClearCost home">
           <span className="font-heading text-lg md:text-xl font-semibold tracking-tight">
             ClearCost
           </span>
@@ -42,10 +52,10 @@ export function Header() {
         <div className="hidden items-center gap-2 md:flex">
           <ThemeToggle />
           <Button asChild variant="ghost">
-            <Link href="/admin/api-keys">Dashboard</Link>
+            <Link href="/login">Sign in</Link>
           </Button>
           <Button asChild>
-            <Link href="/admin/api-keys">Get API key</Link>
+            <Link href="/signup">Sign up</Link>
           </Button>
         </div>
 
@@ -54,9 +64,9 @@ export function Header() {
           onClick={() => setOpen((s) => !s)}
           aria-expanded={open}
           aria-controls="mobile-nav"
-          aria-label="Toggle navigation"
+          aria-label={open ? 'Close navigation' : 'Open navigation'}
         >
-          Menu
+          {open ? 'Close' : 'Menu'}
         </button>
       </div>
 
@@ -78,10 +88,10 @@ export function Header() {
             <div className="pt-2 flex items-center gap-2">
               <ThemeToggle />
               <Button asChild variant="ghost" className="w-full" onClick={() => setOpen(false)}>
-                <Link href="/admin/api-keys">Dashboard</Link>
+                <Link href="/login">Sign in</Link>
               </Button>
               <Button asChild className="w-full" onClick={() => setOpen(false)}>
-                <Link href="/admin/api-keys">Get API key</Link>
+                <Link href="/signup">Sign up</Link>
               </Button>
             </div>
           </div>
