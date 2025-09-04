@@ -147,7 +147,7 @@ export async function importCsvAction(
       cache: 'no-store',
     });
 
-    const json = await r.json().catch(() => ({}) as any);
+    const json = await r.json().catch(() => ({}));
     if (!r.ok) {
       const msg = (json && (json.error || json.message)) || `Import failed (${r.status})`;
       return { ok: false, error: String(msg).slice(0, 300) };
@@ -207,7 +207,7 @@ export async function replaceItemsAction(
       cache: 'no-store',
     });
 
-    const json = await r.json().catch(() => ({}) as any);
+    const json = await r.json().catch(() => ({}));
     if (!r.ok) {
       const msg = (json && (json.error || json.message)) || `Replace failed (${r.status})`;
       return { ok: false, error: String(msg).slice(0, 300) };

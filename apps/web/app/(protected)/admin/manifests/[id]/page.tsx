@@ -1,4 +1,4 @@
-import { fetchManifestFull, fetchManifestQuote } from '@/lib/manifest';
+import { getManifestFull, getManifestQuotes } from '@/lib/manifests';
 import { ComputeButton } from '@/components/manifest/ComputeButton';
 import { ImportCsvForm } from '@/components/manifest/ImportCsvForm';
 import { ReplaceItemsPanel } from '@/components/manifest/ReplaceItemsPanel';
@@ -14,12 +14,12 @@ export const revalidate = 0;
 export default async function ManifestDetailPage({ params }: Props) {
   const { id } = await params;
   const [full, quote, plan] = await Promise.all([
-    fetchManifestFull(id),
-    fetchManifestQuote(id),
+    getManifestFull(id),
+    getManifestQuotes(id),
     fetchBillingPlan(),
   ]);
 
-  const m = full?.manifest;
+  const m = full;
   const items = full?.items ?? [];
   const s = quote?.summary;
 
@@ -43,8 +43,8 @@ export default async function ManifestDetailPage({ params }: Props) {
           <h2 className="text-lg font-medium">Fixed freight</h2>
           <FixedPricingInline
             id={id}
-            fixedFreightTotal={m.fixedFreightTotal as any}
-            fixedFreightCurrency={m.fixedFreightCurrency as any}
+            fixedFreightTotal={m.fixedFreightTotal}
+            fixedFreightCurrency={m.fixedFreightCurrency}
           />
         </section>
       )}
@@ -62,25 +62,25 @@ export default async function ManifestDetailPage({ params }: Props) {
             <div className="p-3 border rounded">
               <div className="text-xs text-neutral-500">Freight</div>
               <div className="font-semibold">
-                {s.freight.toFixed(2)} {s.currency ?? ''}
+                {s.freightTotal.toFixed(2)} {s.currency ?? ''}
               </div>
             </div>
             <div className="p-3 border rounded">
               <div className="text-xs text-neutral-500">Duty</div>
               <div className="font-semibold">
-                {s.duty.toFixed(2)} {s.currency ?? ''}
+                {s.dutyTotal.toFixed(2)} {s.currency ?? ''}
               </div>
             </div>
             <div className="p-3 border rounded">
               <div className="text-xs text-neutral-500">VAT</div>
               <div className="font-semibold">
-                {s.vat.toFixed(2)} {s.currency ?? ''}
+                {s.vatTotal.toFixed(2)} {s.currency ?? ''}
               </div>
             </div>
             <div className="p-3 border rounded">
               <div className="text-xs text-neutral-500">Fees</div>
               <div className="font-semibold">
-                {s.fees.toFixed(2)} {s.currency ?? ''}
+                {s.feesTotal.toFixed(2)} {s.currency ?? ''}
               </div>
             </div>
             <div className="p-3 border rounded">
@@ -101,7 +101,7 @@ export default async function ManifestDetailPage({ params }: Props) {
 
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Items ({items.length})</h2>
-        <InlineItemsTable manifestId={id} items={items as any} />
+        <InlineItemsTable manifestId={id} items={items} />
         <section className="space-y-2 mt-4">
           <ReplaceItemsPanel id={id} items={items} />
         </section>
