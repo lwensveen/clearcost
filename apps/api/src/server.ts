@@ -34,6 +34,7 @@ import { apiKeyAuthPlugin } from './plugins/api-key-auth.js';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
 import metaRoutes from './modules/meta/routes.js';
 import errorHandler from './plugins/error-handler.js';
+import orgSelfSettingsRoutes from './modules/org-settings/routes.js';
 
 export async function buildServer() {
   const app = Fastify({
@@ -103,6 +104,7 @@ export async function buildServer() {
   await app.register(manifestsRoutes, { prefix: '/v1/manifests' });
   await app.register(quoteRoutes, { prefix: '/v1/quotes' });
   await app.register(usagePublicRoutes, { prefix: '/v1/usage' });
+  await app.register(orgSelfSettingsRoutes, { prefix: '/v1/orgs' });
 
   // --------------
   // Admin surfaces
