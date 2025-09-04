@@ -1,6 +1,7 @@
 export * from './api-keys.js';
 export * from './audit-quotes.js';
 export * from './categories.js';
+export * from './classify.js';
 export * from './de-minimis.js';
 export * from './duty-rates.js';
 export * from './freight-rate-cards.js';
@@ -9,6 +10,8 @@ export * from './fx-rates.js';
 export * from './hs-code-aliases.js';
 export * from './hs-codes.js';
 export * from './imports.js';
+export * from './manifest-sdk.js';
 export * from './provenance.js';
+export * from './quotes.js';
 export * from './surcharges.js';
 export * from './vat-rules.js';
