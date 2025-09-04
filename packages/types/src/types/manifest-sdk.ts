@@ -8,7 +8,7 @@ import {
   ManifestModeSchema,
   ManifestSummarySchema,
   MoneyInputSchema,
-} from '../schemas/manifest-sdk.js';
+} from '../schemas/index.js';
 
 export type ManifestMode = z.infer<typeof ManifestModeSchema>;
 export type MoneyInput = z.infer<typeof MoneyInputSchema>;

@@ -12,7 +12,7 @@ export default function DocsPage() {
         </p>
         <div className="mt-4">
           <Button asChild>
-            <Link href="/apps/web/app/(protected)/admin/api-keys">Get API key</Link>
+            <Link href="/admin/api-keys">Get API key</Link>
           </Button>
         </div>
       </section>
