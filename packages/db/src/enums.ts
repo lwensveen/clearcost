@@ -123,3 +123,5 @@ export const resourceTypeEnum = pgEnum('resource_type', [
 export const shippingModeEnum = pgEnum('shipping_mode', ['air', 'sea']);
 export const pricingModeEnum = pgEnum('pricing_mode', ['cards', 'fixed']);
 export const incotermEnum = pgEnum('incoterm', ['DAP', 'DDP']); // optional on quotes
+
+export const orgRoleEnum = pgEnum('org_role', ['owner', 'admin', 'member']);
