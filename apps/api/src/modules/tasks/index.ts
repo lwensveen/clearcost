@@ -14,10 +14,16 @@ import hsRoutes from './hs-routes.js';
 import importsPruneRoutes from './prune-routes.js';
 import sweepRoutes from './sweep-routes.js';
 import deMinimisRoutes from './de-minimis-routes.js';
+import jpDutyRoutes from './duties/jp-routes.js';
+import cnDutyRoutes from './duties/cn-routes.js';
+import aseanDutyRoutes from './duties/asean/index.js';
 
 export default function taskRoutes(app: FastifyInstance) {
   // Duties
+  aseanDutyRoutes(app);
+  cnDutyRoutes(app);
   euDutyRoutes(app);
+  jpDutyRoutes(app);
   ukDutyRoutes(app);
   usDutyRoutes(app);
   witsDutyRoutes(app);
