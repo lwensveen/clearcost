@@ -32,6 +32,13 @@ jobs:
             -X POST -H "x-api-key: $TASKS_KEY" \
             "${API%/}/internal/cron/import/vat/auto" | jq .
 
+      - name: EU Duties (TARIC — daily)
+        run: |
+          curl --fail-with-body --show-error --silent \
+            --retry 3 --retry-all-errors \
+            -X POST -H "x-api-key: $TASKS_KEY" \
+            "${API%/}/internal/cron/import/duties/eu/daily" | jq .
+
       - name: De Minimis — official
         run: |
           curl --fail-with-body --show-error --silent \

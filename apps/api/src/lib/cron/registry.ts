@@ -31,6 +31,7 @@ import {
   surchargesLlmOpenAI,
 } from './commands/surcharges-llm.js';
 import { vatLlmCrossCheck, vatLlmGrok, vatLlmOpenAI } from './commands/vat-llm.js';
+import { dutiesEuBackfill, dutiesEuDaily } from './commands/duties-eu.js';
 
 export const commands: Record<string, Command> = {
   'fx:refresh': fxRefresh,
@@ -41,6 +42,8 @@ export const commands: Record<string, Command> = {
   'import:de-minimis:zonos': deMinimisZonos,
 
   'import:duties': dutiesJson,
+  'import:duties:eu-backfill': dutiesEuBackfill,
+  'import:duties:eu-daily': dutiesEuDaily,
   'import:duties:llm-crosscheck': dutiesLlmCrossCheck,
   'import:duties:llm-grok': dutiesLlmGrok,
   'import:duties:llm-openai': dutiesLlmOpenAI,
