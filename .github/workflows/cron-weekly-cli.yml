@@ -65,6 +65,15 @@ jobs:
             --backfillYears 1 \
             --concurrency 3
 
+      - name: Duties — WITS (China + partners)
+        working-directory: apps/api
+        run: |
+          bun run src/lib/cron/runtime.ts import:duties:wits \
+            --dests CN \
+            --partners EU,US,GB,JP,KR,AU,NZ,CA,MX,CL,PE,PK,CH,NO,IS,LI,SG,MY,TH,ID,PH,VN,LA,KH,BN \
+            --backfillYears 1 \
+            --concurrency 3
+
       # ----------- Surcharges -----------
       - name: Surcharges — US trade remedies
         working-directory: apps/api
