@@ -1,10 +1,10 @@
-import type { Command } from '../runtime.js';
-import { withRun } from '../runtime.js';
-import { parseFlags } from '../utils.js';
-import { parseDateMaybe } from '../../parse-date-maybe.js';
-import { importEuFromDaily } from '../../../modules/duty-rates/services/eu/import-daily.js';
-import { importEuMfn } from '../../../modules/duty-rates/services/eu/import-mfn.js';
-import { importEuPreferential } from '../../../modules/duty-rates/services/eu/import-preferential.js';
+import type { Command } from '../../runtime.js';
+import { withRun } from '../../runtime.js';
+import { parseFlags } from '../../utils.js';
+import { parseDateMaybe } from '../../../parse-date-maybe.js';
+import { importEuFromDaily } from '../../../../modules/duty-rates/services/eu/import-daily.js';
+import { importEuMfn } from '../../../../modules/duty-rates/services/eu/import-mfn.js';
+import { importEuPreferential } from '../../../../modules/duty-rates/services/eu/import-preferential.js';
 
 export const dutiesEuDaily: Command = async (args) => {
   const flags = parseFlags(args);

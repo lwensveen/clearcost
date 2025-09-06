@@ -1,7 +1,7 @@
-import type { Command } from '../runtime.js';
-import { withRun } from '../runtime.js';
-import { importDutyRatesFromWITS } from '../../../modules/duty-rates/services/wits/import-from-wits.js';
-import { buildImportId, parseCSV, parseFlags } from '../utils.js';
+import type { Command } from '../../runtime.js';
+import { withRun } from '../../runtime.js';
+import { importDutyRatesFromWITS } from '../../../../modules/duty-rates/services/wits/import-from-wits.js';
+import { buildImportId, parseCSV, parseFlags } from '../../utils.js';
 
 const DEFAULT_DESTS = [
   'AU',

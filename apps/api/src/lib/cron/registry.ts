@@ -1,8 +1,8 @@
 import type { Command } from './runtime.js';
 import { fxRefresh } from './commands/fx.js';
 import { vatAuto } from './commands/vat.js';
-import { dutiesJson } from './commands/duties-json.js';
-import { dutiesWits } from './commands/duties-wits.js';
+import { dutiesJson } from './commands/duties/duties-json.js';
+import { dutiesWits } from './commands/duties/duties-wits.js';
 import { surchargesJson } from './commands/surcharges-json.js';
 import {
   surchargesUsAll,
@@ -21,17 +21,22 @@ import {
   deMinimisTradeGov,
   deMinimisZonos,
 } from './commands/de-minimis.js';
-import { dutiesUsAll, dutiesUsFta, dutiesUsMfn } from './commands/duties-us.js';
+import { dutiesUsAll, dutiesUsFta, dutiesUsMfn } from './commands/duties/duties-us.js';
 import { programsLoadMembersCsv, programsSeed } from './commands/trade-programs.js';
 import { seedCountriesBasic, seedTradeProgramsUS } from './commands/seed-trade-programs.js';
-import { dutiesLlmCrossCheck, dutiesLlmGrok, dutiesLlmOpenAI } from './commands/duties-llm.js';
+import {
+  dutiesLlmCrossCheck,
+  dutiesLlmGrok,
+  dutiesLlmOpenAI,
+} from './commands/duties/duties-llm.js';
 import {
   surchargesLlmCrossCheck,
   surchargesLlmGrok,
   surchargesLlmOpenAI,
 } from './commands/surcharges-llm.js';
 import { vatLlmCrossCheck, vatLlmGrok, vatLlmOpenAI } from './commands/vat-llm.js';
-import { dutiesEuBackfill, dutiesEuDaily } from './commands/duties-eu.js';
+import { dutiesEuBackfill, dutiesEuDaily } from './commands/duties/duties-eu.js';
+import { dutiesJpAll, dutiesJpFta, dutiesJpMfn } from './commands/duties/duties-jp.js';
 
 export const commands: Record<string, Command> = {
   'fx:refresh': fxRefresh,
@@ -44,6 +49,9 @@ export const commands: Record<string, Command> = {
   'import:duties': dutiesJson,
   'import:duties:eu-backfill': dutiesEuBackfill,
   'import:duties:eu-daily': dutiesEuDaily,
+  'import:duties:jp-all': dutiesJpAll,
+  'import:duties:jp-fta': dutiesJpFta,
+  'import:duties:jp-mfn': dutiesJpMfn,
   'import:duties:llm-crosscheck': dutiesLlmCrossCheck,
   'import:duties:llm-grok': dutiesLlmGrok,
   'import:duties:llm-openai': dutiesLlmOpenAI,
