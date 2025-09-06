@@ -10,8 +10,8 @@
   "devDependencies": {
     "@clearcost/eslint-config": "workspace:*",
     "@clearcost/typescript-config": "workspace:*",
-    "@types/node": "^24.3.0",
-    "eslint": "^9.34.0"
+    "@types/node": "^24.3.1",
+    "eslint": "^9.35.0"
   },
   "files": [
     "dist"
