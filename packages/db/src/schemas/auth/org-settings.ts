@@ -1,11 +1,15 @@
-import { index, jsonb, pgTable, text, uuid, varchar } from 'drizzle-orm/pg-core';
+import { check, jsonb, pgTable, text, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { createTimestampColumn } from '../../utils.js';
+import { orgsTable } from './orgs.js';
+import { sql } from 'drizzle-orm';
 
 export const orgSettingsTable = pgTable(
   'org_settings',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    orgId: uuid('org_id'),
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => orgsTable.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
     billingEmail: varchar('billing_email', { length: 320 }),
     defaultCurrency: varchar('default_currency', { length: 3 }).default('USD').notNull(),
     taxId: varchar('tax_id', { length: 64 }),
@@ -23,6 +27,10 @@ export const orgSettingsTable = pgTable(
     updatedAt: createTimestampColumn('updated_at', { defaultNow: true, onUpdate: true }),
   },
   (t) => ({
-    idxOrg: index('org_settings_org_idx').on(t.orgId),
+    uxOrg: uniqueIndex('ux_org_settings_org').on(t.orgId),
+    ckCurrencyUpper: check(
+      'ck_org_settings_currency_upper',
+      sql`upper(${t.defaultCurrency}) = ${t.defaultCurrency}`
+    ),
   })
 );
