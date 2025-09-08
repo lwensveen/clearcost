@@ -3,6 +3,7 @@ export * from './audit-quotes.js';
 export * from './categories.js';
 export * from './classify.js';
 export * from './de-minimis.js';
+export * from './duty-rate-components.js';
 export * from './duty-rates.js';
 export * from './freight-rate-cards.js';
 export * from './freight-rate-steps.js';
