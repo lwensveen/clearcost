@@ -1,35 +1,18 @@
-import {
-  index,
-  numeric,
-  pgEnum,
-  pgTable,
-  text,
-  uniqueIndex,
-  uuid,
-  varchar,
-} from 'drizzle-orm/pg-core';
-import { dutyRuleEnum } from '../enums.js';
+import { index, numeric, pgTable, text, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { dutyRuleEnum, dutySourceEnum } from '../enums.js';
 import { createTimestampColumn } from '../utils.js';
-
-export const dutySourceEnum = pgEnum('duty_source', [
-  'official', // USITC, TARIC, etc. (authoritative)
-  'wits', // WITS baseline / comparison
-  'vendor', // third-party vendor, if ever
-  'manual', // operator-entered corrections
-  'llm',
-]);
 
 export const dutyRatesTable = pgTable(
   'duty_rates',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    dest: varchar('dest', { length: 2 }).notNull(), // destination ISO2
-    partner: varchar('partner', { length: 2 }).notNull().default(''), // '' = MFN sentinel
+    dest: varchar('dest', { length: 2 }).notNull(),
+    partner: varchar('partner', { length: 2 }).notNull().default(''),
     hs6: varchar('hs6', { length: 6 }).notNull(),
     source: dutySourceEnum('source').notNull().default('official'),
-    ratePct: numeric('rate_pct', { precision: 6, scale: 3 }).notNull(), // e.g., 16.500
-    dutyRule: dutyRuleEnum('duty_rule').default('mfn').notNull(), // MFN by default
-    currency: varchar('currency', { length: 3 }).default('USD').notNull(), // display currency (optional)
+    ratePct: numeric('rate_pct', { precision: 6, scale: 3 }).notNull(),
+    dutyRule: dutyRuleEnum('duty_rule').default('mfn').notNull(),
+    currency: varchar('currency', { length: 3 }).default('USD').notNull(),
     effectiveFrom: createTimestampColumn('effective_from', { defaultNow: true }),
     effectiveTo: createTimestampColumn('effective_to', { defaultNow: true, nullable: true }),
     notes: text('notes'),
@@ -37,7 +20,6 @@ export const dutyRatesTable = pgTable(
     updatedAt: createTimestampColumn('updated_at', { defaultNow: true, onUpdate: true }),
   },
   (t) => ({
-    // single unique that lets MFN (partner='') and FTAs (partner='CA','MX',…) coexist
     byDestPartnerHs6RuleFrom: uniqueIndex('duty_rates_dest_partner_hs6_rule_from_uq').on(
       t.dest,
       t.partner,

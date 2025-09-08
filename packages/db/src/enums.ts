@@ -1,5 +1,6 @@
 import { pgEnum } from 'drizzle-orm/pg-core';
 
+/** VAT / indirect tax */
 export const vatBaseEnum = pgEnum('vat_base', ['CIF', 'CIF_PLUS_DUTY', 'FOB']);
 
 export const deMinimisKind = ['DUTY', 'VAT'] as const;
@@ -15,12 +16,38 @@ export const vatRateKindEnum = pgEnum('vat_rate_kind', [
   'ZERO',
 ]);
 
+/** Freight */
 export const freightModeEnum = pgEnum('freight_mode', ['air', 'sea', 'express']);
-
 export const freightUnitEnum = pgEnum('freight_unit', ['kg', 'm3']);
 
-export const dutyRuleEnum = pgEnum('duty_rule', ['mfn', 'fta', 'anti_dumping', 'safeguard']);
+/** Duties */
+export const dutySourceEnum = pgEnum('duty_source', [
+  'official', // TARIC, USITC, etc.
+  'wits', // World Bank WITS
+  'vendor', // third-party provider
+  'manual', // operator-entered
+  'llm', // model-generated helper / cross-check
+]);
 
+export const dutyRuleEnum = pgEnum('duty_rule', [
+  'mfn',
+  'fta',
+  'anti_dumping',
+  'safeguard',
+  'quota',
+  'provisional',
+]);
+
+/** Duty components (for non-ad-valorem and mixed) */
+export const dutyComponentTypeEnum = pgEnum('duty_component_type', [
+  'advalorem', // percentage of customs value
+  'specific', // amount per unit (e.g., CNY/kg)
+  'minimum', // floor (e.g., min EUR/100kg)
+  'maximum', // cap  (e.g., max EUR/100kg)
+  'other', // catch-all/exotic
+]);
+
+/** Surcharges / fees */
 export const surchargeCodeEnum = pgEnum('surcharge_code', [
   'ANTIDUMPING',
   'AQI_AIRCRAFT',
@@ -49,28 +76,29 @@ export const surchargeCodeEnum = pgEnum('surcharge_code', [
 ]);
 
 export const surchargeRateTypeEnum = pgEnum('surcharge_rate_type', [
-  'ad_valorem', // percent (0–1) of a value basis
-  'fixed', // fixed currency amount
-  'per_unit', // amount per unit (unit_code/unit_amt)
+  'ad_valorem', // fraction (0–1)
+  'fixed', // fixed currency
+  'per_unit', // currency per unit
 ]);
 
 export const surchargeApplyLevelEnum = pgEnum('surcharge_apply_level', [
   'arrival',
-  'entry', // whole entry / shipment arrival
-  'line', // per HS line
-  'program', // program enrollment/annual/etc.
-  'shipment', // transportation-level charge
+  'entry',
+  'line',
+  'program',
+  'shipment',
 ]);
 
 export const surchargeValueBasisEnum = pgEnum('surcharge_value_basis', [
   'cif',
-  'customs', // customs value (transaction value)
-  'duty', // duty amount (rare, but some fees piggyback on duty)
-  'entered', // entered value (if you prefer this naming)
+  'customs',
+  'duty',
+  'entered',
   'fob',
   'other',
 ]);
 
+/** Misc */
 export const transportModeEnum = pgEnum('transport_mode', [
   'ALL',
   'AIR',
@@ -79,23 +107,25 @@ export const transportModeEnum = pgEnum('transport_mode', [
   'RAIL',
   'BARGE',
 ]);
+
 export const importSourceEnum = pgEnum('import_source', [
   'AHTN',
   'APHIS',
   'API',
   'BASELINE',
+  'CN_TAXBOOK',
   'CSV',
   'ECB',
   'FDA',
   'FILE',
   'GROK',
-  'MY_GAZETTE',
   'ID_BTKI',
   'IMF',
   'JP_CUSTOMS',
   'LLM_CROSSCHECK',
   'MANIFEST',
   'MANUAL',
+  'MY_GAZETTE',
   'OECD',
   'OECD/IMF',
   'OFFICIAL',
@@ -117,6 +147,7 @@ export const importStatusEnum = pgEnum('import_status', ['running', 'succeeded',
 export const resourceTypeEnum = pgEnum('resource_type', [
   'de_minimis',
   'duty_rate',
+  'duty_rate_component',
   'freight_card',
   'hs_code',
   'hs_code_alias',
@@ -126,6 +157,6 @@ export const resourceTypeEnum = pgEnum('resource_type', [
 
 export const shippingModeEnum = pgEnum('shipping_mode', ['air', 'sea']);
 export const pricingModeEnum = pgEnum('pricing_mode', ['cards', 'fixed']);
-export const incotermEnum = pgEnum('incoterm', ['DAP', 'DDP']); // optional on quotes
+export const incotermEnum = pgEnum('incoterm', ['DAP', 'DDP']);
 
 export const orgRoleEnum = pgEnum('org_role', ['owner', 'admin', 'member']);
