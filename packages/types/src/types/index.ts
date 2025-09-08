@@ -21,4 +21,6 @@ export * from './orgs.js';
 export * from './quote-snapshots.js';
 export * from './quotes.js';
 export * from './surcharges.js';
+export * from './trade-notice-docs.js';
+export * from './trade-notices.js';
 export * from './vat-rules.js';
