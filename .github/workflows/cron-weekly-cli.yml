@@ -74,6 +74,18 @@ jobs:
             --backfillYears 1 \
             --concurrency 3
 
+      - name: CN — MFN from official PDF (Tabula)
+        if: ${{ env.CN_MFN_PDF_URL != '' }}
+        env:
+          TABULA_JAR_URL: ${{ vars.TABULA_JAR_URL || 'https://github.com/tabulapdf/tabula-java/releases/download/v1.0.5/tabula-1.0.5-jar-with-dependencies.jar' }}
+          CN_MFN_PDF_URL: ${{ secrets.CN_MFN_PDF_URL }}
+        working-directory: apps/api
+        run: |
+          sudo apt-get update && sudo apt-get install -y default-jre
+          curl -L "$TABULA_JAR_URL" -o tabula.jar
+          export TABULA_JAR="$PWD/tabula.jar"
+          bun run src/lib/cron/runtime.ts import:duties:cn-mfn-pdf --url="$CN_MFN_PDF_URL" --mode=auto
+
       # ----------- Surcharges -----------
       - name: Surcharges — US trade remedies
         working-directory: apps/api

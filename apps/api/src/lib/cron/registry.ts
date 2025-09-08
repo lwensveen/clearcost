@@ -37,6 +37,7 @@ import {
 import { vatLlmCrossCheck, vatLlmGrok, vatLlmOpenAI } from './commands/vat-llm.js';
 import { dutiesEuBackfill, dutiesEuDaily } from './commands/duties/duties-eu.js';
 import { dutiesJpAll, dutiesJpFta, dutiesJpMfn } from './commands/duties/duties-jp.js';
+import { dutiesCnMfnPdf } from './commands/duties/duties-cn.js';
 
 export const commands: Record<string, Command> = {
   'fx:refresh': fxRefresh,
@@ -47,6 +48,7 @@ export const commands: Record<string, Command> = {
   'import:de-minimis:zonos': deMinimisZonos,
 
   'import:duties': dutiesJson,
+  'import:duties:cn-mfn-pdf': dutiesCnMfnPdf,
   'import:duties:eu-backfill': dutiesEuBackfill,
   'import:duties:eu-daily': dutiesEuDaily,
   'import:duties:jp-all': dutiesJpAll,

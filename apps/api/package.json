@@ -10,6 +10,7 @@
     "@fastify/swagger": "^9.5.1",
     "@fastify/swagger-ui": "^5.2.3",
     "cheerio": "^1.1.2",
+    "csv-parse": "^6.1.0",
     "dotenv": "^17.2.2",
     "drizzle-orm": "^0.44.5",
     "fast-xml-parser": "^5.2.5",

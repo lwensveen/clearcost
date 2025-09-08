@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
 import { importCnMfn } from '../../duty-rates/services/cn/import-mfn.js';
 import { importCnPreferential } from '../../duty-rates/services/cn/import-preferential.js';
+import { importCnMfnFromPdf } from '../../duty-rates/services/cn/import-mfn-pdf.js';
 
 export default function cnDutyRoutes(app: FastifyInstance) {
   // CN MFN (WITS)
@@ -61,4 +62,30 @@ export default function cnDutyRoutes(app: FastifyInstance) {
       }
     );
   }
+
+  // CN MFN — official tariff book (PDF)
+  const Body = z.object({
+    url: z.string().url(), // e.g. https://yn.mof.gov.cn/.../P020250415728855839413.pdf
+    batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
+    dryRun: z.boolean().optional(),
+  });
+
+  app.post(
+    '/internal/cron/import/duties/cn-mfn/official/pdf',
+    {
+      preHandler: app.requireApiKey(['tasks:duties:cn']),
+      schema: { body: Body },
+      config: { importMeta: { importSource: 'CN_TAXBOOK', job: 'duties:cn-mfn-pdf' } },
+    },
+    async (req, reply) => {
+      const { url, batchSize, dryRun } = Body.parse(req.body ?? {});
+      const res = await importCnMfnFromPdf({
+        urlOrPath: url,
+        batchSize,
+        dryRun,
+        importId: req.importCtx?.runId,
+      });
+      return reply.send(res);
+    }
+  );
 }
