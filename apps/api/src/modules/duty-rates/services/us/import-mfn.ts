@@ -1,7 +1,6 @@
 import { fetchUsMfnDutyRates } from './mfn.js';
 import { batchUpsertDutyRatesFromStream } from '../../utils/batch-upsert.js';
-
-const DEBUG = process.argv.includes('--debug') || process.env.DEBUG === '1';
+import { DEBUG } from '../../utils/utils.js';
 
 export async function importUsMfn({
   effectiveFrom,

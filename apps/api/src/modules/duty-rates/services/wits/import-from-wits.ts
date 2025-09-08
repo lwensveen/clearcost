@@ -3,6 +3,7 @@ import type { DutyRateInsert } from '@clearcost/types';
 import { fetchWitsMfnDutyRates } from './mfn.js';
 import { fetchWitsPreferentialDutyRates } from './preferential.js';
 import { batchUpsertDutyRatesFromStream } from '../../utils/batch-upsert.js';
+import { DEBUG } from '../../utils/utils.js';
 
 const DEFAULT_DESTS = [
   'US',
@@ -55,8 +56,6 @@ function defaultMakeWitsSourceRef(row: DutyRateInsert, ctx: ProvCtx): string {
 export type ImportFromWitsParams = ImportFromWitsCore & {
   makeSourceRef?: (row: DutyRateInsert, ctx: ProvCtx) => string;
 };
-
-const DEBUG = process.argv.includes('--debug') || process.env.DEBUG === '1';
 
 export async function importDutyRatesFromWITS(params: ImportFromWitsParams) {
   const p = ParamsSchema.parse(params);

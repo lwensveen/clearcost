@@ -1,6 +1,7 @@
 import countries from 'i18n-iso-countries';
 import en from 'i18n-iso-countries/langs/en.json' with { type: 'json' };
 import type { DutyRateInsert } from '@clearcost/types';
+import { DEBUG } from '../../utils/utils.js';
 
 countries.registerLocale(en);
 
@@ -9,7 +10,6 @@ export const SDMX_BASE =
 
 // 6 consecutive digits anywhere in a token (fallback extractor)
 const HS6_SUB = /\d{6}/;
-const DEBUG = process.argv.includes('--debug') || process.env.DEBUG === '1';
 
 /** Format to 3 decimals, never "-0.000" */
 export function toNumeric3String(n: number): string {

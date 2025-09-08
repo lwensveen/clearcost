@@ -1,6 +1,7 @@
 import { db, dutyRatesTable, provenanceTable } from '@clearcost/db';
 import { sha256Hex } from '../../../lib/provenance.js';
 import { sql } from 'drizzle-orm';
+import { DEBUG } from './utils.js';
 
 type DutyRateInsertRow = typeof dutyRatesTable.$inferInsert;
 type DutyRateSelectRow = typeof dutyRatesTable.$inferSelect;
@@ -9,8 +10,6 @@ type ProvOpts = {
   importId?: string;
   makeSourceRef?: (row: DutyRateSelectRow) => string | undefined; // e.g., 'wits:US:ERGA:mfn:hs6=010121:y=2022'
 };
-
-const DEBUG = process.argv.includes('--debug') || process.env.DEBUG === '1';
 
 const clamp = (s: string | undefined | null, max = 255) =>
   typeof s === 'string' ? s.slice(0, max) : undefined;

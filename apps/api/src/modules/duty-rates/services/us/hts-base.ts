@@ -12,11 +12,11 @@
 // - We return raw records per chapter; MFN/FTA layers do the parsing.
 
 import { UsitcClient } from './usitc-client.js';
+import { DEBUG } from '../../utils/utils.js';
 
 const HTS_BASE = process.env.HTS_API_BASE ?? 'https://hts.usitc.gov';
 const HTS_CSV_URL = process.env.HTS_CSV_URL || ''; // point this at your CSV mirror or official export URL
 const client = new UsitcClient(HTS_BASE);
-const DEBUG = process.argv.includes('--debug') || process.env.DEBUG === '1';
 
 // ---------------- tiny utils ----------------
 const norm = (s: string) =>
