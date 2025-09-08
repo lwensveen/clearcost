@@ -31,6 +31,8 @@ import { quoteSnapshotsTable } from './quote-snapshots.js';
 import { sessionsTable } from './auth/sessions.js';
 import { surchargesTable } from './surcharges.js';
 import { taxRegistrationsTable } from './tax-registrations.js';
+import { tradeNoticeDocsTable } from './trade-notice-docs.js';
+import { tradeNoticesTable } from './trade-notices.js';
 import { tradeProgramMembersTable } from './trade-program-members.js';
 import { tradeProgramsTable } from './trade-programs.js';
 import { usersTable } from './users/users.js';
@@ -74,6 +76,8 @@ export * from './provenance.js';
 export * from './quote-snapshots.js';
 export * from './surcharges.js';
 export * from './tax-registrations.js';
+export * from './trade-notice-docs.js';
+export * from './trade-notices.js';
 export * from './trade-program-members.js';
 export * from './trade-programs.js';
 export * from './users/users.js';
@@ -115,6 +119,8 @@ export const schema = {
   sessionsTable,
   surchargesTable,
   taxRegistrationsTable,
+  tradeNoticeDocsTable,
+  tradeNoticesTable,
   tradeProgramMembersTable,
   tradeProgramsTable,
   usersTable,

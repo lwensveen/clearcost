@@ -113,6 +113,7 @@ export const importSourceEnum = pgEnum('import_source', [
   'APHIS',
   'API',
   'BASELINE',
+  'CN_NOTICES',
   'CN_TAXBOOK',
   'CSV',
   'ECB',
@@ -126,6 +127,7 @@ export const importSourceEnum = pgEnum('import_source', [
   'MANIFEST',
   'MANUAL',
   'MY_GAZETTE',
+  'NOTICES',
   'OECD',
   'OECD/IMF',
   'OFFICIAL',
@@ -160,3 +162,18 @@ export const pricingModeEnum = pgEnum('pricing_mode', ['cards', 'fixed']);
 export const incotermEnum = pgEnum('incoterm', ['DAP', 'DDP']);
 
 export const orgRoleEnum = pgEnum('org_role', ['owner', 'admin', 'member']);
+
+export const NOTICE_TYPE_VALUES = [
+  'provisional_rate',
+  'trq',
+  'retaliatory',
+  'suspension',
+  'fta_schedule',
+  'general',
+  'other',
+] as const;
+
+export const NOTICE_STATUS_VALUES = ['new', 'fetched', 'parsed', 'ignored', 'error'] as const;
+
+export const noticeTypeEnum = pgEnum('notice_type', NOTICE_TYPE_VALUES);
+export const noticeStatusEnum = pgEnum('notice_status', NOTICE_STATUS_VALUES);
