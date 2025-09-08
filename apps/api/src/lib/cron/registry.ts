@@ -38,6 +38,9 @@ import { vatLlmCrossCheck, vatLlmGrok, vatLlmOpenAI } from './commands/vat-llm.j
 import { dutiesEuBackfill, dutiesEuDaily } from './commands/duties/duties-eu.js';
 import { dutiesJpAll, dutiesJpFta, dutiesJpMfn } from './commands/duties/duties-jp.js';
 import { dutiesCnMfnPdf } from './commands/duties/duties-cn.js';
+import { crawlNoticesCmd } from './commands/notices/notices.js';
+import { fetchNoticeDocsCmd } from './commands/notices/docs.js';
+import { crawlNoticesJsonCmd } from './commands/notices/json-feed.js';
 
 export const commands: Record<string, Command> = {
   'fx:refresh': fxRefresh,
@@ -61,6 +64,10 @@ export const commands: Record<string, Command> = {
   'import:duties:us-fta': dutiesUsFta,
   'import:duties:us-mfn': dutiesUsMfn,
   'import:duties:wits': dutiesWits,
+
+  'crawl:notices': crawlNoticesCmd,
+  'crawl:notices:fetch-docs': fetchNoticeDocsCmd,
+  'crawl:notices:json': crawlNoticesJsonCmd,
 
   'import:freight': freightJson,
 

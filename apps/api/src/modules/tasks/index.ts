@@ -1,22 +1,23 @@
 import type { FastifyInstance } from 'fastify';
-import fxRoutes from './fx-routes.js';
-import vatRoutes from './vat-routes.js';
-import ukDutyRoutes from './duties/uk-routes.js';
+import aseanDutyRoutes from './duties/asean/index.js';
+import cnDutyRoutes from './duties/cn-routes.js';
+import deMinimisRoutes from './de-minimis-routes.js';
 import euDutyRoutes from './duties/eu-routes.js';
-import usDutyRoutes from './duties/us-routes.js';
-import witsDutyRoutes from './duties/wits-routes.js';
-import surchargeUsRoutes from './surcharges/us-routes.js';
-import surchargeEuRoutes from './surcharges/eu-routes.js';
-import surchargeUkRoutes from './surcharges/uk-routes.js';
-import surchargeJsonRoute from './surcharges/generic-json.js';
 import freightRoutes from './freight-routes.js';
+import fxRoutes from './fx-routes.js';
 import hsRoutes from './hs-routes.js';
 import importsPruneRoutes from './prune-routes.js';
-import sweepRoutes from './sweep-routes.js';
-import deMinimisRoutes from './de-minimis-routes.js';
 import jpDutyRoutes from './duties/jp-routes.js';
-import cnDutyRoutes from './duties/cn-routes.js';
-import aseanDutyRoutes from './duties/asean/index.js';
+import noticesRoutes from './notices-routes.js';
+import surchargeEuRoutes from './surcharges/eu-routes.js';
+import surchargeJsonRoute from './surcharges/generic-json.js';
+import surchargeUkRoutes from './surcharges/uk-routes.js';
+import surchargeUsRoutes from './surcharges/us-routes.js';
+import sweepRoutes from './sweep-routes.js';
+import ukDutyRoutes from './duties/uk-routes.js';
+import usDutyRoutes from './duties/us-routes.js';
+import vatRoutes from './vat-routes.js';
+import witsDutyRoutes from './duties/wits-routes.js';
 
 export default function taskRoutes(app: FastifyInstance) {
   // Duties
@@ -33,6 +34,9 @@ export default function taskRoutes(app: FastifyInstance) {
   surchargeUkRoutes(app);
   surchargeUsRoutes(app);
   surchargeJsonRoute(app);
+
+  // Notices
+  noticesRoutes(app);
 
   // Other domains
   fxRoutes(app);
