@@ -60,6 +60,27 @@ jobs:
             -X POST -H "x-api-key: $TASKS_KEY" \
             "${API%/}/internal/cron/de-minimis/import-zonos" | jq .
 
+      - name: Notices — CN (MOF)
+        run: |
+          curl --fail-with-body --show-error --silent \
+            --retry 3 --retry-all-errors \
+            -X POST -H "x-api-key: $TASKS_KEY" \
+            "${API%/}/internal/cron/notices/cn/mof" | jq .
+
+      - name: Notices — CN (GACC)
+        run: |
+          curl --fail-with-body --show-error --silent \
+            --retry 3 --retry-all-errors \
+            -X POST -H "x-api-key: $TASKS_KEY" \
+            "${API%/}/internal/cron/notices/cn/gacc" | jq .
+
+      - name: Notices — CN (MOFCOM)
+        run: |
+          curl --fail-with-body --show-error --silent \
+            --retry 3 --retry-all-errors \
+            -X POST -H "x-api-key: $TASKS_KEY" \
+            "${API%/}/internal/cron/notices/cn/mofcom" | jq .
+
       - name: Prune old imports & provenance
         run: |
           BODY="{\"days\": ${PRUNE_DAYS}}"

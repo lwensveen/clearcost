@@ -1,0 +1,131 @@
+name: Cron (Daily — CLI)
+
+on:
+  schedule:
+    - cron: '29 2 * * *' # daily 02:29 UTC
+  workflow_dispatch: {}
+
+concurrency:
+  group: cron-daily-cli
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '22'
+  BUN_VERSION: 'latest'
+  TZ: UTC
+  HTTP_USER_AGENT: 'clearcost-bot/1.0 (+https://clearcost.io; tariff research; contact: support@clearcost.io)'
+
+jobs:
+  mof_cn_notices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_ENV: production
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node & Bun (with cache)
+        uses: ./.github/actions/setup-node-bun
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          bun-version: ${{ env.BUN_VERSION }}
+
+      # Add more MOF seed pages + include/exclude filters
+      - name: Crawl CN MOF notice lists
+        working-directory: apps/api
+        run: |
+          bun run src/lib/cron/runtime.ts crawl:notices \
+            --dest CN \
+            --authority MOF \
+            --type general \
+            --urls "https://gss.mof.gov.cn/zhengwuxinxi/zhengcefabu/,https://gss.mof.gov.cn/zhengwuxinxi/zhengcefabu_2/" \
+            --include "pdf,tariff,税率,进口关税,关税,调整" \
+            --exclude "存档,归档,old,archive,旧"
+
+      - name: Attach/download PDFs for new CN MOF notices
+        working-directory: apps/api
+        run: |
+          bun run src/lib/cron/runtime.ts crawl:notices:fetch-docs \
+            --dest CN \
+            --authority MOF \
+            --status new \
+            --limit 80 \
+            --attachNonPdf 1 \
+            --concurrency 4
+
+  gacc_cn_notices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_ENV: production
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node & Bun (with cache)
+        uses: ./.github/actions/setup-node-bun
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          bun-version: ${{ env.BUN_VERSION }}
+
+      # GACC seeds (adjust/add pages as needed)
+      - name: Crawl CN GACC notice lists
+        working-directory: apps/api
+        run: |
+          bun run src/lib/cron/runtime.ts crawl:notices \
+            --dest CN \
+            --authority GACC \
+            --type general \
+            --urls "https://www.customs.gov.cn/customs/302249/302266/index.html,https://www.customs.gov.cn/customs/302249/302266/index_1.html" \
+            --include "pdf,税率,关税,税则,进口关税,调整" \
+            --exclude "存档,归档,old,archive,旧"
+
+      - name: Attach/download PDFs for new CN GACC notices
+        working-directory: apps/api
+        run: |
+          bun run src/lib/cron/runtime.ts crawl:notices:fetch-docs \
+            --dest CN \
+            --authority GACC \
+            --status new \
+            --limit 80 \
+            --attachNonPdf 1 \
+            --concurrency 4
+
+  mofcom_cn_notices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_ENV: production
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node & Bun (with cache)
+        uses: ./.github/actions/setup-node-bun
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          bun-version: ${{ env.BUN_VERSION }}
+
+      # MOFCOM seeds (adjust/add pages as needed)
+      - name: Crawl CN MOFCOM notice lists
+        working-directory: apps/api
+        run: |
+          bun run src/lib/cron/runtime.ts crawl:notices \
+            --dest CN \
+            --authority MOFCOM \
+            --type general \
+            --urls "https://www.mofcom.gov.cn/article/b/c/,https://www.mofcom.gov.cn/article/b/c/2025/" \
+            --include "pdf,税率,关税,暂定税率,税则,调整" \
+            --exclude "存档,归档,old,archive,旧"
+
+      - name: Attach/download PDFs for new CN MOFCOM notices
+        working-directory: apps/api
+        run: |
+          bun run src/lib/cron/runtime.ts crawl:notices:fetch-docs \
+            --dest CN \
+            --authority MOFCOM \
+            --status new \
+            --limit 80 \
+            --attachNonPdf 1 \
+            --concurrency 4
