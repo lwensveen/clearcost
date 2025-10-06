@@ -1,7 +1,7 @@
 {
   "name": "clearcost",
   "devDependencies": {
-    "@commitlint/cli": "^19.8.1",
+    "@commitlint/cli": "^20.1.0",
     "@commitlint/config-conventional": "^19.8.1",
     "@dotenvx/dotenvx": "^1.49.0",
     "@types/bun": "^1.2.21",
