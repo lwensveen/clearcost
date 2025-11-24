@@ -23,7 +23,7 @@ jobs:
       NODE_ENV: production
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Setup Node & Bun (with cache)
         uses: ./.github/actions/setup-node-bun
@@ -61,7 +61,7 @@ jobs:
       NODE_ENV: production
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Setup Node & Bun (with cache)
         uses: ./.github/actions/setup-node-bun
@@ -99,7 +99,7 @@ jobs:
       NODE_ENV: production
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Setup Node & Bun (with cache)
         uses: ./.github/actions/setup-node-bun
