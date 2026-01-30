@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useRef } from 'react';
 
+type RedocInit = (specUrl: string, options: Record<string, unknown>, element: HTMLElement) => void;
+
 export default function ApiReference() {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -8,7 +10,8 @@ export default function ApiReference() {
     const s = document.createElement('script');
     s.src = 'https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js';
     s.onload = () => {
-      (window as any).Redoc.init('/api-meta/openapi.json', {}, ref.current!);
+      const redoc = (window as Window & { Redoc?: { init: RedocInit } }).Redoc;
+      redoc?.init('/api-meta/openapi.json', {}, ref.current!);
     };
     document.body.appendChild(s);
     return () => {

@@ -49,6 +49,12 @@ jobs:
       - name: Install deps (monorepo)
         run: bun install --frozen-lockfile
 
+      - name: Validate docs (tasks scopes)
+        run: bun run validate-docs
+
+      - name: Validate turbo env list
+        run: bun run validate-envs
+
       - name: Run DB migrations (if available)
         shell: bash
         run: |

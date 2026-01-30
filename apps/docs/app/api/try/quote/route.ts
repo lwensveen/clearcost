@@ -21,11 +21,16 @@ function isoCc(v: unknown) {
   return /^[A-Z]{2}$/.test(s) ? s : null;
 }
 
+function asRecord(v: unknown): Record<string, unknown> | null {
+  return v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+}
+
 export async function POST(req: NextRequest) {
   if (!API || !KEY) return bad('Server not configured');
-  let body: any = null;
+  let body: Record<string, unknown> | null = null;
   try {
-    body = await req.json();
+    const raw = await req.json();
+    body = asRecord(raw);
   } catch {
     return bad('Invalid JSON');
   }
@@ -33,12 +38,14 @@ export async function POST(req: NextRequest) {
   // Validate/normalize strictly (don’t forward raw user input)
   const origin = isoCc(body?.origin);
   const dest = isoCc(body?.dest);
-  const amount = num(body?.itemValue?.amount, 0);
-  const currency = String(body?.itemValue?.currency ?? 'USD').toUpperCase();
+  const itemValue = asRecord(body?.itemValue);
+  const dimsBody = asRecord(body?.dimsCm);
+  const amount = num(itemValue?.amount, 0);
+  const currency = String(itemValue?.currency ?? 'USD').toUpperCase();
   const dims = {
-    l: num(body?.dimsCm?.l, 0),
-    w: num(body?.dimsCm?.w, 0),
-    h: num(body?.dimsCm?.h, 0),
+    l: num(dimsBody?.l, 0),
+    w: num(dimsBody?.w, 0),
+    h: num(dimsBody?.h, 0),
   };
   const weightKg = num(body?.weightKg, 0);
   const categoryKey = String(body?.categoryKey ?? 'general');

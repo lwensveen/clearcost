@@ -14,21 +14,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      API: ${{ secrets.CLEARCOST_API_URL }}
-      TASKS_KEY: ${{ secrets.CLEARCOST_TASKS_API_KEY }}
+      CLEARCOST_INTERNAL_API_URL: ${{ secrets.CLEARCOST_INTERNAL_API_URL }}
+      CLEARCOST_TASKS_API_KEY: ${{ secrets.CLEARCOST_TASKS_API_KEY }}
+      INTERNAL_SIGNING_SECRET: ${{ secrets.INTERNAL_SIGNING_SECRET }}
       THRESHOLD_MINUTES: ${{ vars.IMPORTS_SWEEP_THRESHOLD_MINUTES || 30 }}
     steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Validate internal envs
+        run: bun run internal-request -- --validate
+
       - name: Sweep stale imports
         run: |
-          set -euo pipefail
           BODY="{\"thresholdMinutes\": ${THRESHOLD_MINUTES}}"
-          curl --fail-with-body --show-error --silent \
-            --retry 3 --retry-all-errors \
-            -X POST \
-            -H "x-api-key: $TASKS_KEY" \
-            -H "content-type: application/json" \
-            -d "$BODY" \
-            "${API%/}/internal/cron/imports/sweep-stale" | jq .
+          bun run internal-request -- --path /internal/cron/imports/sweep-stale --body "$BODY" | jq .
 
       - name: Slack (success)
         if: success()

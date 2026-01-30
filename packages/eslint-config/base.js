@@ -18,7 +18,10 @@ export const config = [
       turbo: turboPlugin,
     },
     rules: {
-      'turbo/no-undeclared-env-vars': 'warn',
+      'turbo/no-undeclared-env-vars': [
+        'warn',
+        { allowList: ['CLEARCOST_WEB_SERVER_KEY', 'NEXT_PHASE'] },
+      ],
     },
   },
   {

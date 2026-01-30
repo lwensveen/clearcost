@@ -189,6 +189,7 @@
         "@clearcost/eslint-config": "workspace:*",
         "@clearcost/typescript-config": "workspace:*",
         "@types/node": "^24.3.1",
+        "esbuild": "^0.25.9",
         "eslint": "^9.35.0",
       },
     },

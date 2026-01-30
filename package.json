@@ -26,10 +26,13 @@
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint -- --fix",
     "prepare": "husky",
+    "internal-request": "bun run scripts/internal-request.ts",
     "test": "vitest run",
     "test:ci": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "validate-docs": "bun run scripts/validate-docs.ts",
+    "validate-envs": "bun run scripts/validate-turbo-envs.ts"
   },
   "trustedDependencies": [
     "@clearcost/widget",

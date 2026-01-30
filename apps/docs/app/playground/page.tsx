@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { formatError } from '../../../web/lib/errors';
 
 type FormState = {
   origin: string;
@@ -67,8 +68,8 @@ export default function Playground() {
       });
       const t = await r.text();
       setResp(t);
-    } catch (e: any) {
-      setResp(e?.message ?? String(e));
+    } catch (e: unknown) {
+      setResp(formatError(e, 'Request failed'));
     } finally {
       setLoading(false);
     }

@@ -14,83 +14,59 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      API: ${{ secrets.CLEARCOST_API_URL }}
-      TASKS_KEY: ${{ secrets.CLEARCOST_TASKS_API_KEY }}
+      CLEARCOST_INTERNAL_API_URL: ${{ secrets.CLEARCOST_INTERNAL_API_URL }}
+      CLEARCOST_TASKS_API_KEY: ${{ secrets.CLEARCOST_TASKS_API_KEY }}
+      INTERNAL_SIGNING_SECRET: ${{ secrets.INTERNAL_SIGNING_SECRET }}
       PRUNE_DAYS: ${{ vars.IMPORTS_PRUNE_DAYS || 90 }}
     steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Validate internal envs
+        run: bun run internal-request -- --validate
+
       - name: FX daily (ECB)
         run: |
-          curl --fail-with-body --show-error --silent \
-            --retry 3 --retry-all-errors \
-            -X POST -H "x-api-key: $TASKS_KEY" \
-            "${API%/}/internal/cron/fx/daily" | jq .
+          bun run internal-request -- --path /internal/cron/fx/daily --body '{}' | jq .
 
       - name: VAT (OECD/IMF auto)
         run: |
-          curl --fail-with-body --show-error --silent \
-            --retry 3 --retry-all-errors \
-            -X POST -H "x-api-key: $TASKS_KEY" \
-            "${API%/}/internal/cron/import/vat/auto" | jq .
+          bun run internal-request -- --path /internal/cron/import/vat/auto --body '{}' | jq .
 
       - name: EU Duties (TARIC — daily)
         run: |
-          curl --fail-with-body --show-error --silent \
-            --retry 3 --retry-all-errors \
-            -X POST -H "x-api-key: $TASKS_KEY" \
-            "${API%/}/internal/cron/import/duties/eu/daily" | jq .
+          bun run internal-request -- --path /internal/cron/import/duties/eu/daily --body '{}' | jq .
 
       - name: JP Duties — MFN (Customs)
         run: |
-          curl --fail-with-body --show-error --silent \
-            --retry 3 --retry-all-errors \
-            -X POST -H "x-api-key: $TASKS_KEY" \
-            "${API%/}/internal/cron/import/duties/jp-mfn" | jq .
+          bun run internal-request -- --path /internal/cron/import/duties/jp-mfn --body '{}' | jq .
 
       - name: De Minimis — official
         run: |
-          curl --fail-with-body --show-error --silent \
-            --retry 3 --retry-all-errors \
-            -X POST -H "x-api-key: $TASKS_KEY" \
-            "${API%/}/internal/cron/de-minimis/import-official" | jq .
+          bun run internal-request -- --path /internal/cron/de-minimis/import-official --body '{}' | jq .
 
       - name: De Minimis — Zonos
         run: |
-          curl --fail-with-body --show-error --silent \
-            --retry 3 --retry-all-errors \
-            -X POST -H "x-api-key: $TASKS_KEY" \
-            "${API%/}/internal/cron/de-minimis/import-zonos" | jq .
+          bun run internal-request -- --path /internal/cron/de-minimis/import-zonos --body '{}' | jq .
 
       - name: Notices — CN (MOF)
         run: |
-          curl --fail-with-body --show-error --silent \
-            --retry 3 --retry-all-errors \
-            -X POST -H "x-api-key: $TASKS_KEY" \
-            "${API%/}/internal/cron/notices/cn/mof" | jq .
+          bun run internal-request -- --path /internal/cron/notices/cn/mof --body '{}' | jq .
 
       - name: Notices — CN (GACC)
         run: |
-          curl --fail-with-body --show-error --silent \
-            --retry 3 --retry-all-errors \
-            -X POST -H "x-api-key: $TASKS_KEY" \
-            "${API%/}/internal/cron/notices/cn/gacc" | jq .
+          bun run internal-request -- --path /internal/cron/notices/cn/gacc --body '{}' | jq .
 
       - name: Notices — CN (MOFCOM)
         run: |
-          curl --fail-with-body --show-error --silent \
-            --retry 3 --retry-all-errors \
-            -X POST -H "x-api-key: $TASKS_KEY" \
-            "${API%/}/internal/cron/notices/cn/mofcom" | jq .
+          bun run internal-request -- --path /internal/cron/notices/cn/mofcom --body '{}' | jq .
 
       - name: Prune old imports & provenance
         run: |
           BODY="{\"days\": ${PRUNE_DAYS}}"
-          curl --fail-with-body --show-error --silent \
-            --retry 3 --retry-all-errors \
-            -X POST \
-            -H "x-api-key: $TASKS_KEY" \
-            -H "content-type: application/json" \
-            -d "$BODY" \
-            "${API%/}/internal/cron/imports/prune" | jq .
+          bun run internal-request -- --path /internal/cron/imports/prune --body "$BODY" | jq .
 
       - name: Slack (success)
         if: success()
