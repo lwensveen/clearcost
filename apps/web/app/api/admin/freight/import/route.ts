@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { importFreight } from '@/lib/freight';
+import { errorJson } from '@/lib/http';
 
 export async function POST(req: Request) {
   const fd = await req.formData();
@@ -13,7 +14,7 @@ export async function POST(req: Request) {
     await importFreight(parsed);
 
     return NextResponse.redirect(new URL('/admin/freight', req.url), 302);
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? 'import failed' }, { status: 500 });
+  } catch (e: unknown) {
+    return errorJson(e instanceof Error ? e.message : 'import failed', 500);
   }
 }

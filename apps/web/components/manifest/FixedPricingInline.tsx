@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { patchManifestAction } from '@/app/(protected)/admin/manifests/[id]/actions';
+import { formatError } from '@/lib/errors';
 
 export function FixedPricingInline({
   id,
@@ -51,12 +52,14 @@ export function FixedPricingInline({
               const amt = amount.trim() ? amount.trim() : null;
               const cur = ccy.trim() ? ccy.trim().toUpperCase() : null;
               await patchManifestAction(id, {
-                fixedFreightTotal: amt as any,
-                fixedFreightCurrency: cur as any,
+                fixedFreightTotal: amt,
+                fixedFreightCurrency: cur,
               });
               toast.success('Saved fixed pricing');
-            } catch (e: any) {
-              toast.error('Save failed', { description: e?.message });
+            } catch (e: unknown) {
+              toast.error('Save failed', {
+                description: formatError(e, 'Save failed'),
+              });
             }
           })
         }

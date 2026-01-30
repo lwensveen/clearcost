@@ -26,6 +26,7 @@ import {
   deleteManifestAction,
   patchManifestAction,
 } from '@/app/(protected)/admin/manifests/[id]/actions';
+import { formatError } from '@/lib/errors';
 
 export function ManifestHeaderActions({
   id,
@@ -87,8 +88,10 @@ export function ManifestHeaderActions({
                     await patchManifestAction(id, { name: newName.trim() });
                     toast.success('Renamed');
                     setRenameOpen(false);
-                  } catch (e: any) {
-                    toast.error('Rename failed', { description: e?.message });
+                  } catch (e: unknown) {
+                    toast.error('Rename failed', {
+                      description: formatError(e, 'Rename failed'),
+                    });
                   }
                 })
               }
@@ -124,8 +127,10 @@ export function ManifestHeaderActions({
                     toast.success('Cloned');
                     setCloneOpen(false);
                     router.push(`/admin/manifests/${newId}`);
-                  } catch (e: any) {
-                    toast.error('Clone failed', { description: e?.message });
+                  } catch (e: unknown) {
+                    toast.error('Clone failed', {
+                      description: formatError(e, 'Clone failed'),
+                    });
                   }
                 })
               }
@@ -158,8 +163,10 @@ export function ManifestHeaderActions({
                     toast.success('Deleted');
                     setConfirmDel(false);
                     router.push('/admin/manifests');
-                  } catch (e: any) {
-                    toast.error('Delete failed', { description: e?.message });
+                  } catch (e: unknown) {
+                    toast.error('Delete failed', {
+                      description: formatError(e, 'Delete failed'),
+                    });
                   }
                 })
               }

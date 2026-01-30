@@ -32,6 +32,7 @@ function money(n?: number, c?: string) {
   try {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: c || 'USD' }).format(n);
   } catch {
+    // fallback to a basic format
     return `${c ?? 'USD'} ${n.toFixed(2)}`;
   }
 }
@@ -52,7 +53,9 @@ async function fetchReplay(key: string) {
     try {
       const data = JSON.parse(text) as Quote;
       return { ok: true as const, quote: data, raw: text };
-    } catch {}
+    } catch {
+      // ignore malformed JSON
+    }
   }
 
   try {

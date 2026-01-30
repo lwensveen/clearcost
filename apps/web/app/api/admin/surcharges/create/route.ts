@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSurcharge } from '@/lib/surcharges';
+import { errorJson } from '@/lib/http';
 
 export async function POST(req: Request) {
   const fd = await req.formData();
@@ -12,10 +13,18 @@ export async function POST(req: Request) {
   const notes = fd.get('notes') ? String(fd.get('notes')) : null;
 
   try {
-    await createSurcharge({ dest, code, fixedAmt, pctAmt, effectiveFrom, effectiveTo, notes });
+    await createSurcharge({
+      dest,
+      surchargeCode: code,
+      fixedAmt,
+      pctAmt,
+      effectiveFrom,
+      effectiveTo,
+      notes,
+    });
 
     return NextResponse.redirect(new URL('/admin/surcharges', req.url), 302);
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? 'create failed' }, { status: 500 });
+  } catch (e: unknown) {
+    return errorJson(e instanceof Error ? e.message : 'create failed', 500);
   }
 }

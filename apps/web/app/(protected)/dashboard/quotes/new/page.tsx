@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { actionCreateQuote } from '../actions';
+import { formatError } from '@/lib/errors';
 
 export default function NewQuotePage() {
   const [loading, setLoading] = useState(false);
@@ -28,8 +29,8 @@ export default function NewQuotePage() {
       Object.entries(form).forEach(([k, v]) => fd.set(k, String(v)));
       const res = await actionCreateQuote(fd);
       setResp(JSON.stringify(res.quote, null, 2));
-    } catch (e: any) {
-      setResp(e?.message ?? String(e));
+    } catch (e: unknown) {
+      setResp(formatError(e, 'Request failed'));
     } finally {
       setLoading(false);
     }

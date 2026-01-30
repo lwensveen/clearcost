@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { errorJson } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +12,7 @@ export async function POST(req: NextRequest) {
   const API = process.env.CLEARCOST_API_URL!;
   const KEY = process.env.CLEARCOST_WEB_SERVER_KEY!;
   if (!API || !KEY) {
-    return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
+    return errorJson('Server misconfigured', 500);
   }
 
   // Fixed path (no user-controlled segments)

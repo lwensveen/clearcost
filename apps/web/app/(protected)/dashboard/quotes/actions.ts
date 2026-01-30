@@ -3,20 +3,28 @@
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { create, getByKey } from '@/lib/quotes';
-import type { QuoteInput } from '@clearcost/types';
+import { QuoteInputSchema } from '@clearcost/types';
+import { z } from 'zod/v4';
 
 const RECENT_KEY = 'cc:recent-quotes';
+const RecentCookieSchema = z.array(
+  z.object({
+    idem: z.string(),
+    at: z.number(),
+  })
+);
 
 function readRecentCookie(raw?: string | undefined) {
   try {
-    return raw ? (JSON.parse(raw) as { idem: string; at: number }[]) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    return RecentCookieSchema.parse(parsed);
   } catch {
     return [];
   }
 }
 
 export async function actionCreateQuote(fd: FormData) {
-  const body: QuoteInput = {
+  const body = QuoteInputSchema.parse({
     origin: String(fd.get('origin') || 'US'),
     dest: String(fd.get('dest') || 'DE'),
     itemValue: {
@@ -32,7 +40,7 @@ export async function actionCreateQuote(fd: FormData) {
     categoryKey: String(fd.get('categoryKey') || 'general'),
     hs6: (String(fd.get('hs6') || '') || undefined) as string | undefined,
     mode: String(fd.get('mode') || 'air') as 'air' | 'sea',
-  };
+  });
 
   const { quote, idempotencyKey } = await create(body);
 

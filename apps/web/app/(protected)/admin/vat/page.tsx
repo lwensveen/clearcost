@@ -60,7 +60,7 @@ async function VatTable() {
                 <TableCell className="font-medium">{r.dest}</TableCell>
                 <TableCell>{Number(r.ratePct).toFixed(2)}%</TableCell>
                 <TableCell>
-                  <Badge variant="secondary">{r.base}</Badge>
+                  <Badge variant="secondary">{r.vatBase}</Badge>
                 </TableCell>
                 <TableCell>{new Date(r.effectiveFrom).toLocaleDateString()}</TableCell>
                 <TableCell>

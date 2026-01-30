@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { listRecent } from '@/lib/quotes';
+import type { RecentQuoteRow } from '@/lib/quotes';
 
 export default async function QuotesPage() {
   const data = await listRecent(50);
@@ -30,7 +31,7 @@ export default async function QuotesPage() {
             </tr>
           </thead>
           <tbody>
-            {data.rows.map((r: any) => (
+            {data.rows.map((r: RecentQuoteRow) => (
               <tr key={r.idemKey} className="border-t">
                 <td className="px-3 py-2">{new Date(r.createdAt).toLocaleString()}</td>
                 <td className="px-3 py-2">

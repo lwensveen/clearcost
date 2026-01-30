@@ -8,6 +8,7 @@ import {
 } from '../actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import type { ManifestItemCoerced, ManifestItemQuoteCoerced } from '@clearcost/types';
 
 function money(n?: number, c?: string) {
   if (n == null) return '—';
@@ -28,7 +29,7 @@ export default async function ManifestDetail({ params }: { params: Promise<{ id:
   const history = await getManifestQuotesHistory(id).catch(() => null);
 
   const m = data;
-  const items = Array.isArray(m.items) ? m.items : [];
+  const items: ManifestItemCoerced[] = Array.isArray(m.items) ? m.items : [];
 
   const s = latest?.summary ?? null;
 
@@ -61,7 +62,7 @@ export default async function ManifestDetail({ params }: { params: Promise<{ id:
   }
 
   // quotes history is an array of item-quote snapshots
-  const historyItems = Array.isArray(history) ? history : [];
+  const historyItems: ManifestItemQuoteCoerced[] = Array.isArray(history) ? history : [];
 
   return (
     <div className="space-y-8">
@@ -96,7 +97,7 @@ export default async function ManifestDetail({ params }: { params: Promise<{ id:
                 </tr>
               </thead>
               <tbody>
-                {items.map((it: any, idx: number) => (
+                {items.map((it, idx) => (
                   <tr key={it.id ?? idx} className="border-t">
                     <td className="p-2">{it.reference ?? ''}</td>
                     <td className="p-2">{it.hs6 ?? ''}</td>
@@ -203,7 +204,7 @@ export default async function ManifestDetail({ params }: { params: Promise<{ id:
           <div className="rounded-md border p-3 text-sm">
             <div className="mb-2">Recent quote history (per item):</div>
             <ul className="list-disc ml-5">
-              {historyItems.map((h: any, i: number) => (
+              {historyItems.map((h, i) => (
                 <li key={h.id ?? i}>
                   item {h.itemId ?? h.id ?? '—'} — basis{' '}
                   {typeof h.basis === 'number' ? h.basis.toFixed(2) : '—'} — CIF{' '}

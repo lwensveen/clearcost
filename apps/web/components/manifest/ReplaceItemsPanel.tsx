@@ -6,8 +6,9 @@ import {
   clearAllItemsAction,
   replaceItemsAction,
 } from '../../app/(protected)/admin/manifests/[id]/actions';
+import type { ManifestItemInput } from '../../app/(protected)/admin/manifests/[id]/actions';
 
-type Props = { id: string; items: any[] };
+type Props = { id: string; items: ManifestItemInput[] };
 
 export function ReplaceItemsPanel({ id, items }: Props) {
   const [pending, start] = useTransition();
@@ -45,7 +46,7 @@ export function ReplaceItemsPanel({ id, items }: Props) {
         setMsg('All items cleared.');
         toast.success('All items cleared');
       } else {
-        toast.error('Clear failed', { description: (res as any).error });
+        toast.error('Clear failed', { description: res.error });
       }
     });
 

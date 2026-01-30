@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { fetchUsageByKey, rowsToCSV } from '@/lib/billing';
+import { errorJson } from '@/lib/http';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -7,7 +8,7 @@ export async function GET(req: Request) {
   const from = searchParams.get('from') || undefined;
   const to = searchParams.get('to') || undefined;
 
-  if (!apiKeyId) return NextResponse.json({ error: 'apiKeyId required' }, { status: 400 });
+  if (!apiKeyId) return errorJson('apiKeyId required', 400);
 
   try {
     const rows = await fetchUsageByKey(apiKeyId, from, to);
@@ -19,7 +20,7 @@ export async function GET(req: Request) {
         'content-disposition': `attachment; filename="usage_${apiKeyId}_${from ?? 'start'}_${to ?? 'end'}.csv"`,
       },
     });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? 'export failed' }, { status: 500 });
+  } catch (e: unknown) {
+    return errorJson(e instanceof Error ? e.message : 'export failed', 500);
   }
 }

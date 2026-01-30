@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { addStep } from '@/lib/freight';
+import { errorJson } from '@/lib/http';
 
-export async function POST(req: Request, ctx: any) {
-  const { id } = await ctx.params;
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const fd = await req.formData();
   const uptoQty = Number(fd.get('uptoQty') ?? 0);
   const pricePerUnit = Number(fd.get('pricePerUnit') ?? 0);
@@ -11,7 +12,7 @@ export async function POST(req: Request, ctx: any) {
     await addStep(id, { uptoQty, pricePerUnit });
 
     return NextResponse.redirect(new URL(`/admin/freight/${id}`, req.url), 302);
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? 'create step failed' }, { status: 500 });
+  } catch (e: unknown) {
+    return errorJson(e instanceof Error ? e.message : 'create step failed', 500);
   }
 }

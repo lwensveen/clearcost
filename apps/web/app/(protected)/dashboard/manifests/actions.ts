@@ -8,12 +8,13 @@ import {
   deleteManifest,
   importItemsCsv,
 } from '@/lib/manifests';
+import type { ManifestItemInput } from '@clearcost/types';
 
 export async function createManifestAction(form: FormData): Promise<void> {
   const body = {
     name: String(form.get('name') || 'Untitled'),
     mode: (String(form.get('shippingMode') || 'air') as 'air' | 'sea') ?? 'air',
-    items: [] as any[],
+    items: [] as ManifestItemInput[],
   };
   await createManifest(body);
   revalidatePath('dashboard/manifests');

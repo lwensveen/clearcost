@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { formatError } from '@/lib/errors';
 
 type PlanResp = {
   plan: string;
@@ -25,8 +26,8 @@ export function ComputeQuotaHint() {
           setData(j);
           setErr(null);
         }
-      } catch (e: any) {
-        if (!cancel) setErr(e?.message ?? 'Failed to load plan');
+      } catch (e: unknown) {
+        if (!cancel) setErr(formatError(e, 'Failed to load plan'));
       }
     })();
     return () => {

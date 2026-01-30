@@ -1,10 +1,13 @@
 import { headers } from 'next/headers';
-import { auth } from '@/auth';
+import { getAuth } from '@/auth';
 import Link from 'next/link';
 import { AdminHeader } from '@/components/layout/admin-header';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const auth = getAuth();
+  await auth.api.getSession({ headers: await headers() });
   // if (!session) redirect('/login');
 
   return (

@@ -20,22 +20,24 @@ type ItemRow = {
   dimsCm?: { l?: number; w?: number; h?: number } | null;
 };
 
-function normalizeItem(it: any): ItemRow {
-  const d = it?.dimsCm ?? it?.dims ?? {};
+function normalizeItem(raw: unknown): ItemRow {
+  const it = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const dimsRaw = (it.dimsCm ?? it.dims) as unknown;
+  const d = dimsRaw && typeof dimsRaw === 'object' ? (dimsRaw as Record<string, unknown>) : {};
   return {
-    id: it.id,
-    reference: it.reference ?? '',
-    notes: it.notes ?? '',
-    hs6: it.hs6 ?? '',
-    categoryKey: it.categoryKey ?? '',
-    itemValueAmount: it.itemValueAmount ?? '0',
-    itemValueCurrency: it.itemValueCurrency ?? 'USD',
-    weightKg: it.weightKg ?? '0',
+    id: typeof it.id === 'string' ? it.id : undefined,
+    reference: it.reference == null ? '' : String(it.reference),
+    notes: it.notes == null ? '' : String(it.notes),
+    hs6: it.hs6 == null ? '' : String(it.hs6),
+    categoryKey: it.categoryKey == null ? '' : String(it.categoryKey),
+    itemValueAmount: it.itemValueAmount == null ? '0' : (it.itemValueAmount as string | number),
+    itemValueCurrency: typeof it.itemValueCurrency === 'string' ? it.itemValueCurrency : 'USD',
+    weightKg: it.weightKg == null ? '0' : (it.weightKg as string | number),
     dimsCm: { l: Number(d.l ?? 0), w: Number(d.w ?? 0), h: Number(d.h ?? 0) },
   };
 }
 
-export function EditableItemsTable({ id, items: initial }: { id: string; items: any[] }) {
+export function EditableItemsTable({ id, items: initial }: { id: string; items: unknown[] }) {
   const [rows, setRows] = useState<ItemRow[]>(() => (initial ?? []).map(normalizeItem));
   const [pending, start] = useTransition();
   const router = useRouter();

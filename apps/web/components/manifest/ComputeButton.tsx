@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { computeAction } from '@/app/(protected)/admin/manifests/[id]/actions';
+import { formatError } from '@/lib/errors';
 
 type PlanResp = {
   plan: string;
@@ -12,9 +13,8 @@ type PlanResp = {
   computeUsedToday?: number | null;
 };
 
-export function ComputeButton({ id, plan }: { id: string; plan?: string | null }) {
+export function ComputeButton({ id }: { id: string }) {
   const [pending, start] = useTransition();
-  const [p, setPlan] = useState<string | null>(plan ?? null);
   const [limit, setLimit] = useState<number | null>(null);
   const [used, setUsed] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -27,12 +27,11 @@ export function ComputeButton({ id, plan }: { id: string; plan?: string | null }
         if (!r.ok) throw new Error(await r.text());
         const j: PlanResp = await r.json();
         if (cancel) return;
-        setPlan(j.plan ?? null);
         setLimit(typeof j.computeLimitPerDay === 'number' ? j.computeLimitPerDay : null);
         setUsed(typeof j.computeUsedToday === 'number' ? j.computeUsedToday : null);
         setErr(null);
-      } catch (e: any) {
-        if (!cancel) setErr(e?.message ?? 'Failed to load plan');
+      } catch (e: unknown) {
+        if (!cancel) setErr(formatError(e, 'Failed to load plan'));
       }
     })();
     return () => {
@@ -65,9 +64,8 @@ export function ComputeButton({ id, plan }: { id: string; plan?: string | null }
                   ? `Count: ${Math.min(used + 1, limit)}/${limit}`
                   : undefined,
             });
-          } catch (e: any) {
-            const msg = e?.message || 'Compute failed';
-            toast.error('Compute failed', { description: msg });
+          } catch (e: unknown) {
+            toast.error('Compute failed', { description: formatError(e, 'Compute failed') });
           }
         })
       }

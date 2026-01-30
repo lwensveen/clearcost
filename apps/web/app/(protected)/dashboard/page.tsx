@@ -3,9 +3,10 @@ import { LinkButton } from '@/components/ui/link-button';
 import { PageHeader } from '@/components/layout/page-header';
 import { Section } from '@/components/layout/section';
 import { StatCard } from '@/components/ui/stat-card';
+import type { RecentQuoteRow } from '@/lib/quotes';
 
-async function getRecentQuotes() {
-  return { rows: [] as any[] };
+async function getRecentQuotes(): Promise<{ rows: RecentQuoteRow[] }> {
+  return { rows: [] };
 }
 async function getUsageSummary() {
   return { last24h: 0, last7d: 0 };
@@ -104,7 +105,7 @@ export default async function DashboardHome() {
               </tr>
             </thead>
             <tbody>
-              {recent.rows?.map((r: any) => (
+              {recent.rows?.map((r: RecentQuoteRow) => (
                 <tr key={r.idemKey} className="border-t">
                   <td className="p-2">{new Date(r.createdAt).toLocaleString()}</td>
                   <td className="p-2">

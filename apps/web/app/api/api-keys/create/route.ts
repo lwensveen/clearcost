@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createKey } from '@/lib/api-keys';
+import { errorJson } from '@/lib/http';
 
 export async function POST(req: Request) {
   const form = await req.formData();
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
     : [];
 
   if (!ownerId || !name) {
-    return NextResponse.json({ error: 'ownerId & name required' }, { status: 400 });
+    return errorJson('ownerId & name required', 400);
   }
 
   try {
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
       ),
       { status: 303 }
     );
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? 'Failed to create key' }, { status: 500 });
+  } catch (e: unknown) {
+    return errorJson(e instanceof Error ? e.message : 'Failed to create key', 500);
   }
 }

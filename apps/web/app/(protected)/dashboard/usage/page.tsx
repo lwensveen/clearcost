@@ -1,10 +1,12 @@
-import { auth } from '@/auth';
+import { getAuth } from '@/auth';
 import { aggregate, fetchUsageByKey } from '@/lib/billing';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { listKeys } from '@/lib/api-keys';
+import { headers } from 'next/headers';
 
 export default async function UsagePage() {
-  const session = await auth();
+  const auth = getAuth();
+  const session = await auth.api.getSession({ headers: await headers() });
   const ownerId = session?.user?.id as string | undefined;
   if (!ownerId) return <div className="text-sm text-muted-foreground">Sign in to continue.</div>;
 

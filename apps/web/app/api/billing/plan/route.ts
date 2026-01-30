@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { errorJson } from '@/lib/http';
 
 const API = process.env.CLEARCOST_API_URL!;
 const KEY = process.env.CLEARCOST_WEB_SERVER_KEY!;
@@ -10,7 +11,7 @@ export async function GET() {
   });
   const body = await r.text().catch(() => '');
   if (!r.ok) {
-    return new NextResponse(body || 'Failed to load plan', { status: r.status });
+    return errorJson(body || 'Failed to load plan', r.status);
   }
   return new NextResponse(body, {
     status: 200,

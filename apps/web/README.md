@@ -27,12 +27,27 @@ Then open [http://localhost:3000](http://localhost:3000)
 Create `apps/web/.env.local` (not committed). Minimal variables:
 
 ```bash
-# Where the API lives (e.g. http://localhost:4000)
-NEXT_PUBLIC_API_BASE="http://localhost:4000"
+# Auth/session DB
+DATABASE_URL="postgres://postgres:postgres@localhost:5432/clearcost"
 
-# If you proxy from the server (preferred for secrets):
+# Where the API lives (server-side)
 CLEARCOST_API_URL="http://localhost:4000"
-CLEARCOST_API_KEY="dev_xxx"
+CLEARCOST_WEB_SERVER_KEY="ck_test_..."
+CLEARCOST_ADMIN_API_KEY="ck_test_admin_..."
+
+# Better Auth + email flows
+BETTER_AUTH_URL="http://localhost:3000"
+BETTER_AUTH_SECRET="super-long-random-secret"
+API_URL="http://localhost:3000"
+EMAIL_OTP_API_SECRET="email-otp-secret"
+TURNSTILE_SECRET_KEY="turnstile-secret"
+
+# Redis (Upstash)
+REDIS_URL="https://...upstash.io"
+REDIS_TOKEN="..."
+
+# Public (client-visible)
+NEXT_PUBLIC_API_BASE="http://localhost:4000"
 ```
 
 **Notes**

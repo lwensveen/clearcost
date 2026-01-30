@@ -1,12 +1,16 @@
 'use server';
 
 import { revalidateTag } from 'next/cache';
+import { z } from 'zod/v4';
+import { extractErrorMessage, formatError } from '@/lib/errors';
+import { requireEnvStrict } from '@/lib/env';
 
-const API = process.env.CLEARCOST_API_URL!;
-const KEY = process.env.CLEARCOST_WEB_SERVER_KEY!;
-
-const API_BASE = new URL(API);
-const ALLOWED_HOSTS = new Set<string>([API_BASE.hostname]);
+function getApiConfig() {
+  const api = requireEnvStrict('CLEARCOST_API_URL');
+  const key = requireEnvStrict('CLEARCOST_WEB_SERVER_KEY');
+  const base = new URL(api);
+  return { api, key, base, allowedHosts: new Set<string>([base.hostname]) };
+}
 
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -20,8 +24,9 @@ function buildApiUrl(
   path: string,
   qs?: Record<string, string | number | boolean | null | undefined>
 ): URL {
-  const url = new URL(path, API_BASE);
-  if (!ALLOWED_HOSTS.has(url.hostname)) throw new Error('Refused external API host');
+  const { base, allowedHosts } = getApiConfig();
+  const url = new URL(path, base);
+  if (!allowedHosts.has(url.hostname)) throw new Error('Refused external API host');
   if (qs) {
     for (const [k, v] of Object.entries(qs)) {
       if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
@@ -33,8 +38,8 @@ function buildApiUrl(
 async function safeApiError(r: Response, fallback: string): Promise<string> {
   try {
     const data = await r.json();
-    const msg = (data && (data.error || data.message)) || '';
-    if (typeof msg === 'string' && msg) return msg.slice(0, 300);
+    const msg = extractErrorMessage(data, '');
+    if (msg) return msg.slice(0, 300);
   } catch {
     // ignore
   }
@@ -48,7 +53,8 @@ async function safeApiError(r: Response, fallback: string): Promise<string> {
 }
 
 function authHeaders(extra: Record<string, string> = {}): HeadersInit {
-  return { 'x-api-key': KEY, ...extra };
+  const { key } = getApiConfig();
+  return { 'x-api-key': key, ...extra };
 }
 
 export async function computeAction(
@@ -87,8 +93,8 @@ export async function createManifestAction(input: {
   name: string;
   origin?: string;
   dest?: string;
-  mode?: 'air' | 'sea' | string;
-  pricingMode?: 'chargeable' | 'volumetric' | 'weight' | string;
+  mode?: 'air' | 'sea';
+  pricingMode?: 'cards' | 'fixed';
 }) {
   const url = buildApiUrl('/v1/manifests');
   const r = await fetch(url, {
@@ -98,9 +104,10 @@ export async function createManifestAction(input: {
     cache: 'no-store',
   });
   if (!r.ok) throw new Error(await safeApiError(r, 'Failed to create manifest'));
-  const { id } = await r.json();
+  const raw = await r.json();
+  const { id } = z.object({ id: z.string().uuid() }).parse(raw);
   revalidateTag('manifests');
-  return id as string;
+  return id;
 }
 
 export type ImportCsvState =
@@ -149,7 +156,7 @@ export async function importCsvAction(
 
     const json = await r.json().catch(() => ({}));
     if (!r.ok) {
-      const msg = (json && (json.error || json.message)) || `Import failed (${r.status})`;
+      const msg = extractErrorMessage(json, `Import failed (${r.status})`);
       return { ok: false, error: String(msg).slice(0, 300) };
     }
 
@@ -157,9 +164,18 @@ export async function importCsvAction(
       revalidateTag(`manifest:${safeId}`);
     }
 
-    return { ok: true, result: json };
-  } catch (e: any) {
-    return { ok: false, error: e?.message ?? 'Import failed' };
+    const ImportResultSchema = z.object({
+      mode: z.enum(['append', 'replace']),
+      dryRun: z.boolean(),
+      valid: z.number().int(),
+      invalid: z.number().int(),
+      inserted: z.number().int(),
+      replaced: z.number().int().optional(),
+      errors: z.array(z.object({ line: z.number().int(), message: z.string() })),
+    });
+    return { ok: true, result: ImportResultSchema.parse(json) };
+  } catch (e: unknown) {
+    return { ok: false, error: formatError(e, 'Import failed') };
   }
 }
 
@@ -180,24 +196,44 @@ export type ManifestItemInput = {
  */
 export async function replaceItemsAction(
   id: string,
-  itemsRaw: any[],
+  itemsRaw: unknown[],
   dryRun = false
 ): Promise<{ ok: true; replaced: number } | { ok: false; error: string }> {
   try {
     const safeId = assertId(id, 'manifest id');
 
-    const items: ManifestItemInput[] = (itemsRaw ?? []).map((it: any) => ({
-      reference: it.reference ?? null,
-      notes: it.notes ?? null,
-      hs6: it.hs6 ?? null,
-      categoryKey: it.categoryKey ?? null,
-      itemValueAmount: it.itemValueAmount ?? '0',
-      itemValueCurrency: it.itemValueCurrency ?? 'USD',
-      weightKg: it.weightKg ?? '0',
-      dimsCm: it.dimsCm
-        ? { l: Number(it.dimsCm.l ?? 0), w: Number(it.dimsCm.w ?? 0), h: Number(it.dimsCm.h ?? 0) }
-        : { l: 0, w: 0, h: 0 },
-    }));
+    const items: ManifestItemInput[] = (itemsRaw ?? []).map((raw) => {
+      const it = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+      const dimsRaw = it.dimsCm;
+      const dims =
+        dimsRaw && typeof dimsRaw === 'object' ? (dimsRaw as Record<string, unknown>) : {};
+
+      const ref = it.reference;
+      const notes = it.notes;
+      const hs6 = it.hs6;
+      const categoryKey = it.categoryKey;
+      const itemValueAmount = it.itemValueAmount;
+      const itemValueCurrency = it.itemValueCurrency;
+      const weightKg = it.weightKg;
+
+      return {
+        reference: ref == null ? null : String(ref),
+        notes: notes == null ? null : String(notes),
+        hs6: hs6 == null ? null : String(hs6),
+        categoryKey: categoryKey == null ? null : String(categoryKey),
+        itemValueAmount:
+          typeof itemValueAmount === 'number' || typeof itemValueAmount === 'string'
+            ? itemValueAmount
+            : '0',
+        itemValueCurrency: typeof itemValueCurrency === 'string' ? itemValueCurrency : 'USD',
+        weightKg: typeof weightKg === 'number' || typeof weightKg === 'string' ? weightKg : '0',
+        dimsCm: {
+          l: Number(dims.l ?? 0) || 0,
+          w: Number(dims.w ?? 0) || 0,
+          h: Number(dims.h ?? 0) || 0,
+        },
+      };
+    });
 
     const url = buildApiUrl(`/v1/manifests/${encodeURIComponent(safeId)}/items:replace`);
     const r = await fetch(url, {
@@ -209,16 +245,20 @@ export async function replaceItemsAction(
 
     const json = await r.json().catch(() => ({}));
     if (!r.ok) {
-      const msg = (json && (json.error || json.message)) || `Replace failed (${r.status})`;
+      const msg = extractErrorMessage(json, `Replace failed (${r.status})`);
       return { ok: false, error: String(msg).slice(0, 300) };
     }
 
     if (!dryRun) {
       revalidateTag(`manifest:${safeId}`);
     }
-    return { ok: true, replaced: json.replaced ?? items.length };
-  } catch (e: any) {
-    return { ok: false, error: e?.message ?? 'Replace failed' };
+    const ReplaceResultSchema = z.object({
+      replaced: z.number().int().optional(),
+    });
+    const parsed = ReplaceResultSchema.parse(json);
+    return { ok: true, replaced: parsed.replaced ?? items.length };
+  } catch (e: unknown) {
+    return { ok: false, error: formatError(e, 'Replace failed') };
   }
 }
 
@@ -237,9 +277,10 @@ export async function cloneManifestAction(id: string, name?: string): Promise<st
     cache: 'no-store',
   });
   if (!r.ok) throw new Error(await safeApiError(r, 'Clone failed'));
-  const j = await r.json();
+  const raw = await r.json();
+  const j = z.object({ id: z.string().uuid() }).parse(raw);
   revalidateTag('manifests');
-  return j.id as string;
+  return j.id;
 }
 
 export async function deleteManifestAction(id: string) {

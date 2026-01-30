@@ -4,6 +4,7 @@ import { useTransition } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { createCheckout, openPortal } from './actions';
+import { formatError } from '@/lib/errors';
 
 export function BillingButtons() {
   const [pending, start] = useTransition();
@@ -14,8 +15,10 @@ export function BillingButtons() {
         toast.loading(label);
         const url = await fn();
         window.location.href = url;
-      } catch (e: any) {
-        toast.error('Billing action failed', { description: e?.message });
+      } catch (e: unknown) {
+        toast.error('Billing action failed', {
+          description: formatError(e, 'Billing action failed'),
+        });
       } finally {
         toast.dismiss(); // clear the loading toast
       }

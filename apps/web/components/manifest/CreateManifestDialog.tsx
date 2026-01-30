@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { formatError } from '@/lib/errors';
 
 export function CreateManifestDialog() {
   const [open, setOpen] = useState(false);
@@ -71,21 +72,21 @@ export function CreateManifestDialog() {
 
             start(async () => {
               try {
-                // Backend expects shippingMode/pricingMode on Manifest;
-                // your existing action accepts `mode`, so send both for compatibility.
                 const id = await createManifestAction({
                   name,
                   origin,
                   dest,
-                  mode: shippingMode, // <-- keeps current action typing happy
-                  pricingMode, // 'cards' | 'fixed'
-                } as any);
+                  mode: shippingMode,
+                  pricingMode,
+                });
 
                 toast.success('Manifest created');
                 setOpen(false);
                 router.push(`/admin/manifests/${id}`);
-              } catch (err: any) {
-                toast.error('Create failed', { description: err?.message });
+              } catch (err: unknown) {
+                toast.error('Create failed', {
+                  description: formatError(err, 'Unknown error'),
+                });
               }
             });
           }}
@@ -111,7 +112,7 @@ export function CreateManifestDialog() {
               <div className="text-xs text-neutral-600">Shipping mode</div>
               <Select
                 value={shippingMode}
-                onValueChange={(v: any) => setShippingMode(v as 'air' | 'sea')}
+                onValueChange={(v) => setShippingMode(v === 'sea' ? 'sea' : 'air')}
                 disabled={pending}
               >
                 <SelectTrigger>
@@ -128,7 +129,7 @@ export function CreateManifestDialog() {
               <div className="text-xs text-neutral-600">Pricing mode</div>
               <Select
                 value={pricingMode}
-                onValueChange={(v) => setPricingMode(v as 'cards' | 'fixed')}
+                onValueChange={(v) => setPricingMode(v === 'fixed' ? 'fixed' : 'cards')}
                 disabled={pending}
               >
                 <SelectTrigger>

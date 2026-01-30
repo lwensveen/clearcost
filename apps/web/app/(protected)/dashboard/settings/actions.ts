@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { headers as nextHeaders } from 'next/headers';
 import { z } from 'zod';
-import { auth } from '@/auth';
+import { getAuth } from '@/auth';
 import {
   fetchOrgSettings,
   rotateOrgWebhook,
@@ -71,9 +71,10 @@ export async function updateProfile(formData: FormData): Promise<void> {
     throw new Error(parsed.error.message);
   }
 
+  const auth = getAuth();
   if (typeof auth.api.updateUser === 'function') {
     await auth.api.updateUser({
-      headers: nextHeaders(),
+      headers: await nextHeaders(),
       body: { name: parsed.data.name },
     });
   }

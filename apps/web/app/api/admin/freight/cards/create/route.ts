@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createCard } from '@/lib/freight';
+import { errorJson } from '@/lib/http';
 
 export async function POST(req: Request) {
   const fd = await req.formData();
@@ -8,8 +9,8 @@ export async function POST(req: Request) {
     await createCard({
       origin: String(fd.get('origin') ?? ''),
       dest: String(fd.get('dest') ?? ''),
-      mode: String(fd.get('mode') ?? 'air') as 'air' | 'sea',
-      unit: String(fd.get('unit') ?? 'kg') as 'kg' | 'm3',
+      freightMode: String(fd.get('mode') ?? 'air') as 'air' | 'sea',
+      freightUnit: String(fd.get('unit') ?? 'kg') as 'kg' | 'm3',
       carrier: fd.get('carrier') ? String(fd.get('carrier')) : null,
       service: fd.get('service') ? String(fd.get('service')) : null,
       notes: fd.get('notes') ? String(fd.get('notes')) : null,
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.redirect(new URL('/admin/freight', req.url), 302);
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? 'create failed' }, { status: 500 });
+  } catch (e: unknown) {
+    return errorJson(e instanceof Error ? e.message : 'create failed', 500);
   }
 }

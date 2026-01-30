@@ -21,10 +21,10 @@ export async function POST(req: Request) {
     );
 
     return NextResponse.redirect(url, 302);
-  } catch (e: any) {
+  } catch (e: unknown) {
     const url = new URL(`/admin/api-keys?ownerId=${ownerId}`, req.url);
 
-    url.searchParams.set('error', e?.message ?? 'create failed');
+    url.searchParams.set('error', e instanceof Error ? e.message : 'create failed');
 
     return NextResponse.redirect(url, 302);
   }

@@ -1,7 +1,10 @@
+import 'server-only';
+import { ApiError, extractErrorMessage } from './errors';
+import { requireEnvStrict } from './env';
+
 export function publicApi() {
-  const baseUrl = process.env.CLEARCOST_API_URL!;
-  const apiKey = process.env.CLEARCOST_WEB_SERVER_KEY!;
-  if (!baseUrl || !apiKey) throw new Error('Missing CLEARCOST_API_URL / CLEARCOST_WEB_SERVER_KEY');
+  const baseUrl = requireEnvStrict('CLEARCOST_API_URL');
+  const apiKey = requireEnvStrict('CLEARCOST_WEB_SERVER_KEY');
 
   const join = (p: string) => `${baseUrl.replace(/\/+$/, '')}${p.startsWith('/') ? p : `/${p}`}`;
 
@@ -24,10 +27,11 @@ export function publicApi() {
     if (!res.ok) {
       let msg = text || 'request failed';
       try {
-        const j = JSON.parse(text);
-        msg = j?.error ?? j?.message ?? msg;
-      } catch {}
-      throw new Error(`${res.status} ${msg}`);
+        msg = extractErrorMessage(JSON.parse(text), msg);
+      } catch {
+        // ignore JSON parse errors
+      }
+      throw new ApiError(res.status, `${res.status} ${msg || 'request failed'}`, text);
     }
     return text ? (JSON.parse(text) as T) : (null as unknown as T);
   }

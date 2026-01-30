@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { extractErrorMessage, formatError } from '@/lib/errors';
 
 export function RowActions({ id }: { id: string }) {
   const router = useRouter();
@@ -14,11 +15,11 @@ export function RowActions({ id }: { id: string }) {
       setBusy('clone');
       const r = await fetch(`/api/cc/manifest/${id}/clone`, { method: 'POST' });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j?.error || `Clone failed (${r.status})`);
+      if (!r.ok) throw new Error(extractErrorMessage(j, `Clone failed (${r.status})`));
       toast.success('Cloned manifest');
       router.push(`/admin/manifests/${j.id}`);
-    } catch (e: any) {
-      toast.error(e?.message || 'Clone failed');
+    } catch (e: unknown) {
+      toast.error(formatError(e, 'Clone failed'));
     } finally {
       setBusy(null);
     }
@@ -30,11 +31,11 @@ export function RowActions({ id }: { id: string }) {
       setBusy('delete');
       const r = await fetch(`/api/cc/manifest/${id}/delete`, { method: 'POST' });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j?.error || `Delete failed (${r.status})`);
+      if (!r.ok) throw new Error(extractErrorMessage(j, `Delete failed (${r.status})`));
       toast.success('Deleted');
       router.refresh();
-    } catch (e: any) {
-      toast.error(e?.message || 'Delete failed');
+    } catch (e: unknown) {
+      toast.error(formatError(e, 'Delete failed'));
     } finally {
       setBusy(null);
     }

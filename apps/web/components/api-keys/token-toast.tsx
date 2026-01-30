@@ -11,7 +11,9 @@ export function TokenToast({ token }: { token: string }) {
     });
     try {
       navigator.clipboard?.writeText(token);
-    } catch {}
+    } catch {
+      // ignore clipboard errors
+    }
   }, [token]);
 
   return null;

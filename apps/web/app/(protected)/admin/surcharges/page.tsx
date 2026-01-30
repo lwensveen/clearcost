@@ -58,7 +58,7 @@ async function SurchargesTable() {
             {rows.map((r) => (
               <TableRow key={r.id}>
                 <TableCell className="font-medium">{r.dest}</TableCell>
-                <TableCell>{r.code}</TableCell>
+                <TableCell>{r.surchargeCode}</TableCell>
                 <TableCell className="text-right">{r.fixedAmt ?? '—'}</TableCell>
                 <TableCell className="text-right">
                   {r.pctAmt ?? '—'}

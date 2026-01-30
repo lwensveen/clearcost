@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { setActive } from '@/lib/api-keys';
 
-export async function POST(req: Request, ctx: any) {
-  const { id } = await ctx.params;
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const fd = await req.formData();
 
   const ownerId = String(fd.get('ownerId') ?? '');
@@ -11,7 +11,7 @@ export async function POST(req: Request, ctx: any) {
   try {
     await setActive(id, to);
   } catch {
-    /* empty */
+    // ignore toggle failures
   }
 
   const url = new URL(`/admin/api-keys?ownerId=${ownerId}`, req.url);

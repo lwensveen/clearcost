@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { deleteItemAction, updateItemAction } from '@/app/(protected)/admin/manifests/[id]/actions';
+import { formatError } from '@/lib/errors';
 
 type Item = {
   id: string;
@@ -24,7 +25,7 @@ export function InlineItemsTable({ manifestId, items }: { manifestId: string; it
 
   const onEdit = (id: string, on: boolean) => setEditing((m) => ({ ...m, [id]: on }));
 
-  const onField = (id: string, key: keyof Item, value: any) =>
+  const onField = <K extends keyof Item>(id: string, key: K, value: Item[K]) =>
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, [key]: value } : r)));
 
   const currencyChoices = useMemo(() => {
@@ -158,8 +159,10 @@ export function InlineItemsTable({ manifestId, items }: { manifestId: string; it
                               });
                               toast.success('Item saved');
                               onEdit(r.id, false);
-                            } catch (e: any) {
-                              toast.error('Save failed', { description: e?.message });
+                            } catch (e: unknown) {
+                              toast.error('Save failed', {
+                                description: formatError(e, 'Save failed'),
+                              });
                             }
                           })
                         }
@@ -184,9 +187,11 @@ export function InlineItemsTable({ manifestId, items }: { manifestId: string; it
                             try {
                               await deleteItemAction(manifestId, r.id);
                               toast.success('Item deleted');
-                            } catch (e: any) {
+                            } catch (e: unknown) {
                               setRows(prev);
-                              toast.error('Delete failed', { description: e?.message });
+                              toast.error('Delete failed', {
+                                description: formatError(e, 'Delete failed'),
+                              });
                             }
                           })
                         }

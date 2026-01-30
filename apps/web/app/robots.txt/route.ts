@@ -1,6 +1,4 @@
-import type { NextRequest } from 'next/server';
-
-export function GET(_req: NextRequest) {
+export function GET() {
   const body = ['User-agent: *', 'Allow: /', 'Sitemap: https://containo.example/sitemap.xml'].join(
     '\n'
   );

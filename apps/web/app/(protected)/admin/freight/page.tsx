@@ -62,10 +62,10 @@ async function CardsTable() {
                 <TableCell className="font-medium">{r.origin}</TableCell>
                 <TableCell>{r.dest}</TableCell>
                 <TableCell>
-                  <Badge>{r.mode}</Badge>
+                  <Badge>{r.freightMode}</Badge>
                 </TableCell>
                 <TableCell>
-                  <Badge variant="secondary">{r.unit}</Badge>
+                  <Badge variant="secondary">{r.freightUnit}</Badge>
                 </TableCell>
                 <TableCell>{r.carrier ?? '—'}</TableCell>
                 <TableCell>{r.service ?? '—'}</TableCell>

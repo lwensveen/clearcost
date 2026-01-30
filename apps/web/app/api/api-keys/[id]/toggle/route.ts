@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { setActive } from '@/lib/api-keys';
+import { errorJson } from '@/lib/http';
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const form = await req.formData();
   const ownerId = String(form.get('ownerId') ?? '');
@@ -14,7 +15,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       new URL(`/admin/api-keys?ownerId=${encodeURIComponent(ownerId)}`, req.url),
       { status: 303 }
     );
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? 'Failed to toggle' }, { status: 500 });
+  } catch (e: unknown) {
+    return errorJson(e instanceof Error ? e.message : 'Failed to toggle', 500);
   }
 }

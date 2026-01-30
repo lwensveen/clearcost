@@ -12,7 +12,7 @@ export default function ImportFreight() {
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
             Paste an array of cards:{' '}
-            <code>{`[{ origin, dest, mode, unit, effectiveFrom, steps: [ { uptoQty, pricePerUnit } ] }]`}</code>
+            <code>{`[{ origin, dest, freightMode, freightUnit, effectiveFrom, steps: [ { uptoQty, pricePerUnit } ] }]`}</code>
           </p>
           <form action="/api/admin/freight/import" method="post" className="space-y-3">
             <textarea

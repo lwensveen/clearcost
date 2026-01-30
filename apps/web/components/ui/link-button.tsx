@@ -1,7 +1,8 @@
 import Link from 'next/link';
+import type { ComponentProps } from 'react';
 import { Button } from '@/components/ui/button';
 
-type LinkButtonProps = Omit<any, 'asChild'> & { href: string };
+type LinkButtonProps = Omit<ComponentProps<typeof Button>, 'asChild'> & { href: string };
 
 export function LinkButton({ href, children, ...btn }: LinkButtonProps) {
   return (

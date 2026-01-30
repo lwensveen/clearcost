@@ -1,10 +1,13 @@
 import { headers } from 'next/headers';
-import { auth } from '@/auth';
+import { getAuth } from '@/auth';
 import { DashboardHeader } from '@/components/layout/dashboard/dashboard-header';
 import { DashboardNav } from '@/components/layout/dashboard/dashboard-nav';
 
+export const dynamic = 'force-dynamic';
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const auth = getAuth();
+  await auth.api.getSession({ headers: await headers() });
   // if (!session) redirect('/login');
 
   return (

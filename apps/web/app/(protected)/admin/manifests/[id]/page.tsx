@@ -2,7 +2,6 @@ import { getManifestFull, getManifestQuotes } from '@/lib/manifests';
 import { ComputeButton } from '@/components/manifest/ComputeButton';
 import { ImportCsvForm } from '@/components/manifest/ImportCsvForm';
 import { ReplaceItemsPanel } from '@/components/manifest/ReplaceItemsPanel';
-import { fetchBillingPlan } from '@/lib/billing';
 import { ComputeQuotaHint } from '@/components/manifest/ComputeQuotaHint';
 import { ManifestHeaderActions } from '@/components/manifest/ManifestHeaderActions';
 import { FixedPricingInline } from '@/components/manifest/FixedPricingInline';
@@ -13,11 +12,7 @@ export const revalidate = 0;
 
 export default async function ManifestDetailPage({ params }: Props) {
   const { id } = await params;
-  const [full, quote, plan] = await Promise.all([
-    getManifestFull(id),
-    getManifestQuotes(id),
-    fetchBillingPlan(),
-  ]);
+  const [full, quote] = await Promise.all([getManifestFull(id), getManifestQuotes(id)]);
 
   const m = full;
   const items = full?.items ?? [];
@@ -33,7 +28,7 @@ export default async function ManifestDetailPage({ params }: Props) {
             Export CSV
           </a>
           <ComputeQuotaHint />
-          <ComputeButton id={id} plan={plan?.plan} />
+          <ComputeButton id={id} />
           <ManifestHeaderActions id={id} currentName={m?.name} />
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { formatError } from '@/lib/errors';
 
 type ManifestCsvItem = {
   hs6?: string;
@@ -98,8 +99,8 @@ export default function NewManifestPage() {
       const items = parseCsv(text);
       setPreview(items.slice(0, 5));
       setError(null);
-    } catch (e: any) {
-      setError(e?.message ?? String(e));
+    } catch (e: unknown) {
+      setError(formatError(e, 'Invalid CSV'));
     }
   }
 
@@ -150,8 +151,8 @@ export default function NewManifestPage() {
           `\nOpen: /dashboard/manifests/${id}`,
         ].join(' ')
       );
-    } catch (e: any) {
-      setResult(e?.message || String(e));
+    } catch (e: unknown) {
+      setResult(formatError(e, 'Create failed'));
     } finally {
       setCreating(false);
     }

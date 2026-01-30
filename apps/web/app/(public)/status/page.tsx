@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Card, CardContent } from '@/components/ui/card';
+import { formatError } from '@/lib/errors';
 
 export const metadata: Metadata = {
   title: 'Status — ClearCost',
@@ -44,8 +45,8 @@ async function fetchHealth(): Promise<{ health: Health | null; error?: string }>
     if (!r.ok) return { health: null, error: `${r.status} ${r.statusText}` };
     const json = (await r.json()) as Health;
     return { health: json };
-  } catch (e: any) {
-    return { health: null, error: String(e?.message ?? e) };
+  } catch (e: unknown) {
+    return { health: null, error: formatError(e, 'Fetch failed') };
   }
 }
 
