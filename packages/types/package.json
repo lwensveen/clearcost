@@ -5,20 +5,15 @@
   "dependencies": {
     "@clearcost/db": "workspace:*",
     "drizzle-zod": "^0.8.3",
-    "zod": "^4.1.5"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@clearcost/eslint-config": "workspace:*",
     "@clearcost/typescript-config": "workspace:*",
-    "@types/node": "^24.3.1",
-    "esbuild": "^0.25.9",
-    "eslint": "^9.35.0"
+    "@types/node": "^25.1.0",
+    "esbuild": "^0.27.2",
+    "eslint": "^9.39.2"
   },
-  "files": [
-    "dist"
-  ],
-  "main": "dist/index.js",
-  "private": true,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -26,6 +21,11 @@
       "default": "./dist/index.js"
     }
   },
+  "files": [
+    "dist"
+  ],
+  "main": "dist/index.js",
+  "private": true,
   "scripts": {
     "build": "bun run build:types && bun run build:js",
     "build:js": "esbuild src/index.ts --bundle --format=esm --platform=neutral --packages=external --target=es2020 --outfile=dist/index.js",

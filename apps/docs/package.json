@@ -3,25 +3,25 @@
   "version": "0.1.0",
   "dependencies": {
     "@clearcost/ui": "workspace:*",
-    "next": "^15.5.2",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "next": "^16.1.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
   },
   "devDependencies": {
     "@clearcost/eslint-config": "workspace:*",
     "@clearcost/typescript-config": "workspace:*",
-    "@types/node": "^24.3.1",
-    "@types/react": "19.1.12",
-    "@types/react-dom": "19.1.9",
-    "eslint": "^9.35.0",
-    "typescript": "5.9.2"
+    "@types/node": "^25.1.0",
+    "@types/react": "19.2.10",
+    "@types/react-dom": "19.2.3",
+    "eslint": "^9.39.2",
+    "typescript": "5.9.3"
   },
   "private": true,
   "scripts": {
     "build": "next build",
     "check-types": "tsc --noEmit",
     "dev": "next dev --turbopack --port 3001",
-    "lint": "next lint",
+    "lint": "eslint . --max-warnings 0 --ignore-pattern .next --ignore-pattern next-env.d.ts",
     "start": "next start"
   },
   "type": "module"
