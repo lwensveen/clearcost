@@ -27,24 +27,27 @@ export const FreightRateCardsListQuerySchema = z.object({
 export const FreightModeSchema = z.enum(['air', 'sea']);
 export const FreightUnitSchema = z.enum(['kg', 'm3']);
 
-export const FreightCardAdminCreateSchema = z
-  .object({
-    origin: z.string().length(3),
-    dest: z.string().length(3),
-    freightMode: FreightModeSchema,
-    freightUnit: FreightUnitSchema,
-    carrier: z.string().min(1).optional().nullable(),
-    service: z.string().min(1).optional().nullable(),
-    notes: z.string().optional().nullable(),
-    effectiveFrom: z.coerce.date(),
-    effectiveTo: z.coerce.date().optional().nullable(),
-  })
-  .refine((b) => !b.effectiveTo || b.effectiveTo >= b.effectiveFrom, {
+const FreightCardAdminBaseSchema = z.object({
+  origin: z.string().length(3),
+  dest: z.string().length(3),
+  freightMode: FreightModeSchema,
+  freightUnit: FreightUnitSchema,
+  carrier: z.string().min(1).optional().nullable(),
+  service: z.string().min(1).optional().nullable(),
+  notes: z.string().optional().nullable(),
+  effectiveFrom: z.coerce.date(),
+  effectiveTo: z.coerce.date().optional().nullable(),
+});
+
+export const FreightCardAdminCreateSchema = FreightCardAdminBaseSchema.refine(
+  (b) => !b.effectiveTo || b.effectiveTo >= b.effectiveFrom,
+  {
     message: 'effectiveTo must be >= effectiveFrom',
     path: ['effectiveTo'],
-  });
+  }
+);
 
-export const FreightCardAdminUpdateSchema = FreightCardAdminCreateSchema.partial().refine(
+export const FreightCardAdminUpdateSchema = FreightCardAdminBaseSchema.partial().refine(
   (b) =>
     Object.values(b).some((v) => v !== undefined) &&
     (!b.effectiveTo || !b.effectiveFrom || b.effectiveTo >= b.effectiveFrom),

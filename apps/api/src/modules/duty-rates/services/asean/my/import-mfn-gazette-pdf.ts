@@ -1,4 +1,4 @@
-import pdf from 'pdf-parse';
+import { PDFParse } from 'pdf-parse';
 import { batchUpsertDutyRatesFromStream } from '../../../utils/batch-upsert.js';
 import { parsePercentAdValorem, toHs6 } from '../../../utils/parse.js';
 import { httpFetch } from '../../../../../lib/http.js';
@@ -35,11 +35,17 @@ export async function importMyMfnFromGazettePdf(options: ImportPdfOptions) {
   if (!response.ok) throw new Error(`MY Gazette PDF download failed ${response.status}`);
   const buffer = Buffer.from(await response.arrayBuffer());
 
-  const parsed = await pdf(buffer);
-  const lines = String(parsed.text ?? '')
-    .split(/\r?\n/)
-    .map((line) => line.replace(/\s+/g, ' ').trim())
-    .filter(Boolean);
+  const parser = new PDFParse({ data: buffer });
+  let lines: string[] = [];
+  try {
+    const parsed = await parser.getText();
+    lines = String(parsed.text ?? '')
+      .split(/\r?\n/)
+      .map((line) => line.replace(/\s+/g, ' ').trim())
+      .filter(Boolean);
+  } finally {
+    await parser.destroy();
+  }
 
   // Collect raw (hs6, ratePct) rows from text lines
   const parsedRows: Array<{ hs6: string; ratePct: string }> = [];

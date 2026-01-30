@@ -18,7 +18,7 @@ import {
 } from '@clearcost/types';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2025-08-27.basil',
+  apiVersion: '2026-01-28.clover',
 });
 
 const PRICE: Record<string, string> = {
