@@ -85,8 +85,8 @@ export async function computeAction(
     throw new Error(msg);
   }
 
-  revalidateTag(`manifest:${safeId}`);
-  revalidateTag(`manifest:${safeId}:quote`);
+  revalidateTag(`manifest:${safeId}`, 'default');
+  revalidateTag(`manifest:${safeId}:quote`, 'default');
 }
 
 export async function createManifestAction(input: {
@@ -106,7 +106,7 @@ export async function createManifestAction(input: {
   if (!r.ok) throw new Error(await safeApiError(r, 'Failed to create manifest'));
   const raw = await r.json();
   const { id } = z.object({ id: z.string().uuid() }).parse(raw);
-  revalidateTag('manifests');
+  revalidateTag('manifests', 'default');
   return id;
 }
 
@@ -161,7 +161,7 @@ export async function importCsvAction(
     }
 
     if (!dryRun) {
-      revalidateTag(`manifest:${safeId}`);
+      revalidateTag(`manifest:${safeId}`, 'default');
     }
 
     const ImportResultSchema = z.object({
@@ -250,7 +250,7 @@ export async function replaceItemsAction(
     }
 
     if (!dryRun) {
-      revalidateTag(`manifest:${safeId}`);
+      revalidateTag(`manifest:${safeId}`, 'default');
     }
     const ReplaceResultSchema = z.object({
       replaced: z.number().int().optional(),
@@ -279,7 +279,7 @@ export async function cloneManifestAction(id: string, name?: string): Promise<st
   if (!r.ok) throw new Error(await safeApiError(r, 'Clone failed'));
   const raw = await r.json();
   const j = z.object({ id: z.string().uuid() }).parse(raw);
-  revalidateTag('manifests');
+  revalidateTag('manifests', 'default');
   return j.id;
 }
 
@@ -292,7 +292,7 @@ export async function deleteManifestAction(id: string) {
     cache: 'no-store',
   });
   if (!r.ok) throw new Error(await safeApiError(r, 'Delete failed'));
-  revalidateTag('manifests');
+  revalidateTag('manifests', 'default');
 }
 
 export async function patchManifestAction(
@@ -317,8 +317,8 @@ export async function patchManifestAction(
     cache: 'no-store',
   });
   if (!r.ok) throw new Error(await safeApiError(r, 'Update failed'));
-  revalidateTag(`manifest:${safeId}`);
-  revalidateTag('manifests');
+  revalidateTag(`manifest:${safeId}`, 'default');
+  revalidateTag('manifests', 'default');
 }
 
 export async function updateItemAction(
@@ -349,8 +349,8 @@ export async function updateItemAction(
     cache: 'no-store',
   });
   if (!r.ok) throw new Error(await safeApiError(r, 'Update failed'));
-  revalidateTag(`manifest:${safeManifestId}`);
-  revalidateTag(`manifest:${safeManifestId}:quote`);
+  revalidateTag(`manifest:${safeManifestId}`, 'default');
+  revalidateTag(`manifest:${safeManifestId}:quote`, 'default');
 }
 
 export async function deleteItemAction(manifestId: string, itemId: string) {
@@ -367,8 +367,8 @@ export async function deleteItemAction(manifestId: string, itemId: string) {
     cache: 'no-store',
   });
   if (!r.ok) throw new Error(await safeApiError(r, 'Delete failed'));
-  revalidateTag(`manifest:${safeManifestId}`);
-  revalidateTag(`manifest:${safeManifestId}:quote`);
+  revalidateTag(`manifest:${safeManifestId}`, 'default');
+  revalidateTag(`manifest:${safeManifestId}:quote`, 'default');
 }
 
 export async function updateManifestAction(
@@ -393,6 +393,6 @@ export async function updateManifestAction(
     cache: 'no-store',
   });
   if (!r.ok) throw new Error(await safeApiError(r, 'Update failed'));
-  revalidateTag(`manifest:${safeId}`);
-  revalidateTag('manifests');
+  revalidateTag(`manifest:${safeId}`, 'default');
+  revalidateTag('manifests', 'default');
 }

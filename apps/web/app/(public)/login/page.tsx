@@ -47,7 +47,7 @@ function LoginInner() {
     await authClient.signIn.email(
       { email, password, callbackURL },
       {
-        onError: (ctx) => setError(ctx.error.message),
+        onError: (ctx: { error: { message: string } }) => setError(ctx.error.message),
         onSuccess: () => router.push(callbackURL),
       }
     );

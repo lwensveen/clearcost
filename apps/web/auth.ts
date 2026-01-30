@@ -2,7 +2,6 @@ import 'server-only';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { admin, captcha, emailOTP, haveIBeenPwned, magicLink, username } from 'better-auth/plugins';
-import { passkey } from 'better-auth/plugins/passkey';
 import { nextCookies } from 'better-auth/next-js';
 import { Redis } from '@upstash/redis';
 import {
@@ -115,7 +114,7 @@ export function getAuth(): AuthInstance {
               'Content-Type': 'application/json',
               'x-email-otp-secret': emailOtpApiSecret,
             },
-            body: JSON.stringify({ email: user.email, url }),
+            body: JSON.stringify({ email: user.email, newEmail, url }),
           });
         },
       },
@@ -128,11 +127,11 @@ export function getAuth(): AuthInstance {
               'Content-Type': 'application/json',
               'x-email-otp-secret': emailOtpApiSecret,
             },
-            body: JSON.stringify({ email: user.email, url }),
+            body: JSON.stringify({ email: user.email, url, token }),
           });
         },
-        beforeDelete: async (_user) => {},
-        afterDelete: async (_user) => {},
+        beforeDelete: async () => {},
+        afterDelete: async () => {},
       },
     },
     emailAndPassword: {
@@ -161,7 +160,6 @@ export function getAuth(): AuthInstance {
     },
     plugins: [
       admin(),
-      passkey(),
       haveIBeenPwned(),
       captcha({
         provider: 'cloudflare-turnstile',
