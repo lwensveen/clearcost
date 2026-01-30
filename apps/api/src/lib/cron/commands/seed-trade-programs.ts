@@ -1,6 +1,12 @@
 import type { Command } from '../runtime.js';
 import { withRun } from '../runtime.js';
-import { countriesTable, db, jurisdictionsTable, tradeProgramMembersTable, tradeProgramsTable } from '@clearcost/db';
+import {
+  countriesTable,
+  db,
+  jurisdictionsTable,
+  tradeProgramMembersTable,
+  tradeProgramsTable,
+} from '@clearcost/db';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { parseFlags } from '../utils.js';
 
