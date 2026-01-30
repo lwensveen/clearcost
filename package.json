@@ -1,6 +1,7 @@
 {
   "name": "clearcost",
   "devDependencies": {
+    "@changesets/cli": "^2.29.8",
     "@commitlint/cli": "^20.4.0",
     "@commitlint/config-conventional": "^20.4.0",
     "@dotenvx/dotenvx": "^1.52.0",
