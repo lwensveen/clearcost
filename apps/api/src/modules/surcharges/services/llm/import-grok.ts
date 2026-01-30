@@ -3,6 +3,7 @@ import {
   surchargeLlmSystemPrompt,
 } from './prompts/surcharge-llm.js';
 import { type LlmSurcharge, LlmSurchargePayload } from './schema.js';
+import { httpFetch } from '../../../../lib/http.js';
 
 function stripJsonFence(s: string): string {
   const m = s.match(/^\s*```(?:json)?\s*([\s\S]*?)\s*```\s*$/i);
@@ -27,10 +28,13 @@ export async function importSurchargesFromGrok(
     ],
   };
 
-  const r = await fetch('https://api.x.ai/v1/chat/completions', {
+  const r = await httpFetch('https://api.x.ai/v1/chat/completions', {
     method: 'POST',
     headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
     body: JSON.stringify(body),
+    timeoutMs: 30000,
+    retries: 2,
+    retryOn: (res) => [429, 500, 502, 503, 504].includes(res.status),
   });
   if (!r.ok) throw new Error(`Grok surcharges request failed: ${r.status} ${r.statusText}`);
 

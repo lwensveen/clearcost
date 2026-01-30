@@ -6,6 +6,7 @@ import { tabulaCsv } from '../../utils/pdf-tabula.js';
 import { pickHeader, toHs6 } from '../../utils/parse.js';
 import { db, hsCodeAliasesTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
+import { httpFetch } from '../../../../lib/http.js';
 import {
   type DutyComponentInput,
   type ParentKey,
@@ -167,7 +168,11 @@ export async function importCnMfnFromPdf(options: ImportOptions) {
   // 1) Buffer
   const isUrl = /^https?:\/\//i.test(options.urlOrPath) || options.urlOrPath.startsWith('file://');
   const buffer = isUrl
-    ? Buffer.from(await (await fetch(options.urlOrPath, { redirect: 'follow' })).arrayBuffer())
+    ? Buffer.from(
+        await (
+          await httpFetch(options.urlOrPath, { redirect: 'follow', timeoutMs: 60000 })
+        ).arrayBuffer()
+      )
     : await readFile(options.urlOrPath);
 
   // 2) Tabula → CSV

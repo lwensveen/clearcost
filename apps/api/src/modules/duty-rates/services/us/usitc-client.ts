@@ -1,5 +1,6 @@
 import setCookie from 'set-cookie-parser';
 import { hostIsOrSub } from '../../../surcharges/services/llm/import-cross-check.js';
+import { httpFetch } from '../../../../lib/http.js';
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127 Safari/537.36';
@@ -19,7 +20,7 @@ export class UsitcClient {
       `${this.base}/export`,
     ];
     for (const url of pages) {
-      const res = await fetch(url, {
+      const res = await httpFetch(url, {
         headers: {
           'User-Agent': UA,
           Accept: 'text/html,application/xhtml+xml',
@@ -215,7 +216,7 @@ export class UsitcClient {
   // Text fetch with retry if we get HTML app shell
   private async fetchTextOnce(url0: string, headers: Record<string, string>): Promise<string> {
     const url = this.cacheBust(url0);
-    const res = await fetch(url, { headers, redirect: 'follow' });
+    const res = await httpFetch(url, { headers, redirect: 'follow' });
     this.storeCookies(res, url0);
     const raw = (await res.text()).replace(/^\uFEFF/, '');
     if (!res.ok) {

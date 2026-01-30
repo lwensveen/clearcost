@@ -2,6 +2,7 @@ import type { DutyRateInsert } from '@clearcost/types';
 import * as XLSX from 'xlsx';
 import { readFile } from 'node:fs/promises';
 import { batchUpsertDutyRatesFromStream } from '../../../utils/batch-upsert.js';
+import { httpFetch } from '../../../../../lib/http.js';
 import {
   parsePercentAdValorem,
   pickHeader,
@@ -32,7 +33,7 @@ function isHttpLike(input: string) {
 
 async function loadBuffer(urlOrPath: string): Promise<Buffer> {
   if (isHttpLike(urlOrPath)) {
-    const response = await fetch(urlOrPath, { redirect: 'follow' });
+    const response = await httpFetch(urlOrPath, { redirect: 'follow', timeoutMs: 60000 });
     if (!response.ok) throw new Error(`MY MFN Excel download failed ${response.status}`);
     return Buffer.from(await response.arrayBuffer());
   }

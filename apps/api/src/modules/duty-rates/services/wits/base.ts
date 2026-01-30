@@ -2,6 +2,7 @@ import countries from 'i18n-iso-countries';
 import en from 'i18n-iso-countries/langs/en.json' with { type: 'json' };
 import type { DutyRateInsert } from '@clearcost/types';
 import { DEBUG } from '../../utils/utils.js';
+import { httpFetch } from '../../../../lib/http.js';
 
 countries.registerLocale(en);
 
@@ -105,7 +106,7 @@ export async function fetchSdmx(
 
   for (const url of variants) {
     if (DEBUG) console.log('[wits] GET', url);
-    const r = await fetch(url, {
+    const r = await httpFetch(url, {
       headers: {
         'user-agent': 'clearcost-importer',
         accept: 'application/vnd.sdmx.data+json;version=1.0.0-wd',

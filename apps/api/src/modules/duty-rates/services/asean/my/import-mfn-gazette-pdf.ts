@@ -1,6 +1,7 @@
 import pdf from 'pdf-parse';
 import { batchUpsertDutyRatesFromStream } from '../../../utils/batch-upsert.js';
 import { parsePercentAdValorem, toHs6 } from '../../../utils/parse.js';
+import { httpFetch } from '../../../../../lib/http.js';
 
 type ImportPdfOptions = {
   url: string;
@@ -30,7 +31,7 @@ function extractAdValoremPctFromLine(line: string): string | null {
 }
 
 export async function importMyMfnFromGazettePdf(options: ImportPdfOptions) {
-  const response = await fetch(options.url, { redirect: 'follow' });
+  const response = await httpFetch(options.url, { redirect: 'follow', timeoutMs: 60000 });
   if (!response.ok) throw new Error(`MY Gazette PDF download failed ${response.status}`);
   const buffer = Buffer.from(await response.arrayBuffer());
 

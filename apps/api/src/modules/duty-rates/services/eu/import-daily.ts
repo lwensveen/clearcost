@@ -6,6 +6,7 @@ import unzipper from 'unzipper';
 import { getDailyZipUrlForDate, getLatestDailyZipUrl } from './taric-daily-list.js';
 import { importEuMfn } from './import-mfn.js';
 import { importEuPreferential } from './import-preferential.js';
+import { httpFetch } from '../../../../lib/http.js';
 
 type ImportResult = {
   ok: true;
@@ -39,7 +40,7 @@ export async function importEuFromDaily({
     ? await getDailyZipUrlForDate(date, listUrl)
     : await getLatestDailyZipUrl(listUrl);
 
-  const res = await fetch(zipUrl, { redirect: 'follow' });
+  const res = await httpFetch(zipUrl, { redirect: 'follow', timeoutMs: 60000 });
   if (!res.ok) throw new Error(`Download failed ${res.status}`);
   const buf = Buffer.from(await res.arrayBuffer());
 

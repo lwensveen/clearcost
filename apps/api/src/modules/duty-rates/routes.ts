@@ -1,33 +1,30 @@
 import type { FastifyInstance } from 'fastify';
-import { z } from 'zod/v4';
 import { withIdempotency } from '../../lib/idempotency.js';
 import { importDutyRates } from './services/import-duty-rates.js';
-import { DutyRateInsert, DutyRateInsertSchema, HeaderSchema } from '@clearcost/types';
-
-const BodySchema = z.array(DutyRateInsertSchema).min(1).max(50_000);
-
-const ReplySchema = z.object({ ok: z.literal(true), count: z.number().int().nonnegative() });
-
-const QuerySchema = z.object({
-  dryRun: z.coerce.boolean().default(false),
-  source: z.string().min(1).max(40).optional(),
-});
+import { z } from 'zod/v4';
+import {
+  DutyRateInsert,
+  DutyRatesImportBodySchema,
+  DutyRatesImportQuerySchema,
+  DutyRatesImportResponseSchema,
+  IdempotencyHeaderSchema,
+} from '@clearcost/types';
 
 export default function dutyRoutes(app: FastifyInstance) {
   app.post<{
     Body: DutyRateInsert[];
-    Headers: z.infer<typeof HeaderSchema>;
-    Querystring: z.infer<typeof QuerySchema>;
-    Reply: z.infer<typeof ReplySchema>;
+    Headers: z.infer<typeof IdempotencyHeaderSchema>;
+    Querystring: z.infer<typeof DutyRatesImportQuerySchema>;
+    Reply: z.infer<typeof DutyRatesImportResponseSchema>;
   }>(
     '/import',
     {
       preHandler: app.requireApiKey(['admin:rates']),
       schema: {
-        headers: HeaderSchema,
-        querystring: QuerySchema,
-        body: BodySchema,
-        response: { 200: ReplySchema },
+        headers: IdempotencyHeaderSchema,
+        querystring: DutyRatesImportQuerySchema,
+        body: DutyRatesImportBodySchema,
+        response: { 200: DutyRatesImportResponseSchema },
       },
       config: {
         importMeta: { importSource: 'MANUAL', job: 'duties:json' },
@@ -35,9 +32,9 @@ export default function dutyRoutes(app: FastifyInstance) {
       },
     },
     async (req, reply) => {
-      const headers = HeaderSchema.parse(req.headers);
-      const { dryRun, source } = QuerySchema.parse(req.query);
-      const rows = BodySchema.parse(req.body);
+      const headers = IdempotencyHeaderSchema.parse(req.headers);
+      const { dryRun, source } = DutyRatesImportQuerySchema.parse(req.query);
+      const rows = DutyRatesImportBodySchema.parse(req.body);
 
       if (source && req.routeOptions?.config?.importMeta) {
         req.routeOptions.config.importMeta.source = source;

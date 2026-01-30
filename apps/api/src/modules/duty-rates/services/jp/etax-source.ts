@@ -1,9 +1,10 @@
 import { parse } from 'node-html-parser';
+import { httpFetch } from '../../../../lib/http.js';
 
 const JP_TARIFF_INDEX = process.env.JP_TARIFF_INDEX ?? 'https://www.customs.go.jp/english/tariff/';
 
 export async function getLatestJpTariffBase(): Promise<string> {
-  const res = await fetch(JP_TARIFF_INDEX, { redirect: 'follow' });
+  const res = await httpFetch(JP_TARIFF_INDEX, { redirect: 'follow' });
   if (!res.ok) throw new Error(`JP index fetch ${res.status}`);
   const root = parse(await res.text());
 
@@ -20,7 +21,7 @@ export async function getLatestJpTariffBase(): Promise<string> {
 }
 
 export async function listJpTariffChapterPages(baseHref: string): Promise<string[]> {
-  const res = await fetch(new URL('index.htm', baseHref), { redirect: 'follow' });
+  const res = await httpFetch(new URL('index.htm', baseHref), { redirect: 'follow' });
   if (!res.ok) throw new Error(`JP edition index ${res.status}`);
   const root = parse(await res.text());
 

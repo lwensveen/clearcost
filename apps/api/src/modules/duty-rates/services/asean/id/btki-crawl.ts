@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { URL } from 'node:url';
+import { httpFetch } from '../../../../../lib/http.js';
 
 type CrawlOpts = {
   /** Seed page to start from (required). Example: https://repository.beacukai.go.id/… */
@@ -77,13 +78,19 @@ function looksLikeBtkiPdf(pdfUrl: string, hints: string[] = []) {
 }
 
 async function fetchHtmlPage(url: string) {
-  const response = await fetch(url, { redirect: 'follow', headers: { 'user-agent': USER_AGENT } });
+  const response = await httpFetch(url, {
+    redirect: 'follow',
+    headers: { 'user-agent': USER_AGENT },
+  });
   if (!response.ok) throw new Error(`GET ${url} -> ${response.status}`);
   return response.text();
 }
 
 async function fetchBinary(url: string) {
-  const response = await fetch(url, { redirect: 'follow', headers: { 'user-agent': USER_AGENT } });
+  const response = await httpFetch(url, {
+    redirect: 'follow',
+    headers: { 'user-agent': USER_AGENT },
+  });
   if (!response.ok) throw new Error(`GET ${url} -> ${response.status}`);
   return Buffer.from(await response.arrayBuffer());
 }

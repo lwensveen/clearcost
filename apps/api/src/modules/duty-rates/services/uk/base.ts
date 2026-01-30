@@ -1,4 +1,5 @@
 import { z } from 'zod/v4';
+import { httpFetch } from '../../../../lib/http.js';
 
 export const DATASET_ID = 'uk-tariff-2021-01-01';
 export const TABLE_ID = 'commodities';
@@ -11,7 +12,7 @@ export const MEASURE_TYPE_PREF_ENDUSE = '145'; // Preference under end-use
 export const ERGA_OMNES_ID = '1011';
 
 export async function httpGet(url: string, opts: RequestInit = {}) {
-  return fetch(url, {
+  return httpFetch(url, {
     ...opts,
     headers: { 'user-agent': 'clearcost-importer', ...(opts.headers || {}) },
   });

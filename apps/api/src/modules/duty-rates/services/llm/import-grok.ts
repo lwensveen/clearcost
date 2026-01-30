@@ -3,6 +3,7 @@ import type { dutyRatesTable } from '@clearcost/db';
 import { batchUpsertDutyRatesFromStream } from '../../utils/batch-upsert.js';
 import { upsertDutyRateComponentsForLLM } from './upsert-duty-components.js';
 import { dutyLlmDefaultUserPrompt, dutyLlmSystemPrompt } from './prompts/duty-llm.js';
+import { httpFetch } from '../../../../lib/http.js';
 
 const DutyRuleSchema = z.enum(['mfn', 'fta', 'anti_dumping', 'safeguard']);
 
@@ -61,10 +62,13 @@ export async function importDutyRatesFromGrok(
     ],
   };
 
-  const r = await fetch('https://api.x.ai/v1/chat/completions', {
+  const r = await httpFetch('https://api.x.ai/v1/chat/completions', {
     method: 'POST',
     headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
     body: JSON.stringify(body),
+    timeoutMs: 30000,
+    retries: 2,
+    retryOn: (res) => [429, 500, 502, 503, 504].includes(res.status),
   });
   if (!r.ok) throw new Error(`Grok duties request failed: ${r.status} ${r.statusText}`);
 

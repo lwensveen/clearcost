@@ -1,11 +1,12 @@
 import { parse } from 'node-html-parser';
+import { httpFetch } from '../../../../lib/http.js';
 
 const LIST_URL =
   process.env.EU_TARIC_DAILY_LIST ??
   'https://ec.europa.eu/taxation_customs/dds2/taric/daily_publications.jsp?Lang=en';
 
 export async function getLatestDailyZipUrl(listUrl = LIST_URL): Promise<string> {
-  const res = await fetch(listUrl, { redirect: 'follow' });
+  const res = await httpFetch(listUrl, { redirect: 'follow', timeoutMs: 60000 });
   if (!res.ok) throw new Error(`list fetch ${res.status}`);
   const root = parse(await res.text());
   const a = root.querySelectorAll('a').find((el) => /download/i.test(el.innerText));
@@ -15,7 +16,7 @@ export async function getLatestDailyZipUrl(listUrl = LIST_URL): Promise<string> 
 }
 
 export async function getDailyZipUrlForDate(dateYmd: string, listUrl = LIST_URL): Promise<string> {
-  const res = await fetch(listUrl, { redirect: 'follow' });
+  const res = await httpFetch(listUrl, { redirect: 'follow', timeoutMs: 60000 });
   if (!res.ok) throw new Error(`list fetch ${res.status}`);
   const root = parse(await res.text());
   const rows = root.querySelectorAll('tr, .resultRow, .row'); // be liberal in selectors

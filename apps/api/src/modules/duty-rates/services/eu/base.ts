@@ -1,6 +1,7 @@
 import { createGunzip } from 'node:zlib';
 import { Readable } from 'node:stream';
 import sax from 'sax';
+import { httpFetch } from '../../../../lib/http.js';
 
 export const MFN_MEASURE_TYPE_ID = '103';
 export const PREF_MEASURE_TYPE_IDS = new Set(['142', '145']);
@@ -28,7 +29,7 @@ function isGzip(buf: Uint8Array) {
 
 /** Fetch URL → Node Readable; transparently gunzip if gzipped. */
 export async function fetchXmlStream(url: string): Promise<Readable> {
-  const res = await fetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
+  const res = await httpFetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
   if (!res.ok || !res.body)
     throw new Error(`Fetch failed ${res.status} ${res.statusText} – ${url}`);
 

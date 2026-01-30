@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { dutyLlmDefaultUserPrompt, dutyLlmSystemPrompt } from './prompts/duty-llm.js';
+import { httpFetch } from '../../../../lib/http.js';
 
 const DutyRuleSchema = z.enum(['mfn', 'fta', 'anti_dumping', 'safeguard']);
 
@@ -51,10 +52,13 @@ export async function fetchDutyRatesFromOpenAI(
     ],
   };
 
-  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+  const r = await httpFetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
     body: JSON.stringify(body),
+    timeoutMs: 30000,
+    retries: 2,
+    retryOn: (res) => [429, 500, 502, 503, 504].includes(res.status),
   });
   if (!r.ok) throw new Error(`OpenAI duties request failed: ${r.status} ${r.statusText}`);
 

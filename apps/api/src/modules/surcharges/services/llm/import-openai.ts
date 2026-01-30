@@ -1,4 +1,5 @@
 import { type LlmSurcharge, LlmSurchargePayload } from './schema.js';
+import { httpFetch } from '../../../../lib/http.js';
 import {
   surchargeLlmDefaultUserPrompt,
   surchargeLlmSystemPrompt,
@@ -22,10 +23,13 @@ export async function importSurchargesFromOpenAI(
     ],
   };
 
-  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+  const r = await httpFetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
     body: JSON.stringify(body),
+    timeoutMs: 30000,
+    retries: 2,
+    retryOn: (res) => [429, 500, 502, 503, 504].includes(res.status),
   });
   if (!r.ok) throw new Error(`OpenAI surcharges request failed: ${r.status} ${r.statusText}`);
 

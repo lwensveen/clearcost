@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { readFile } from 'node:fs/promises';
 import { batchUpsertDutyRatesFromStream } from '../../../utils/batch-upsert.js';
 import { parsePercentAdValorem, toHs6 } from '../../../utils/parse.js';
+import { httpFetch } from '../../../../../lib/http.js';
 
 export type ImportPhMfnParams = {
   urlOrPath: string;
@@ -38,7 +39,7 @@ function isHttpLike(input: string) {
 
 async function loadBuffer(urlOrPath: string): Promise<Buffer> {
   if (isHttpLike(urlOrPath)) {
-    const res = await fetch(urlOrPath, { redirect: 'follow' });
+    const res = await httpFetch(urlOrPath, { redirect: 'follow', timeoutMs: 60000 });
     if (!res.ok) throw new Error(`Download failed: ${res.status} ${res.statusText}`);
     return Buffer.from(await res.arrayBuffer());
   }

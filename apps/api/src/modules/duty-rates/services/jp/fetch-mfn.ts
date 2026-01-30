@@ -2,6 +2,7 @@ import { parse } from 'node-html-parser';
 import type { DutyRateInsert } from '@clearcost/types';
 import { getLatestJpTariffBase, listJpTariffChapterPages } from './etax-source.js';
 import { parsePercentAdValorem, toHs6 } from '../../utils/parse.js';
+import { httpFetch } from '../../../../lib/http.js';
 
 type FetchOpts = {
   /** Override the dated base (e.g., https://www.customs.go.jp/english/tariff/2025_1/index.htm) */
@@ -19,7 +20,7 @@ export async function fetchJpMfnDutyRates(options: FetchOpts = {}): Promise<Duty
   const results: DutyRateInsert[] = [];
 
   for (const chapterUrl of chapterPageUrls) {
-    const response = await fetch(chapterUrl, {
+    const response = await httpFetch(chapterUrl, {
       headers: options.userAgent ? { 'user-agent': options.userAgent } : undefined,
       redirect: 'follow',
     });

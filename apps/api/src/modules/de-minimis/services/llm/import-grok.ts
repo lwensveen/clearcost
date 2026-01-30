@@ -6,6 +6,7 @@ import {
   deMinimisLlmSystemPrompt,
 } from './prompts/de-minimis-llm.js';
 import { PayloadSchema, RowSchema } from './schema.js';
+import { httpFetch } from '../../../../lib/http.js';
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const toDate = (s: string) => new Date(`${s}T00:00:00Z`);
@@ -41,13 +42,16 @@ export async function importDeMinimisFromGrok(
     ],
   };
 
-  const r = await fetch('https://api.x.ai/v1/chat/completions', {
+  const r = await httpFetch('https://api.x.ai/v1/chat/completions', {
     method: 'POST',
     headers: {
       authorization: `Bearer ${apiKey}`,
       'content-type': 'application/json',
     },
     body: JSON.stringify(body),
+    timeoutMs: 30000,
+    retries: 2,
+    retryOn: (res) => [429, 500, 502, 503, 504].includes(res.status),
   });
   if (!r.ok) throw new Error(`Grok request failed: ${r.status} ${r.statusText}`);
   const json = await r.json();

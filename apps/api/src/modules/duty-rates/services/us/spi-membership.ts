@@ -7,6 +7,7 @@ import {
 import { countriesTable } from '@clearcost/db/dist/schemas/countries.js';
 import { eq } from 'drizzle-orm';
 import { cell, headerIndex, iterateCsvRecords } from '../../utils/stream-csv.js';
+import { httpFetch } from '../../../../lib/http.js';
 
 export type ProgramMember = { iso2: string; from: Date; to: Date | null };
 
@@ -65,7 +66,7 @@ export async function loadMembershipFromDb(): Promise<Map<string, ProgramMember[
  * - effective_to
  */
 export async function loadMembershipFromCsv(url: string): Promise<Map<string, ProgramMember[]>> {
-  const res = await fetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
+  const res = await httpFetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
   if (!res.ok || !res.body) throw new Error(`SPI CSV ${url} failed: ${res.status}`);
 
   const map = new Map<string, ProgramMember[]>();

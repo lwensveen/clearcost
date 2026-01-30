@@ -1,6 +1,7 @@
 import { db, hsCodeAliasesTable, hsCodesTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
 import { cell, headerIndex, iterateCsvRecords } from '../../../../duty-rates/utils/stream-csv.js';
+import { httpFetch } from '../../../../../lib/http.js';
 import {
   DATASET_ID,
   getLatestVersionId,
@@ -41,7 +42,10 @@ function compose10(itemRaw: string, statRaw: string, defaultStatIfMissing = true
 }
 
 async function httpJson<T = any>(url: string): Promise<T> {
-  const res = await fetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
+  const res = await httpFetch(url, {
+    headers: { 'user-agent': 'clearcost-importer' },
+    timeoutMs: 60000,
+  });
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
     throw new Error(`${url} failed: ${res.status} ${txt}`);
@@ -54,7 +58,10 @@ async function fetchCsvStream(
   table: string
 ): Promise<ReadableStream<Uint8Array> | null> {
   const url = `${UK_10_DATA_API_BASE}/v1/datasets/${DATASET_ID}/versions/${versionId}/tables/${table}/data?format=csv`;
-  const res = await fetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
+  const res = await httpFetch(url, {
+    headers: { 'user-agent': 'clearcost-importer' },
+    timeoutMs: 60000,
+  });
   if (res.status === 404) {
     if (DEBUG) console.warn(`[UK] table 404: ${table} ${url}`);
     return null;
