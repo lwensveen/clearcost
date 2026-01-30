@@ -2,15 +2,7 @@
   "extends": "@clearcost/typescript-config/base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "baseUrl": ".",
-    "paths": {
-      "@clearcost/db": [
-        "../db/src/index.ts"
-      ],
-      "@clearcost/db/*": [
-        "../db/src/*"
-      ]
-    }
+    "baseUrl": "."
   },
   "include": [
     "src"

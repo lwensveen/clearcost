@@ -53,5 +53,5 @@
   },
   "sideEffects": false,
   "type": "module",
-  "types": "dist/index.d.ts"
+  "types": "src/index.ts"
 }
