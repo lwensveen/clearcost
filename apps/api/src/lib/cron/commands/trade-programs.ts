@@ -1,14 +1,18 @@
 import type { Command } from '../runtime.js';
 import { withRun } from '../runtime.js';
-import { db, tradeProgramMembersTable, tradeProgramsTable } from '@clearcost/db';
+import {
+  db,
+  tradeProgramMembersTable,
+  tradeProgramsTable,
+  countriesTable,
+  jurisdictionsTable,
+} from '@clearcost/db';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   cell,
   headerIndex,
   iterateCsvRecords,
 } from '../../../modules/duty-rates/utils/stream-csv.js';
-import { countriesTable } from '@clearcost/db/dist/schemas/countries.js';
-import { jurisdictionsTable } from '@clearcost/db/dist/schemas/jurisdictions.js';
 import { parseFlags } from '../utils.js';
 import { httpFetch } from '../../http.js';
 
