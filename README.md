@@ -48,6 +48,9 @@ clearcost/
           api-usage.ts
           import-instrumentation.ts
       types/                   # Fastify module augmentations
+    web/                       # Internal/admin UI + customer dashboard (Next.js)
+    docs/                      # Public docs + playground (Next.js)
+    widget/                    # Embeddable JS widget bundle
 
   packages/
     db/                        # Drizzle schema & migrations
@@ -150,15 +153,59 @@ bunx turbo run dev
 
 ---
 
+## Environment (by app)
+
+These are the **minimum** env vars to boot each app locally. Feature‑specific vars (imports, Stripe, LLMs) are listed in
+`apps/api/README.md`.
+
+### Notes for clients and runtime envs
+
+- **API error envelope**: all error responses should be shaped as
+  `{ error: { code: string; message: string; details?: unknown } }`.
+- **Client parsing**: use `extractErrorMessage(...)` (see `apps/web/lib/errors.ts`) instead of reading `json.error`
+  directly so both string and object errors are handled safely.
+- **Env helpers (apps/web)**: `requireEnv` is build‑safe in non‑prod; `requireEnvStrict` always throws.
+  Use `requireEnvStrict` only inside lazy/runtime helpers like `getAuth()`/`getDb()` and `getAdminEnv()`.
+- **Internal ops flags**: `ALLOW_INTERNAL_BIND=1` permits internal server public bind in production (logs a warning).
+  `METRICS_REQUIRE_SIGNING=1` requires internal signing for `/metrics`.
+
+**API (`apps/api`)**
+
+- Required: `DATABASE_URL`, `API_KEY_PEPPER`, `INTERNAL_SIGNING_SECRET`, `CLEARCOST_API_URL`
+- Ops/CI: `CLEARCOST_INTERNAL_API_URL`
+- Common: `WEB_ORIGIN` (CORS), `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW`, `INTERNAL_PORT`, `INTERNAL_HOST`, `TRUST_PROXY`
+- Deployment guardrails: `ALLOW_INTERNAL_BIND=1` to permit public bind for internal server in production
+- Feature flags: `STRIPE_*`, `WEBHOOK_KMS_KEY`, `OXR_APP_ID`, `OPENAI_API_KEY`/`GROK_API_KEY`
+
+**Web (`apps/web`)**
+
+- Required: `DATABASE_URL`, `CLEARCOST_API_URL`, `CLEARCOST_WEB_SERVER_KEY`
+- Admin screens: `CLEARCOST_ADMIN_API_KEY`
+- Auth/session: `REDIS_URL`, `REDIS_TOKEN`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `API_URL`, `EMAIL_OTP_API_SECRET`, `TURNSTILE_SECRET_KEY`
+
+**Docs (`apps/docs`)**
+
+- Required: `CLEARCOST_API_URL`, `CLEARCOST_WEB_SERVER_KEY`
+
+---
+
 ## API overview
+
+### Deployment/runtime topology
+
+The API runs **two Fastify servers**:
+
+- **Public server**: `HOST` + `PORT` (default `0.0.0.0:3001`)
+- **Internal server**: `INTERNAL_HOST` + `INTERNAL_PORT` (default `0.0.0.0:3002`)
+
+Public APIs and admin surfaces live on the public server. Ops/internal routes (metrics, import health, cron, notices)
+live on the internal server and require internal request signing in production.
 
 ### Public/Customer APIs
 
 - `POST /v1/quotes` — compute landed cost (**requires scope:** `quotes:write`)
 - `GET /v1/quotes/by-key/:key` — replay cached quote (**requires:** `quotes:read`)
 - `GET /healthz` / `HEAD /healthz` — liveness & readiness
-- `GET /health/imports` — import activity snapshot
-- `GET /metrics` — Prometheus metrics
 - `GET /v1/hs-codes` — HS6 search/lookup (**requires:** `hs:read`)
 - `GET /v1/hs-codes/lookup` — alias→HS6 (**requires:** `hs:read`)
 
@@ -172,9 +219,19 @@ bunx turbo run dev
 - `PATCH /v1/admin/api-keys/:id` — patch/revoke/reactivate
 - `POST /v1/admin/api-keys/:id/rotate` — admin rotate (plaintext once)
 
+### Ops / Admin-only (internal server)
+
+Hosted on the internal server (`INTERNAL_PORT`, default 3002). Access should be restricted by network ACLs.
+
+- `GET /metrics` — Prometheus metrics (**requires scope:** `ops:metrics` in `x-api-key`, no signature)
+- `GET /v1/admin/health/imports` — import activity snapshot (**requires scope:** `ops:health`)
+- `GET /internal/healthz` — internal health check (no signature)
+
 ### Internal cron routes (scoped)
 
-All mounted under `/internal/cron/**` and **require an API key** with the specific `tasks:*` scope. Highlights:
+Mounted under `/internal/cron/**` on the internal server (`INTERNAL_PORT`) and **require an API key**
+with the specific `tasks:*` scope. In production, internal requests must also include `x-cc-ts` + `x-cc-sig`
+signatures. Highlights (not exhaustive):
 
 ```
 # FX
@@ -184,12 +241,12 @@ POST /internal/cron/fx/daily                           (tasks:fx:daily)
 POST /internal/cron/import/vat/auto                    (tasks:vat:auto)
 
 # Duties
-POST /internal/cron/import/duties/uk-mfn               (tasks:duties:uk-mfn)
-POST /internal/cron/import/duties/uk-fta               (tasks:duties:uk-fta)
-POST /internal/cron/import/duties/eu-mfn               (tasks:duties:eu-mfn)
-POST /internal/cron/import/duties/eu-fta               (tasks:duties:eu-fta)
-POST /internal/cron/import/duties/us-mfn               (tasks:duties:us-mfn)
-POST /internal/cron/import/duties/us-preferential      (tasks:duties:us-fta)
+POST /internal/cron/import/duties/uk-mfn               (tasks:duties:uk)
+POST /internal/cron/import/duties/uk-fta               (tasks:duties:uk)
+POST /internal/cron/import/duties/eu-mfn               (tasks:duties:eu)
+POST /internal/cron/import/duties/eu-fta               (tasks:duties:eu)
+POST /internal/cron/import/duties/us-mfn               (tasks:duties:us:mfn)
+POST /internal/cron/import/duties/us-preferential      (tasks:duties:us:fta)
 POST /internal/cron/import/duties/wits                 (tasks:duties:wits)
 POST /internal/cron/import/duties/wits/asean           (tasks:duties:wits:asean)
 POST /internal/cron/import/duties/wits/japan           (tasks:duties:wits:japan)
@@ -208,9 +265,26 @@ POST /internal/cron/import/hs/ahtn                      (tasks:hs:ahtn)
 # De‑minimis
 POST /internal/cron/de-minimis/import-zonos             (tasks:de-minimis:import-zonos)
 POST /internal/cron/de-minimis/import-official          (tasks:de-minimis:import-official)
+POST /internal/cron/de-minimis/seed-baseline            (tasks:de-minimis:seed-baseline)
+
+# Notices (internal ops)
+GET /internal/notices                                   (tasks:notices)
+GET /internal/notices/:id                               (tasks:notices)
 ```
 
 > Some legacy routes may still accept an **admin token**; prefer scoped API keys going forward.
+
+**Internal ops client (recommended)**
+
+Use the shared signer client to call internal routes from CI/ops:
+
+```bash
+export CLEARCOST_INTERNAL_API_URL="https://internal.clearcost.example"
+export CLEARCOST_TASKS_API_KEY="ck_..."
+export INTERNAL_SIGNING_SECRET="..."
+
+bun run internal-request -- --path /internal/cron/fx/daily --body '{}'
+```
 
 ---
 
@@ -264,12 +338,12 @@ Internals are implemented in `apps/api/src/lib/idempotency.ts`.
 
 ## Webhooks (admin)
 
-Admin endpoints allow managing webhook endpoints; secrets are stored as **salted hashes** (no plaintext persistence).
+Admin endpoints allow managing webhook endpoints; secrets are stored **encrypted at rest** (plaintext never persisted).
 
-- `POST /v1/webhooks/endpoints` _(admin scope)_ → returns `secret` **once**
-- `POST /v1/webhooks/endpoints/:id/rotate` → returns new `secret` **once**
-- `PATCH /v1/webhooks/endpoints/:id` → activate/deactivate
-- `GET /v1/webhooks/deliveries?endpointId=…` → recent deliveries
+- `POST /v1/admin/webhooks/endpoints` _(admin scope)_ → returns `secret` **once**
+- `POST /v1/admin/webhooks/endpoints/:id/rotate` → returns new `secret` **once**
+- `PATCH /v1/admin/webhooks/endpoints/:id` → activate/deactivate
+- `GET /v1/admin/webhooks/deliveries?endpointId=…` → recent deliveries
 
 **Signature**: requests include `clearcost-signature: t=<unix>,v1=<hex>` where
 
