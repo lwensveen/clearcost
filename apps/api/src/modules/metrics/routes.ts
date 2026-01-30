@@ -3,10 +3,11 @@ import { registry } from '../../lib/metrics.js';
 
 export default function metricsRoutes(app: FastifyInstance) {
   // Prometheus scrape (protected)
+  const requireSigning = process.env.METRICS_REQUIRE_SIGNING === '1';
   app.get(
     '/metrics',
     {
-      preHandler: app.requireApiKey(['ops:metrics']),
+      preHandler: app.requireApiKey(['ops:metrics'], { internalSigned: requireSigning }),
       config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
     },
     async (_req, reply) => {
@@ -16,16 +17,5 @@ export default function metricsRoutes(app: FastifyInstance) {
     }
   );
 
-  // HEAD variant (auth + quick check)
-  app.head(
-    '/metrics',
-    {
-      preHandler: app.requireApiKey(['ops:metrics']),
-      config: { rateLimit: { max: 300, timeWindow: '1 minute' } },
-    },
-    async (_req, reply) => {
-      reply.header('content-type', registry.contentType).header('cache-control', 'no-store');
-      return reply.send();
-    }
-  );
+  // GET already exposes HEAD automatically in Fastify.
 }
