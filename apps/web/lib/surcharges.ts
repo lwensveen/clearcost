@@ -1,62 +1,73 @@
 'use server';
+import 'server-only';
 
-export type SurchargeRow = {
-  id: string;
-  dest: string;
-  code: string;
-  fixedAmt: string | null;
-  pctAmt: string | null;
-  effectiveFrom: string;
-  effectiveTo: string | null;
-  notes: string | null;
-};
+import {
+  SurchargeSelectCoercedSchema,
+  SurchargesAdminImportResponseSchema,
+  SurchargesAdminListQuerySchema,
+  SurchargesAdminListResponseSchema,
+  type SurchargeCoerced,
+} from '@clearcost/types';
+import { requireEnvStrict } from './env';
 
-const BASE = process.env.CLEARCOST_API_URL!;
-const KEY = process.env.CLEARCOST_ADMIN_API_KEY!;
+export type SurchargeRow = SurchargeCoerced;
+
+function getAdminEnv() {
+  return {
+    base: requireEnvStrict('CLEARCOST_API_URL'),
+    key: requireEnvStrict('CLEARCOST_ADMIN_API_KEY'),
+  };
+}
 
 export async function listSurcharges(
   q: {
     dest?: string;
-    code?: string;
+    surchargeCode?: string;
     limit?: number;
     offset?: number;
   } = {}
 ): Promise<SurchargeRow[]> {
+  const { base, key } = getAdminEnv();
+  const parsed = SurchargesAdminListQuerySchema.parse(q);
   const p = new URLSearchParams();
-  if (q.dest) p.set('dest', q.dest);
-  if (q.code) p.set('code', q.code);
-  if (q.limit) p.set('limit', String(q.limit));
-  if (q.offset) p.set('offset', String(q.offset));
-  const r = await fetch(`${BASE}/v1/surcharges?${p.toString()}`, {
-    headers: { Authorization: `Bearer ${KEY}` },
+  if (parsed.dest) p.set('dest', parsed.dest);
+  if (parsed.surchargeCode) p.set('surchargeCode', parsed.surchargeCode);
+  if (parsed.limit) p.set('limit', String(parsed.limit));
+  if (parsed.offset) p.set('offset', String(parsed.offset));
+  const r = await fetch(`${base}/v1/admin/surcharges?${p.toString()}`, {
+    headers: { Authorization: `Bearer ${key}` },
     cache: 'no-store',
   });
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-  return r.json();
+  const raw = await r.json();
+  return SurchargesAdminListResponseSchema.parse(raw);
 }
 
 export async function createSurcharge(input: {
   dest: string;
-  code: string;
+  surchargeCode: string;
   fixedAmt?: number | null;
   pctAmt?: number | null;
   notes?: string | null;
   effectiveFrom: string;
   effectiveTo?: string | null;
 }) {
-  const r = await fetch(`${BASE}/v1/surcharges`, {
+  const { base, key } = getAdminEnv();
+  const r = await fetch(`${base}/v1/admin/surcharges`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', Authorization: `Bearer ${KEY}` },
+    headers: { 'content-type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify(input),
   });
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-  return r.json() as Promise<SurchargeRow>;
+  const raw = await r.json();
+  return SurchargeSelectCoercedSchema.parse(raw);
 }
 
 export async function deleteSurcharge(id: string) {
-  const r = await fetch(`${BASE}/v1/surcharges/${encodeURIComponent(id)}`, {
+  const { base, key } = getAdminEnv();
+  const r = await fetch(`${base}/v1/admin/surcharges/${encodeURIComponent(id)}`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${KEY}` },
+    headers: { Authorization: `Bearer ${key}` },
   });
   if (!r.ok && r.status !== 204) throw new Error(`${r.status} ${await r.text()}`);
 }
@@ -64,7 +75,7 @@ export async function deleteSurcharge(id: string) {
 export async function importSurcharges(
   rows: Array<{
     dest: string;
-    code: string;
+    surchargeCode: string;
     fixedAmt?: number | null;
     pctAmt?: number | null;
     notes?: string | null;
@@ -72,11 +83,13 @@ export async function importSurcharges(
     effectiveTo?: string | null;
   }>
 ) {
-  const r = await fetch(`${BASE}/v1/surcharges/import-json`, {
+  const { base, key } = getAdminEnv();
+  const r = await fetch(`${base}/v1/admin/surcharges/import`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', Authorization: `Bearer ${KEY}` },
-    body: JSON.stringify({ rows }),
+    headers: { 'content-type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify(rows),
   });
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-  return r.json() as Promise<{ inserted: number }>;
+  const raw = await r.json();
+  return SurchargesAdminImportResponseSchema.parse(raw);
 }

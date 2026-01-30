@@ -1,73 +1,74 @@
-const BASE = process.env.CLEARCOST_API_URL!;
-const KEY = process.env.CLEARCOST_ADMIN_API_KEY!;
+import 'server-only';
+import {
+  VatAdminCreateSchema,
+  VatAdminImportJsonBodySchema,
+  VatAdminImportJsonResponseSchema,
+  VatAdminListQuerySchema,
+  VatAdminListResponseSchema,
+  VatRuleSelectCoercedSchema,
+  type VatRuleCoerced,
+} from '@clearcost/types';
+import { z } from 'zod/v4';
+import { requireEnvStrict } from './env';
 
-export type VatRow = {
-  id: string;
-  dest: string;
-  ratePct: string; // numeric in DB, string in TS
-  base: 'CIF' | 'CIF_PLUS_DUTY';
-  effectiveFrom: string;
-  effectiveTo: string | null;
-  notes: string | null;
-  createdAt?: string | null;
-  updatedAt?: string | null;
-};
+function getAdminEnv() {
+  return {
+    base: requireEnvStrict('CLEARCOST_API_URL'),
+    key: requireEnvStrict('CLEARCOST_ADMIN_API_KEY'),
+  };
+}
+
+export type VatRow = VatRuleCoerced;
 
 export async function listVAT(
   query: { dest?: string; limit?: number; offset?: number } = {}
 ): Promise<VatRow[]> {
+  const { base, key } = getAdminEnv();
+  const parsed = VatAdminListQuerySchema.parse(query);
   const params = new URLSearchParams();
-  if (query.dest) params.set('dest', query.dest);
-  if (query.limit) params.set('limit', String(query.limit));
-  if (query.offset) params.set('offset', String(query.offset));
-  const r = await fetch(`${BASE}/v1/vat?${params.toString()}`, {
-    headers: { Authorization: `Bearer ${KEY}` },
+  if (parsed.dest) params.set('dest', parsed.dest);
+  if (parsed.limit) params.set('limit', String(parsed.limit));
+  if (parsed.offset) params.set('offset', String(parsed.offset));
+  const r = await fetch(`${base}/v1/admin/vat?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${key}` },
     cache: 'no-store',
   });
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-  return r.json();
+  const raw = await r.json();
+  return VatAdminListResponseSchema.parse(raw);
 }
 
-export async function createVAT(input: {
-  dest: string;
-  ratePct: number;
-  base: 'CIF' | 'CIF_PLUS_DUTY';
-  effectiveFrom: string;
-  effectiveTo?: string | null;
-  notes?: string | null;
-}) {
-  const r = await fetch(`${BASE}/v1/vat`, {
+export async function createVAT(input: z.input<typeof VatAdminCreateSchema>) {
+  const { base, key } = getAdminEnv();
+  const payload = VatAdminCreateSchema.parse(input);
+  const r = await fetch(`${base}/v1/admin/vat`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', Authorization: `Bearer ${KEY}` },
-    body: JSON.stringify(input),
+    headers: { 'content-type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify(payload),
   });
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-  return r.json() as Promise<VatRow>;
+  const raw = await r.json();
+  return VatRuleSelectCoercedSchema.parse(raw);
 }
 
 export async function deleteVAT(id: string) {
-  const r = await fetch(`${BASE}/v1/vat/${encodeURIComponent(id)}`, {
+  const { base, key } = getAdminEnv();
+  const r = await fetch(`${base}/v1/admin/vat/${encodeURIComponent(id)}`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${KEY}` },
+    headers: { Authorization: `Bearer ${key}` },
   });
   if (!r.ok && r.status !== 204) throw new Error(`${r.status} ${await r.text()}`);
 }
 
-export async function importVAT(
-  rows: Array<{
-    dest: string;
-    ratePct: number;
-    base: 'CIF' | 'CIF_PLUS_DUTY';
-    effectiveFrom: string;
-    effectiveTo?: string | null;
-    notes?: string | null;
-  }>
-) {
-  const r = await fetch(`${BASE}/v1/vat/import-json`, {
+export async function importVAT(rows: z.input<typeof VatAdminImportJsonBodySchema>['rows']) {
+  const { base, key } = getAdminEnv();
+  const payload = VatAdminImportJsonBodySchema.parse({ rows });
+  const r = await fetch(`${base}/v1/admin/vat/import-json`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', Authorization: `Bearer ${KEY}` },
-    body: JSON.stringify({ rows }),
+    headers: { 'content-type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify(payload),
   });
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-  return r.json() as Promise<{ inserted: number }>;
+  const raw = await r.json();
+  return VatAdminImportJsonResponseSchema.parse(raw);
 }

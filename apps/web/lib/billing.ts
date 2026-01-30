@@ -1,6 +1,14 @@
+import 'server-only';
+import {
+  BillingEntitlementsResponseSchema,
+  BillingPlanResponseSchema,
+  ErrorResponseSchema,
+  UsageResponseSchema,
+} from '@clearcost/types';
+import { UpstreamError, extractErrorMessage } from './errors';
+import { requireEnvStrict } from './env';
+
 export type UsageRow = {
-  id?: string;
-  apiKeyId?: string;
   day: string; // YYYY-MM-DD
   route: string; // e.g., /v1/quotes
   method: string; // GET/POST
@@ -10,8 +18,12 @@ export type UsageRow = {
   sumBytesOut: number;
 };
 
-const API = process.env.CLEARCOST_API_URL!;
-const KEY = process.env.CLEARCOST_ADMIN_API_KEY!;
+function getAdminEnv() {
+  return {
+    api: requireEnvStrict('CLEARCOST_API_URL'),
+    key: requireEnvStrict('CLEARCOST_ADMIN_API_KEY'),
+  };
+}
 
 function qs(params: Record<string, string | undefined>) {
   const s = new URLSearchParams();
@@ -27,17 +39,36 @@ export type BillingPlan = {
   currentPeriodEnd?: string | null; // ISO when serialized across fetch
 };
 
+async function readError(res: Response): Promise<{ message: string; body?: string }> {
+  const text = await res.text();
+  if (!text) return { message: 'request failed' };
+  try {
+    const parsed = ErrorResponseSchema.safeParse(JSON.parse(text));
+    if (parsed.success) {
+      return { message: extractErrorMessage(parsed.data, 'request failed'), body: text };
+    }
+  } catch {
+    // ignore JSON parse errors
+  }
+  return { message: extractErrorMessage(text, text), body: text };
+}
+
 export async function fetchBillingPlan(): Promise<BillingPlan> {
-  const r = await fetch(`${API}/v1/billing/plan`, {
-    headers: { 'x-api-key': KEY },
+  const { api, key } = getAdminEnv();
+  const r = await fetch(`${api}/v1/billing/plan`, {
+    headers: { 'x-api-key': key },
     cache: 'no-store',
   });
-  if (!r.ok) throw new Error(`plan ${r.status}`);
-  const j = await r.json();
+  if (!r.ok) {
+    const { message, body } = await readError(r);
+    throw new UpstreamError(r.status, `${r.status} ${message}`, body);
+  }
+  const raw = await r.json();
+  const j = BillingPlanResponseSchema.parse(raw);
   // normalize date → ISO string for server components
   return {
     ...j,
-    currentPeriodEnd: j.currentPeriodEnd ? new Date(j.currentPeriodEnd).toISOString() : null,
+    currentPeriodEnd: j.currentPeriodEnd ? j.currentPeriodEnd.toISOString() : null,
   };
 }
 
@@ -46,14 +77,30 @@ export async function fetchUsageByKey(
   from?: string,
   to?: string
 ): Promise<UsageRow[]> {
-  if (!API || !KEY) throw new Error('Missing CLEARCOST_API_URL or CLEARCOST_ADMIN_API_KEY');
-  const url = `${API}/v1/usage/by-key/${encodeURIComponent(apiKeyId)}${qs({ from, to })}`;
+  const { api, key } = getAdminEnv();
+  const url = `${api}/v1/admin/usage/by-key/${encodeURIComponent(apiKeyId)}${qs({ from, to })}`;
   const r = await fetch(url, {
-    headers: { Authorization: `Bearer ${KEY}` },
+    headers: { Authorization: `Bearer ${key}` },
     cache: 'no-store',
   });
-  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-  return r.json();
+  if (!r.ok) {
+    const { message, body } = await readError(r);
+    throw new UpstreamError(r.status, `${r.status} ${message}`, body);
+  }
+  const raw = await r.json();
+  const parsed = UsageResponseSchema.parse(raw);
+  return parsed.map((row) => ({
+    day:
+      row.day instanceof Date
+        ? row.day.toISOString().slice(0, 10)
+        : String(row.day ?? '').slice(0, 10),
+    route: row.route,
+    method: row.method,
+    count: row.count,
+    sumDurationMs: row.sumDurationMs,
+    sumBytesIn: row.sumBytesIn,
+    sumBytesOut: row.sumBytesOut,
+  }));
 }
 
 export function aggregate(rows: UsageRow[]) {
@@ -105,10 +152,15 @@ export type Entitlements = {
 };
 
 export async function fetchEntitlements(): Promise<Entitlements> {
-  const r = await fetch(`${API}/v1/billing/entitlements`, {
-    headers: { 'x-api-key': KEY },
+  const { api, key } = getAdminEnv();
+  const r = await fetch(`${api}/v1/billing/entitlements`, {
+    headers: { 'x-api-key': key },
     cache: 'no-store',
   });
-  if (!r.ok) throw new Error(await r.text().catch(() => 'Failed to load entitlements'));
-  return r.json();
+  if (!r.ok) {
+    const { message, body } = await readError(r);
+    throw new UpstreamError(r.status, `${r.status} ${message}`, body);
+  }
+  const raw = await r.json();
+  return BillingEntitlementsResponseSchema.parse(raw);
 }
