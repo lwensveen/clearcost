@@ -8,6 +8,7 @@ import {
 } from '../lib/metrics.js';
 import { finishImportRun, heartBeatImportRun, startImportRun } from '../lib/provenance.js';
 import { acquireRunLock, makeLockKey, releaseRunLock } from '../lib/run-lock.js'; // 👈 NEW
+import { errorResponseForStatus } from '../lib/errors.js';
 
 const plugin: FastifyPluginAsync = async (app) => {
   app.decorateRequest('importCtx', undefined);
@@ -24,7 +25,9 @@ const plugin: FastifyPluginAsync = async (app) => {
 
     const ok = await acquireRunLock(lockKey);
     if (!ok) {
-      return reply.code(409).send({ error: 'import already running', lockKey });
+      return reply
+        .code(409)
+        .send(errorResponseForStatus(409, 'import already running', { lockKey }));
     }
 
     // 3) start metrics + provenance
