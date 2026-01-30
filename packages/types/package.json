@@ -11,6 +11,7 @@
     "@clearcost/eslint-config": "workspace:*",
     "@clearcost/typescript-config": "workspace:*",
     "@types/node": "^24.3.1",
+    "esbuild": "^0.25.9",
     "eslint": "^9.35.0"
   },
   "files": [
@@ -18,8 +19,17 @@
   ],
   "main": "dist/index.js",
   "private": true,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "bun run build:types && bun run build:js",
+    "build:js": "esbuild src/index.ts --bundle --format=esm --platform=neutral --packages=external --target=es2020 --outfile=dist/index.js",
+    "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
     "check-types": "tsc --noEmit",
     "lint": "eslint src "
   },

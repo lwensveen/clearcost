@@ -32,3 +32,37 @@ export const HsCodeSearchQuerySchema = z.object({
     .optional(),
   limit: z.coerce.number().int().positive().max(500).optional(),
 });
+
+// Public search endpoint: /v1/hs-codes
+export const HsCodesSearchQuerySchema = z.object({
+  q: z.string().trim().min(1).optional(),
+  hs6: z
+    .string()
+    .regex(/^\d{6}$/)
+    .optional(),
+  limit: z.coerce.number().int().positive().max(50).default(20),
+});
+
+export const HsCodesSearchResponseSchema = z.array(
+  z.object({
+    hs6: z.string(),
+    title: z.string(),
+    ahtn8: z.string().nullish(),
+    cn8: z.string().nullish(),
+    hts10: z.string().nullish(),
+  })
+);
+
+// Alias lookup endpoint: /v1/hs-codes/lookup
+export const HsCodesLookupQuerySchema = z.object({
+  system: z.enum(['CN8', 'HTS10', 'UK10', 'AHTN8']),
+  code: z.string().regex(/^\d{8,10}$/),
+});
+
+export const HsCodesLookupResponseSchema = z.object({
+  hs6: z.string(),
+  title: z.string(),
+  aliasTitle: z.string().nullable().optional(),
+  system: z.enum(['CN8', 'HTS10', 'UK10', 'AHTN8']),
+  code: z.string(),
+});

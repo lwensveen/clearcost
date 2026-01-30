@@ -4,7 +4,7 @@ export const ClassifyInputSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   categoryKey: z.string().optional(),
-  origin: z.string().optional(), // ISO-2 (relaxed)
+  origin: z.string().length(2).optional(),
 });
 
 export const ClassifyResponseSchema = z.object({

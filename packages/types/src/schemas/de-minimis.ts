@@ -19,3 +19,51 @@ export const DeMinimisListQuerySchema = z.object({
   appliesTo: z.enum(['DUTY', 'DUTY_VAT', 'NONE']).optional(),
   limit: z.coerce.number().int().positive().max(500).optional(),
 });
+
+export const DeMinimisThresholdQuerySchema = z.object({
+  dest: z.string().length(2),
+  on: z.coerce.date().optional(),
+});
+
+export const DeMinimisThresholdResponseSchema = z.object({
+  duty: z
+    .object({
+      currency: z.string().length(3),
+      value: z.number(),
+      deMinimisBasis: z.enum(['INTRINSIC', 'CIF']),
+    })
+    .nullable(),
+  vat: z
+    .object({
+      currency: z.string().length(3),
+      value: z.number(),
+      deMinimisBasis: z.enum(['INTRINSIC', 'CIF']),
+    })
+    .nullable(),
+});
+
+export const DeMinimisEvalBodySchema = z.object({
+  dest: z.string().length(2),
+  goodsDest: z.number().nonnegative(),
+  freightDest: z.number().nonnegative().default(0),
+  fxAsOf: z.coerce.date().optional(),
+});
+
+export const DeMinimisEvalResponseSchema = z.object({
+  duty: z
+    .object({
+      thresholdDest: z.number(),
+      deMinimisBasis: z.enum(['INTRINSIC', 'CIF']),
+      under: z.boolean(),
+    })
+    .optional(),
+  vat: z
+    .object({
+      thresholdDest: z.number(),
+      deMinimisBasis: z.enum(['INTRINSIC', 'CIF']),
+      under: z.boolean(),
+    })
+    .optional(),
+  suppressDuty: z.boolean(),
+  suppressVAT: z.boolean(),
+});

@@ -12,8 +12,8 @@ export const DimsCmSchema = z.object({
 });
 
 export const QuoteInputSchema = z.object({
-  origin: z.string().min(2), // ISO-2 (relaxed)
-  dest: z.string().min(2), // ISO-2 (relaxed)
+  origin: z.string().length(2),
+  dest: z.string().length(2),
   itemValue: MoneySchema,
   dimsCm: DimsCmSchema,
   weightKg: z.number().finite(),
@@ -62,4 +62,48 @@ export const QuoteResponseSchema = z.object({
   total: z.number(),
   guaranteedMax: z.number(),
   policy: z.string(),
+});
+
+export const QuoteRecentQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  sinceHours: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 90)
+    .optional(),
+});
+
+export const QuoteByKeyParamsSchema = z.object({
+  key: z.string().min(1),
+});
+
+export const QuoteReplayQuerySchema = z.object({
+  key: z.string().min(1),
+  // kept for legacy, but ignored in favor of tenant-scoped lookup
+  scope: z.string().default('quotes'),
+});
+
+export const QuoteRecentRowSchema = z.object({
+  createdAt: z.string(),
+  idemKey: z.string(),
+  origin: z.string(),
+  dest: z.string(),
+  mode: z.enum(['air', 'sea']).nullable(),
+  hs6: z.string().nullable(),
+  currency: z.string().nullable(),
+  itemValue: z.number().nullable(),
+  total: z.number(),
+  duty: z.number(),
+  vat: z.number().nullable(),
+  fees: z.number(),
+});
+
+export const QuoteRecentListResponseSchema = z.object({
+  rows: z.array(QuoteRecentRowSchema),
+});
+
+export const QuoteStatsResponseSchema = z.object({
+  last24h: z.object({ count: z.number() }),
+  last7d: z.object({ count: z.number() }),
 });

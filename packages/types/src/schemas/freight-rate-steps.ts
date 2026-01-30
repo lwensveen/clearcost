@@ -19,3 +19,20 @@ export const FreightRateStepsListQuerySchema = z.object({
   cardId: z.string().uuid().optional(),
   limit: z.coerce.number().int().positive().max(1000).optional(),
 });
+
+export const FreightStepAdminCreateSchema = z.object({
+  uptoQty: z.number().positive(),
+  pricePerUnit: z.number().nonnegative(),
+});
+
+export const FreightStepAdminUpdateSchema = FreightStepAdminCreateSchema.partial().refine(
+  (b) => Object.values(b).some((v) => v !== undefined),
+  { message: 'At least one field required' }
+);
+
+export const FreightStepIdParamSchema = z.object({
+  id: z.string().uuid(),
+  stepId: z.string().uuid(),
+});
+
+export const FreightRateStepsListResponseSchema = z.array(FreightRateStepSelectCoercedSchema);

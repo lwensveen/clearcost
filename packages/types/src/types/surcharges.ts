@@ -4,6 +4,9 @@ import {
   SurchargeInsertSchema,
   SurchargeSelectCoercedSchema,
   SurchargeSelectSchema,
+  SurchargesAdminImportResponseSchema,
+  SurchargesAdminListQuerySchema,
+  SurchargesAdminListResponseSchema,
   SurchargesListQuerySchema,
   SurchargeUpdateSchema,
 } from '../schemas/index.js';
@@ -14,3 +17,6 @@ export type SurchargeInsert = z.infer<typeof SurchargeInsertSchema>;
 export type SurchargeUpdate = z.infer<typeof SurchargeUpdateSchema>;
 export type SurchargeById = z.infer<typeof SurchargeByIdSchema>;
 export type SurchargesListQuery = z.infer<typeof SurchargesListQuerySchema>;
+export type SurchargesAdminListQuery = z.infer<typeof SurchargesAdminListQuerySchema>;
+export type SurchargesAdminListResponse = z.infer<typeof SurchargesAdminListResponseSchema>;
+export type SurchargesAdminImportResponse = z.infer<typeof SurchargesAdminImportResponseSchema>;

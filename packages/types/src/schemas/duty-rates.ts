@@ -27,3 +27,15 @@ export const DutyRatesListQuerySchema = z.object({
   activeOn: z.coerce.date().optional(),
   limit: z.coerce.number().int().positive().max(500).optional(),
 });
+
+export const DutyRatesImportBodySchema = z.array(DutyRateInsertSchema).min(1).max(50_000);
+
+export const DutyRatesImportQuerySchema = z.object({
+  dryRun: z.coerce.boolean().default(false),
+  source: z.string().min(1).max(40).optional(),
+});
+
+export const DutyRatesImportResponseSchema = z.object({
+  ok: z.literal(true),
+  count: z.number().int().nonnegative(),
+});

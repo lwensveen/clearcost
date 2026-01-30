@@ -75,3 +75,14 @@ export const SurchargesListQuerySchema = z.object({
   activeOn: z.coerce.date().optional(),
   limit: z.coerce.number().int().positive().max(500).optional(),
 });
+
+export const SurchargesAdminListQuerySchema = SurchargesListQuerySchema.extend({
+  offset: z.coerce.number().int().nonnegative().default(0),
+});
+
+export const SurchargesAdminListResponseSchema = z.array(SurchargeSelectCoercedSchema);
+
+export const SurchargesAdminImportResponseSchema = z.object({
+  ok: z.literal(true),
+  count: z.number(),
+});

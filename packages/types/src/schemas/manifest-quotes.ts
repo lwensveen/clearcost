@@ -26,3 +26,38 @@ export const ManifestQuotesListQuerySchema = z.object({
   currency: z.string().length(3).optional(),
   limit: z.coerce.number().int().positive().max(1000).optional(),
 });
+
+export const ManifestQuoteItemSchema = z.object({
+  id: z.string().uuid(),
+  currency: z.string().length(3).optional(),
+  basis: z.number(),
+  chargeableKg: z.number().nullable().optional(),
+  freightShare: z.number(),
+  components: z.object({
+    CIF: z.number(),
+    duty: z.number(),
+    vat: z.number(),
+    fees: z.number(),
+    checkoutVAT: z.number().optional(),
+  }),
+});
+
+export const ManifestQuoteSummarySchema = z.object({
+  itemsCount: z.number(),
+  currency: z.string().length(3).optional(),
+  freight: z.number(),
+  duty: z.number(),
+  vat: z.number(),
+  fees: z.number(),
+  checkoutVat: z.number().nullable().optional(),
+  grandTotal: z.number(),
+  fxAsOf: z.date().optional(),
+  updatedAt: z.date(),
+});
+
+export const ManifestQuoteResponseSchema = z.object({
+  ok: z.literal(true),
+  manifestId: z.string().uuid(),
+  summary: ManifestQuoteSummarySchema,
+  items: z.array(ManifestQuoteItemSchema),
+});

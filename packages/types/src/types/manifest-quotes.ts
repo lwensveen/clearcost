@@ -2,8 +2,11 @@ import { z } from 'zod/v4';
 import {
   ManifestQuoteByIdSchema,
   ManifestQuoteInsertSchema,
+  ManifestQuoteItemSchema,
+  ManifestQuoteResponseSchema,
   ManifestQuoteSelectCoercedSchema,
   ManifestQuoteSelectSchema,
+  ManifestQuoteSummarySchema,
   ManifestQuotesListQuerySchema,
   ManifestQuoteUpdateSchema,
 } from '../schemas/manifest-quotes.js';
@@ -14,3 +17,6 @@ export type ManifestQuoteInsert = z.infer<typeof ManifestQuoteInsertSchema>;
 export type ManifestQuoteUpdate = z.infer<typeof ManifestQuoteUpdateSchema>;
 export type ManifestQuoteById = z.infer<typeof ManifestQuoteByIdSchema>;
 export type ManifestQuotesListQuery = z.infer<typeof ManifestQuotesListQuerySchema>;
+export type ManifestQuoteItem = z.infer<typeof ManifestQuoteItemSchema>;
+export type ManifestQuoteSummary = z.infer<typeof ManifestQuoteSummarySchema>;
+export type ManifestQuoteResponse = z.infer<typeof ManifestQuoteResponseSchema>;

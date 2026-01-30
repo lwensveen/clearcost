@@ -27,3 +27,9 @@ export const FxRatesListQuerySchema = z.object({
   asOf: z.coerce.date().optional(),
   limit: z.coerce.number().int().positive().max(1000).optional(),
 });
+
+export const FxRefreshResponseSchema = z.object({
+  base: z.string(),
+  fxAsOf: z.string(),
+  attemptedInserts: z.number().int().nonnegative(),
+});
