@@ -1,10 +1,10 @@
 import {
   db,
   jurisdictionsTable,
+  countriesTable,
   tradeProgramMembersTable,
   tradeProgramsTable,
 } from '@clearcost/db';
-import { countriesTable } from '@clearcost/db/dist/schemas/countries.js';
 import { eq } from 'drizzle-orm';
 import { cell, headerIndex, iterateCsvRecords } from '../../utils/stream-csv.js';
 import { httpFetch } from '../../../../lib/http.js';
