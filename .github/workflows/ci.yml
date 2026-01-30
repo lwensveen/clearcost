@@ -24,11 +24,20 @@ jobs:
       - name: Set GIT_SHA
         run: echo "GIT_SHA=${GITHUB_SHA}" >> $GITHUB_ENV
 
+      - name: Validate turbo env lists
+        run: bun run validate-envs
+
       - name: Build
         run: bun run build
 
-      - name: Lint & Type‑check
-        run: bun run lint check-types
+      - name: Build web (no turbo cache)
+        run: bun run --cwd apps/web build
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Type-check
+        run: bun run check-types
 
       - name: Coverage
         run: bun run test:coverage
