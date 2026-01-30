@@ -9,6 +9,12 @@
       ],
       "@clearcost/types/*": [
         "../types/src/*"
+      ],
+      "@clearcost/db": [
+        "../db/src/index.ts"
+      ],
+      "@clearcost/db/*": [
+        "../db/src/*"
       ]
     }
   },
