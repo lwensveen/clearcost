@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
+import { errorResponseForStatus } from '../../lib/errors.js';
 // Import the mocked modules so our expectations reference the same instances
 import {
   importErrors,
@@ -86,7 +87,9 @@ describe('import-instrumentation plugin (unit)', () => {
 
     const r = await app.inject({ method: 'POST', url: '/imp', headers: jsonCT(), payload: '{}' });
     expect(r.statusCode).toBe(409);
-    expect(r.json()).toMatchObject({ error: 'import already running', lockKey: 'WITS:seed' });
+    expect(r.json()).toMatchObject({
+      error: { message: 'import already running', details: { lockKey: 'WITS:seed' } },
+    });
 
     expect(acquireRunLockMock).toHaveBeenCalledWith('WITS:seed');
     expect(startImportTimer).not.toHaveBeenCalled();
@@ -202,7 +205,8 @@ describe('import-instrumentation plugin (unit)', () => {
     app.get(
       '/fail',
       { config: { importMeta: { importSource: 'WITS', job: 'seed' } } },
-      async (_req, reply) => reply.code(500).type('application/json').send({ error: 'boom' })
+      async (_req, reply) =>
+        reply.code(500).type('application/json').send(errorResponseForStatus(500, 'boom'))
     );
 
     const r = await app.inject({ method: 'GET', url: '/fail' });

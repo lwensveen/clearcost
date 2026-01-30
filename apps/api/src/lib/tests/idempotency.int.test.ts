@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
 import { withIdempotency } from '../idempotency.js';
+import { errorResponseForStatus } from '../errors.js';
 
 type Row = {
   scope: string;
@@ -187,7 +188,8 @@ describe('withIdempotency (integration via Fastify route)', () => {
         );
         return reply.send(res);
       } catch (e: any) {
-        return reply.code(e.statusCode ?? 500).send({ error: e.message });
+        const status = e.statusCode ?? 500;
+        return reply.code(status).send(errorResponseForStatus(status, e.message));
       }
     });
 
@@ -210,7 +212,8 @@ describe('withIdempotency (integration via Fastify route)', () => {
         );
         return reply.send(res);
       } catch (e: any) {
-        return reply.code(e.statusCode ?? 500).send({ error: e.message });
+        const status = e.statusCode ?? 500;
+        return reply.code(status).send(errorResponseForStatus(status, e.message));
       }
     });
 
@@ -265,7 +268,8 @@ describe('withIdempotency (integration via Fastify route)', () => {
         );
         return reply.send(res);
       } catch (e: any) {
-        return reply.code(e.statusCode ?? 500).send({ error: e.message });
+        const status = e.statusCode ?? 500;
+        return reply.code(status).send(errorResponseForStatus(status, e.message));
       }
     });
 
@@ -287,7 +291,7 @@ describe('withIdempotency (integration via Fastify route)', () => {
       payload: '{}',
     });
     expect(r2.statusCode).toBe(409);
-    expect(r2.json().error).toBe('Processing');
+    expect(r2.json().error.message).toBe('Processing');
 
     release();
     const r1 = await p1;
@@ -312,7 +316,8 @@ describe('withIdempotency (integration via Fastify route)', () => {
         );
         return reply.send(res);
       } catch (e: any) {
-        return reply.code(e.statusCode ?? 500).send({ error: e.message });
+        const status = e.statusCode ?? 500;
+        return reply.code(status).send(errorResponseForStatus(status, e.message));
       }
     });
 
