@@ -1,17 +1,13 @@
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod/v4';
 import { fetchJSON } from '../common.js';
-import { SurchargeInsert } from '@clearcost/types';
+import { SurchargeInsert, TasksSurchargeGenericJsonBodySchema } from '@clearcost/types';
 import { batchUpsertSurchargesFromStream } from '../../surcharges/utils/batch-upsert.js';
 
 export default function surchargeJsonRoute(app: FastifyInstance) {
-  const Body = z.object({
-    // Optional override; defaults to repo file
-    path: z.string().min(1).optional(),
-  });
+  const Body = TasksSurchargeGenericJsonBodySchema;
 
   app.post(
-    '/internal/cron/import/surcharges',
+    '/cron/import/surcharges',
     {
       preHandler: app.requireApiKey(['tasks:surcharges:json']),
       schema: { body: Body.optional() },

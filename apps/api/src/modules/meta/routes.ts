@@ -1,12 +1,12 @@
 import type { FastifyInstance } from 'fastify';
-import { z } from 'zod/v4';
+import { MetaHealthResponseSchema, MetaVersionResponseSchema } from '@clearcost/types';
 
 export default async function metaRoutes(app: FastifyInstance) {
   // GET /v1/_meta/healthz
   app.get('/v1/_meta/healthz', {
     schema: {
       tags: ['_meta'],
-      response: { 200: z.object({ ok: z.literal(true) }) },
+      response: { 200: MetaHealthResponseSchema },
     },
     handler: async () => ({ ok: true }),
   });
@@ -16,12 +16,7 @@ export default async function metaRoutes(app: FastifyInstance) {
     schema: {
       tags: ['_meta'],
       response: {
-        200: z.object({
-          name: z.string(),
-          version: z.string(),
-          gitSha: z.string().optional(),
-          buildTime: z.string().optional(),
-        }),
+        200: MetaVersionResponseSchema,
       },
     },
     handler: async () => ({

@@ -1,5 +1,6 @@
 import { batchUpsertSurchargesFromStream } from '../../utils/batch-upsert.js';
 import type { SurchargeInsert } from '@clearcost/types';
+import { httpFetch } from '../../../../lib/http.js';
 
 const APHIS_FEES_URL = 'https://www.aphis.usda.gov/aphis/resources/fees';
 const APHIS_FY25_URL = 'https://www.aphis.usda.gov/aphis/newsroom/stakeholder-info/aqi-fee-2025';
@@ -24,7 +25,7 @@ function currentFY(d = new Date()): number {
 }
 
 async function fetchText(url: string) {
-  const r = await fetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
+  const r = await httpFetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
   if (!r.ok) throw new Error(`APHIS fetch ${url} -> ${r.status}`);
   return await r.text();
 }

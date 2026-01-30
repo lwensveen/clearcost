@@ -10,6 +10,7 @@
 import { db, hsCodeAliasesTable, provenanceTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
 import { sha256Hex } from '../../../../../lib/provenance.js';
+import { httpFetch } from '../../../../../lib/http.js';
 
 function hs6(code8: string): string | null {
   const s = (code8 ?? '').replace(/\D+/g, '').slice(0, 6);
@@ -23,7 +24,7 @@ const hs2n = (code: string) => parseInt(code.slice(0, 2), 10);
 const hs4 = (code: string) => code.slice(0, 4);
 
 async function fetchText(url: string): Promise<string> {
-  const r = await fetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
+  const r = await httpFetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
   if (!r.ok) throw new Error(`Fetch failed ${r.status} ${r.statusText}`);
   return r.text();
 }

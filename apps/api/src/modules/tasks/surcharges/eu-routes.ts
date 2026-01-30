@@ -1,15 +1,12 @@
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod/v4';
 import { importEuTradeRemediesAsSurcharges } from '../../surcharges/services/eu/import-remedies.js';
+import { TasksSurchargeEuBodySchema } from '@clearcost/types';
 
 export default function surchargeEuRoutes(app: FastifyInstance) {
-  const Body = z.object({
-    // Optional override; if omitted we read from EU_TARIC_REMEDY_TYPES env (comma-separated)
-    measureTypeIds: z.array(z.string().min(1)).optional(),
-  });
+  const Body = TasksSurchargeEuBodySchema;
 
   app.post(
-    '/internal/cron/import/surcharges/eu-remedies',
+    '/cron/import/surcharges/eu-remedies',
     {
       preHandler: app.requireApiKey(['tasks:surcharges:eu-remedies']),
       schema: { body: Body },

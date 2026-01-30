@@ -1,42 +1,22 @@
 import { db, freightRateCardsTable, freightRateStepsTable, provenanceTable } from '@clearcost/db';
-import { z } from 'zod/v4';
 import { eq, sql } from 'drizzle-orm';
 import { sha256Hex } from '../../../lib/provenance.js';
-
-const Step = z.object({
-  uptoQty: z.coerce.number().positive(),
-  pricePerUnit: z.coerce.number().nonnegative(),
-});
-
-export const FreightCard = z.object({
-  origin: z.string().length(2),
-  dest: z.string().length(2),
-  freightMode: z.enum(['air', 'sea']),
-  freightUnit: z.enum(['kg', 'm3']),
-  currency: z.string().length(3).default('USD'),
-  effectiveFrom: z.coerce.date(),
-  effectiveTo: z.coerce.date().optional().nullable(),
-  minCharge: z.coerce.number().optional(),
-  priceRounding: z.coerce.number().optional(),
-  volumetricDivisor: z.coerce.number().int().positive().optional(),
-  carrier: z.string().optional(),
-  notes: z.string().optional(),
-  steps: z.array(Step).min(1),
-});
-
-export const FreightCards = z.array(FreightCard);
-export type FreightCardInput = z.infer<typeof FreightCard>;
+import {
+  FreightCardImportSchema,
+  FreightCardsImportSchema,
+  type FreightCardImport,
+} from '@clearcost/types';
 
 type ImportOpts = {
   batchSize?: number;
   importId?: string;
-  makeSourceRef?: (card: FreightCardInput) => string | undefined;
+  makeSourceRef?: (card: FreightCardImport) => string | undefined;
 };
 
 const ymd = (d?: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 
-export async function importFreightCards(cards: FreightCardInput[], opts: ImportOpts = {}) {
-  const parsed = FreightCards.parse(cards);
+export async function importFreightCards(cards: FreightCardImport[], opts: ImportOpts = {}) {
+  const parsed = FreightCardsImportSchema.parse(cards);
   const items = parsed.map((card) => ({
     ...card,
     origin: card.origin.toUpperCase(),

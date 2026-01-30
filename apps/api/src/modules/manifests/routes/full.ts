@@ -1,12 +1,14 @@
 import type { FastifyInstance } from 'fastify';
-import { z } from 'zod/v4';
 import { and, desc, eq } from 'drizzle-orm';
 import { db, manifestItemsTable, manifestsTable } from '@clearcost/db';
+import { errorResponseForStatus } from '../../../lib/errors.js';
 import {
+  ManifestErrorResponseSchema,
   ManifestByIdSchema,
+  ManifestFullResponseSchema,
+  ManifestItemSelectCoercedSchema,
   ManifestSelectCoercedSchema,
-} from '@clearcost/types/dist/schemas/manifests.js';
-import { ManifestItemSelectCoercedSchema } from '@clearcost/types/dist/schemas/manifest-items.js';
+} from '@clearcost/types';
 
 export default async function manifestsFullRoutes(app: FastifyInstance) {
   app.get(
@@ -16,11 +18,8 @@ export default async function manifestsFullRoutes(app: FastifyInstance) {
       schema: {
         params: ManifestByIdSchema,
         response: {
-          200: z.object({
-            manifest: ManifestSelectCoercedSchema,
-            items: z.array(ManifestItemSelectCoercedSchema),
-          }),
-          404: z.object({ error: z.string() }),
+          200: ManifestFullResponseSchema,
+          404: ManifestErrorResponseSchema,
         },
       },
     },
@@ -34,7 +33,7 @@ export default async function manifestsFullRoutes(app: FastifyInstance) {
         .where(and(eq(manifestsTable.id, id), eq(manifestsTable.ownerId, ownerId)))
         .limit(1);
 
-      if (!m) return reply.notFound('Not found');
+      if (!m) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
 
       const rows = await db
         .select()

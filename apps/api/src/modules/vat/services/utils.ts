@@ -1,6 +1,7 @@
 import countries from 'i18n-iso-countries';
 import en from 'i18n-iso-countries/langs/en.json' with { type: 'json' };
 import { VatBase } from './get-vat.js';
+import { httpFetch } from '../../../lib/http.js';
 
 countries.registerLocale(en);
 
@@ -45,7 +46,7 @@ export async function fetchArrayBuffer(
   let lastErr: unknown;
   for (let i = 1; i <= attempts; i++) {
     try {
-      const res = await fetch(url, {
+      const res = await httpFetch(url, {
         headers: {
           'user-agent': `${USER_AGENT} (+https://clearcost.dev)`,
           accept:

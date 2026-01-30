@@ -3,17 +3,16 @@ import { z } from 'zod/v4';
 import { importDeMinimisFromZonos } from '../de-minimis/services/import-from-zonos.js';
 import { importDeMinimisFromOfficial } from '../de-minimis/services/import-official.js';
 import { seedDeMinimisBaseline } from '../de-minimis/services/import-baseline.js';
+import { TasksDeMinimisImportBodySchema } from '@clearcost/types';
 
-const Body = z.object({
-  effectiveOn: z.coerce.date().optional(),
-});
+const Body = TasksDeMinimisImportBodySchema;
 
 const toMidnightUTC = (d: Date) => new Date(d.toISOString().slice(0, 10));
 
 export default function deMinimisTaskRoutes(app: FastifyInstance) {
   // Zonos (scraped) — convenience source
   app.post<{ Body: z.infer<typeof Body> }>(
-    '/internal/cron/de-minimis/import-zonos',
+    '/cron/de-minimis/import-zonos',
     {
       preHandler: app.requireApiKey(['tasks:de-minimis:import-zonos']),
       schema: { body: Body.optional() },
@@ -30,7 +29,7 @@ export default function deMinimisTaskRoutes(app: FastifyInstance) {
 
   // Official (primary) — EU/GB/US etc. from gov sources
   app.post(
-    '/internal/cron/de-minimis/import-official',
+    '/cron/de-minimis/import-official',
     {
       preHandler: app.requireApiKey(['tasks:de-minimis:import-official']),
       config: { importMeta: { importSource: 'OFFICIAL', job: 'de-minimis:import-official' } },
@@ -43,7 +42,7 @@ export default function deMinimisTaskRoutes(app: FastifyInstance) {
 
   // Seed baseline defaults (idempotent upserts)
   app.post<{ Body: z.infer<typeof Body> }>(
-    '/internal/cron/de-minimis/seed-baseline',
+    '/cron/de-minimis/seed-baseline',
     {
       preHandler: app.requireApiKey(['tasks:de-minimis:seed-baseline']),
       schema: { body: Body.optional() },

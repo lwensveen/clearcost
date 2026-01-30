@@ -16,6 +16,7 @@ import {
   ScryptOptions,
   timingSafeEqual,
 } from 'node:crypto';
+import { errorResponseForStatus } from '../lib/errors.js';
 
 function scryptAsync(
   password: BinaryLike,
@@ -148,6 +149,7 @@ declare module 'fastify' {
         internalSigned?: boolean;
       }
     ) => preHandlerHookHandler;
+    requireInternalSignature: () => preHandlerHookHandler;
   }
 }
 
@@ -163,6 +165,10 @@ const INTERNAL_SIGNING_SECRET: string = process.env.INTERNAL_SIGNING_SECRET ?? '
 
 export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
   async (app: FastifyInstance) => {
+    if (process.env.NODE_ENV === 'production' && !INTERNAL_SIGNING_SECRET) {
+      throw new Error('INTERNAL_SIGNING_SECRET must be set in production');
+    }
+
     function verifyInternalSignature(req: FastifyRequest): boolean {
       if (!INTERNAL_SIGNING_SECRET) return true;
 
@@ -216,7 +222,7 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
       (requiredScopes: string[] = [], opts: RequireApiKeyOptions = {}) => {
         return async (req: FastifyRequest, reply: FastifyReply) => {
           if (opts.internalSigned === true && !verifyInternalSignature(req)) {
-            return reply.unauthorized('Invalid internal signature');
+            return reply.code(401).send(errorResponseForStatus(401, 'Invalid internal signature'));
           }
 
           const authHdr = req.headers['authorization'] as string | undefined;
@@ -225,7 +231,9 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
 
           if (!presented) {
             if (opts.optional) return;
-            return reply.unauthorized('Missing or malformed API key');
+            return reply
+              .code(401)
+              .send(errorResponseForStatus(401, 'Missing or malformed API key'));
           }
 
           const { keyId, secret, prefix: presentedPrefix } = presented;
@@ -235,17 +243,19 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
             .where(and(eq(apiKeysTable.keyId, keyId), eq(apiKeysTable.isActive, true)))
             .limit(1);
           const row = rows[0];
-          if (!row) return reply.unauthorized('Invalid API key');
+          if (!row) return reply.code(401).send(errorResponseForStatus(401, 'Invalid API key'));
 
           if (row.prefix && row.prefix !== presentedPrefix)
-            return reply.unauthorized('Invalid API key');
+            return reply.code(401).send(errorResponseForStatus(401, 'Invalid API key'));
           if (row.expiresAt && row.expiresAt < new Date())
-            return reply.unauthorized('API key expired');
-          if (row.revokedAt) return reply.unauthorized('API key revoked');
+            return reply.code(401).send(errorResponseForStatus(401, 'API key expired'));
+          if (row.revokedAt)
+            return reply.code(401).send(errorResponseForStatus(401, 'API key revoked'));
 
-          if (!row.tokenPhc) return reply.unauthorized('Invalid API key');
+          if (!row.tokenPhc)
+            return reply.code(401).send(errorResponseForStatus(401, 'Invalid API key'));
           const ok = await verifyTokenPhc(secret, PEPPER, row.tokenPhc);
-          if (!ok) return reply.unauthorized('Invalid API key');
+          if (!ok) return reply.code(401).send(errorResponseForStatus(401, 'Invalid API key'));
 
           const scopes = row.scopes ?? [];
           const allowedOrigins = row.allowedOrigins ?? [];
@@ -254,17 +264,19 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
             const has = requiredScopes.every(
               (s) => scopes.includes(s) || scopes.includes('admin:all')
             );
-            if (!has) return reply.forbidden('Missing required scope(s)');
+            if (!has)
+              return reply.code(403).send(errorResponseForStatus(403, 'Missing required scope(s)'));
           }
 
           const ownerFrom = opts.ownerFrom?.(req);
           if (ownerFrom && row.ownerId !== ownerFrom && !scopes.includes('admin:all')) {
-            return reply.forbidden('Owner mismatch');
+            return reply.code(403).send(errorResponseForStatus(403, 'Owner mismatch'));
           }
 
           const reqOrigin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
           if (allowedOrigins.length && reqOrigin && !scopes.includes('admin:all')) {
-            if (!allowedOrigins.includes(reqOrigin)) return reply.forbidden('Origin not allowed');
+            if (!allowedOrigins.includes(reqOrigin))
+              return reply.code(403).send(errorResponseForStatus(403, 'Origin not allowed'));
           }
 
           req.apiKey = {
@@ -283,6 +295,14 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
         };
       }
     );
+
+    app.decorate('requireInternalSignature', () => {
+      return async (req: FastifyRequest, reply: FastifyReply) => {
+        if (!verifyInternalSignature(req)) {
+          return reply.code(401).send(errorResponseForStatus(401, 'Invalid internal signature'));
+        }
+      };
+    });
   },
   { name: 'api-key-auth' }
 );

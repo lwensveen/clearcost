@@ -1,8 +1,14 @@
 import type { FastifyInstance } from 'fastify';
-import { z } from 'zod/v4';
 import { apiKeysTable, db } from '@clearcost/db';
 import { eq } from 'drizzle-orm';
 import { generateApiKey } from '../../../plugins/api-key-auth.js';
+import { errorResponseForStatus } from '../../../lib/errors.js';
+import {
+  ApiKeyErrorResponseSchema,
+  ApiKeySelfResponseSchema,
+  ApiKeySelfRevokeResponseSchema,
+  ApiKeySelfRotateResponseSchema,
+} from '@clearcost/types';
 
 type Prefix = 'live' | 'test';
 const isPrefix = (v: unknown): v is Prefix => v === 'live' || v === 'test';
@@ -16,19 +22,8 @@ export default function apiKeySelfRoutes(app: FastifyInstance) {
       preHandler: app.requireApiKey([], { optional: false }),
       schema: {
         response: {
-          200: z.object({
-            id: z.uuid(),
-            keyId: z.string(),
-            prefix: z.string(),
-            ownerId: z.uuid(),
-            name: z.string(),
-            scopes: z.array(z.string()),
-            isActive: z.boolean(),
-            expiresAt: z.any().nullable(),
-            revokedAt: z.any().nullable(),
-            createdAt: z.any().nullable(),
-            lastUsedAt: z.any().nullable(),
-          }),
+          200: ApiKeySelfResponseSchema,
+          401: ApiKeyErrorResponseSchema,
         },
       },
     },
@@ -53,8 +48,8 @@ export default function apiKeySelfRoutes(app: FastifyInstance) {
         .limit(1);
 
       const row = rows[0];
-      if (!row) return reply.unauthorized(); // should not happen if middleware passed
-      return row;
+      if (!row) return reply.code(401).send(errorResponseForStatus(401, 'Unauthorized'));
+      return ApiKeySelfResponseSchema.parse(row);
     }
   );
 
@@ -65,17 +60,8 @@ export default function apiKeySelfRoutes(app: FastifyInstance) {
       preHandler: app.requireApiKey([], { optional: false }),
       schema: {
         response: {
-          201: z.object({
-            id: z.uuid(),
-            token: z.string(),
-            keyId: z.string(),
-            prefix: z.string(),
-            name: z.string(),
-            ownerId: z.uuid(),
-            scopes: z.array(z.string()),
-            isActive: z.boolean(),
-            createdAt: z.any().nullable(),
-          }),
+          201: ApiKeySelfRotateResponseSchema,
+          500: ApiKeyErrorResponseSchema,
         },
       },
     },
@@ -120,19 +106,22 @@ export default function apiKeySelfRoutes(app: FastifyInstance) {
         });
 
       const row = inserted[0];
-      if (!row) return reply.internalServerError('Failed to create API key');
+      if (!row)
+        return reply.code(500).send(errorResponseForStatus(500, 'Failed to create API key'));
 
-      return reply.code(201).send({
-        id: row.id,
-        token,
-        keyId,
-        prefix,
-        name: rotatedName,
-        ownerId,
-        scopes: baseScopes,
-        isActive: true,
-        createdAt: row.createdAt,
-      });
+      return reply.code(201).send(
+        ApiKeySelfRotateResponseSchema.parse({
+          id: row.id,
+          token,
+          keyId,
+          prefix,
+          name: rotatedName,
+          ownerId,
+          scopes: baseScopes,
+          isActive: true,
+          createdAt: row.createdAt,
+        })
+      );
     }
   );
 
@@ -143,12 +132,8 @@ export default function apiKeySelfRoutes(app: FastifyInstance) {
       preHandler: app.requireApiKey([], { optional: false }),
       schema: {
         response: {
-          200: z.object({
-            id: z.uuid(),
-            isActive: z.boolean(),
-            revokedAt: z.any().nullable(),
-            updatedAt: z.any().nullable(),
-          }),
+          200: ApiKeySelfRevokeResponseSchema,
+          404: ApiKeyErrorResponseSchema,
         },
       },
     },
@@ -166,8 +151,8 @@ export default function apiKeySelfRoutes(app: FastifyInstance) {
         });
 
       const row = updated[0];
-      if (!row) return reply.notFound('Not found');
-      return row;
+      if (!row) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
+      return ApiKeySelfRevokeResponseSchema.parse(row);
     }
   );
 }

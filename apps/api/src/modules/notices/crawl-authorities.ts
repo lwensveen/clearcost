@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { URL } from 'node:url';
+import { httpFetch } from '../../lib/http.js';
 
 export type CrawlOptions = {
   startUrls: string[];
@@ -70,7 +71,7 @@ function looksLikeNoticePdf(
 }
 
 async function fetchHtml(url: string, userAgent?: string): Promise<string> {
-  const res = await fetch(url, {
+  const res = await httpFetch(url, {
     redirect: 'follow',
     headers: { 'user-agent': userAgent ?? DEFAULT_UA },
   });
@@ -79,7 +80,7 @@ async function fetchHtml(url: string, userAgent?: string): Promise<string> {
 }
 
 async function fetchBin(url: string, userAgent?: string): Promise<Buffer> {
-  const res = await fetch(url, {
+  const res = await httpFetch(url, {
     redirect: 'follow',
     headers: { 'user-agent': userAgent ?? DEFAULT_UA },
   });

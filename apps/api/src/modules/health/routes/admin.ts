@@ -1,30 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { db, provenanceTable } from '@clearcost/db';
-import { z } from 'zod/v4';
 import { sql } from 'drizzle-orm';
-
-const QS = z.object({
-  thresholdHours: z.coerce
-    .number()
-    .int()
-    .positive()
-    .max(24 * 14)
-    .default(36),
-});
-
-const ImportHealthSchema = z.object({
-  now: z.coerce.date(),
-  thresholdHours: z.number(),
-  imports: z.array(
-    z.object({
-      id: z.string(),
-      lastAt: z.coerce.date().nullable(),
-      ok: z.boolean(),
-      rows24h: z.number(),
-      total: z.number(),
-    })
-  ),
-});
+import { z } from 'zod/v4';
+import { HealthImportsQuerySchema, HealthImportsResponseSchema } from '@clearcost/types';
 
 function toDate(v: unknown): Date | null {
   if (v == null) return null;
@@ -45,15 +23,18 @@ type Row = {
 
 export default function healthAdminRoutes(app: FastifyInstance) {
   // Import health (admin/ops only)
-  app.get<{ Querystring: z.infer<typeof QS> }>(
-    '/health/imports',
+  app.get<{ Querystring: z.infer<typeof HealthImportsQuerySchema> }>(
+    '/imports',
     {
       preHandler: app.requireApiKey(['ops:health']),
-      schema: { querystring: QS, response: { 200: ImportHealthSchema } },
+      schema: {
+        querystring: HealthImportsQuerySchema,
+        response: { 200: HealthImportsResponseSchema },
+      },
       config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
-      const { thresholdHours } = QS.parse(req.query);
+      const { thresholdHours } = HealthImportsQuerySchema.parse(req.query);
 
       const q = sql<Row>`
         SELECT
@@ -90,7 +71,7 @@ export default function healthAdminRoutes(app: FastifyInstance) {
       );
 
       reply.header('cache-control', 'public, max-age=15, stale-while-revalidate=60');
-      return { now, thresholdHours, imports };
+      return HealthImportsResponseSchema.parse({ now, thresholdHours, imports });
     }
   );
 }

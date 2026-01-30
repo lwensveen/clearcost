@@ -1,35 +1,10 @@
 import { db } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
-import { z } from 'zod/v4';
+import { HealthSchema, type Health } from '@clearcost/types';
 
 const FX_MAX_AGE_HOURS = Number(process.env.FX_MAX_AGE_HOURS ?? 48);
 
-export const HealthSchema = z.object({
-  ok: z.boolean(),
-  service: z.string().default('clearcost-api'),
-  time: z.object({
-    server: z.string(),
-    uptimeSec: z.number(),
-    tz: z.string(),
-  }),
-  db: z.object({
-    ok: z.boolean(),
-    latencyMs: z.number().nullable(),
-  }),
-  fxCache: z.object({
-    ok: z.boolean().nullable(),
-    latest: z.string().nullable(),
-    ageHours: z.number().nullable(),
-    maxAgeHours: z.number(),
-  }),
-  version: z.object({
-    commit: z.string().nullable(),
-    env: z.string(),
-  }),
-  durationMs: z.number(),
-});
-
-type Health = z.infer<typeof HealthSchema>;
+export { HealthSchema };
 
 export async function checkHealth(): Promise<Health> {
   const startedAt = Date.now();

@@ -1,6 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
-import { HeaderSchema } from '@clearcost/types';
+import {
+  IdempotencyHeaderSchema,
+  OrgSettingsBodySchema,
+  OrgSettingsResponseSchema,
+  OrgSettingsRotateWebhookResponseSchema,
+} from '@clearcost/types';
 import {
   ensureOrgSettings,
   getOrgHeader,
@@ -9,33 +14,7 @@ import {
 } from './services.js';
 import { withIdempotency } from '../../lib/idempotency.js';
 
-// Body accepted from the frontend (strings/nullable)
-const OrgSettingsBody = z.object({
-  name: z.string().min(1),
-  billingEmail: z.string().email().nullable().optional(),
-  defaultCurrency: z.string().length(3),
-  taxId: z.string().max(64).nullable().optional(),
-  webhookUrl: z.string().url().nullable().optional(),
-});
-
-// Shared response schema
-const OrgSettingsResponse = z.object({
-  org: z.object({ id: z.string(), name: z.string() }),
-  settings: z.object({
-    id: z.string(),
-    orgId: z.string().nullable(),
-    billingEmail: z.string().nullable(),
-    defaultCurrency: z.string(),
-    taxId: z.string().nullable(),
-    webhookUrl: z.string().nullable(),
-    webhookSecret: z.string().nullable(),
-    address: z.any().nullable(),
-    createdAt: z.coerce.date().nullable(),
-    updatedAt: z.coerce.date().nullable().optional(),
-  }),
-});
-
-function idemFrom(headers: z.infer<typeof HeaderSchema>) {
+function idemFrom(headers: z.infer<typeof IdempotencyHeaderSchema>) {
   return headers['idempotency-key'] ?? headers['x-idempotency-key']!;
 }
 
@@ -45,7 +24,7 @@ export default function orgSelfSettingsRoutes(app: FastifyInstance) {
     '/self/settings',
     {
       preHandler: app.requireApiKey(['self:read']),
-      schema: { response: { 200: OrgSettingsResponse } },
+      schema: { response: { 200: OrgSettingsResponseSchema } },
       config: { rateLimit: { max: 300, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
@@ -57,22 +36,22 @@ export default function orgSelfSettingsRoutes(app: FastifyInstance) {
 
   // PUT /v1/orgs/self/settings
   app.put<{
-    Body: z.infer<typeof OrgSettingsBody>;
-    Headers: z.infer<typeof HeaderSchema>;
+    Body: z.infer<typeof OrgSettingsBodySchema>;
+    Headers: z.infer<typeof IdempotencyHeaderSchema>;
   }>(
     '/self/settings',
     {
       preHandler: app.requireApiKey(['self:write']),
       schema: {
-        body: OrgSettingsBody,
-        headers: HeaderSchema,
-        response: { 200: OrgSettingsResponse },
+        body: OrgSettingsBodySchema,
+        headers: IdempotencyHeaderSchema,
+        response: { 200: OrgSettingsResponseSchema },
       },
       config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
-      const headers = HeaderSchema.parse(req.headers);
-      const body = OrgSettingsBody.parse(req.body);
+      const headers = IdempotencyHeaderSchema.parse(req.headers);
+      const body = OrgSettingsBodySchema.parse(req.body);
       const orgId = req.apiKey!.ownerId;
       const ns = `orgs:self:settings:update:${orgId}`;
       const idem = idemFrom(headers);
@@ -95,19 +74,19 @@ export default function orgSelfSettingsRoutes(app: FastifyInstance) {
 
   // POST /v1/orgs/self/settings/rotate-webhook
   app.post<{
-    Headers: z.infer<typeof HeaderSchema>;
+    Headers: z.infer<typeof IdempotencyHeaderSchema>;
   }>(
     '/self/settings/rotate-webhook',
     {
       preHandler: app.requireApiKey(['self:write']),
       schema: {
-        headers: HeaderSchema,
-        response: { 200: z.object({ ok: z.literal(true), secret: z.string() }) },
+        headers: IdempotencyHeaderSchema,
+        response: { 200: OrgSettingsRotateWebhookResponseSchema },
       },
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
-      const headers = HeaderSchema.parse(req.headers);
+      const headers = IdempotencyHeaderSchema.parse(req.headers);
       const orgId = req.apiKey!.ownerId;
       const ns = `orgs:self:settings:rotate-webhook:${orgId}`;
       const idem = idemFrom(headers);

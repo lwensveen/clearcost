@@ -3,13 +3,18 @@ import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod/v4';
 import { and, desc, eq } from 'drizzle-orm';
 import { db, manifestItemsTable, manifestsTable } from '@clearcost/db';
-import { HeaderSchema } from '@clearcost/types';
-import { ManifestByIdSchema } from '@clearcost/types/dist/schemas/manifests.js';
 import {
+  IdempotencyHeaderSchema,
+  ManifestByIdSchema,
+  ManifestErrorResponseSchema,
   ManifestItemInsertSchema,
   ManifestItemSelectCoercedSchema,
-} from '@clearcost/types/dist/schemas/manifest-items.js';
+  ManifestItemsImportResponseSchema,
+  ManifestItemsReplaceBodySchema,
+  ManifestItemsReplaceResponseSchema,
+} from '@clearcost/types';
 import { ImportQuery, mapRecordToItem, parseCsv, RowShape } from './utils.js';
+import { errorResponseForStatus } from '../../../../lib/errors.js';
 
 /** Ensure the manifest belongs to the API key owner */
 async function assertOwnsManifest(manifestId: string, ownerId?: string) {
@@ -39,25 +44,13 @@ export default async function manifestsBulkRoutes(app: FastifyInstance) {
   // ---------------------------------------------------------------------------
   // POST /v1/manifests/:id/items:replace  (replace entire list)
   // ---------------------------------------------------------------------------
-  const ReplaceBodySchema = z.object({
-    items: z
-      .array(
-        ManifestItemInsertSchema.omit({
-          id: true,
-          manifestId: true,
-          createdAt: true,
-          updatedAt: true,
-        })
-      )
-      .min(0),
-    dryRun: z.coerce.boolean().default(false),
-  });
-  const ReplaceReplySchema = z.object({ replaced: z.number().int().min(0) });
-  const NotFoundReply = z.object({ error: z.string() });
+  const ReplaceBodySchema = ManifestItemsReplaceBodySchema;
+  const ReplaceReplySchema = ManifestItemsReplaceResponseSchema;
+  const NotFoundReply = ManifestErrorResponseSchema;
 
   r.post<{
     Params: z.infer<typeof ManifestByIdSchema>;
-    Headers: z.infer<typeof HeaderSchema>;
+    Headers: z.infer<typeof IdempotencyHeaderSchema>;
     Body: z.infer<typeof ReplaceBodySchema>;
     Reply: z.infer<typeof ReplaceReplySchema> | z.infer<typeof NotFoundReply>;
   }>(
@@ -66,7 +59,7 @@ export default async function manifestsBulkRoutes(app: FastifyInstance) {
       preHandler: app.requireApiKey(['manifests:write']),
       schema: {
         params: ManifestByIdSchema,
-        headers: HeaderSchema,
+        headers: IdempotencyHeaderSchema,
         body: ReplaceBodySchema,
         response: { 200: ReplaceReplySchema, 404: NotFoundReply },
       },
@@ -76,14 +69,14 @@ export default async function manifestsBulkRoutes(app: FastifyInstance) {
       const ownerId = req.apiKey!.ownerId;
 
       if (!(await assertOwnsManifest(id, ownerId))) {
-        return reply.notFound('Manifest not found');
+        return reply.code(404).send(errorResponseForStatus(404, 'Manifest not found'));
       }
 
       const { items, dryRun } = req.body;
       const rows = items.map((it) => ({ ...it, manifestId: id }));
 
       const g = await req.server.entitlements.guardReplaceItems(req, id, rows.length);
-      if (!g.allowed) return reply.code(g.code).send({ error: g.reason });
+      if (!g.allowed) return reply.code(g.code).send(errorResponseForStatus(g.code, g.reason));
 
       if (dryRun) {
         const current = await db
@@ -122,7 +115,7 @@ export default async function manifestsBulkRoutes(app: FastifyInstance) {
       const ownerId = req.apiKey!.ownerId;
 
       if (!(await assertOwnsManifest(id, ownerId))) {
-        return reply.notFound('Manifest not found');
+        return reply.code(404).send(errorResponseForStatus(404, 'Manifest not found'));
       }
 
       const rows = await db
@@ -185,15 +178,7 @@ export default async function manifestsBulkRoutes(app: FastifyInstance) {
   // POST /v1/manifests/:id/items:import-csv  (append|replace)
   // Content-Type: text/csv; query: ?mode=append|replace&dryRun=true|false
   // ---------------------------------------------------------------------------
-  const ImportReplySchema = z.object({
-    mode: z.enum(['append', 'replace']),
-    dryRun: z.boolean(),
-    valid: z.number().int(),
-    invalid: z.number().int(),
-    inserted: z.number().int(),
-    replaced: z.number().int().optional(),
-    errors: z.array(z.object({ line: z.number().int(), message: z.string() })),
-  });
+  const ImportReplySchema = ManifestItemsImportResponseSchema;
 
   r.post<{
     Params: z.infer<typeof ManifestByIdSchema>;
@@ -216,7 +201,7 @@ export default async function manifestsBulkRoutes(app: FastifyInstance) {
       const q = req.query;
 
       if (!(await assertOwnsManifest(id, ownerId))) {
-        return reply.notFound('Manifest not found');
+        return reply.code(404).send(errorResponseForStatus(404, 'Manifest not found'));
       }
 
       const bodyStr =
@@ -242,10 +227,10 @@ export default async function manifestsBulkRoutes(app: FastifyInstance) {
       if (!q.dryRun) {
         if (q.mode === 'replace') {
           const g = await req.server.entitlements.guardReplaceItems(req, id, rows.length);
-          if (!g.allowed) return reply.code(g.code).send({ error: g.reason });
+          if (!g.allowed) return reply.code(g.code).send(errorResponseForStatus(g.code, g.reason));
         } else {
           const g = await req.server.entitlements.guardAppendItems(req, id, rows.length);
-          if (!g.allowed) return reply.code(g.code).send({ error: g.reason });
+          if (!g.allowed) return reply.code(g.code).send(errorResponseForStatus(g.code, g.reason));
         }
       }
 

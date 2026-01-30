@@ -1,46 +1,30 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
 import { importDutyRatesFromWITS } from '../../duty-rates/services/wits/import-from-wits.js';
+import {
+  TasksDutyWitsAseanBodySchema,
+  TasksDutyWitsGenericBodySchema,
+  TasksDutyWitsJapanBodySchema,
+} from '@clearcost/types';
 
 // ----------------------------
 // Shared schemas & defaults
 // ----------------------------
-const GenericBody = z.object({
-  dests: z.array(z.string().length(2)).min(1),
-  partners: z.array(z.string().length(2)).optional().default([]),
-  year: z.coerce.number().int().min(1990).max(2100).optional(),
-  backfillYears: z.coerce.number().int().min(0).max(5).default(1),
-  concurrency: z.coerce.number().int().min(1).max(6).default(3),
-  batchSize: z.coerce.number().int().min(1).max(20_000).default(5000),
-  hs6List: z.array(z.string().regex(/^\d{6}$/)).optional(),
-});
-type GenericBodyT = z.infer<typeof GenericBody>;
+const GenericBody = TasksDutyWitsGenericBodySchema;
+type GenericBodyT = z.infer<typeof TasksDutyWitsGenericBodySchema>;
 
-const AseanBody = z.object({
-  year: z.coerce.number().int().min(1990).max(2100).optional(),
-  backfillYears: z.coerce.number().int().min(0).max(5).default(1),
-  concurrency: z.coerce.number().int().min(1).max(6).default(4),
-  hs6: z.array(z.string().regex(/^\d{6}$/)).optional(),
-  dests: z.array(z.string().length(2)).optional(),
-  partners: z.array(z.string().length(2)).optional(),
-});
-type AseanBodyT = z.infer<typeof AseanBody>;
+const AseanBody = TasksDutyWitsAseanBodySchema;
+type AseanBodyT = z.infer<typeof TasksDutyWitsAseanBodySchema>;
 
-const JapanBody = z.object({
-  year: z.coerce.number().int().min(1990).max(2100).optional(),
-  backfillYears: z.coerce.number().int().min(0).max(5).default(1),
-  concurrency: z.coerce.number().int().min(1).max(6).default(3),
-  hs6: z.array(z.string().regex(/^\d{6}$/)).optional(),
-  partners: z.array(z.string().length(2)).optional(),
-});
-type JapanBodyT = z.infer<typeof JapanBody>;
+const JapanBody = TasksDutyWitsJapanBodySchema;
+type JapanBodyT = z.infer<typeof TasksDutyWitsJapanBodySchema>;
 
 export default function witsDutyRoutes(app: FastifyInstance) {
   // ----------------------------
   // WITS (MFN + Preferential): generic
   // ----------------------------
   app.post(
-    '/internal/cron/import/duties/wits',
+    '/cron/import/duties/wits',
     {
       preHandler: app.requireApiKey(['tasks:duties:wits']),
       schema: { body: GenericBody },
@@ -68,7 +52,7 @@ export default function witsDutyRoutes(app: FastifyInstance) {
   // WITS: ASEAN preset
   // ----------------------------
   app.post(
-    '/internal/cron/import/duties/wits/asean',
+    '/cron/import/duties/wits/asean',
     {
       preHandler: app.requireApiKey(['tasks:duties:wits:asean']),
       schema: { body: AseanBody },
@@ -99,7 +83,7 @@ export default function witsDutyRoutes(app: FastifyInstance) {
   // WITS: Japan preset
   // ----------------------------
   app.post(
-    '/internal/cron/import/duties/wits/japan',
+    '/cron/import/duties/wits/japan',
     {
       preHandler: app.requireApiKey(['tasks:duties:wits:japan']),
       schema: { body: JapanBody },

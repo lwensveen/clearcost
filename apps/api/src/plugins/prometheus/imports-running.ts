@@ -1,5 +1,6 @@
 import fp from 'fastify-plugin';
 import { Gauge } from 'prom-client';
+import { registry } from '../../lib/metrics.js';
 import { db, importsTable } from '@clearcost/db';
 import { eq } from 'drizzle-orm';
 
@@ -21,6 +22,7 @@ export default fp(async (app) => {
     name: 'clearcost_imports_running',
     help: 'Count of running imports by age bucket (minutes since last heartbeat/updated_at).',
     labelNames: ['age_bucket'] as const,
+    registers: [registry],
   });
 
   async function update() {

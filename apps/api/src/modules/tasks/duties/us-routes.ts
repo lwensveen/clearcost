@@ -5,7 +5,7 @@ import { importUsPreferential } from '../../duty-rates/services/us/import-prefer
 export default function usDutyRoutes(app: FastifyInstance) {
   // US MFN (Column 1 “General” from HTS)
   app.post(
-    '/internal/cron/import/duties/us-mfn',
+    '/cron/import/duties/us-mfn',
     {
       preHandler: app.requireApiKey(['tasks:duties:us:mfn']),
       config: { importMeta: { importSource: 'USITC_HTS', job: 'duties:us-mfn' } },
@@ -19,7 +19,7 @@ export default function usDutyRoutes(app: FastifyInstance) {
 
   // US Preferential (Column 1 “Special” from HTS)
   app.post(
-    '/internal/cron/import/duties/us-preferential',
+    '/cron/import/duties/us-preferential',
     {
       preHandler: app.requireApiKey(['tasks:duties:us:fta']),
       config: { importMeta: { importSource: 'USITC_HTS', job: 'duties:us-fta' } },

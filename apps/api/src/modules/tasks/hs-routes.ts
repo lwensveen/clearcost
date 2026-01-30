@@ -1,12 +1,12 @@
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod/v4';
 import { importEuHs6FromTaric } from '../hs-codes/services/aliases/eu/import-cn6-from-taric.js';
 import { importAhtnAliases } from '../hs-codes/services/aliases/asean/import-ahtn.js';
+import { TasksHsAhtnBodySchema } from '@clearcost/types';
 
 export default function hsRoutes(app: FastifyInstance) {
   // EU HS6 from TARIC
   app.post(
-    '/internal/cron/import/hs/eu-hs6',
+    '/cron/import/hs/eu-hs6',
     {
       preHandler: app.requireApiKey(['tasks:hs:eu-hs6']),
       config: { importMeta: { importSource: 'TARIC', job: 'hs:eu-hs6' } },
@@ -20,16 +20,11 @@ export default function hsRoutes(app: FastifyInstance) {
 
   // ASEAN AHTN aliases
   app.post(
-    '/internal/cron/import/hs/ahtn',
+    '/cron/import/hs/ahtn',
     {
       preHandler: app.requireApiKey(['tasks:hs:ahtn']),
       config: { importMeta: { importSource: 'AHTN', job: 'hs:ahtn' } },
-      schema: {
-        body: z.object({
-          url: z.string().url().optional(),
-          batchSize: z.coerce.number().int().min(1).max(20000).optional(),
-        }),
-      },
+      schema: { body: TasksHsAhtnBodySchema },
     },
     async (req, reply) => {
       const { url, batchSize } = (req.body ?? {}) as {

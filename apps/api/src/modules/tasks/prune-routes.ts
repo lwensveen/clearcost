@@ -2,14 +2,13 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
 import { db, importsTable, provenanceTable } from '@clearcost/db';
 import { lt } from 'drizzle-orm';
+import { TasksPruneImportsBodySchema } from '@clearcost/types';
 
 export default function importsPruneRoutes(app: FastifyInstance) {
-  const Body = z.object({
-    days: z.coerce.number().int().min(1).max(3650).default(90),
-  });
+  const Body = TasksPruneImportsBodySchema;
 
   app.post<{ Body: z.infer<typeof Body> }>(
-    '/internal/cron/imports/prune',
+    '/cron/imports/prune',
     {
       preHandler: app.requireApiKey(['tasks:ops:prune']),
       config: { importMeta: { importSource: 'MANUAL', job: 'ops:prune' } },

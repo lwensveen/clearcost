@@ -1,20 +1,19 @@
 // apps/api/src/modules/tasks/duties/vn-routes.ts
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod/v4';
 import { importVnMfn } from '../../../duty-rates/services/asean/vn/import-mfn.js';
 import { importVnPreferential } from '../../../duty-rates/services/asean/vn/import-preferential.js';
+import {
+  TasksDutyHs6BatchDryRunBodySchema,
+  TasksDutyHs6BatchPartnerGeoIdsBodySchema,
+} from '@clearcost/types';
 
 export default function vnDutyRoutes(app: FastifyInstance) {
   // MFN
   {
-    const Body = z.object({
-      hs6: z.array(z.string().regex(/^\d{6}$/)).optional(),
-      batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
-      dryRun: z.boolean().optional(),
-    });
+    const Body = TasksDutyHs6BatchDryRunBodySchema;
 
     app.post(
-      '/internal/cron/import/duties/vn-mfn',
+      '/cron/import/duties/vn-mfn',
       {
         preHandler: app.requireApiKey(['tasks:duties:vn']),
         schema: { body: Body },
@@ -35,15 +34,10 @@ export default function vnDutyRoutes(app: FastifyInstance) {
 
   // Preferential (FTA)
   {
-    const Body = z.object({
-      hs6: z.array(z.string().regex(/^\d{6}$/)).optional(),
-      partnerGeoIds: z.array(z.string()).optional(),
-      batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
-      dryRun: z.boolean().optional(),
-    });
+    const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
 
     app.post(
-      '/internal/cron/import/duties/vn-fta',
+      '/cron/import/duties/vn-fta',
       {
         preHandler: app.requireApiKey(['tasks:duties:vn']),
         schema: { body: Body },

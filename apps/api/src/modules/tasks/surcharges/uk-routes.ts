@@ -1,16 +1,12 @@
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod/v4';
 import { importUkTradeRemediesAsSurcharges } from '../../surcharges/services/uk/import-remedies.js';
+import { TasksSurchargeUkBodySchema } from '@clearcost/types';
 
 export default function surchargeUkRoutes(app: FastifyInstance) {
-  const Body = z.object({
-    // Optional: override env-provided measure types
-    measureTypeIds: z.array(z.string().min(1)).optional(),
-    batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
-  });
+  const Body = TasksSurchargeUkBodySchema;
 
   app.post(
-    '/internal/cron/import/surcharges/uk-remedies',
+    '/cron/import/surcharges/uk-remedies',
     {
       preHandler: app.requireApiKey(['tasks:surcharges:uk-remedies']),
       schema: { body: Body.optional() },

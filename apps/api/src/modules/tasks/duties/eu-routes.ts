@@ -1,20 +1,20 @@
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod/v4';
 import { importEuMfn } from '../../duty-rates/services/eu/import-mfn.js';
 import { importEuPreferential } from '../../duty-rates/services/eu/import-preferential.js';
 import { importEuFromDaily } from '../../duty-rates/services/eu/import-daily.js';
+import {
+  TasksDutyEuDailyBodySchema,
+  TasksDutyHs6BatchDryRunBodySchema,
+  TasksDutyHs6BatchPartnerGeoIdsBodySchema,
+} from '@clearcost/types';
 
 export default function euDutyRoutes(app: FastifyInstance) {
   // EU MFN (TARIC)
   {
-    const Body = z.object({
-      hs6: z.array(z.string().regex(/^\d{6}$/)).optional(),
-      batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
-      dryRun: z.boolean().optional(),
-    });
+    const Body = TasksDutyHs6BatchDryRunBodySchema;
 
     app.post(
-      '/internal/cron/import/duties/eu-mfn',
+      '/cron/import/duties/eu-mfn',
       {
         preHandler: app.requireApiKey(['tasks:duties:eu']),
         schema: { body: Body },
@@ -35,15 +35,10 @@ export default function euDutyRoutes(app: FastifyInstance) {
 
   // EU Preferential (TARIC)
   {
-    const Body = z.object({
-      hs6: z.array(z.string().regex(/^\d{6}$/)).optional(),
-      partnerGeoIds: z.array(z.string()).optional(),
-      batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
-      dryRun: z.boolean().optional(),
-    });
+    const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
 
     app.post(
-      '/internal/cron/import/duties/eu-fta',
+      '/cron/import/duties/eu-fta',
       {
         preHandler: app.requireApiKey(['tasks:duties:eu']),
         schema: { body: Body },
@@ -65,19 +60,10 @@ export default function euDutyRoutes(app: FastifyInstance) {
 
   // EU Daily (TARIC) — downloads latest (or specific date) and runs the XML importer
   {
-    const Body = z.object({
-      date: z
-        .string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/)
-        .optional(), // backfill support
-      include: z.enum(['mfn', 'fta', 'both']).optional().default('both'),
-      partnerGeoIds: z.array(z.string()).optional(),
-      batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
-      dryRun: z.boolean().optional(),
-    });
+    const Body = TasksDutyEuDailyBodySchema;
 
     app.post(
-      '/internal/cron/import/duties/eu/daily',
+      '/cron/import/duties/eu/daily',
       {
         preHandler: app.requireApiKey(['tasks:duties:eu']),
         schema: { body: Body },

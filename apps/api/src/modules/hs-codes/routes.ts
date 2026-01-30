@@ -1,50 +1,33 @@
 import type { FastifyInstance } from 'fastify';
-import { z } from 'zod/v4';
 import { db, hsCodeAliasesTable, hsCodesTable } from '@clearcost/db';
 import { and, eq, ilike, or, sql } from 'drizzle-orm';
-
-const HsSearchQuery = z.object({
-  q: z.string().trim().min(1).optional(),
-  hs6: z
-    .string()
-    .regex(/^\d{6}$/)
-    .optional(),
-  limit: z.coerce.number().int().positive().max(50).default(20),
-});
-
-const HsSearchResponse = z.array(
-  z.object({
-    hs6: z.string(),
-    title: z.string(),
-    ahtn8: z.string().nullish(),
-    cn8: z.string().nullish(),
-    hts10: z.string().nullish(),
-  })
-);
-
-const LookupQuerySchema = z.object({
-  system: z.enum(['CN8', 'HTS10', 'UK10', 'AHTN8']),
-  code: z.string().regex(/^\d{8,10}$/),
-});
-const LookupResponseSchema = z.object({
-  hs6: z.string(),
-  title: z.string(), // HS6 title
-  aliasTitle: z.string().nullable().optional(),
-  system: z.enum(['CN8', 'HTS10', 'UK10', 'AHTN8']),
-  code: z.string(),
-});
+import { z } from 'zod/v4';
+import { errorResponseForStatus } from '../../lib/errors.js';
+import {
+  ErrorResponseSchema,
+  HsCodesLookupQuerySchema,
+  HsCodesLookupResponseSchema,
+  HsCodesSearchQuerySchema,
+  HsCodesSearchResponseSchema,
+} from '@clearcost/types';
 
 export default function hsRoutes(app: FastifyInstance) {
   // GET /v1/hs
-  app.get<{ Querystring: z.infer<typeof HsSearchQuery>; Reply: z.infer<typeof HsSearchResponse> }>(
+  app.get<{
+    Querystring: z.infer<typeof HsCodesSearchQuerySchema>;
+    Reply: z.infer<typeof HsCodesSearchResponseSchema>;
+  }>(
     '/',
     {
       preHandler: app.requireApiKey(['hs:read']),
-      schema: { querystring: HsSearchQuery, response: { 200: HsSearchResponse } },
+      schema: {
+        querystring: HsCodesSearchQuerySchema,
+        response: { 200: HsCodesSearchResponseSchema },
+      },
       config: { rateLimit: { max: 300, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
-      const { q, hs6, limit } = HsSearchQuery.parse(req.query);
+      const { q, hs6, limit } = HsCodesSearchQuerySchema.parse(req.query);
 
       // Fast path: exact HS6 lookup
       if (hs6) {
@@ -144,17 +127,20 @@ export default function hsRoutes(app: FastifyInstance) {
 
   // GET /v1/hs/lookup?system=HTS10&code=8517620090
   app.get<{
-    Querystring: z.infer<typeof LookupQuerySchema>;
-    Reply: z.infer<typeof LookupResponseSchema>;
+    Querystring: z.infer<typeof HsCodesLookupQuerySchema>;
+    Reply: z.infer<typeof HsCodesLookupResponseSchema> | z.infer<typeof ErrorResponseSchema>;
   }>(
     '/lookup',
     {
       preHandler: app.requireApiKey(['hs:read']),
-      schema: { querystring: LookupQuerySchema, response: { 200: LookupResponseSchema } },
+      schema: {
+        querystring: HsCodesLookupQuerySchema,
+        response: { 200: HsCodesLookupResponseSchema, 404: ErrorResponseSchema },
+      },
       config: { rateLimit: { max: 300, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
-      const { system, code } = LookupQuerySchema.parse(req.query);
+      const { system, code } = HsCodesLookupQuerySchema.parse(req.query);
 
       const [row] = await db
         .select({
@@ -170,8 +156,7 @@ export default function hsRoutes(app: FastifyInstance) {
         .limit(1);
 
       if (!row || !row.hs6) {
-        reply.notFound('Alias not found');
-        return;
+        return reply.code(404).send(errorResponseForStatus(404, 'Alias not found'));
       }
 
       reply.header('cache-control', 'public, max-age=300, stale-while-revalidate=600');

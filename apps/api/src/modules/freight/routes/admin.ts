@@ -3,68 +3,30 @@ import { z } from 'zod/v4';
 import { db, freightRateCardsTable, freightRateStepsTable } from '@clearcost/db';
 import { and, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm';
 import { withIdempotency } from '../../../lib/idempotency.js';
-import { FreightCard, importFreightCards } from '../services/import-cards.js';
-import { HeaderSchema } from '@clearcost/types';
-
-const ModeEnum = z.enum(['air', 'sea']);
-const UnitEnum = z.enum(['kg', 'm3']);
-
-const CardCreate = z
-  .object({
-    origin: z.string().length(3),
-    dest: z.string().length(3),
-    freightMode: ModeEnum,
-    freightUnit: UnitEnum,
-    carrier: z.string().min(1).optional().nullable(),
-    service: z.string().min(1).optional().nullable(),
-    notes: z.string().optional().nullable(),
-    effectiveFrom: z.coerce.date(),
-    effectiveTo: z.coerce.date().optional().nullable(),
-  })
-  .refine((b) => !b.effectiveTo || b.effectiveTo >= b.effectiveFrom, {
-    message: 'effectiveTo must be >= effectiveFrom',
-    path: ['effectiveTo'],
-  });
-
-const CardUpdate = CardCreate.partial().refine(
-  (b) =>
-    Object.keys(b).some((k) => (b as any)[k] !== undefined) &&
-    (!b.effectiveTo || !b.effectiveFrom || b.effectiveTo >= b.effectiveFrom),
-  { message: 'At least one field required and effectiveTo>=effectiveFrom when both provided' }
-);
-
-const StepCreate = z.object({
-  uptoQty: z.number().positive(), // threshold (in unit)
-  pricePerUnit: z.number().nonnegative(),
-});
-const StepUpdate = StepCreate.partial().refine(
-  (b) => Object.keys(b).some((k) => (b as any)[k] !== undefined),
-  { message: 'At least one field required' }
-);
-
-const CardsQuery = z
-  .object({
-    q: z.string().optional(),
-    origin: z.string().length(3).optional(),
-    dest: z.string().length(3).optional(),
-    freightMode: ModeEnum.optional(),
-    freightUnit: UnitEnum.optional(),
-    from: z.coerce.date().optional(),
-    to: z.coerce.date().optional(),
-    limit: z.coerce.number().int().positive().max(200).default(50),
-    offset: z.coerce.number().int().nonnegative().default(0),
-  })
-  .refine((q) => !(q.from && q.to) || q.to >= q.from, {
-    message: '`to` must be >= `from`',
-    path: ['to'],
-  });
-
-export const FreightCardsPayload = z.object({
-  cards: z.array(FreightCard),
-});
+import { importFreightCards } from '../services/import-cards.js';
+import { errorResponseForStatus } from '../../../lib/errors.js';
+import {
+  ErrorResponseSchema,
+  FreightCardAdminCreateSchema,
+  FreightCardAdminIdParamSchema,
+  FreightCardAdminImportJsonBodySchema,
+  FreightCardAdminImportJsonResponseSchema,
+  FreightCardAdminUpdateSchema,
+  FreightCardsAdminListResponseSchema,
+  FreightCardsAdminQuerySchema,
+  FreightCardsImportResponseSchema,
+  FreightCardsImportSchema,
+  FreightRateCardSelectCoercedSchema,
+  FreightRateStepSelectCoercedSchema,
+  FreightRateStepsListResponseSchema,
+  FreightStepAdminCreateSchema,
+  FreightStepAdminUpdateSchema,
+  FreightStepIdParamSchema,
+  IdempotencyHeaderSchema,
+} from '@clearcost/types';
 
 // Require Idempotency-Key on write endpoints
-function getIdem(headers: z.infer<typeof HeaderSchema>) {
+function getIdem(headers: z.infer<typeof IdempotencyHeaderSchema>) {
   return headers['idempotency-key'] ?? headers['x-idempotency-key']!;
 }
 
@@ -97,15 +59,18 @@ function overlapWhere({ from, to }: { from?: Date; to?: Date }) {
 
 export default function freightRoutes(app: FastifyInstance) {
   // List/search cards
-  app.get<{ Querystring: z.infer<typeof CardsQuery> }>(
+  app.get<{ Querystring: z.infer<typeof FreightCardsAdminQuerySchema> }>(
     '/cards',
     {
       preHandler: app.requireApiKey(['admin:rates']),
-      schema: { querystring: CardsQuery },
+      schema: {
+        querystring: FreightCardsAdminQuerySchema,
+        response: { 200: FreightCardsAdminListResponseSchema },
+      },
       config: { rateLimit: { max: 180, timeWindow: '1 minute' } },
     },
     async (req) => {
-      const q = CardsQuery.parse(req.query);
+      const q = FreightCardsAdminQuerySchema.parse(req.query);
       const where = and(
         q.origin ? eq(freightRateCardsTable.origin, q.origin) : sql`TRUE`,
         q.dest ? eq(freightRateCardsTable.dest, q.dest) : sql`TRUE`,
@@ -115,30 +80,38 @@ export default function freightRoutes(app: FastifyInstance) {
         overlapWhere({ from: q.from, to: q.to })
       );
 
-      return db
+      const rows = await db
         .select()
         .from(freightRateCardsTable)
         .where(where)
         .orderBy(desc(freightRateCardsTable.effectiveFrom), desc(freightRateCardsTable.createdAt))
         .limit(q.limit)
         .offset(q.offset);
+      return FreightCardsAdminListResponseSchema.parse(rows);
     }
   );
 
   // Create card
-  app.post<{ Body: z.infer<typeof CardCreate>; Headers: z.infer<typeof HeaderSchema> }>(
+  app.post<{
+    Body: z.infer<typeof FreightCardAdminCreateSchema>;
+    Headers: z.infer<typeof IdempotencyHeaderSchema>;
+  }>(
     '/cards',
     {
       preHandler: app.requireApiKey(['admin:rates']),
-      schema: { body: CardCreate, headers: HeaderSchema },
+      schema: {
+        body: FreightCardAdminCreateSchema,
+        headers: IdempotencyHeaderSchema,
+        response: { 201: FreightRateCardSelectCoercedSchema },
+      },
       config: {
         rateLimit: { max: 60, timeWindow: '1 minute' },
         importMeta: { importSource: 'MANUAL', job: 'freight:card-create' },
       },
     },
     async (req, reply) => {
-      const headers = HeaderSchema.parse(req.headers);
-      const body = CardCreate.parse(req.body);
+      const headers = IdempotencyHeaderSchema.parse(req.headers);
+      const body = FreightCardAdminCreateSchema.parse(req.body);
       const ns = `freight:cards:create:${req.apiKey!.ownerId}`;
       const idem = getIdem(headers);
 
@@ -167,28 +140,33 @@ export default function freightRoutes(app: FastifyInstance) {
         }
       );
 
-      return reply.code(201).send(out);
+      return reply.code(201).send(FreightRateCardSelectCoercedSchema.parse(out));
     }
   );
 
   // Patch card
   app.patch<{
-    Params: { id: string };
-    Body: z.infer<typeof CardUpdate>;
-    Headers: z.infer<typeof HeaderSchema>;
+    Params: z.infer<typeof FreightCardAdminIdParamSchema>;
+    Body: z.infer<typeof FreightCardAdminUpdateSchema>;
+    Headers: z.infer<typeof IdempotencyHeaderSchema>;
   }>(
     '/cards/:id',
     {
       preHandler: app.requireApiKey(['admin:rates']),
-      schema: { params: z.object({ id: z.string() }), body: CardUpdate, headers: HeaderSchema },
+      schema: {
+        params: FreightCardAdminIdParamSchema,
+        body: FreightCardAdminUpdateSchema,
+        headers: IdempotencyHeaderSchema,
+        response: { 200: FreightRateCardSelectCoercedSchema, 404: ErrorResponseSchema },
+      },
       config: {
         rateLimit: { max: 120, timeWindow: '1 minute' },
         importMeta: { importSource: 'MANUAL', job: 'freight:card-update' },
       },
     },
     async (req, reply) => {
-      const headers = HeaderSchema.parse(req.headers);
-      const b = CardUpdate.parse(req.body);
+      const headers = IdempotencyHeaderSchema.parse(req.headers);
+      const b = FreightCardAdminUpdateSchema.parse(req.body);
       const ns = `freight:cards:update:${req.apiKey!.ownerId}`;
       const idem = getIdem(headers);
 
@@ -198,8 +176,8 @@ export default function freightRoutes(app: FastifyInstance) {
           .set({
             ...(b.origin ? { origin: b.origin } : {}),
             ...(b.dest ? { dest: b.dest } : {}),
-            ...(b.freightMode ? { mode: b.freightMode } : {}),
-            ...(b.freightUnit ? { unit: b.freightUnit } : {}),
+            ...(b.freightMode ? { freightMode: b.freightMode } : {}),
+            ...(b.freightUnit ? { freightUnit: b.freightUnit } : {}),
             ...(b.carrier !== undefined ? { carrier: b.carrier ?? null } : {}),
             ...(b.service !== undefined ? { service: b.service ?? null } : {}),
             ...(b.notes !== undefined ? { notes: b.notes ?? null } : {}),
@@ -212,29 +190,37 @@ export default function freightRoutes(app: FastifyInstance) {
         if (!row) throw new Error('NOT_FOUND');
         return row;
       }).catch((e) => {
-        if (String(e?.message) === 'NOT_FOUND') return reply.notFound('Not found');
+        if (String(e?.message) === 'NOT_FOUND')
+          return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
         throw e;
       });
 
       // If we already replied above due to NOT_FOUND, stop here
       if (reply.sent) return;
-      return out;
+      return FreightRateCardSelectCoercedSchema.parse(out);
     }
   );
 
   // Delete card
-  app.delete<{ Params: { id: string }; Headers: z.infer<typeof HeaderSchema> }>(
+  app.delete<{
+    Params: z.infer<typeof FreightCardAdminIdParamSchema>;
+    Headers: z.infer<typeof IdempotencyHeaderSchema>;
+  }>(
     '/cards/:id',
     {
       preHandler: app.requireApiKey(['admin:rates']),
-      schema: { params: z.object({ id: z.string() }), headers: HeaderSchema },
+      schema: {
+        params: FreightCardAdminIdParamSchema,
+        headers: IdempotencyHeaderSchema,
+        response: { 204: z.any(), 404: ErrorResponseSchema },
+      },
       config: {
         rateLimit: { max: 60, timeWindow: '1 minute' },
         importMeta: { importSource: 'MANUAL', job: 'freight:card-delete' },
       },
     },
     async (req, reply) => {
-      const headers = HeaderSchema.parse(req.headers);
+      const headers = IdempotencyHeaderSchema.parse(req.headers);
       const ns = `freight:cards:delete:${req.apiKey!.ownerId}`;
       const idem = getIdem(headers);
 
@@ -246,7 +232,8 @@ export default function freightRoutes(app: FastifyInstance) {
         if (!row) throw new Error('NOT_FOUND');
         return { ok: true as const };
       }).catch((e) => {
-        if (String(e?.message) === 'NOT_FOUND') return reply.notFound('Not found');
+        if (String(e?.message) === 'NOT_FOUND')
+          return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
         throw e;
       });
 
@@ -256,11 +243,14 @@ export default function freightRoutes(app: FastifyInstance) {
   );
 
   // List steps for a card
-  app.get<{ Params: { id: string } }>(
+  app.get<{ Params: z.infer<typeof FreightCardAdminIdParamSchema> }>(
     '/cards/:id/steps',
     {
       preHandler: app.requireApiKey(['admin:rates']),
-      schema: { params: z.object({ id: z.string() }) },
+      schema: {
+        params: FreightCardAdminIdParamSchema,
+        response: { 200: FreightRateStepsListResponseSchema },
+      },
       config: { rateLimit: { max: 240, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
@@ -269,28 +259,33 @@ export default function freightRoutes(app: FastifyInstance) {
         .from(freightRateStepsTable)
         .where(eq(freightRateStepsTable.cardId, req.params.id))
         .orderBy(freightRateStepsTable.uptoQty);
-      return reply.send(rows);
+      return reply.send(FreightRateStepsListResponseSchema.parse(rows));
     }
   );
 
   // Create step
   app.post<{
-    Params: { id: string };
-    Body: z.infer<typeof StepCreate>;
-    Headers: z.infer<typeof HeaderSchema>;
+    Params: z.infer<typeof FreightCardAdminIdParamSchema>;
+    Body: z.infer<typeof FreightStepAdminCreateSchema>;
+    Headers: z.infer<typeof IdempotencyHeaderSchema>;
   }>(
     '/cards/:id/steps',
     {
       preHandler: app.requireApiKey(['admin:rates']),
-      schema: { params: z.object({ id: z.string() }), body: StepCreate, headers: HeaderSchema },
+      schema: {
+        params: FreightCardAdminIdParamSchema,
+        body: FreightStepAdminCreateSchema,
+        headers: IdempotencyHeaderSchema,
+        response: { 201: FreightRateStepSelectCoercedSchema },
+      },
       config: {
         rateLimit: { max: 120, timeWindow: '1 minute' },
         importMeta: { importSource: 'MANUAL', job: 'freight:step-create' },
       },
     },
     async (req, reply) => {
-      const headers = HeaderSchema.parse(req.headers);
-      const b = StepCreate.parse(req.body);
+      const headers = IdempotencyHeaderSchema.parse(req.headers);
+      const b = FreightStepAdminCreateSchema.parse(req.body);
       const ns = `freight:steps:create:${req.apiKey!.ownerId}`;
       const idem = getIdem(headers);
 
@@ -308,23 +303,24 @@ export default function freightRoutes(app: FastifyInstance) {
         return row as unknown as Record<string, unknown>;
       });
 
-      return reply.code(201).send(out);
+      return reply.code(201).send(FreightRateStepSelectCoercedSchema.parse(out));
     }
   );
 
   // Patch step
   app.patch<{
-    Params: { id: string; stepId: string };
-    Body: z.infer<typeof StepUpdate>;
-    Headers: z.infer<typeof HeaderSchema>;
+    Params: z.infer<typeof FreightStepIdParamSchema>;
+    Body: z.infer<typeof FreightStepAdminUpdateSchema>;
+    Headers: z.infer<typeof IdempotencyHeaderSchema>;
   }>(
     '/cards/:id/steps/:stepId',
     {
       preHandler: app.requireApiKey(['admin:rates']),
       schema: {
-        params: z.object({ id: z.string(), stepId: z.string() }),
-        body: StepUpdate,
-        headers: HeaderSchema,
+        params: FreightStepIdParamSchema,
+        body: FreightStepAdminUpdateSchema,
+        headers: IdempotencyHeaderSchema,
+        response: { 200: FreightRateStepSelectCoercedSchema, 404: ErrorResponseSchema },
       },
       config: {
         rateLimit: { max: 180, timeWindow: '1 minute' },
@@ -332,8 +328,8 @@ export default function freightRoutes(app: FastifyInstance) {
       },
     },
     async (req, reply) => {
-      const headers = HeaderSchema.parse(req.headers);
-      const b = StepUpdate.parse(req.body);
+      const headers = IdempotencyHeaderSchema.parse(req.headers);
+      const b = FreightStepAdminUpdateSchema.parse(req.body);
       const ns = `freight:steps:update:${req.apiKey!.ownerId}`;
       const idem = getIdem(headers);
 
@@ -360,31 +356,36 @@ export default function freightRoutes(app: FastifyInstance) {
           return row;
         }
       ).catch((e) => {
-        if (String(e?.message) === 'NOT_FOUND') return reply.notFound('Not found');
+        if (String(e?.message) === 'NOT_FOUND')
+          return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
         throw e;
       });
 
       if (reply.sent) return;
-      return out;
+      return FreightRateStepSelectCoercedSchema.parse(out);
     }
   );
 
   // Delete step
   app.delete<{
-    Params: { id: string; stepId: string };
-    Headers: z.infer<typeof HeaderSchema>;
+    Params: z.infer<typeof FreightStepIdParamSchema>;
+    Headers: z.infer<typeof IdempotencyHeaderSchema>;
   }>(
     '/cards/:id/steps/:stepId',
     {
       preHandler: app.requireApiKey(['admin:rates']),
-      schema: { params: z.object({ id: z.string(), stepId: z.string() }), headers: HeaderSchema },
+      schema: {
+        params: FreightStepIdParamSchema,
+        headers: IdempotencyHeaderSchema,
+        response: { 204: z.any(), 404: ErrorResponseSchema },
+      },
       config: {
         rateLimit: { max: 120, timeWindow: '1 minute' },
         importMeta: { importSource: 'MANUAL', job: 'freight:step-delete' },
       },
     },
     async (req, reply) => {
-      const headers = HeaderSchema.parse(req.headers);
+      const headers = IdempotencyHeaderSchema.parse(req.headers);
       const ns = `freight:steps:delete:${req.apiKey!.ownerId}`;
       const idem = getIdem(headers);
 
@@ -406,7 +407,8 @@ export default function freightRoutes(app: FastifyInstance) {
           return { ok: true as const };
         }
       ).catch((e) => {
-        if (String(e?.message) === 'NOT_FOUND') return reply.notFound('Not found');
+        if (String(e?.message) === 'NOT_FOUND')
+          return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
         throw e;
       });
 
@@ -418,19 +420,21 @@ export default function freightRoutes(app: FastifyInstance) {
   // Bulk JSON import (cards + nested steps) — transactional, idempotent
   app.post<{
     Body: {
-      cards: Array<z.infer<typeof CardCreate> & { steps?: Array<z.infer<typeof StepCreate>> }>;
+      cards: Array<
+        z.infer<typeof FreightCardAdminCreateSchema> & {
+          steps?: Array<z.infer<typeof FreightStepAdminCreateSchema>>;
+        }
+      >;
     };
-    Headers: z.infer<typeof HeaderSchema>;
+    Headers: z.infer<typeof IdempotencyHeaderSchema>;
   }>(
     '/import-json',
     {
       preHandler: app.requireApiKey(['admin:rates']),
       schema: {
-        headers: HeaderSchema,
-        body: z.object({
-          cards: z.array(CardCreate.safeExtend({ steps: z.array(StepCreate).optional() })).min(1),
-        }),
-        response: { 200: z.object({ insertedCards: z.number(), insertedSteps: z.number() }) },
+        headers: IdempotencyHeaderSchema,
+        body: FreightCardAdminImportJsonBodySchema,
+        response: { 200: FreightCardAdminImportJsonResponseSchema },
       },
       config: {
         rateLimit: { max: 12, timeWindow: '1 minute' },
@@ -438,8 +442,8 @@ export default function freightRoutes(app: FastifyInstance) {
       },
     },
     async (req) => {
-      const headers = HeaderSchema.parse(req.headers);
-      const body = req.body;
+      const headers = IdempotencyHeaderSchema.parse(req.headers);
+      const body = FreightCardAdminImportJsonBodySchema.parse(req.body);
       const ns = `freight:cards:import-json:${req.apiKey!.ownerId}`;
       const idem = getIdem(headers);
 
@@ -490,16 +494,16 @@ export default function freightRoutes(app: FastifyInstance) {
 
   // Cards import (normalized schema via service)
   app.post<{
-    Body: z.infer<typeof FreightCardsPayload>;
-    Headers: z.infer<typeof HeaderSchema>;
+    Body: z.infer<typeof FreightCardsImportSchema>;
+    Headers: z.infer<typeof IdempotencyHeaderSchema>;
   }>(
     '/cards/import',
     {
       preHandler: app.requireApiKey(['admin:rates']),
       schema: {
-        headers: HeaderSchema,
-        body: FreightCardsPayload,
-        response: { 200: z.object({ ok: z.literal(true), count: z.number() }) },
+        headers: IdempotencyHeaderSchema,
+        body: FreightCardsImportSchema,
+        response: { 200: FreightCardsImportResponseSchema, 400: ErrorResponseSchema },
       },
       config: {
         rateLimit: { max: 12, timeWindow: '1 minute' },
@@ -507,14 +511,15 @@ export default function freightRoutes(app: FastifyInstance) {
       },
     },
     async (req, reply) => {
-      const headers = HeaderSchema.parse(req.headers);
+      const headers = IdempotencyHeaderSchema.parse(req.headers);
       const idem = getIdem(headers);
-      if (!idem) return reply.badRequest('Idempotency-Key header required');
+      if (!idem)
+        return reply.code(400).send(errorResponseForStatus(400, 'Idempotency-Key header required'));
 
       const ns = `freight:cards:service-import:${req.apiKey!.ownerId}`;
 
       return withIdempotency(ns, idem, req.body, async () => {
-        return importFreightCards(req.body.cards);
+        return importFreightCards(req.body);
       });
     }
   );

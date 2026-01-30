@@ -2,27 +2,21 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
 import { withIdempotency } from '../../lib/idempotency.js';
 import { refreshFx } from '../../lib/refresh-fx.js';
-import { HeaderSchema } from '@clearcost/types';
-
-const ReplySchema = z.object({
-  base: z.string(),
-  fxAsOf: z.string(), // ISO8601
-  attemptedInserts: z.number().int().nonnegative(),
-});
+import { FxRefreshResponseSchema, IdempotencyHeaderSchema } from '@clearcost/types';
 
 export default function fxRoutes(app: FastifyInstance) {
-  // TODO add admin?
+  // Admin scope: writes only
   // POST /v1/fx/refresh  (requires API key with fx:write)
   app.post<{
-    Headers: z.infer<typeof HeaderSchema>;
-    Reply: z.infer<typeof ReplySchema>;
+    Headers: z.infer<typeof IdempotencyHeaderSchema>;
+    Reply: z.infer<typeof FxRefreshResponseSchema>;
   }>(
     '/refresh',
     {
       preHandler: app.requireApiKey(['fx:write']),
       schema: {
-        headers: HeaderSchema,
-        response: { 200: ReplySchema },
+        headers: IdempotencyHeaderSchema,
+        response: { 200: FxRefreshResponseSchema },
       },
       // Prometheus & provenance auto-wired
       config: {
@@ -31,7 +25,7 @@ export default function fxRoutes(app: FastifyInstance) {
       },
     },
     async (req, reply) => {
-      const headers = HeaderSchema.parse(req.headers);
+      const headers = IdempotencyHeaderSchema.parse(req.headers);
       const idem = headers['idempotency-key'] ?? headers['x-idempotency-key']!;
       const ns = `fx:refresh:${req.apiKey!.ownerId}`;
 
@@ -44,7 +38,7 @@ export default function fxRoutes(app: FastifyInstance) {
         };
       });
 
-      return reply.send(result);
+      return reply.send(FxRefreshResponseSchema.parse(result));
     }
   );
 }

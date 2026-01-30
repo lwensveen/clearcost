@@ -2,6 +2,7 @@ import { db, hsCodesTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
 import sanitizeHtml from 'sanitize-html';
 import { decode as decodeEntities } from 'he';
+import { httpFetch } from '../../../lib/http.js';
 
 // SDMX endpoints (data + DSD)
 const SDMX_DATA_BASE = 'https://wits.worldbank.org/API/V1/SDMX/V21/rest/data/DF_WITS_Tariff_TRAINS';
@@ -54,7 +55,7 @@ function sanitizeTitle(raw: string): string {
 async function fetchHs6ViaData(year: number) {
   const path = `A.842.0..reported`; // reporter=USA, partner=WLD, wildcard product
   const url = `${SDMX_DATA_BASE}/${path}?startPeriod=${year}&endPeriod=${year}&detail=DataOnly`;
-  const r = await fetch(url, { headers: { ...baseHeaders, accept: ACCEPT_DATA } });
+  const r = await httpFetch(url, { headers: { ...baseHeaders, accept: ACCEPT_DATA } });
   if (!r.ok) throw new Error(`WITS /data fetch failed ${r.status} ${r.statusText}`);
   const json: any = await r.json();
 
@@ -79,7 +80,7 @@ async function fetchHs6ViaData(year: number) {
 
 // 2) Try SDMX DSD (JSON). Some WITS deployments may only return XML here.
 async function fetchHs6ViaDSD_JSON() {
-  const r = await fetch(SDMX_DSD_URL, { headers: { ...baseHeaders, accept: ACCEPT_STRUCT } });
+  const r = await httpFetch(SDMX_DSD_URL, { headers: { ...baseHeaders, accept: ACCEPT_STRUCT } });
   if (!r.ok) throw new Error(`WITS /datastructure fetch failed ${r.status} ${r.statusText}`);
   const json: any = await r.json();
 
@@ -133,7 +134,7 @@ async function fetchHs6ViaDSD_JSON() {
 
 // 3) FINAL fallback: URL-based metadata (XML) — guaranteed to list all HS6 products
 async function fetchHs6ViaURL_XML() {
-  const r = await fetch(URL_PRODUCTS_ALL, {
+  const r = await httpFetch(URL_PRODUCTS_ALL, {
     headers: { ...baseHeaders, accept: 'application/xml' },
   });
   if (!r.ok) throw new Error(`WITS product/all fetch failed ${r.status} ${r.statusText}`);

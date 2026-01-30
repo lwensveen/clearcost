@@ -4,7 +4,7 @@ import { importVatRules } from '../vat/services/import-vat.js';
 
 export default function vatRoutes(app: FastifyInstance) {
   app.post(
-    '/internal/cron/import/vat/auto',
+    '/cron/import/vat/auto',
     {
       preHandler: app.requireApiKey(['tasks:vat:auto']),
       config: { importMeta: { importSource: 'OECD/IMF', job: 'vat:auto' } },

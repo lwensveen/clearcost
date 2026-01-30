@@ -4,6 +4,18 @@ import rawBodyPlugin from 'fastify-raw-body';
 import { z } from 'zod/v4';
 import { billingAccountsTable, db } from '@clearcost/db';
 import { eq } from 'drizzle-orm';
+import { errorResponseForStatus } from '../../lib/errors.js';
+import {
+  BillingCheckoutBodySchema,
+  BillingCheckoutResponseSchema,
+  BillingComputeUsageResponseSchema,
+  BillingEntitlementsResponseSchema,
+  BillingPlanResponseSchema,
+  BillingPortalBodySchema,
+  BillingPortalResponseSchema,
+  BillingWebhookResponseSchema,
+  ErrorResponseSchema,
+} from '@clearcost/types';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: '2025-08-27.basil',
@@ -38,20 +50,17 @@ async function ensureBillingAccount(ownerId: string) {
 export default async function billingRoutes(app: FastifyInstance) {
   // Create Checkout session (subscription)
   app.post<{
-    Body: { plan: 'starter' | 'growth' | 'scale'; returnUrl?: string };
-    Reply: { url: string } | { error: string };
+    Body: z.infer<typeof BillingCheckoutBodySchema>;
+    Reply: z.infer<typeof BillingCheckoutResponseSchema> | z.infer<typeof ErrorResponseSchema>;
   }>(
-    '/v1/billing/checkout',
+    '/checkout',
     {
       preHandler: app.requireApiKey(['billing:write']),
       schema: {
-        body: z.object({
-          plan: z.enum(['starter', 'growth', 'scale']),
-          returnUrl: z.string().url().optional(),
-        }),
+        body: BillingCheckoutBodySchema,
         response: {
-          200: z.object({ url: z.string().url() }),
-          400: z.object({ error: z.string() }),
+          200: BillingCheckoutResponseSchema,
+          400: ErrorResponseSchema,
         },
       },
     },
@@ -59,7 +68,8 @@ export default async function billingRoutes(app: FastifyInstance) {
       const ownerId = req.apiKey!.ownerId;
       const { plan, returnUrl } = req.body;
 
-      if (!PRICE[plan]) return reply.badRequest('Price not configured');
+      if (!PRICE[plan])
+        return reply.code(400).send(errorResponseForStatus(400, 'Price not configured'));
 
       const account = await ensureBillingAccount(ownerId);
 
@@ -99,24 +109,25 @@ export default async function billingRoutes(app: FastifyInstance) {
 
   // Billing Portal
   app.post<{
-    Body: { returnUrl?: string };
-    Reply: { url: string } | { error: string };
+    Body: z.infer<typeof BillingPortalBodySchema> | undefined;
+    Reply: z.infer<typeof BillingPortalResponseSchema> | z.infer<typeof ErrorResponseSchema>;
   }>(
-    '/v1/billing/portal',
+    '/portal',
     {
       preHandler: app.requireApiKey(['billing:write']),
       schema: {
-        body: z.object({ returnUrl: z.string().url().optional() }).optional(),
+        body: BillingPortalBodySchema.optional(),
         response: {
-          200: z.object({ url: z.string().url() }),
-          400: z.object({ error: z.string() }),
+          200: BillingPortalResponseSchema,
+          400: ErrorResponseSchema,
         },
       },
     },
     async (req, reply) => {
       const ownerId = req.apiKey!.ownerId;
       const account = await ensureBillingAccount(ownerId);
-      if (!account.stripeCustomerId) return reply.badRequest('No Stripe customer');
+      if (!account.stripeCustomerId)
+        return reply.code(400).send(errorResponseForStatus(400, 'No Stripe customer'));
 
       const returnUrl =
         req.body?.returnUrl ?? process.env.WEB_ORIGIN ?? 'http://localhost:3000/admin/billing';
@@ -131,17 +142,12 @@ export default async function billingRoutes(app: FastifyInstance) {
 
   // Get current plan
   app.get(
-    '/v1/billing/plan',
+    '/plan',
     {
       preHandler: app.requireApiKey(['billing:read']),
       schema: {
         response: {
-          200: z.object({
-            plan: z.string(),
-            status: z.string().nullable(),
-            priceId: z.string().nullable().optional(),
-            currentPeriodEnd: z.date().nullable().optional(),
-          }),
+          200: BillingPlanResponseSchema,
         },
       },
     },
@@ -166,17 +172,18 @@ export default async function billingRoutes(app: FastifyInstance) {
   });
 
   app.post<{
-    Reply: { received: true } | { error: string };
+    Reply: z.infer<typeof BillingWebhookResponseSchema> | z.infer<typeof ErrorResponseSchema>;
   }>(
-    '/v1/billing/webhook/stripe',
+    '/webhook/stripe',
     {
       config: { rawBody: true },
+      schema: { response: { 200: BillingWebhookResponseSchema, 400: ErrorResponseSchema } },
     },
     async (req, reply) => {
       const sig = req.headers['stripe-signature'] as string | undefined;
       const whSecret = process.env.STRIPE_WEBHOOK_SECRET;
       if (!sig || !whSecret) {
-        return reply.code(400).send({ error: 'Missing signature or secret' });
+        return reply.code(400).send(errorResponseForStatus(400, 'Missing signature or secret'));
       }
 
       let event: Stripe.Event;
@@ -185,7 +192,7 @@ export default async function billingRoutes(app: FastifyInstance) {
         event = stripe.webhooks.constructEvent(raw, sig, whSecret);
       } catch (err: any) {
         req.log.error({ err }, 'stripe_webhook_verify_failed');
-        return reply.code(400).send({ error: `Webhook Error: ${err.message}` });
+        return reply.code(400).send(errorResponseForStatus(400, `Webhook Error: ${err.message}`));
       }
 
       try {
@@ -292,11 +299,7 @@ export default async function billingRoutes(app: FastifyInstance) {
       preHandler: app.requireApiKey(['billing:read']),
       schema: {
         response: {
-          200: z.object({
-            plan: z.string(),
-            maxManifests: z.number(),
-            maxItemsPerManifest: z.number(),
-          }),
+          200: BillingEntitlementsResponseSchema,
         },
       },
     },
@@ -309,17 +312,12 @@ export default async function billingRoutes(app: FastifyInstance) {
   );
 
   app.get(
-    '/v1/billing/compute-usage',
+    '/compute-usage',
     {
       preHandler: app.requireApiKey(['billing:read']),
       schema: {
         response: {
-          200: z.object({
-            allowed: z.boolean(),
-            plan: z.string(),
-            limit: z.number().int(),
-            used: z.number().int(),
-          }),
+          200: BillingComputeUsageResponseSchema,
         },
       },
     },

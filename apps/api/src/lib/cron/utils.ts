@@ -1,7 +1,8 @@
+import { httpFetch } from '../http.js';
 export const USER_AGENT = 'clearcost-importer';
 
 export async function fetchJSON<T>(url: string): Promise<T> {
-  const r = await fetch(url, { headers: { 'user-agent': USER_AGENT } });
+  const r = await httpFetch(url, { headers: { 'user-agent': USER_AGENT } });
 
   if (!r.ok) {
     const body = await r.text().catch(() => '');

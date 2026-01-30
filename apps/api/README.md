@@ -10,7 +10,7 @@ Prometheus metrics, provenance/locking for batch jobs, and a small cron CLI.
 - **Runtime:** Bun / Node 18+
 - **Web:** Fastify 5, Zod schemas
 - **DB:** PostgreSQL + Drizzle ORM
-- **Metrics:** prom-client (/metrics)
+- **Metrics:** prom-client (/metrics, **requires scope:** `ops:metrics`)
 - **Lang:** TypeScript
 
 ---
@@ -75,15 +75,20 @@ Create `apps/api/.env` (examples):
 ```env
 NODE_ENV=development
 PORT=4000
+INTERNAL_PORT=4001
+INTERNAL_HOST=0.0.0.0
+HOST=0.0.0.0
 DATABASE_URL=postgres://user:pass@localhost:5432/clearcost
-
-# Admin / ops
-ADMIN_TOKEN=dev-admin-token              # header: x-admin-token
+TRUST_PROXY=false
+ALLOW_INTERNAL_BIND=0
 
 # Public API base (also used by Swagger servers[]):
 CLEARCOST_API_URL=http://localhost:4000
 
-# Internal signing (optional, for /internal/*)
+# Internal API base (used by CI/ops for /internal/*):
+CLEARCOST_INTERNAL_API_URL=http://localhost:4001
+
+# Internal signing (required in production for /internal/*)
 INTERNAL_SIGNING_SECRET=change-me
 
 # FX + data
@@ -113,8 +118,9 @@ IMPORT_STALE_MINUTES=30                   # sweeper
 ```
 
 > API keys are stored in DB (see `api-keys` module). Clients authenticate with `x-api-key`.
-> Internal/ops routes can use `x-admin-token` **or** scoped keys. Internal service-to-service can add `x-cc-ts` +
-> `x-cc-sig`.
+> Internal/ops routes require scoped API keys and (in production) `x-cc-ts` + `x-cc-sig` request signing.
+> Set `TRUST_PROXY` to `true` or a hop count when running behind a reverse proxy.
+> Internal server binds are guarded in production unless `ALLOW_INTERNAL_BIND=1`.
 
 ---
 
@@ -135,6 +141,11 @@ bun run --cwd apps/api build
 bun run --cwd apps/api start
 ```
 
+The API starts two servers:
+
+- Public server: `HOST` + `PORT` (default `0.0.0.0:3001`)
+- Internal server: `INTERNAL_HOST` + `INTERNAL_PORT` (default `0.0.0.0:3002`)
+
 ---
 
 ## OpenAPI & Docs
@@ -154,7 +165,7 @@ curl -s \
   $CLEARCOST_API_URL/v1/quotes | jq .
 ```
 
-**Internal signing (optional):**
+**Internal signing (required in production for /internal/\*):**
 
 ```
 x-cc-ts: <epoch ms>
@@ -183,11 +194,35 @@ Fetch a cached response by key/scope for debugging.
 
 > HS search/classify endpoints live in `src/modules/hs-codes` / `src/modules/classify` (enable as needed).
 
+### `GET /metrics` (internal server)
+
+Prometheus scrape endpoint.
+
+- **Auth:** `x-api-key: <key with scope ops:metrics>` (signing not required for metrics)
+
 ---
 
 ## Internal /cron routes (ops)
 
-All require admin auth or a scoped API key. Invoked by GitHub Actions or ops manually.
+Routes are defined under `/cron/**` in code and mounted with the `/internal` prefix in `apps/api/src/server.ts`, so the
+external URLs are `/internal/cron/**` on the internal server (`INTERNAL_PORT`).
+
+All require scoped API keys (e.g. `tasks:*` or `ops:*`) and internal request signing in production. Invoked by GitHub
+Actions or ops manually. List below is not exhaustive.
+
+Internal health (no signature required):
+
+- `GET /internal/healthz`
+
+Internal ops client (recommended):
+
+```bash
+export CLEARCOST_INTERNAL_API_URL="http://localhost:4001"
+export CLEARCOST_TASKS_API_KEY="ck_..."
+export INTERNAL_SIGNING_SECRET="..."
+
+bun run internal-request -- --path /internal/cron/fx/daily --body '{}'
+```
 
 - **FX**
   - `POST /internal/cron/fx/daily` — refresh ECB rates
@@ -199,8 +234,32 @@ All require admin auth or a scoped API key. Invoked by GitHub Actions or ops man
   - `POST /internal/cron/import/duties/us-mfn`
   - `POST /internal/cron/import/duties/us-preferential`
   - `POST /internal/cron/import/duties/eu-mfn`
+  - `POST /internal/cron/import/duties/eu-fta`
   - `POST /internal/cron/import/duties/uk-mfn`
+  - `POST /internal/cron/import/duties/uk-fta`
   - `POST /internal/cron/import/duties/wits`
+  - `POST /internal/cron/import/duties/wits/asean`
+  - `POST /internal/cron/import/duties/wits/japan`
+  - `POST /internal/cron/import/duties/cn-mfn`
+  - `POST /internal/cron/import/duties/cn-fta`
+  - `POST /internal/cron/import/duties/cn-mfn/official/pdf`
+  - `POST /internal/cron/import/duties/jp-mfn`
+  - `POST /internal/cron/import/duties/jp-fta`
+  - `POST /internal/cron/import/duties/my-mfn`
+  - `POST /internal/cron/import/duties/my-fta`
+  - `POST /internal/cron/import/duties/my-mfn/official/excel`
+  - `POST /internal/cron/import/duties/my-mfn/official/pdf`
+  - `POST /internal/cron/import/duties/my-fta/official/excel`
+  - `POST /internal/cron/import/duties/sg-mfn`
+  - `POST /internal/cron/import/duties/sg-fta`
+  - `POST /internal/cron/import/duties/th-mfn`
+  - `POST /internal/cron/import/duties/th-fta`
+  - `POST /internal/cron/import/duties/vn-mfn`
+  - `POST /internal/cron/import/duties/vn-fta`
+  - `POST /internal/cron/import/duties/ph-mfn`
+  - `POST /internal/cron/import/duties/id-mfn`
+  - `POST /internal/cron/import/duties/id-fta`
+  - `POST /internal/cron/id/btki/crawl`
 
 - **Surcharges**
   - `POST /internal/cron/import/surcharges/us-trade-remedies`
@@ -219,10 +278,14 @@ All require admin auth or a scoped API key. Invoked by GitHub Actions or ops man
 - **De‑minimis**
   - `POST /internal/cron/de-minimis/import-zonos`
   - `POST /internal/cron/de-minimis/import-official`
+  - `POST /internal/cron/de-minimis/seed-baseline`
 
 - **Ops maintenance**
   - `POST /internal/cron/imports/sweep-stale` — mark stuck runs failed
   - `POST /internal/cron/imports/prune` — delete old imports/provenance
+
+- `GET /internal/notices` — internal notices browsing (tasks scope)
+- `GET /internal/notices/:id` — internal notices detail (tasks scope)
 
 ---
 
@@ -251,15 +314,15 @@ Command registry: `src/lib/cron/registry.ts` (implementations under `src/lib/cro
 ## Auth
 
 - **Client APIs:** `x-api-key` (row in DB), enforced by `plugins/api-key-auth.ts`.
-- **Admin /cron:** `x-admin-token` must match `ADMIN_TOKEN` (or use scoped keys).
-- **Internal signing:** `x-cc-ts` + `x-cc-sig` for server-to-server where enabled.
+- **Admin /cron:** scoped API keys (e.g. `tasks:*`, `ops:*`) on the internal server.
+- **Internal signing:** `x-cc-ts` + `x-cc-sig` required in production for internal routes.
 - **Scopes:** routes declare scopes, e.g. `quotes:write`.
 
 ---
 
 ## Observability
 
-- **Prometheus** at `GET /metrics`
+- **Prometheus** at `GET /metrics` (internal server)
   - HTTP: `http_server_request_duration_seconds`, `http_server_requests_total`
   - Import batch: `clearcost_import_rows_inserted_total`, `clearcost_import_errors_total`,
     `clearcost_import_last_run_timestamp`
@@ -268,7 +331,7 @@ Command registry: `src/lib/cron/registry.ts` (implementations under `src/lib/cro
 - **Health**
   - `GET /healthz` (HEAD also)
   - `GET /health`
-  - `GET /health/imports?thresholdHours=36` — recent provenance summary
+  - `GET /v1/admin/health/imports?thresholdHours=36` — recent provenance summary (internal server)
 
 ---
 
@@ -331,7 +394,7 @@ CI workflow: `.github/workflows/api-tests.yml`.
 - **TS augmentation not picked up**: ensure `apps/api/types/**/*.d.ts` is included in `tsconfig.json`.
 - **Prometheus types**: use the module augmentation in `types/import-instrumentation.d.ts` for Fastify extras.
 - **DB errors**: verify `DATABASE_URL` and run migrations from `packages/db`.
-- **Admin routes 401**: set `ADMIN_TOKEN` and send header `x-admin-token`.
+- **Admin routes 401**: ensure your API key includes the required `admin:*` or `ops:*` scope.
 - **LLM imports**: ensure `OPENAI_API_KEY` or `XAI_API_KEY` is set before running `import:*:llm-*` commands.
 
 ---

@@ -50,8 +50,6 @@ export async function computePool(manifestId: string, opts: ComputePoolOpts = {}
     .limit(1)
     .then((r) => r[0]);
 
-  const incoterm = (profile?.defaultIncoterm ?? 'DAP').toUpperCase() as 'DAP' | 'DDP';
-
   const { origin, dest, shippingMode } = manifest;
   const currency = dest; // MVP convention
   const fixedFreightTotal = Number(manifest.fixedFreightTotal ?? 0);
@@ -121,8 +119,7 @@ export async function computePool(manifestId: string, opts: ComputePoolOpts = {}
       {
         origin,
         dest,
-        shippingMode: shippingMode as 'air' | 'sea',
-        incoterm,
+        mode: shippingMode as 'air' | 'sea',
         itemValue: {
           amount: Number(it.itemValueAmount ?? 0),
           currency: String(it.itemValueCurrency ?? 'USD'),

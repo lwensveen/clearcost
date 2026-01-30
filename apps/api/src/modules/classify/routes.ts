@@ -1,28 +1,28 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
-import { ClassifyInputSchema, ClassifyResponseSchema } from './schemas.js';
+import { ClassifyInputSchema, ClassifyResponseSchema } from '@clearcost/types';
 import { withIdempotency } from '../../lib/idempotency.js';
 import { classifyHS6 } from './services/classify-hs6.js';
-import { HeaderSchema } from '@clearcost/types';
+import { IdempotencyHeaderSchema } from '@clearcost/types';
 
 export default function classifyRoutes(app: FastifyInstance) {
   app.post<{
     Body: z.infer<typeof ClassifyInputSchema>;
     Reply: z.infer<typeof ClassifyResponseSchema>;
-    Headers: z.infer<typeof HeaderSchema>;
+    Headers: z.infer<typeof IdempotencyHeaderSchema>;
   }>(
     '/',
     {
       preHandler: app.requireApiKey(['classify:write']),
       schema: {
         body: ClassifyInputSchema,
-        headers: HeaderSchema,
+        headers: IdempotencyHeaderSchema,
         response: { 200: ClassifyResponseSchema },
       },
       config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
-      const headers = HeaderSchema.parse(req.headers);
+      const headers = IdempotencyHeaderSchema.parse(req.headers);
       const idem = headers['idempotency-key'] ?? headers['x-idempotency-key']!;
       const ns = `classify:${req.apiKey!.ownerId}`;
 

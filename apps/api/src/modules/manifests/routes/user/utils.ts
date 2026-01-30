@@ -1,10 +1,7 @@
-import { ManifestItemInsertSchema } from '@clearcost/types/dist/schemas/manifest-items.js';
+import { ManifestItemInsertSchema, ManifestItemsImportQuerySchema } from '@clearcost/types';
 import { z } from 'zod/v4';
 
-export const ImportQuery = z.object({
-  mode: z.enum(['append', 'replace']).default('append'),
-  dryRun: z.coerce.boolean().default(false),
-});
+export const ImportQuery = ManifestItemsImportQuerySchema;
 
 export type RowShape = z.input<typeof ManifestItemInsertSchema>;
 

@@ -1,19 +1,18 @@
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod/v4';
 import { importUsTradeRemediesFromHTS } from '../../surcharges/services/us/import-usitc-hts.js';
 import { importAllUsSurcharges } from '../../surcharges/services/us/import-all.js';
+import {
+  TasksSurchargeUsAllBodySchema,
+  TasksSurchargeUsTradeRemediesBodySchema,
+} from '@clearcost/types';
 
 export default function surchargeUsRoutes(app: FastifyInstance) {
   // US trade remedies (Section 301/232) from HTS JSON
   {
-    const Body = z.object({
-      effectiveFrom: z.coerce.date().optional(),
-      skipFree: z.coerce.boolean().default(false),
-      batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
-    });
+    const Body = TasksSurchargeUsTradeRemediesBodySchema;
 
     app.post(
-      '/internal/cron/import/surcharges/us-trade-remedies',
+      '/cron/import/surcharges/us-trade-remedies',
       {
         preHandler: app.requireApiKey(['tasks:surcharges:us-trade-remedies']),
         schema: { body: Body.optional() },
@@ -37,12 +36,10 @@ export default function surchargeUsRoutes(app: FastifyInstance) {
 
   // US generic surcharges bundle (MPF/HMF/etc.)
   {
-    const Body = z.object({
-      batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
-    });
+    const Body = TasksSurchargeUsAllBodySchema;
 
     app.post(
-      '/internal/cron/import/surcharges/us-all',
+      '/cron/import/surcharges/us-all',
       {
         preHandler: app.requireApiKey(['tasks:surcharges:us-all']),
         schema: { body: Body.optional() },

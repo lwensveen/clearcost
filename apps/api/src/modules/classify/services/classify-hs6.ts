@@ -1,6 +1,6 @@
 import { categoriesTable, db, hsCodesTable } from '@clearcost/db';
 import { ilike, sql } from 'drizzle-orm';
-import { ClassifyInput } from '../schemas.js';
+import type { ClassifyInput } from '@clearcost/types';
 
 // very naive keyword map to start; expand in DB later
 const KWD: Array<{ re: RegExp; hs6: string; score: number }> = [

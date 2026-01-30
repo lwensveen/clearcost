@@ -3,43 +3,22 @@ import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod/v4';
 import { db, vatRulesTable } from '@clearcost/db';
 import { and, desc, eq, gte, ilike, lte, sql } from 'drizzle-orm';
-import { VatRuleInsert, VatRuleInsertSchema } from '@clearcost/types';
+import {
+  ErrorResponseSchema,
+  VatAdminCreateSchema,
+  VatAdminIdParamSchema,
+  VatAdminImportJsonBodySchema,
+  VatAdminImportJsonResponseSchema,
+  VatAdminImportResponseSchema,
+  VatAdminListQuerySchema,
+  VatAdminListResponseSchema,
+  VatAdminUpdateSchema,
+  VatRuleInsert,
+  VatRuleInsertSchema,
+  VatRuleSelectCoercedSchema,
+} from '@clearcost/types';
 import { importVatRules } from '../services/import-vat.js';
-
-const VatBaseEnum = z.enum(['CIF', 'CIF_PLUS_DUTY']);
-
-const VatCreateSchema = z.object({
-  dest: z.string().length(2), // ISO2
-  ratePct: z.number().min(0).max(100),
-  vatBase: VatBaseEnum.default('CIF_PLUS_DUTY'),
-  effectiveFrom: z.coerce.date(),
-  effectiveTo: z.coerce.date().optional().nullable(),
-  notes: z.string().optional().nullable(),
-});
-
-const VatUpdateSchema = VatCreateSchema.partial();
-
-const VatListQuery = z.object({
-  q: z.string().optional(), // search by dest (contains)
-  dest: z.string().length(2).optional(),
-  from: z.coerce.date().optional(),
-  to: z.coerce.date().optional(),
-  limit: z.coerce.number().int().positive().max(200).default(50),
-  offset: z.coerce.number().int().nonnegative().default(0),
-});
-
-// Coerced select shape (matches DB types: numeric as string, timestamps as Date)
-const VatSelectSchema = z.object({
-  id: z.string().uuid(),
-  dest: z.string().length(2),
-  ratePct: z.string(), // stored as numeric in DB
-  vatBase: VatBaseEnum,
-  effectiveFrom: z.any(),
-  effectiveTo: z.any().nullable(),
-  notes: z.string().nullable().optional(),
-  createdAt: z.any().nullable().optional(),
-  updatedAt: z.any().nullable().optional(),
-});
+import { errorResponseForStatus } from '../../../lib/errors.js';
 
 export default function vatRoutes(app: FastifyInstance) {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -49,11 +28,14 @@ export default function vatRoutes(app: FastifyInstance) {
     '/',
     {
       preHandler: app.requireApiKey(['admin:rates']),
-      schema: { querystring: VatListQuery, response: { 200: z.array(VatSelectSchema) } },
+      schema: {
+        querystring: VatAdminListQuerySchema,
+        response: { 200: VatAdminListResponseSchema },
+      },
       config: { rateLimit: { max: 240, timeWindow: '1 minute' } },
     },
     async (req) => {
-      const { q, dest, from, to, limit, offset } = req.query;
+      const { q, dest, from, to, limit, offset } = VatAdminListQuerySchema.parse(req.query);
 
       const where = and(
         dest ? eq(vatRulesTable.dest, dest.toUpperCase()) : sql`TRUE`,
@@ -70,7 +52,7 @@ export default function vatRoutes(app: FastifyInstance) {
         .limit(limit)
         .offset(offset);
 
-      return z.array(VatSelectSchema).parse(rows);
+      return VatAdminListResponseSchema.parse(rows);
     }
   );
 
@@ -79,11 +61,11 @@ export default function vatRoutes(app: FastifyInstance) {
     '/',
     {
       preHandler: app.requireApiKey(['admin:rates']),
-      schema: { body: VatCreateSchema, response: { 201: VatSelectSchema } },
+      schema: { body: VatAdminCreateSchema, response: { 201: VatRuleSelectCoercedSchema } },
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
-      const b = req.body;
+      const b = VatAdminCreateSchema.parse(req.body);
       const [row] = await db
         .insert(vatRulesTable)
         .values({
@@ -95,7 +77,7 @@ export default function vatRoutes(app: FastifyInstance) {
           notes: b.notes ?? null,
         })
         .returning();
-      return reply.code(201).send(VatSelectSchema.parse(row));
+      return reply.code(201).send(VatRuleSelectCoercedSchema.parse(row));
     }
   );
 
@@ -105,22 +87,22 @@ export default function vatRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['admin:rates']),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
-        body: VatUpdateSchema,
-        response: { 200: VatSelectSchema, 404: z.any() },
+        params: VatAdminIdParamSchema,
+        body: VatAdminUpdateSchema,
+        response: { 200: VatRuleSelectCoercedSchema, 404: ErrorResponseSchema },
       },
       config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
-      const { id } = req.params;
-      const b = req.body;
+      const { id } = VatAdminIdParamSchema.parse(req.params);
+      const b = VatAdminUpdateSchema.parse(req.body);
 
       const [row] = await db
         .update(vatRulesTable)
         .set({
           ...(b.dest ? { dest: b.dest.toUpperCase() } : {}),
           ...(b.ratePct !== undefined ? { ratePct: String(b.ratePct) } : {}),
-          ...(b.vatBase ? { base: b.vatBase } : {}),
+          ...(b.vatBase ? { vatBase: b.vatBase } : {}),
           ...(b.effectiveFrom ? { effectiveFrom: b.effectiveFrom } : {}),
           ...(b.effectiveTo !== undefined ? { effectiveTo: b.effectiveTo ?? null } : {}),
           ...(b.notes !== undefined ? { notes: b.notes ?? null } : {}),
@@ -129,8 +111,8 @@ export default function vatRoutes(app: FastifyInstance) {
         .where(eq(vatRulesTable.id, id))
         .returning();
 
-      if (!row) return reply.notFound('Not found');
-      return VatSelectSchema.parse(row);
+      if (!row) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
+      return VatRuleSelectCoercedSchema.parse(row);
     }
   );
 
@@ -139,7 +121,10 @@ export default function vatRoutes(app: FastifyInstance) {
     '/:id',
     {
       preHandler: app.requireApiKey(['admin:rates']),
-      schema: { params: z.object({ id: z.string().uuid() }) },
+      schema: {
+        params: VatAdminIdParamSchema,
+        response: { 204: z.any(), 404: ErrorResponseSchema },
+      },
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
@@ -147,7 +132,7 @@ export default function vatRoutes(app: FastifyInstance) {
         .delete(vatRulesTable)
         .where(eq(vatRulesTable.id, req.params.id))
         .returning();
-      if (!row) return reply.notFound('Not found');
+      if (!row) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
       return reply.code(204).send();
     }
   );
@@ -158,14 +143,15 @@ export default function vatRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['admin:rates']),
       schema: {
-        body: z.object({ rows: z.array(VatCreateSchema) }),
-        response: { 200: z.object({ inserted: z.number() }) },
+        body: VatAdminImportJsonBodySchema,
+        response: { 200: VatAdminImportJsonResponseSchema },
       },
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
     },
     async (req) => {
       let inserted = 0;
-      for (const r0 of req.body.rows) {
+      const body = VatAdminImportJsonBodySchema.parse(req.body);
+      for (const r0 of body.rows) {
         await db
           .insert(vatRulesTable)
           .values({
@@ -179,7 +165,7 @@ export default function vatRoutes(app: FastifyInstance) {
           .onConflictDoNothing();
         inserted++;
       }
-      return { inserted };
+      return VatAdminImportJsonResponseSchema.parse({ inserted });
     }
   );
 
@@ -194,13 +180,13 @@ export default function vatRoutes(app: FastifyInstance) {
       schema: {
         // Expect an array of rows, not a single row
         body: z.array(VatRuleInsertSchema),
-        response: { 200: z.object({ ok: z.literal(true), count: z.number() }) },
+        response: { 200: VatAdminImportResponseSchema },
       },
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
     },
     async (req) => {
       const res = await importVatRules(req.body);
-      return { ok: true as const, count: res.count };
+      return VatAdminImportResponseSchema.parse({ ok: true as const, count: res.count });
     }
   );
 }

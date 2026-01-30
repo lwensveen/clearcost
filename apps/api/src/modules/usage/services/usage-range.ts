@@ -1,27 +1,7 @@
-import { z } from 'zod/v4';
+import { UsageRangeQuerySchema, UsageResponseSchema } from '@clearcost/types';
 
-export const QueryRange = z.object({
-  // YYYY-MM-DD in UTC
-  from: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
-  to: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
-});
-
-const UsageRowSchema = z.object({
-  day: z.any(), // date (returned as Date by drizzle)
-  route: z.string(),
-  method: z.string(),
-  count: z.number(),
-  sumDurationMs: z.number(),
-  sumBytesIn: z.number(),
-  sumBytesOut: z.number(),
-});
-export const UsageResponseSchema = z.array(UsageRowSchema);
+export const QueryRange = UsageRangeQuerySchema;
+export { UsageResponseSchema };
 
 export const dayToUTC = (s: string) => new Date(`${s}T00:00:00.000Z`);
 export const todayISO = () => new Date().toISOString().slice(0, 10);

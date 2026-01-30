@@ -3,20 +3,26 @@ import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod/v4';
 import { and, desc, eq } from 'drizzle-orm';
 import { db, manifestItemsTable, manifestsTable } from '@clearcost/db';
+import { errorResponseForStatus } from '../../../../lib/errors.js';
 import {
   ManifestByIdSchema,
-  ManifestInsertSchema,
-  ManifestSelectCoercedSchema,
-  ManifestsListQuerySchema,
-  ManifestUpdateSchema,
-} from '@clearcost/types/dist/schemas/manifests.js';
-import {
+  ManifestCreateBodySchema,
+  ManifestCreateResponseSchema,
+  ManifestErrorResponseSchema,
   ManifestItemByIdSchema,
-  ManifestItemInsertSchema,
+  ManifestItemParamsSchema,
   ManifestItemSelectCoercedSchema,
-  ManifestItemsListQuerySchema,
   ManifestItemUpdateSchema,
-} from '@clearcost/types/dist/schemas/manifest-items.js';
+  ManifestItemsAddBodySchema,
+  ManifestItemsAddResponseSchema,
+  ManifestItemsListResponseSchema,
+  ManifestItemsListQuerySchema,
+  ManifestOkResponseSchema,
+  ManifestSelectCoercedSchema,
+  ManifestUpdateSchema,
+  ManifestsListResponseSchema,
+  ManifestsListQuerySchema,
+} from '@clearcost/types';
 
 /**
  * NOTE:
@@ -42,18 +48,16 @@ export default async function manifestsCrud(app: FastifyInstance) {
   // ────────────────────────────────────────────────────────────────────────────
   // LIST MANIFESTS  GET /v1/manifests?origin=&dest=&mode=&pricingMode=&limit=
   // ────────────────────────────────────────────────────────────────────────────
-  const ListReplySchema = z.object({ items: z.array(ManifestSelectCoercedSchema) });
-
   r.get<{
     Querystring: z.infer<typeof ManifestsListQuerySchema>;
-    Reply: z.infer<typeof ListReplySchema>;
+    Reply: z.infer<typeof ManifestsListResponseSchema>;
   }>(
     '/',
     {
       preHandler: app.requireApiKey(['manifests:read']),
       schema: {
         querystring: ManifestsListQuerySchema,
-        response: { 200: ListReplySchema },
+        response: { 200: ManifestsListResponseSchema },
       },
     },
     async (req) => {
@@ -75,40 +79,35 @@ export default async function manifestsCrud(app: FastifyInstance) {
         .orderBy(desc(manifestsTable.createdAt))
         .limit(q.limit ?? 100);
 
-      return { items: rows.map((r) => ManifestSelectCoercedSchema.parse(r)) };
+      return ManifestsListResponseSchema.parse({
+        items: rows.map((r) => ManifestSelectCoercedSchema.parse(r)),
+      });
     }
   );
 
   // ────────────────────────────────────────────────────────────────────────────
   // CREATE MANIFEST  POST /v1/manifests
   // ────────────────────────────────────────────────────────────────────────────
-  const CreateBodySchema = ManifestInsertSchema.omit({
-    id: true,
-    ownerId: true,
-    createdAt: true,
-    updatedAt: true,
-  });
-  const CreateReplySchema = z.object({ id: z.string().uuid() });
-
   r.post<{
-    Body: z.infer<typeof CreateBodySchema>;
-    Reply: z.infer<typeof CreateReplySchema> | { error: string };
+    Body: z.infer<typeof ManifestCreateBodySchema>;
+    Reply:
+      | z.infer<typeof ManifestCreateResponseSchema>
+      | z.infer<typeof ManifestErrorResponseSchema>;
   }>(
     '/',
     {
       preHandler: app.requireApiKey(['manifests:write']),
       schema: {
-        body: CreateBodySchema,
-        response: { 200: CreateReplySchema },
+        body: ManifestCreateBodySchema,
+        response: { 200: ManifestCreateResponseSchema },
       },
     },
-    async (req) => {
+    async (req, reply) => {
       const ownerId = req.apiKey!.ownerId;
 
       const g = await req.server.entitlements.guardCreateManifest(req);
       if (!g.allowed) {
-        // If called from Fastify context, reply has already been sent in guard.
-        return { error: g.reason } as const;
+        return reply.code(g.code).send(errorResponseForStatus(g.code, g.reason));
       }
 
       const rows = await db
@@ -121,7 +120,7 @@ export default async function manifestsCrud(app: FastifyInstance) {
         throw new Error('Manifest insert failed');
       }
 
-      return { id: row.id };
+      return ManifestCreateResponseSchema.parse({ id: row.id });
     }
   );
 
@@ -130,7 +129,9 @@ export default async function manifestsCrud(app: FastifyInstance) {
   // ────────────────────────────────────────────────────────────────────────────
   r.get<{
     Params: z.infer<typeof ManifestByIdSchema>;
-    Reply: z.infer<typeof ManifestSelectCoercedSchema> | { error: string };
+    Reply:
+      | z.infer<typeof ManifestSelectCoercedSchema>
+      | z.infer<typeof ManifestErrorResponseSchema>;
   }>(
     '/:id',
     {
@@ -139,7 +140,7 @@ export default async function manifestsCrud(app: FastifyInstance) {
         params: ManifestByIdSchema,
         response: {
           200: ManifestSelectCoercedSchema,
-          404: z.object({ error: z.string() }),
+          404: ManifestErrorResponseSchema,
         },
       },
     },
@@ -153,7 +154,7 @@ export default async function manifestsCrud(app: FastifyInstance) {
         .where(and(eq(manifestsTable.id, id), eq(manifestsTable.ownerId, ownerId)))
         .limit(1);
 
-      if (!rows[0]) return reply.notFound('Not found');
+      if (!rows[0]) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
       return ManifestSelectCoercedSchema.parse(rows[0]);
     }
   );
@@ -167,13 +168,11 @@ export default async function manifestsCrud(app: FastifyInstance) {
     createdAt: true,
     updatedAt: true,
   });
-  const OkReplySchema = z.object({ ok: z.literal(true) });
-  const NotFoundReplySchema = z.object({ error: z.string() });
 
   r.patch<{
     Params: z.infer<typeof ManifestByIdSchema>;
     Body: z.infer<typeof UpdateBodySchema>;
-    Reply: z.infer<typeof OkReplySchema> | z.infer<typeof NotFoundReplySchema>;
+    Reply: z.infer<typeof ManifestOkResponseSchema> | z.infer<typeof ManifestErrorResponseSchema>;
   }>(
     '/:id',
     {
@@ -181,7 +180,7 @@ export default async function manifestsCrud(app: FastifyInstance) {
       schema: {
         params: ManifestByIdSchema,
         body: UpdateBodySchema,
-        response: { 200: OkReplySchema, 404: NotFoundReplySchema },
+        response: { 200: ManifestOkResponseSchema, 404: ManifestErrorResponseSchema },
       },
     },
     async (req, reply) => {
@@ -189,10 +188,10 @@ export default async function manifestsCrud(app: FastifyInstance) {
       const ownerId = req.apiKey!.ownerId;
 
       const ok = await assertOwnsManifest(id, ownerId);
-      if (!ok) return reply.notFound('Not found');
+      if (!ok) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
 
       await db.update(manifestsTable).set(req.body).where(eq(manifestsTable.id, id));
-      return { ok: true as const };
+      return ManifestOkResponseSchema.parse({ ok: true as const });
     }
   );
 
@@ -201,14 +200,14 @@ export default async function manifestsCrud(app: FastifyInstance) {
   // ────────────────────────────────────────────────────────────────────────────
   r.delete<{
     Params: z.infer<typeof ManifestByIdSchema>;
-    Reply: z.infer<typeof OkReplySchema> | z.infer<typeof NotFoundReplySchema>;
+    Reply: z.infer<typeof ManifestOkResponseSchema> | z.infer<typeof ManifestErrorResponseSchema>;
   }>(
     '/:id',
     {
       preHandler: app.requireApiKey(['manifests:write']),
       schema: {
         params: ManifestByIdSchema,
-        response: { 200: OkReplySchema, 404: NotFoundReplySchema },
+        response: { 200: ManifestOkResponseSchema, 404: ManifestErrorResponseSchema },
       },
     },
     async (req, reply) => {
@@ -216,10 +215,10 @@ export default async function manifestsCrud(app: FastifyInstance) {
       const ownerId = req.apiKey!.ownerId;
 
       const ok = await assertOwnsManifest(id, ownerId);
-      if (!ok) return reply.notFound('Not found');
+      if (!ok) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
 
       await db.delete(manifestsTable).where(eq(manifestsTable.id, id));
-      return { ok: true as const };
+      return ManifestOkResponseSchema.parse({ ok: true as const });
     }
   );
 
@@ -227,12 +226,13 @@ export default async function manifestsCrud(app: FastifyInstance) {
   // LIST ITEMS  GET /v1/manifests/:id/items?hs6=&categoryKey=&limit=
   // ────────────────────────────────────────────────────────────────────────────
   const ItemsListQuerySchema = ManifestItemsListQuerySchema.omit({ manifestId: true });
-  const ItemsListReplySchema = z.object({ items: z.array(ManifestItemSelectCoercedSchema) });
 
   r.get<{
     Params: z.infer<typeof ManifestByIdSchema>;
     Querystring: z.infer<typeof ItemsListQuerySchema>;
-    Reply: z.infer<typeof ItemsListReplySchema> | z.infer<typeof NotFoundReplySchema>;
+    Reply:
+      | z.infer<typeof ManifestItemsListResponseSchema>
+      | z.infer<typeof ManifestErrorResponseSchema>;
   }>(
     '/:id/items',
     {
@@ -240,7 +240,7 @@ export default async function manifestsCrud(app: FastifyInstance) {
       schema: {
         params: ManifestByIdSchema,
         querystring: ItemsListQuerySchema,
-        response: { 200: ItemsListReplySchema, 404: NotFoundReplySchema },
+        response: { 200: ManifestItemsListResponseSchema, 404: ManifestErrorResponseSchema },
       },
     },
     async (req, reply) => {
@@ -248,7 +248,7 @@ export default async function manifestsCrud(app: FastifyInstance) {
       const ownerId = req.apiKey!.ownerId;
 
       const ok = await assertOwnsManifest(id, ownerId);
-      if (!ok) return reply.notFound('Not found');
+      if (!ok) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
 
       const q = req.query;
 
@@ -267,41 +267,31 @@ export default async function manifestsCrud(app: FastifyInstance) {
 
       // (If you intend this guard for read limits, keep it; otherwise remove.)
       const g = await req.server.entitlements.guardAppendItems(req, id, rows.length);
-      if (!g.allowed) return reply.code(g.code).send({ error: g.reason });
+      if (!g.allowed) return reply.code(g.code).send(errorResponseForStatus(g.code, g.reason));
 
-      return { items: rows.map((r) => ManifestItemSelectCoercedSchema.parse(r)) };
+      return ManifestItemsListResponseSchema.parse({
+        items: rows.map((r) => ManifestItemSelectCoercedSchema.parse(r)),
+      });
     }
   );
 
   // ────────────────────────────────────────────────────────────────────────────
   // ADD ITEMS (bulk)  POST /v1/manifests/:id/items
   // ────────────────────────────────────────────────────────────────────────────
-  const AddItemsBodySchema = z.object({
-    items: z
-      .array(
-        ManifestItemInsertSchema.omit({
-          id: true,
-          manifestId: true,
-          createdAt: true,
-          updatedAt: true,
-        })
-      )
-      .min(1),
-  });
-  const AddItemsReplySchema = z.object({ inserted: z.number().int().min(0) });
-
   r.post<{
     Params: z.infer<typeof ManifestByIdSchema>;
-    Body: z.infer<typeof AddItemsBodySchema>;
-    Reply: z.infer<typeof AddItemsReplySchema> | z.infer<typeof NotFoundReplySchema>;
+    Body: z.infer<typeof ManifestItemsAddBodySchema>;
+    Reply:
+      | z.infer<typeof ManifestItemsAddResponseSchema>
+      | z.infer<typeof ManifestErrorResponseSchema>;
   }>(
     '/:id/items',
     {
       preHandler: app.requireApiKey(['manifests:write']),
       schema: {
         params: ManifestByIdSchema,
-        body: AddItemsBodySchema,
-        response: { 200: AddItemsReplySchema, 404: NotFoundReplySchema },
+        body: ManifestItemsAddBodySchema,
+        response: { 200: ManifestItemsAddResponseSchema, 404: ManifestErrorResponseSchema },
       },
     },
     async (req, reply) => {
@@ -309,7 +299,7 @@ export default async function manifestsCrud(app: FastifyInstance) {
       const ownerId = req.apiKey!.ownerId;
 
       const ok = await assertOwnsManifest(id, ownerId);
-      if (!ok) return reply.notFound('Not found');
+      if (!ok) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
 
       const rows = req.body.items.map((it) => ({ ...it, manifestId: id }));
       const n = await db
@@ -317,17 +307,13 @@ export default async function manifestsCrud(app: FastifyInstance) {
         .values(rows)
         .then((c) => c as unknown as number);
 
-      return { inserted: n ?? rows.length };
+      return ManifestItemsAddResponseSchema.parse({ inserted: n ?? rows.length });
     }
   );
 
   // ────────────────────────────────────────────────────────────────────────────
   // UPDATE ITEM  PATCH /v1/manifests/:id/items/:itemId
   // ────────────────────────────────────────────────────────────────────────────
-  const ItemParamsSchema = z.object({
-    id: ManifestByIdSchema.shape.id,
-    itemId: ManifestItemByIdSchema.shape.id,
-  });
   const ItemUpdateBodySchema = ManifestItemUpdateSchema.omit({
     id: true,
     manifestId: true,
@@ -336,17 +322,17 @@ export default async function manifestsCrud(app: FastifyInstance) {
   });
 
   r.patch<{
-    Params: z.infer<typeof ItemParamsSchema>;
+    Params: z.infer<typeof ManifestItemParamsSchema>;
     Body: z.infer<typeof ItemUpdateBodySchema>;
-    Reply: z.infer<typeof OkReplySchema> | z.infer<typeof NotFoundReplySchema>;
+    Reply: z.infer<typeof ManifestOkResponseSchema> | z.infer<typeof ManifestErrorResponseSchema>;
   }>(
     '/:id/items/:itemId',
     {
       preHandler: app.requireApiKey(['manifests:write']),
       schema: {
-        params: ItemParamsSchema,
+        params: ManifestItemParamsSchema,
         body: ItemUpdateBodySchema,
-        response: { 200: OkReplySchema, 404: NotFoundReplySchema },
+        response: { 200: ManifestOkResponseSchema, 404: ManifestErrorResponseSchema },
       },
     },
     async (req, reply) => {
@@ -354,7 +340,7 @@ export default async function manifestsCrud(app: FastifyInstance) {
       const ownerId = req.apiKey!.ownerId;
 
       const ok = await assertOwnsManifest(id, ownerId);
-      if (!ok) return reply.notFound('Not found');
+      if (!ok) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
 
       const n = await db
         .update(manifestItemsTable)
@@ -362,8 +348,8 @@ export default async function manifestsCrud(app: FastifyInstance) {
         .where(and(eq(manifestItemsTable.id, itemId), eq(manifestItemsTable.manifestId, id)))
         .then((c) => c as unknown as number);
 
-      if (!n) return reply.notFound('Item not found');
-      return { ok: true as const };
+      if (!n) return reply.code(404).send(errorResponseForStatus(404, 'Item not found'));
+      return ManifestOkResponseSchema.parse({ ok: true as const });
     }
   );
 
@@ -371,15 +357,15 @@ export default async function manifestsCrud(app: FastifyInstance) {
   // DELETE ITEM  DELETE /v1/manifests/:id/items/:itemId
   // ────────────────────────────────────────────────────────────────────────────
   r.delete<{
-    Params: z.infer<typeof ItemParamsSchema>;
-    Reply: z.infer<typeof OkReplySchema> | z.infer<typeof NotFoundReplySchema>;
+    Params: z.infer<typeof ManifestItemParamsSchema>;
+    Reply: z.infer<typeof ManifestOkResponseSchema> | z.infer<typeof ManifestErrorResponseSchema>;
   }>(
     '/:id/items/:itemId',
     {
       preHandler: app.requireApiKey(['manifests:write']),
       schema: {
-        params: ItemParamsSchema,
-        response: { 200: OkReplySchema, 404: NotFoundReplySchema },
+        params: ManifestItemParamsSchema,
+        response: { 200: ManifestOkResponseSchema, 404: ManifestErrorResponseSchema },
       },
     },
     async (req, reply) => {
@@ -387,15 +373,15 @@ export default async function manifestsCrud(app: FastifyInstance) {
       const ownerId = req.apiKey!.ownerId;
 
       const ok = await assertOwnsManifest(id, ownerId);
-      if (!ok) return reply.notFound('Not found');
+      if (!ok) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
 
       const n = await db
         .delete(manifestItemsTable)
         .where(and(eq(manifestItemsTable.id, itemId), eq(manifestItemsTable.manifestId, id)))
         .then((c) => c as unknown as number);
 
-      if (!n) return reply.notFound('Item not found');
-      return { ok: true as const };
+      if (!n) return reply.code(404).send(errorResponseForStatus(404, 'Item not found'));
+      return ManifestOkResponseSchema.parse({ ok: true as const });
     }
   );
 }

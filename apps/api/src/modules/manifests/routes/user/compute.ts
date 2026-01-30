@@ -10,52 +10,22 @@ import {
 import { and, desc, eq } from 'drizzle-orm';
 import { withIdempotency } from '../../../../lib/idempotency.js';
 import { computePool } from '../../services/compute-pool.js';
-import { HeaderSchema } from '@clearcost/types';
-
-const Params = z.object({ manifestId: z.string().uuid() });
-
-const ComputeBodySchema = z.object({
-  allocation: z.enum(['chargeable', 'volumetric', 'weight']).default('chargeable'),
-  dryRun: z.coerce.boolean().default(false),
-});
-type ComputeBody = z.infer<typeof ComputeBodySchema>;
-
-const HistoryItem = z.object({
-  id: z.string().uuid(),
-  createdAt: z.coerce.date().nullable(),
-  idemKey: z.string(),
-  allocation: z.string(),
-  dryRun: z.boolean(),
-});
-const HistoryReply = z.object({
-  items: z.array(HistoryItem),
-});
-
-const IdemHeaderSchema = z.object({
-  'idempotency-key': z.string().min(1).optional(),
-  'x-idempotency-key': z.string().min(1).optional(),
-});
+import { errorResponseForStatus } from '../../../../lib/errors.js';
+import {
+  IdempotencyHeaderSchema,
+  ManifestComputeBodySchema,
+  ManifestComputeResponseSchema,
+  ManifestErrorResponseSchema,
+  ManifestIdParamSchema,
+  ManifestQuotesByKeyParamsSchema,
+  ManifestQuotesHistoryResponseSchema,
+  ManifestQuotesResponseSchema,
+} from '@clearcost/types';
 
 function idemKeyFrom(h: unknown) {
-  const hdrs = IdemHeaderSchema.parse(h ?? {});
+  const hdrs = IdempotencyHeaderSchema.parse(h ?? {});
   return hdrs['idempotency-key'] ?? hdrs['x-idempotency-key'] ?? null;
 }
-
-const ComputeReply = z.object({
-  ok: z.literal(true),
-  manifestId: z.string().uuid(),
-  allocation: z.enum(['chargeable', 'volumetric', 'weight']),
-  dryRun: z.boolean(),
-  summary: z.unknown().nullable(),
-  items: z.array(z.unknown()),
-});
-
-const QuotesReply = z.object({
-  ok: z.literal(true),
-  manifestId: z.string().uuid(),
-  summary: z.unknown().nullable(),
-  items: z.array(z.unknown()),
-});
 
 async function assertOwnsManifest(manifestId: string, ownerId?: string) {
   if (!ownerId) return false;
@@ -70,24 +40,26 @@ async function assertOwnsManifest(manifestId: string, ownerId?: string) {
 export default function manifestsPublicRoutes(app: FastifyInstance) {
   // POST /v1/manifests/:manifestId/compute  (idempotent + snapshot)
   app.post<{
-    Params: z.infer<typeof Params>;
-    Body: ComputeBody | undefined;
-    Headers: z.infer<typeof HeaderSchema> & z.infer<typeof IdemHeaderSchema>;
-    Reply: z.infer<typeof ComputeReply> | { error: string };
+    Params: z.infer<typeof ManifestIdParamSchema>;
+    Body: z.infer<typeof ManifestComputeBodySchema> | undefined;
+    Headers: z.infer<typeof IdempotencyHeaderSchema>;
+    Reply:
+      | z.infer<typeof ManifestComputeResponseSchema>
+      | z.infer<typeof ManifestErrorResponseSchema>;
   }>(
     '/:manifestId/compute',
     {
       preHandler: app.requireApiKey(['manifests:write']),
       schema: {
-        params: Params,
-        headers: HeaderSchema.merge(IdemHeaderSchema),
-        body: ComputeBodySchema.optional(),
+        params: ManifestIdParamSchema,
+        headers: IdempotencyHeaderSchema,
+        body: ManifestComputeBodySchema.optional(),
         response: {
-          200: ComputeReply,
-          400: z.object({ error: z.string() }),
-          402: z.object({ error: z.string() }),
-          403: z.object({ error: z.string() }),
-          409: z.object({ error: z.string() }),
+          200: ManifestComputeResponseSchema,
+          400: ManifestErrorResponseSchema,
+          402: ManifestErrorResponseSchema,
+          403: ManifestErrorResponseSchema,
+          409: ManifestErrorResponseSchema,
         },
       },
       config: {
@@ -101,17 +73,18 @@ export default function manifestsPublicRoutes(app: FastifyInstance) {
           typeof gate.limit === 'number' && typeof gate.used === 'number'
             ? `Plan limit exceeded (${gate.used}/${gate.limit} compute calls today on plan "${gate.plan ?? 'unknown'}")`
             : 'Plan limit exceeded';
-        return reply.code(402).send({ error: msg });
+        return reply.code(402).send(errorResponseForStatus(402, msg));
       }
 
-      const { manifestId } = Params.parse(req.params);
-      const { allocation, dryRun } = ComputeBodySchema.parse(req.body ?? {});
+      const { manifestId } = ManifestIdParamSchema.parse(req.params);
+      const { allocation, dryRun } = ManifestComputeBodySchema.parse(req.body ?? {});
       const ownerId = req.apiKey?.ownerId;
       const ok = await assertOwnsManifest(manifestId, ownerId);
-      if (!ok) return reply.forbidden('Not your manifest');
+      if (!ok) return reply.code(403).send(errorResponseForStatus(403, 'Not your manifest'));
 
       const idemKey = idemKeyFrom(req.headers);
-      if (!idemKey) return reply.badRequest('Idempotency-Key header required');
+      if (!idemKey)
+        return reply.code(400).send(errorResponseForStatus(400, 'Idempotency-Key header required'));
 
       const scope = `manifests:${ownerId}:${manifestId}`;
       const requestDoc = { allocation, dryRun };
@@ -153,29 +126,31 @@ export default function manifestsPublicRoutes(app: FastifyInstance) {
       );
 
       reply.header('Idempotency-Key', idemKey).header('Cache-Control', 'no-store');
-      return reply.send(result);
+      return reply.send(ManifestComputeResponseSchema.parse(result));
     }
   );
 
   // GET /v1/manifests/:manifestId/quotes — latest snapshot (unchanged from your version)
   app.get<{
-    Params: z.infer<typeof Params>;
-    Reply: z.infer<typeof QuotesReply> | { error: string };
+    Params: z.infer<typeof ManifestIdParamSchema>;
+    Reply:
+      | z.infer<typeof ManifestQuotesResponseSchema>
+      | z.infer<typeof ManifestErrorResponseSchema>;
   }>(
     '/:manifestId/quotes',
     {
       preHandler: app.requireApiKey(['manifests:read']),
       schema: {
-        params: Params,
-        response: { 200: QuotesReply, 403: z.object({ error: z.string() }) },
+        params: ManifestIdParamSchema,
+        response: { 200: ManifestQuotesResponseSchema, 403: ManifestErrorResponseSchema },
       },
       config: { rateLimit: { max: 240, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
-      const { manifestId } = Params.parse(req.params);
+      const { manifestId } = ManifestIdParamSchema.parse(req.params);
       const ownerId = req.apiKey?.ownerId;
       const ok = await assertOwnsManifest(manifestId, ownerId);
-      if (!ok) return reply.forbidden('Not your manifest');
+      if (!ok) return reply.code(403).send(errorResponseForStatus(403, 'Not your manifest'));
 
       const summary = await db.query.manifestQuotesTable.findFirst({
         where: eq(manifestQuotesTable.manifestId, manifestId),
@@ -187,21 +162,30 @@ export default function manifestsPublicRoutes(app: FastifyInstance) {
         .where(eq(manifestItemQuotesTable.manifestId, manifestId));
 
       reply.header('cache-control', 'private, max-age=10, stale-while-revalidate=60');
-      return reply.send({ ok: true as const, manifestId, summary: summary ?? null, items });
+      return reply.send(
+        ManifestQuotesResponseSchema.parse({
+          ok: true as const,
+          manifestId,
+          summary: summary ?? null,
+          items,
+        })
+      );
     }
   );
 
   // GET /v1/manifests/:manifestId/quotes/by-key/:key — tenant-scoped replay from idempotency store
   app.get<{
-    Params: { manifestId: string; key: string };
-    Reply: z.infer<typeof ComputeReply> | { error: string };
+    Params: z.infer<typeof ManifestQuotesByKeyParamsSchema>;
+    Reply:
+      | z.infer<typeof ManifestComputeResponseSchema>
+      | z.infer<typeof ManifestErrorResponseSchema>;
   }>(
     '/:manifestId/quotes/by-key/:key',
     {
       preHandler: app.requireApiKey(['manifests:read']),
       schema: {
-        params: z.object({ manifestId: z.string().uuid(), key: z.string().min(1) }),
-        response: { 200: ComputeReply, 404: z.object({ error: z.string() }) },
+        params: ManifestQuotesByKeyParamsSchema,
+        response: { 200: ManifestComputeResponseSchema, 404: ManifestErrorResponseSchema },
       },
       config: { rateLimit: { max: 600, timeWindow: '1 minute' } },
     },
@@ -213,10 +197,11 @@ export default function manifestsPublicRoutes(app: FastifyInstance) {
         where: (t, { and, eq }) =>
           and(eq(t.scope, scope), eq(t.key, req.params.key), eq(t.status, 'completed')),
       });
-      if (!row || !row.response) return reply.notFound('Not found');
+      if (!row || !row.response)
+        return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
 
-      const parsed = ComputeReply.safeParse(row.response);
-      if (!parsed.success) return reply.notFound('Not found');
+      const parsed = ManifestComputeResponseSchema.safeParse(row.response);
+      if (!parsed.success) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
 
       reply.header('Idempotency-Key', req.params.key).header('Cache-Control', 'no-store');
       return reply.send(parsed.data);
@@ -225,15 +210,15 @@ export default function manifestsPublicRoutes(app: FastifyInstance) {
 
   // GET /v1/manifests/:manifestId/quotes/history — recent snapshots for UI debugging
   app.get<{
-    Params: { manifestId: string };
-    Reply: z.infer<typeof HistoryReply>;
+    Params: z.infer<typeof ManifestIdParamSchema>;
+    Reply: z.infer<typeof ManifestQuotesHistoryResponseSchema>;
   }>(
     '/:manifestId/quotes/history',
     {
       preHandler: app.requireApiKey(['manifests:read']),
       schema: {
-        params: z.object({ manifestId: z.string().uuid() }),
-        response: { 200: HistoryReply },
+        params: ManifestIdParamSchema,
+        response: { 200: ManifestQuotesHistoryResponseSchema },
       },
       config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
     },
@@ -252,7 +237,7 @@ export default function manifestsPublicRoutes(app: FastifyInstance) {
         .where(eq(manifestSnapshotsTable.scope, scope))
         .orderBy(desc(manifestSnapshotsTable.createdAt))
         .limit(50);
-      return { items: rows };
+      return ManifestQuotesHistoryResponseSchema.parse({ items: rows });
     }
   );
 }

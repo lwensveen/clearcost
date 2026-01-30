@@ -4,6 +4,7 @@ import { db, tradeNoticesTable } from '@clearcost/db';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { attachNoticeDoc, markNoticeStatus } from '../../../../modules/notices/registry.js';
 import { parse } from 'node-html-parser';
+import { httpFetch } from '../../../http.js';
 
 const USER_AGENT =
   process.env.HTTP_USER_AGENT ??
@@ -13,7 +14,7 @@ type NoticeRow = typeof tradeNoticesTable.$inferSelect;
 
 async function fetchBuffer(url: string): Promise<{ ok: boolean; buf?: Buffer; mime?: string }> {
   try {
-    const res = await fetch(url, { headers: { 'user-agent': USER_AGENT }, redirect: 'follow' });
+    const res = await httpFetch(url, { headers: { 'user-agent': USER_AGENT }, redirect: 'follow' });
     if (!res.ok) return { ok: false };
     const array = await res.arrayBuffer();
     return {
@@ -113,7 +114,7 @@ export const fetchNoticeDocsCmd: Command = async (argv) => {
 
         // Case B: HTML page → try to find PDF links if allowed
         if (attachNonPdf) {
-          const page = await fetch(n.url, {
+          const page = await httpFetch(n.url, {
             headers: { 'user-agent': USER_AGENT },
             redirect: 'follow',
           });

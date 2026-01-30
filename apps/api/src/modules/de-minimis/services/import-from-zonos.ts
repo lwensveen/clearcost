@@ -2,6 +2,7 @@ import { db, deMinimisTable, provenanceTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
 import { load } from 'cheerio';
 import { sha256Hex } from '../../../lib/provenance.js';
+import { httpFetch } from '../../../lib/http.js';
 
 type ParsedCell = { value: number; currency: string };
 const URL = 'https://zonos.com/docs/guides/de-minimis-values';
@@ -60,7 +61,7 @@ export async function importDeMinimisFromZonos(
   effectiveOn = new Date(),
   opts: { importId?: string; skipUS?: boolean } = {}
 ) {
-  const res = await fetch(URL, { headers: { 'user-agent': 'clearcost-seed/1.0' } });
+  const res = await httpFetch(URL, { headers: { 'user-agent': 'clearcost-seed/1.0' } });
   if (!res.ok) throw new Error(`Fetch failed ${res.status} ${res.statusText} @ ${URL}`);
   const html = await res.text();
   const $ = load(html);

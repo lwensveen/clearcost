@@ -1,19 +1,18 @@
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod/v4';
 import { importMyMfn } from '../../../duty-rates/services/asean/my/import-mfn.js';
 import { importMyPreferential } from '../../../duty-rates/services/asean/my/import-preferential.js';
+import {
+  TasksDutyHs6BatchDryRunBodySchema,
+  TasksDutyHs6BatchPartnerGeoIdsBodySchema,
+} from '@clearcost/types';
 
 export default function myDutyRoutes(app: FastifyInstance) {
   // MY MFN (WITS)
   {
-    const Body = z.object({
-      hs6: z.array(z.string().regex(/^\d{6}$/)).optional(),
-      batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
-      dryRun: z.boolean().optional(),
-    });
+    const Body = TasksDutyHs6BatchDryRunBodySchema;
 
     app.post(
-      '/internal/cron/import/duties/my-mfn',
+      '/cron/import/duties/my-mfn',
       {
         preHandler: app.requireApiKey(['tasks:duties:my']),
         schema: { body: Body },
@@ -34,15 +33,10 @@ export default function myDutyRoutes(app: FastifyInstance) {
 
   // MY Preferential (WITS)
   {
-    const Body = z.object({
-      hs6: z.array(z.string().regex(/^\d{6}$/)).optional(),
-      partnerGeoIds: z.array(z.string()).optional(),
-      batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
-      dryRun: z.boolean().optional(),
-    });
+    const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
 
     app.post(
-      '/internal/cron/import/duties/my-fta',
+      '/cron/import/duties/my-fta',
       {
         preHandler: app.requireApiKey(['tasks:duties:my']),
         schema: { body: Body },

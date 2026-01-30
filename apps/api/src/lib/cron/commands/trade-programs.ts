@@ -10,6 +10,7 @@ import {
 import { countriesTable } from '@clearcost/db/dist/schemas/countries.js';
 import { jurisdictionsTable } from '@clearcost/db/dist/schemas/jurisdictions.js';
 import { parseFlags } from '../utils.js';
+import { httpFetch } from '../../http.js';
 
 /** --- Minimal seeds --------------------------------------------------- */
 const BASE_COUNTRIES: Array<{ iso2: string; name: string; iso3?: string; numeric?: string }> = [
@@ -245,7 +246,7 @@ export const programsLoadMembersCsv: Command = async (args) => {
         iOwner = -1;
       let upserts = 0;
 
-      const res = await fetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
+      const res = await httpFetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
       if (!res.ok || !res.body) throw new Error(`Fetch ${url} failed: ${res.status}`);
 
       for await (const rec of iterateCsvRecords(res.body)) {

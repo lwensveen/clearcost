@@ -20,7 +20,7 @@ type FreightCardRow = {
 
 export default function freightRoutes(app: FastifyInstance) {
   app.post(
-    '/internal/cron/import/freight',
+    '/cron/import/freight',
     {
       preHandler: app.requireApiKey(['tasks:freight:import-json']),
       config: { importMeta: { importSource: 'FILE', job: 'freight:json' } },

@@ -5,34 +5,21 @@ import { db, webhookDeliveriesTable, webhookEndpointsTable } from '@clearcost/db
 import { desc, eq } from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
 import { encryptSecret } from '../services/secret-kms.js';
-
-const CreateBody = z.object({
-  ownerId: z.string().uuid(),
-  url: z.string().url(),
-  events: z.array(z.string()).default([]),
-});
-
-const EndpointRowSchema = z.object({
-  id: z.string().uuid(),
-  ownerId: z.string().uuid(),
-  url: z.string().url(),
-  events: z.array(z.string()),
-  isActive: z.boolean(),
-  createdAt: z.any().nullable(),
-  updatedAt: z.any().nullable(),
-});
-
-const DeliveryRowSchema = z.object({
-  id: z.string().uuid(),
-  endpointId: z.string().uuid(),
-  event: z.string(),
-  status: z.number(),
-  attempt: z.number().int(),
-  requestId: z.string().nullable().optional(),
-  createdAt: z.any(),
-  payload: z.unknown().optional(), // if you store it
-  error: z.string().nullable().optional(),
-});
+import { errorResponseForStatus } from '../../../lib/errors.js';
+import {
+  ErrorResponseSchema,
+  WebhookDeliveriesListQuerySchema,
+  WebhookDeliveriesListResponseSchema,
+  WebhookEndpointCreateBodySchema,
+  WebhookEndpointCreateResponseSchema,
+  WebhookEndpointRotateParamsSchema,
+  WebhookEndpointRotateResponseSchema,
+  WebhookEndpointUpdateBodySchema,
+  WebhookEndpointUpdateParamsSchema,
+  WebhookEndpointUpdateResponseSchema,
+  WebhookEndpointsListQuerySchema,
+  WebhookEndpointsListResponseSchema,
+} from '@clearcost/types';
 
 export default function webhookAdminRoutes(app: FastifyInstance) {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -43,13 +30,13 @@ export default function webhookAdminRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['admin:webhooks']),
       schema: {
-        querystring: z.object({ ownerId: z.string().uuid() }),
-        response: { 200: z.array(EndpointRowSchema) },
+        querystring: WebhookEndpointsListQuerySchema,
+        response: { 200: WebhookEndpointsListResponseSchema },
       },
     },
     async (req) => {
-      const { ownerId } = req.query;
-      return db
+      const { ownerId } = WebhookEndpointsListQuerySchema.parse(req.query);
+      const rows = await db
         .select({
           id: webhookEndpointsTable.id,
           ownerId: webhookEndpointsTable.ownerId,
@@ -61,29 +48,36 @@ export default function webhookAdminRoutes(app: FastifyInstance) {
         })
         .from(webhookEndpointsTable)
         .where(eq(webhookEndpointsTable.ownerId, ownerId));
+      return WebhookEndpointsListResponseSchema.parse(rows);
     }
   );
 
   // CREATE — returns plaintext secret once
-  r.post(
+  r.post<{
+    Body: z.infer<typeof WebhookEndpointCreateBodySchema>;
+    Reply:
+      | z.infer<typeof WebhookEndpointCreateResponseSchema>
+      | z.infer<typeof ErrorResponseSchema>;
+  }>(
     '/endpoints',
     {
       preHandler: app.requireApiKey(['admin:webhooks']),
       schema: {
-        body: CreateBody,
-        response: { 201: EndpointRowSchema.extend({ secret: z.string() }) },
+        body: WebhookEndpointCreateBodySchema,
+        response: { 201: WebhookEndpointCreateResponseSchema, 500: ErrorResponseSchema },
       },
     },
     async (req, reply) => {
+      const body = WebhookEndpointCreateBodySchema.parse(req.body);
       const plaintext = 'whsec_' + randomBytes(32).toString('base64url');
       const { encB64u, ivB64u, tagB64u } = encryptSecret(plaintext);
 
       const [row] = await db
         .insert(webhookEndpointsTable)
         .values({
-          ownerId: req.body.ownerId,
-          url: req.body.url,
-          events: req.body.events,
+          ownerId: body.ownerId,
+          url: body.url,
+          events: body.events,
           isActive: true,
           secretEnc: encB64u,
           secretIv: ivB64u,
@@ -99,51 +93,67 @@ export default function webhookAdminRoutes(app: FastifyInstance) {
           updatedAt: webhookEndpointsTable.updatedAt,
         });
 
-      if (!row) return reply.internalServerError('Insert failed');
-      return reply.code(201).send({ ...row, secret: plaintext });
+      if (!row) return reply.code(500).send(errorResponseForStatus(500, 'Insert failed'));
+      return reply
+        .code(201)
+        .send(WebhookEndpointCreateResponseSchema.parse({ ...row, secret: plaintext }));
     }
   );
 
   // ROTATE — returns new plaintext once
-  r.post(
+  r.post<{
+    Params: z.infer<typeof WebhookEndpointRotateParamsSchema>;
+    Reply:
+      | z.infer<typeof WebhookEndpointRotateResponseSchema>
+      | z.infer<typeof ErrorResponseSchema>;
+  }>(
     '/endpoints/:id/rotate',
     {
       preHandler: app.requireApiKey(['admin:webhooks']),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
-        response: { 200: z.object({ id: z.string().uuid(), secret: z.string() }) },
+        params: WebhookEndpointRotateParamsSchema,
+        response: { 200: WebhookEndpointRotateResponseSchema, 404: ErrorResponseSchema },
       },
     },
     async (req, reply) => {
+      const { id } = WebhookEndpointRotateParamsSchema.parse(req.params);
       const plaintext = 'whsec_' + randomBytes(32).toString('base64url');
       const { encB64u, ivB64u, tagB64u } = encryptSecret(plaintext);
 
       const [row] = await db
         .update(webhookEndpointsTable)
         .set({ secretEnc: encB64u, secretIv: ivB64u, secretTag: tagB64u, updatedAt: new Date() })
-        .where(eq(webhookEndpointsTable.id, req.params.id))
+        .where(eq(webhookEndpointsTable.id, id))
         .returning({ id: webhookEndpointsTable.id });
 
-      if (!row) return reply.notFound('Not found');
-      return reply.send({ id: row.id, secret: plaintext });
+      if (!row) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
+      return reply.send(
+        WebhookEndpointRotateResponseSchema.parse({ id: row.id, secret: plaintext })
+      );
     }
   );
 
   // ACTIVATE/DEACTIVATE (admin)
-  r.patch(
+  r.patch<{
+    Params: z.infer<typeof WebhookEndpointUpdateParamsSchema>;
+    Body: z.infer<typeof WebhookEndpointUpdateBodySchema>;
+    Reply:
+      | z.infer<typeof WebhookEndpointUpdateResponseSchema>
+      | z.infer<typeof ErrorResponseSchema>;
+  }>(
     '/endpoints/:id',
     {
       preHandler: app.requireApiKey(['admin:webhooks']),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
-        body: z.object({ isActive: z.boolean() }),
-        response: { 200: z.object({ id: z.string().uuid(), isActive: z.boolean() }) },
+        params: WebhookEndpointUpdateParamsSchema,
+        body: WebhookEndpointUpdateBodySchema,
+        response: { 200: WebhookEndpointUpdateResponseSchema, 404: ErrorResponseSchema },
       },
       config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
-      const { id } = req.params;
-      const { isActive } = req.body;
+      const { id } = WebhookEndpointUpdateParamsSchema.parse(req.params);
+      const { isActive } = WebhookEndpointUpdateBodySchema.parse(req.body);
 
       const [row] = await db
         .update(webhookEndpointsTable)
@@ -151,8 +161,8 @@ export default function webhookAdminRoutes(app: FastifyInstance) {
         .where(eq(webhookEndpointsTable.id, id))
         .returning({ id: webhookEndpointsTable.id, isActive: webhookEndpointsTable.isActive });
 
-      if (!row) return reply.notFound('Not found');
-      return reply.send(row);
+      if (!row) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
+      return reply.send(WebhookEndpointUpdateResponseSchema.parse(row));
     }
   );
 
@@ -162,20 +172,20 @@ export default function webhookAdminRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['admin:webhooks']),
       schema: {
-        querystring: z.object({ endpointId: z.string().uuid() }),
-        response: { 200: z.array(DeliveryRowSchema) },
+        querystring: WebhookDeliveriesListQuerySchema,
+        response: { 200: WebhookDeliveriesListResponseSchema },
       },
       config: { rateLimit: { max: 240, timeWindow: '1 minute' } },
     },
     async (req) => {
-      const { endpointId } = req.query;
+      const { endpointId } = WebhookDeliveriesListQuerySchema.parse(req.query);
       const rows = await db
         .select()
         .from(webhookDeliveriesTable)
         .where(eq(webhookDeliveriesTable.endpointId, endpointId))
         .orderBy(desc(webhookDeliveriesTable.createdAt))
         .limit(200);
-      return z.array(DeliveryRowSchema).parse(rows);
+      return WebhookDeliveriesListResponseSchema.parse(rows);
     }
   );
 }

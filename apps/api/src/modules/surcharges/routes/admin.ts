@@ -4,17 +4,17 @@ import { z } from 'zod/v4';
 import { db, surchargesTable } from '@clearcost/db';
 import { and, desc, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
 import {
+  ErrorResponseSchema,
   SurchargeByIdSchema,
   SurchargeInsertSchema,
   SurchargeSelectCoercedSchema,
-  SurchargesListQuerySchema,
+  SurchargesAdminImportResponseSchema,
+  SurchargesAdminListQuerySchema,
+  SurchargesAdminListResponseSchema,
   SurchargeUpdateSchema,
 } from '@clearcost/types';
 import { importSurcharges } from '../services/import-surcharges.js';
-
-const ListQuerySchema = SurchargesListQuerySchema.extend({
-  offset: z.coerce.number().int().nonnegative().default(0),
-});
+import { errorResponseForStatus } from '../../../lib/errors.js';
 
 export default function surchargesAdminRoutes(app: FastifyInstance) {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -25,8 +25,8 @@ export default function surchargesAdminRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['admin:rates']),
       schema: {
-        querystring: ListQuerySchema,
-        response: { 200: z.array(SurchargeSelectCoercedSchema) },
+        querystring: SurchargesAdminListQuerySchema,
+        response: { 200: SurchargesAdminListResponseSchema },
       },
       config: { rateLimit: { max: 240, timeWindow: '1 minute' } },
     },
@@ -52,7 +52,7 @@ export default function surchargesAdminRoutes(app: FastifyInstance) {
         .limit(limit)
         .offset(offset);
 
-      return z.array(SurchargeSelectCoercedSchema).parse(rows);
+      return SurchargesAdminListResponseSchema.parse(rows);
     }
   );
 
@@ -81,7 +81,7 @@ export default function surchargesAdminRoutes(app: FastifyInstance) {
       schema: {
         params: SurchargeByIdSchema,
         body: SurchargeUpdateSchema,
-        response: { 200: SurchargeSelectCoercedSchema, 404: z.any() },
+        response: { 200: SurchargeSelectCoercedSchema, 404: ErrorResponseSchema },
       },
       config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
     },
@@ -95,7 +95,7 @@ export default function surchargesAdminRoutes(app: FastifyInstance) {
         .where(eq(surchargesTable.id, id))
         .returning();
 
-      if (!updated) return reply.notFound('Not found');
+      if (!updated) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
       return SurchargeSelectCoercedSchema.parse(updated);
     }
   );
@@ -105,7 +105,10 @@ export default function surchargesAdminRoutes(app: FastifyInstance) {
     '/:id',
     {
       preHandler: app.requireApiKey(['admin:rates']),
-      schema: { params: SurchargeByIdSchema },
+      schema: {
+        params: SurchargeByIdSchema,
+        response: { 204: z.any(), 404: ErrorResponseSchema },
+      },
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
@@ -115,7 +118,7 @@ export default function surchargesAdminRoutes(app: FastifyInstance) {
         .where(eq(surchargesTable.id, id))
         .returning();
 
-      if (!deleted) return reply.notFound('Not found');
+      if (!deleted) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
       return reply.code(204).send();
     }
   );
@@ -127,10 +130,10 @@ export default function surchargesAdminRoutes(app: FastifyInstance) {
       preHandler: app.requireApiKey(['admin:rates']),
       schema: {
         body: z.array(SurchargeInsertSchema),
-        response: { 200: z.object({ ok: z.literal(true), count: z.number() }) },
+        response: { 200: SurchargesAdminImportResponseSchema },
       },
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
     },
-    async (req) => importSurcharges(req.body)
+    async (req) => SurchargesAdminImportResponseSchema.parse(await importSurcharges(req.body))
   );
 }

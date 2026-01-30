@@ -1,18 +1,17 @@
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod/v4';
-import { DutyRateInsert } from '@clearcost/types';
+import { DutyRateInsert, TasksDutyJsonImportResponseSchema } from '@clearcost/types';
 import { fetchJSON } from '../common.js';
 import { importDutyRates } from '../../duty-rates/services/import-duty-rates.js';
 
 export default function dutyJsonRoute(app: FastifyInstance) {
-  // POST /internal/cron/import/duties — import duty rates from a JSON blob (manual)
+  // POST /cron/import/duties — import duty rates from a JSON blob (manual)
   app.post(
-    '/internal/cron/import/duties',
+    '/cron/import/duties',
     {
       preHandler: app.requireApiKey(['tasks:duties:json']),
       schema: {
         response: {
-          200: z.object({ ok: z.literal(true), count: z.number() }),
+          200: TasksDutyJsonImportResponseSchema,
         },
       },
       config: { importMeta: { importSource: 'FILE', job: 'duties:json' } },

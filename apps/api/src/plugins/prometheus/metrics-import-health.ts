@@ -1,5 +1,6 @@
 import fp from 'fastify-plugin';
 import { Gauge } from 'prom-client';
+import { registry } from '../../lib/metrics.js';
 import { db, provenanceTable } from '@clearcost/db';
 import { isNotNull, sql } from 'drizzle-orm';
 
@@ -14,6 +15,7 @@ export default fp(async (app) => {
     name: 'clearcost_import_last_run_timestamp',
     help: 'UNIX seconds of last provenance row per import id',
     labelNames: ['import_id'] as const,
+    registers: [registry],
   });
 
   let timer: NodeJS.Timer | undefined;

@@ -1,5 +1,6 @@
 import { batchUpsertSurchargesFromStream } from '../../utils/batch-upsert.js';
 import type { SurchargeInsert } from '@clearcost/types';
+import { httpFetch } from '../../../../lib/http.js';
 
 const FDA_VQIP_URL = 'https://www.fda.gov/food/voluntary-qualified-importer-program-vqip/vqip-fees';
 
@@ -26,7 +27,7 @@ function currentFY(d = new Date()): number {
 }
 
 async function fetchText(url: string) {
-  const r = await fetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
+  const r = await httpFetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
   if (!r.ok) throw new Error(`FDA/FR fetch ${url} -> ${r.status}`);
   return await r.text();
 }

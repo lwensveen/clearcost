@@ -2,34 +2,29 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
 import { db, tradeNoticeDocsTable, tradeNoticesTable } from '@clearcost/db';
 import { and, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm';
-import { NoticeStatus, NoticeType, TradeNotice, TradeNoticeDoc } from '@clearcost/types';
-
-const QuerySchema = z.object({
-  dest: z.string().length(2).optional(),
-  authority: z.string().min(1).optional(), // e.g. "MOF", "GACC", "MOFCOM"
-  type: NoticeType.optional(),
-  status: NoticeStatus.optional(),
-  lang: z.string().min(2).max(8).optional(),
-  q: z.string().min(1).optional(), // full-text-ish on title/url
-  tags: z.string().optional(), // comma-separated; all must be present
-  publishedFrom: z.coerce.date().optional(),
-  publishedTo: z.coerce.date().optional(),
-  limit: z.coerce.number().int().positive().max(200).default(50),
-  offset: z.coerce.number().int().min(0).default(0),
-  sort: z.enum(['publishedAt', 'createdAt', 'updatedAt']).default('publishedAt'),
-  dir: z.enum(['asc', 'desc']).default('desc'),
-});
+import {
+  TradeNoticeByIdSchema,
+  TradeNoticeDetailResponseSchema,
+  TradeNoticeDocSelectCoercedSchema,
+  TradeNoticeErrorResponseSchema,
+  TradeNoticeSelectCoercedSchema,
+  TradeNoticesListQuerySchema,
+  TradeNoticesListResponseSchema,
+} from '@clearcost/types';
 
 export default function noticesBrowseRoutes(app: FastifyInstance) {
   app.get(
-    '/internal/notices',
+    '/notices',
     {
       preHandler: app.requireApiKey(['tasks:notices']),
-      schema: { querystring: QuerySchema },
+      schema: {
+        querystring: TradeNoticesListQuerySchema,
+        response: { 200: TradeNoticesListResponseSchema },
+      },
       config: { importMeta: { importSource: 'NOTICES', job: 'notices:list' } },
     },
     async (req, reply) => {
-      const query = QuerySchema.parse(req.query ?? {});
+      const query = TradeNoticesListQuerySchema.parse(req.query ?? {});
       const {
         dest,
         authority,
@@ -45,6 +40,10 @@ export default function noticesBrowseRoutes(app: FastifyInstance) {
         sort,
         dir,
       } = query;
+      const limitNum = limit ?? 50;
+      const offsetNum = offset ?? 0;
+      const sortKey = sort ?? 'publishedAt';
+      const dirKey = dir ?? 'desc';
 
       const conditions = [];
 
@@ -67,7 +66,7 @@ export default function noticesBrowseRoutes(app: FastifyInstance) {
       if (tags) {
         const tagList = tags
           .split(',')
-          .map((s) => s.trim())
+          .map((s: string) => s.trim())
           .filter(Boolean);
         for (const tag of tagList) {
           conditions.push(sql`${tradeNoticesTable.tags} @> ${JSON.stringify([tag])}::jsonb`);
@@ -84,13 +83,13 @@ export default function noticesBrowseRoutes(app: FastifyInstance) {
         .as('dc');
 
       const orderCol =
-        sort === 'createdAt'
+        sortKey === 'createdAt'
           ? tradeNoticesTable.createdAt
-          : sort === 'updatedAt'
+          : sortKey === 'updatedAt'
             ? tradeNoticesTable.updatedAt
             : tradeNoticesTable.publishedAt;
 
-      const orderExpr = dir === 'asc' ? orderCol : desc(orderCol);
+      const orderExpr = dirKey === 'asc' ? orderCol : desc(orderCol);
 
       const items = await db
         .select({
@@ -115,8 +114,8 @@ export default function noticesBrowseRoutes(app: FastifyInstance) {
         .leftJoin(docsCount, eq(tradeNoticesTable.id, docsCount.noticeId))
         .where(and(...(conditions.length ? conditions : [sql`true`])))
         .orderBy(orderExpr)
-        .limit(limit)
-        .offset(offset);
+        .limit(limitNum)
+        .offset(offsetNum);
 
       const totalRow = await db
         .select({ total: sql<number>`count(*)` })
@@ -125,26 +124,34 @@ export default function noticesBrowseRoutes(app: FastifyInstance) {
 
       const total = totalRow[0]?.total ?? 0;
 
-      return reply.send({
-        ok: true,
-        total,
-        limit,
-        offset,
-        items: items as unknown as TradeNotice[],
-        nextOffset: offset + items.length < total ? offset + items.length : null,
-      });
+      return reply.send(
+        TradeNoticesListResponseSchema.parse({
+          ok: true,
+          total,
+          limit: limitNum,
+          offset: offsetNum,
+          items: items.map((it) => TradeNoticeSelectCoercedSchema.parse(it)),
+          nextOffset: offsetNum + items.length < total ? offsetNum + items.length : null,
+        })
+      );
     }
   );
 
   app.get(
-    '/internal/notices/:id',
+    '/notices/:id',
     {
       preHandler: app.requireApiKey(['tasks:notices']),
-      schema: { params: z.object({ id: z.string().uuid() }) },
+      schema: {
+        params: TradeNoticeByIdSchema,
+        response: {
+          200: TradeNoticeDetailResponseSchema,
+          404: TradeNoticeErrorResponseSchema,
+        },
+      },
       config: { importMeta: { importSource: 'NOTICES', job: 'notices:get' } },
     },
     async (req, reply) => {
-      const { id } = (req.params ?? {}) as { id: string };
+      const { id } = TradeNoticeByIdSchema.parse(req.params ?? {});
 
       const [notice] = await db
         .select()
@@ -160,11 +167,13 @@ export default function noticesBrowseRoutes(app: FastifyInstance) {
         .where(eq(tradeNoticeDocsTable.noticeId, id))
         .orderBy(desc(tradeNoticeDocsTable.createdAt));
 
-      return reply.send({
-        ok: true,
-        notice: notice as unknown as TradeNotice,
-        docs: docs as unknown as TradeNoticeDoc[],
-      });
+      return reply.send(
+        TradeNoticeDetailResponseSchema.parse({
+          ok: true,
+          notice: TradeNoticeSelectCoercedSchema.parse(notice),
+          docs: docs.map((d) => TradeNoticeDocSelectCoercedSchema.parse(d)),
+        })
+      );
     }
   );
 }

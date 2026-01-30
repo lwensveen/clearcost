@@ -1,5 +1,6 @@
 import { importDeMinimis } from './import-de-minimis.js';
 import type { DeMinimisInsert } from '@clearcost/types';
+import { httpFetch } from '../../../lib/http.js';
 
 const API_BASE = 'https://api.trade.gov/v1/de_minimis/search';
 
@@ -59,7 +60,7 @@ export async function importDeMinimisFromTradeGov(
     url.searchParams.set('offset', String(offset));
     if (apiKey) url.searchParams.set('api_key', apiKey);
 
-    const r = await fetch(url.toString(), { headers: { 'user-agent': 'clearcost-importer' } });
+    const r = await httpFetch(url.toString(), { headers: { 'user-agent': 'clearcost-importer' } });
     if (!r.ok) throw new Error(`Trade.gov de_minimis fetch ${r.status}`);
 
     const data: TradeGovResp = await r.json();

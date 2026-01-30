@@ -1,19 +1,12 @@
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod/v4';
 import { importPhMfnExcel } from '../../../duty-rates/services/asean/ph/import-mfn-excel.js';
+import { TasksDutyPhBodySchema } from '@clearcost/types';
 
 export default function phDutyRoutes(app: FastifyInstance) {
-  const Body = z.object({
-    url: z.string().min(1).optional(), // falls back to env
-    sheet: z.union([z.string(), z.coerce.number()]).optional(),
-    mapFreeToZero: z.boolean().optional(),
-    skipSpecific: z.boolean().optional(),
-    batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
-    dryRun: z.boolean().optional(),
-  });
+  const Body = TasksDutyPhBodySchema;
 
   app.post(
-    '/internal/cron/import/duties/ph-mfn',
+    '/cron/import/duties/ph-mfn',
     {
       preHandler: app.requireApiKey(['tasks:duties:ph']),
       schema: { body: Body },

@@ -4,7 +4,8 @@ import { z } from 'zod/v4';
 import { readFile } from 'node:fs/promises';
 import { crawlAuthorityPdfs } from '../notices/crawl-authorities.js';
 import { attachNoticeDoc, ensureNotice } from '../notices/registry.js';
-import { NOTICE_TYPE_VALUES } from '@clearcost/db'; // single source of truth
+import { TasksNoticesCrawlBodySchema } from '@clearcost/types';
+import { httpFetch } from '../../lib/http.js';
 
 type CnAuthority = 'MOF' | 'GACC' | 'MOFCOM';
 
@@ -21,23 +22,8 @@ function csvEnv(name: string, fallback = ''): string[] {
 }
 
 // Schema: defaults + normalization (so handler logic stays thin)
-const BodySchema = z.object({
-  urls: z.array(z.string().url()).optional(),
-  includeHints: z.array(z.string()).optional(),
-  excludeHints: z.array(z.string()).optional(),
-  maxDepth: z.coerce.number().int().min(0).max(4).default(1),
-  concurrency: z.coerce.number().int().min(1).max(10).default(4),
-  outDir: z.string().optional(),
-  dest: z
-    .string()
-    .length(2)
-    .transform((s) => s.toUpperCase())
-    .default('CN'),
-  type: z.enum(NOTICE_TYPE_VALUES).default('general'),
-  lang: z.string().min(2).max(8).default('zh'),
-  tags: z.array(z.string()).optional(),
-});
-type Body = z.infer<typeof BodySchema>;
+const BodySchema = TasksNoticesCrawlBodySchema;
+type Body = z.infer<typeof TasksNoticesCrawlBodySchema>;
 
 function deriveTitleFromUrl(url: string): string {
   try {
@@ -121,7 +107,7 @@ export default function noticesRoutes(app: FastifyInstance) {
 
         if (!bodyBuffer) {
           try {
-            const resp = await fetch(fileUrl, {
+            const resp = await httpFetch(fileUrl, {
               headers: { 'user-agent': UA },
               redirect: 'follow',
             });
@@ -165,7 +151,7 @@ export default function noticesRoutes(app: FastifyInstance) {
 
   // CN — MOF
   app.post(
-    '/internal/cron/notices/cn/mof',
+    '/cron/notices/cn/mof',
     {
       preHandler: app.requireApiKey(['tasks:notices']),
       schema: { body: BodySchema },
@@ -176,7 +162,7 @@ export default function noticesRoutes(app: FastifyInstance) {
 
   // CN — GACC
   app.post(
-    '/internal/cron/notices/cn/gacc',
+    '/cron/notices/cn/gacc',
     {
       preHandler: app.requireApiKey(['tasks:notices']),
       schema: { body: BodySchema },
@@ -187,7 +173,7 @@ export default function noticesRoutes(app: FastifyInstance) {
 
   // CN — MOFCOM
   app.post(
-    '/internal/cron/notices/cn/mofcom',
+    '/cron/notices/cn/mofcom',
     {
       preHandler: app.requireApiKey(['tasks:notices']),
       schema: { body: BodySchema },

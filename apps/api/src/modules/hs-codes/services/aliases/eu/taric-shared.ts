@@ -1,3 +1,4 @@
+import { httpFetch } from '../../../../../lib/http.js';
 export type GoodsRow = {
   sid: string;
   code8: string;
@@ -9,7 +10,7 @@ export type DescMap = Map<string, string>;
 export type GoodsMap = Map<string, GoodsRow>;
 
 async function fetchXml(url: string) {
-  const r = await fetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
+  const r = await httpFetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
   if (!r.ok) throw new Error(`Fetch failed ${r.status} ${r.statusText}`);
   return r.text(); // rely on Content-Encoding: gzip
 }

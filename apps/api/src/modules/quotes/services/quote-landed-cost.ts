@@ -1,4 +1,4 @@
-import { QuoteInput } from '../schemas.js';
+import type { QuoteInput } from '@clearcost/types';
 import { db, merchantProfilesTable, taxRegistrationsTable } from '@clearcost/db';
 import { and, eq } from 'drizzle-orm';
 import { EU_ISO2, volumeM3, volumetricKg } from '../utils.js';
@@ -64,15 +64,14 @@ export async function quoteLandedCost(
   const hs6 = await resolveHs6(input.categoryKey, input.hs6);
 
   const volKg = volumetricKg(input.dimsCm);
-  const chargeableKg =
-    input.shippingMode === 'air' ? Math.max(input.weightKg, volKg) : input.weightKg;
-  const qty = input.shippingMode === 'air' ? chargeableKg : volumeM3(input.dimsCm);
-  const unit: Unit = input.shippingMode === 'air' ? 'kg' : 'm3';
+  const chargeableKg = input.mode === 'air' ? Math.max(input.weightKg, volKg) : input.weightKg;
+  const qty = input.mode === 'air' ? chargeableKg : volumeM3(input.dimsCm);
+  const unit: Unit = input.mode === 'air' ? 'kg' : 'm3';
 
   const freightRow = await getFreight({
     origin: input.origin,
     dest: input.dest,
-    freightMode: input.shippingMode,
+    freightMode: input.mode,
     freightUnit: unit,
     qty,
     on: now,

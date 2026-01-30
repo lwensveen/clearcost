@@ -3,27 +3,34 @@ import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod/v4';
 import { and, eq } from 'drizzle-orm';
 import { db, manifestItemsTable, manifestsTable } from '@clearcost/db';
-import { ManifestInsertSchema } from '@clearcost/types/dist/schemas/manifests.js';
-
-const Params = z.object({ manifestId: z.string().uuid() });
+import { errorResponseForStatus } from '../../../lib/errors.js';
+import {
+  ManifestCloneBodySchema,
+  ManifestCloneParamsSchema,
+  ManifestCloneResponseSchema,
+  ManifestErrorResponseSchema,
+  ManifestInsertSchema,
+} from '@clearcost/types';
 
 export default async function manifestsCloneRoute(app: FastifyInstance) {
   const r = app.withTypeProvider<ZodTypeProvider>();
 
   r.post<{
-    Params: z.infer<typeof Params>;
-    Body: { name?: string } | undefined;
-    Reply: { id: string; itemsCopied: number } | { error: string };
+    Params: z.infer<typeof ManifestCloneParamsSchema>;
+    Body: z.infer<typeof ManifestCloneBodySchema> | undefined;
+    Reply:
+      | z.infer<typeof ManifestCloneResponseSchema>
+      | z.infer<typeof ManifestErrorResponseSchema>;
   }>(
     '/:manifestId/clone',
     {
       preHandler: app.requireApiKey(['manifests:write']),
       schema: {
-        params: Params,
-        body: z.object({ name: z.string().min(1).max(200).optional() }).optional(),
+        params: ManifestCloneParamsSchema,
+        body: ManifestCloneBodySchema.optional(),
         response: {
-          200: z.object({ id: z.string().uuid(), itemsCopied: z.number().int().min(0) }),
-          404: z.object({ error: z.string() }),
+          200: ManifestCloneResponseSchema,
+          404: ManifestErrorResponseSchema,
         },
       },
     },
@@ -39,7 +46,7 @@ export default async function manifestsCloneRoute(app: FastifyInstance) {
         .where(and(eq(manifestsTable.id, manifestId), eq(manifestsTable.ownerId, ownerId)))
         .limit(1);
 
-      if (!src) return reply.notFound('Not found');
+      if (!src) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
 
       // Restrict to insertable fields (omit id/owner/timestamps); this will carry over
       // origin, dest, shippingMode, pricingMode, fixedFreight*, reference, name, etc.

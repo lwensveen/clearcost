@@ -2,6 +2,7 @@ import { db, surchargesTable } from '@clearcost/db';
 import type { SurchargeInsert } from '@clearcost/types';
 import { batchUpsertSurchargesFromStream } from '../../utils/batch-upsert.js';
 import { and, desc, eq, isNull, lt, lte, sql } from 'drizzle-orm';
+import { httpFetch } from '../../../../lib/http.js';
 
 /**
  * Compute US Fiscal Year for a given UTC date.
@@ -40,7 +41,7 @@ async function fetchFRDocForFY(
   url.searchParams.set('conditions[publication_date][lte]', to);
   url.searchParams.set('conditions[term]', `Customs User Fees Fiscal Year ${fy}`);
 
-  const r = await fetch(url.toString(), { headers: { 'user-agent': 'clearcost-importer' } });
+  const r = await httpFetch(url.toString(), { headers: { 'user-agent': 'clearcost-importer' } });
   if (!r.ok) return null;
 
   const json = await r.json();

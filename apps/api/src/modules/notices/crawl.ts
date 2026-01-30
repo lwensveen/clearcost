@@ -1,6 +1,7 @@
 import { parse } from 'node-html-parser';
 import { attachNoticeDoc, ensureNotice } from './registry.js';
 import { NOTICE_TYPE_VALUES } from '@clearcost/db';
+import { httpFetch } from '../../lib/http.js';
 
 type NoticeType = (typeof NOTICE_TYPE_VALUES)[number];
 
@@ -86,7 +87,7 @@ export async function crawlNotices(options: CrawlNoticesOptions) {
   for (const listUrl of options.urls) {
     let html = '';
     try {
-      const res = await fetch(listUrl, { headers: { 'user-agent': UA }, redirect: 'follow' });
+      const res = await httpFetch(listUrl, { headers: { 'user-agent': UA }, redirect: 'follow' });
       if (!res.ok) continue;
       html = await res.text();
     } catch {
@@ -155,7 +156,10 @@ export async function crawlNotices(options: CrawlNoticesOptions) {
 
     if (options.attach && /\.pdf($|\?)/i.test(item.url)) {
       try {
-        const res = await fetch(item.url, { headers: { 'user-agent': UA }, redirect: 'follow' });
+        const res = await httpFetch(item.url, {
+          headers: { 'user-agent': UA },
+          redirect: 'follow',
+        });
         if (!res.ok) continue;
 
         const buf = Buffer.from(await res.arrayBuffer());

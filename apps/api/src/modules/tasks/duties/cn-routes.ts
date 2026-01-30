@@ -1,20 +1,20 @@
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod/v4';
 import { importCnMfn } from '../../duty-rates/services/cn/import-mfn.js';
 import { importCnPreferential } from '../../duty-rates/services/cn/import-preferential.js';
 import { importCnMfnFromPdf } from '../../duty-rates/services/cn/import-mfn-pdf.js';
+import {
+  TasksDutyCnMfnPdfBodySchema,
+  TasksDutyHs6BatchDryRunBodySchema,
+  TasksDutyHs6BatchPartnerGeoIdsBodySchema,
+} from '@clearcost/types';
 
 export default function cnDutyRoutes(app: FastifyInstance) {
   // CN MFN (WITS)
   {
-    const Body = z.object({
-      hs6: z.array(z.string().regex(/^\d{6}$/)).optional(),
-      batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
-      dryRun: z.boolean().optional(),
-    });
+    const Body = TasksDutyHs6BatchDryRunBodySchema;
 
     app.post(
-      '/internal/cron/import/duties/cn-mfn',
+      '/cron/import/duties/cn-mfn',
       {
         preHandler: app.requireApiKey(['tasks:duties:cn']),
         schema: { body: Body },
@@ -35,15 +35,10 @@ export default function cnDutyRoutes(app: FastifyInstance) {
 
   // CN Preferential (WITS)
   {
-    const Body = z.object({
-      hs6: z.array(z.string().regex(/^\d{6}$/)).optional(),
-      partnerGeoIds: z.array(z.string()).optional(),
-      batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
-      dryRun: z.boolean().optional(),
-    });
+    const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
 
     app.post(
-      '/internal/cron/import/duties/cn-fta',
+      '/cron/import/duties/cn-fta',
       {
         preHandler: app.requireApiKey(['tasks:duties:cn']),
         schema: { body: Body },
@@ -64,14 +59,10 @@ export default function cnDutyRoutes(app: FastifyInstance) {
   }
 
   // CN MFN — official tariff book (PDF)
-  const Body = z.object({
-    url: z.string().url(), // e.g. https://yn.mof.gov.cn/.../P020250415728855839413.pdf
-    batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
-    dryRun: z.boolean().optional(),
-  });
+  const Body = TasksDutyCnMfnPdfBodySchema;
 
   app.post(
-    '/internal/cron/import/duties/cn-mfn/official/pdf',
+    '/cron/import/duties/cn-mfn/official/pdf',
     {
       preHandler: app.requireApiKey(['tasks:duties:cn']),
       schema: { body: Body },

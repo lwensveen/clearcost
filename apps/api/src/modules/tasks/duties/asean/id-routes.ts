@@ -1,17 +1,14 @@
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod/v4';
 import { importIdMfn } from '../../../duty-rates/services/asean/id/import-mfn.js';
 import { importIdPreferential } from '../../../duty-rates/services/asean/id/import-preferential.js';
+import { TasksDutyIdBodySchema, TasksDutyIdFtaBodySchema } from '@clearcost/types';
 
 export default function idDutyRoutes(app: FastifyInstance) {
-  const Body = z.object({
-    batchSize: z.coerce.number().int().min(1).max(20_000).optional(),
-    dryRun: z.boolean().optional(),
-  });
+  const Body = TasksDutyIdBodySchema;
 
   // MFN
   app.post(
-    '/internal/cron/import/duties/id-mfn',
+    '/cron/import/duties/id-mfn',
     {
       preHandler: app.requireApiKey(['tasks:duties:id']),
       schema: { body: Body },
@@ -26,16 +23,14 @@ export default function idDutyRoutes(app: FastifyInstance) {
 
   // Preferential (WITS fallback)
   app.post(
-    '/internal/cron/import/duties/id-fta',
+    '/cron/import/duties/id-fta',
     {
       preHandler: app.requireApiKey(['tasks:duties:id']),
-      schema: { body: Body.extend({ partnerGeoIds: z.array(z.string()).optional() }) },
+      schema: { body: TasksDutyIdFtaBodySchema },
       config: { importMeta: { importSource: 'WITS', job: 'duties:id-fta' } },
     },
     async (req, reply) => {
-      const { batchSize, dryRun, partnerGeoIds } = Body.extend({
-        partnerGeoIds: z.array(z.string()).optional(),
-      }).parse(req.body ?? {});
+      const { batchSize, dryRun, partnerGeoIds } = TasksDutyIdFtaBodySchema.parse(req.body ?? {});
       const res = await importIdPreferential({
         batchSize,
         dryRun,

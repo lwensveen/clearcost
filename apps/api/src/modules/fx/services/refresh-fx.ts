@@ -2,6 +2,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { db, fxRatesTable } from '@clearcost/db';
 import { z } from 'zod/v4';
 import { FxProviderSchema, FxRateInsert } from '@clearcost/types';
+import { httpFetch } from '../../../lib/http.js';
 import {
   calculateDaysBetween,
   formatISODate,
@@ -39,7 +40,7 @@ type EcbDoc = {
 
 async function fetchFromEcb(): Promise<EurMapWithProvenance> {
   const url = 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml';
-  const response = await fetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
+  const response = await httpFetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
   if (!response.ok) throw new Error(`${response.status} ${await response.text()}`);
 
   const xmlText = await response.text();
@@ -87,7 +88,7 @@ async function fetchFromEcb(): Promise<EurMapWithProvenance> {
 async function fetchFromExchangerateHost(targetDate: Date): Promise<EurMapWithProvenance | null> {
   const dateStr = formatISODate(targetDate);
   const url = `https://api.exchangerate.host/${dateStr}?base=EUR`;
-  const response = await fetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
+  const response = await httpFetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
   if (!response.ok) return null;
 
   const json = await response.json();
@@ -132,7 +133,7 @@ async function fetchFromOpenExchangeRates(targetDate: Date): Promise<EurMapWithP
 
   const dateStr = formatISODate(targetDate);
   const url = `https://openexchangerates.org/api/historical/${dateStr}.json?app_id=${encodeURIComponent(appId)}`;
-  const response = await fetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
+  const response = await httpFetch(url, { headers: { 'user-agent': 'clearcost-importer' } });
   if (!response.ok) return null;
 
   const json = await response.json();

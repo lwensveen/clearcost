@@ -3,15 +3,16 @@ import { z } from 'zod/v4';
 import { apiUsageTable, db } from '@clearcost/db';
 import { and, desc, eq, gte, lte } from 'drizzle-orm';
 import { normalizeRange, QueryRange, UsageResponseSchema } from '../services/usage-range.js';
+import { UsageByKeyParamsSchema } from '@clearcost/types';
 
 export default function usageRoutes(app: FastifyInstance) {
   // GET /v1/usage/by-key/:apiKeyId — admin view (same range behavior)
-  app.get<{ Params: { apiKeyId: string } }>(
+  app.get<{ Params: z.infer<typeof UsageByKeyParamsSchema> }>(
     '/by-key/:apiKeyId',
     {
       preHandler: app.requireApiKey(['admin:usage']),
       schema: {
-        params: z.object({ apiKeyId: z.string().uuid() }),
+        params: UsageByKeyParamsSchema,
         querystring: QueryRange,
         response: { 200: UsageResponseSchema },
       },

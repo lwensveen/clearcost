@@ -1,5 +1,6 @@
 import { db, NOTICE_TYPE_VALUES, tradeNoticesTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
+import { httpFetch } from '../../../lib/http.js';
 
 type NoticeType = (typeof NOTICE_TYPE_VALUES)[number];
 
@@ -42,7 +43,7 @@ export async function ingestJsonFeed(opts: JsonFeedOpts) {
     process.env.HTTP_USER_AGENT ??
     'clearcost-bot/1.0 (+https://clearcost.io; tariff research; contact: support@clearcost.io)';
 
-  const res = await fetch(opts.url, { headers: { 'user-agent': ua }, redirect: 'follow' });
+  const res = await httpFetch(opts.url, { headers: { 'user-agent': ua }, redirect: 'follow' });
   if (!res.ok) throw new Error(`JSON feed fetch failed ${res.status}`);
   const json = await res.json();
 
