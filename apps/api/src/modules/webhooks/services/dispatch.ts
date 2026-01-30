@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { db, webhookDeliveriesTable, webhookEndpointsTable } from '@clearcost/db';
 import crypto from 'node:crypto';
 import { decryptSecret } from './secret-kms.js';
+import { httpFetch } from '../../../lib/http.js';
 
 type EventName = 'quote.created';
 type Payload = Record<string, unknown>;
@@ -73,8 +74,12 @@ export async function emitWebhook(ownerId: string, event: EventName, payload: Pa
       continue;
     }
 
-    // Fire-and-forget the attempt
-    void sendAttempt(ep.id, ep.url, secret, delivery.id, body);
+    // Fire-and-forget in production; await in tests for determinism
+    if (process.env.NODE_ENV === 'test') {
+      await sendAttempt(ep.id, ep.url, secret, delivery.id, body);
+    } else {
+      void sendAttempt(ep.id, ep.url, secret, delivery.id, body);
+    }
   }
 }
 
@@ -91,7 +96,7 @@ async function sendAttempt(
   let status = 0;
   let text = '';
   try {
-    const r = await fetch(url, {
+    const r = await httpFetch(url, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -99,7 +104,7 @@ async function sendAttempt(
         'clearcost-signature': `t=${ts},v1=${sig}`,
       },
       body,
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      timeoutMs: TIMEOUT_MS,
     });
     status = r.status;
     text = await r.text();
