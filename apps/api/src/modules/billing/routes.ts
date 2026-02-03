@@ -62,6 +62,31 @@ function subscriptionPeriodEnd(sub: Stripe.Subscription): Date | null {
   return typeof unix === 'number' ? new Date(unix * 1000) : null;
 }
 
+export function mapPlanFromPrice(
+  priceId: string | null | undefined,
+  price: BillingEnv['price'],
+  fallbackPlan: string
+): string {
+  if (priceId === price.scale) return 'scale';
+  if (priceId === price.growth) return 'growth';
+  if (priceId === price.starter) return 'starter';
+  return fallbackPlan;
+}
+
+export function resolveSubscriptionState(
+  sub: Stripe.Subscription,
+  price: BillingEnv['price'],
+  fallbackPlan: string
+) {
+  const priceId = sub.items.data[0]?.price.id ?? null;
+  return {
+    plan: mapPlanFromPrice(priceId, price, fallbackPlan),
+    status: sub.status,
+    priceId,
+    currentPeriodEnd: subscriptionPeriodEnd(sub),
+  };
+}
+
 async function ensureBillingAccount(ownerId: string) {
   const [row] = await db
     .select()
@@ -239,35 +264,26 @@ export default async function billingRoutes(app: FastifyInstance) {
 
               // Narrow: treat the response as Subscription to access snake_case fields safely
               const sub = subResp as unknown as Stripe.Subscription;
-
-              const priceId = sub.items.data[0]?.price.id || null;
-              const planFromPrice =
-                priceId === PRICE.scale
-                  ? 'scale'
-                  : priceId === PRICE.growth
-                    ? 'growth'
-                    : priceId === PRICE.starter
-                      ? 'starter'
-                      : 'unknown';
+              const next = resolveSubscriptionState(sub, billingEnv.price, 'unknown');
 
               await db
                 .insert(billingAccountsTable)
                 .values({
                   ownerId,
                   stripeCustomerId: String(s.customer),
-                  plan: planFromPrice,
-                  status: sub.status,
-                  priceId: priceId ?? null,
-                  currentPeriodEnd: subscriptionPeriodEnd(sub),
+                  plan: next.plan,
+                  status: next.status,
+                  priceId: next.priceId,
+                  currentPeriodEnd: next.currentPeriodEnd,
                 })
                 .onConflictDoUpdate({
                   target: billingAccountsTable.ownerId,
                   set: {
                     stripeCustomerId: String(s.customer),
-                    plan: planFromPrice,
-                    status: sub.status,
-                    priceId: priceId ?? null,
-                    currentPeriodEnd: subscriptionPeriodEnd(sub),
+                    plan: next.plan,
+                    status: next.status,
+                    priceId: next.priceId,
+                    currentPeriodEnd: next.currentPeriodEnd,
                   },
                 });
             }
@@ -288,23 +304,15 @@ export default async function billingRoutes(app: FastifyInstance) {
               .limit(1);
 
             if (row) {
-              const priceId = sub.items.data[0]?.price.id ?? null;
-              const planFromPrice =
-                priceId === PRICE.scale
-                  ? 'scale'
-                  : priceId === PRICE.growth
-                    ? 'growth'
-                    : priceId === PRICE.starter
-                      ? 'starter'
-                      : (row.plan ?? 'free');
+              const next = resolveSubscriptionState(sub, billingEnv.price, row.plan ?? 'free');
 
               await db
                 .update(billingAccountsTable)
                 .set({
-                  plan: planFromPrice,
-                  status: sub.status,
-                  priceId,
-                  currentPeriodEnd: subscriptionPeriodEnd(sub),
+                  plan: next.plan,
+                  status: next.status,
+                  priceId: next.priceId,
+                  currentPeriodEnd: next.currentPeriodEnd,
                   updatedAt: new Date(),
                 })
                 .where(eq(billingAccountsTable.ownerId, row.ownerId));
