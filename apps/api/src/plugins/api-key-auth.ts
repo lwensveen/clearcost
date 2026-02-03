@@ -165,6 +165,10 @@ const INTERNAL_SIGNING_SECRET: string = process.env.INTERNAL_SIGNING_SECRET ?? '
 
 export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
   async (app: FastifyInstance) => {
+    if (process.env.NODE_ENV === 'production' && !PEPPER) {
+      throw new Error('API_KEY_PEPPER must be set in production');
+    }
+
     if (process.env.NODE_ENV === 'production' && !INTERNAL_SIGNING_SECRET) {
       throw new Error('INTERNAL_SIGNING_SECRET must be set in production');
     }

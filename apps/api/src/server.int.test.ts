@@ -14,6 +14,7 @@ beforeEach(() => {
   process.env.STRIPE_PRICE_GROWTH = 'price_growth_dummy';
   process.env.STRIPE_PRICE_SCALE = 'price_scale_dummy';
   process.env.INTERNAL_SIGNING_SECRET = 'test-secret';
+  process.env.API_KEY_PEPPER = 'pepper_dummy';
 });
 
 afterEach(() => {

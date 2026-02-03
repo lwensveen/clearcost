@@ -1,6 +1,6 @@
 import { db } from '@clearcost/db';
 import { and, desc, eq, lte } from 'drizzle-orm';
-import { vatOverridesTable } from '@clearcost/db/src/schemas/vat-overrides.js';
+import { vatOverridesTable } from '@clearcost/db';
 import { VatRateKind } from './utils.js';
 
 /**
