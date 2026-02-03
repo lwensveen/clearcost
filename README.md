@@ -406,6 +406,12 @@ bun run src/lib/run-cron.ts import:prune --days 90
   - Required secrets: `STAGING_PUBLIC_API_URL`, `STAGING_INTERNAL_API_URL`, `STAGING_PUBLIC_API_KEY`, `STAGING_OPS_API_KEY`
   - Optional secrets: `STAGING_BILLING_API_KEY`, `STAGING_INTERNAL_SIGNING_SECRET`
 
+### Release TODO
+
+- [ ] Enable branch protection on `main` and require `Release Gate`.
+- [ ] Create `staging` environment secrets used by `staging-smoke.yml`.
+- [ ] Run one manual `Staging Smoke` workflow and verify artifact output.
+
 ---
 
 ## License
