@@ -1,4 +1,5 @@
 import type { Command } from '../../runtime.js';
+import { withRun } from '../../runtime.js';
 import { parseFlags } from '../../utils.js';
 import { crawlNotices } from '../../../../modules/notices/crawl.js';
 
@@ -31,16 +32,26 @@ export const crawlNoticesCmd: Command = async (argv) => {
 
   const attach = Boolean(flags.attach); // --attach to fetch PDFs and store as docs
 
-  const result = await crawlNotices({
-    dest,
-    authority,
-    type,
-    urls,
-    include,
-    exclude,
-    sameHostOnly: flags.sameHostOnly !== '0',
-    attach,
-  });
+  const result = await withRun(
+    {
+      importSource: 'CN_NOTICES',
+      job: `notices:crawl:${authority.toLowerCase()}`,
+      params: { dest, authority, type, seeds: urls.length, attach: Boolean(attach) },
+    },
+    async () => {
+      const payload = await crawlNotices({
+        dest,
+        authority,
+        type,
+        urls,
+        include,
+        exclude,
+        sameHostOnly: flags.sameHostOnly !== '0',
+        attach,
+      });
+      return { inserted: payload.persisted ?? 0, payload };
+    }
+  );
 
   console.log(result);
 };

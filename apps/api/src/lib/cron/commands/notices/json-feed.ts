@@ -1,4 +1,5 @@
 import type { Command } from '../../runtime.js';
+import { withRun } from '../../runtime.js';
 import { parseFlags } from '../../utils.js';
 import { ingestJsonFeed } from '../../../../modules/notices/adapters/json-feed.js';
 import { NOTICE_TYPE_VALUES } from '@clearcost/db';
@@ -43,31 +44,42 @@ const get = (obj: unknown, path?: string): unknown => {
 export const crawlNoticesJsonCmd: Command = async (argv) => {
   const flags = FlagsSchema.parse(parseFlags(argv));
 
-  const result = await ingestJsonFeed({
-    dest: flags.dest,
-    authority: flags.authority,
-    type: flags.type,
-    lang: flags.lang,
-    url: flags.url,
-    arrayPath: flags.arrayPath,
-    userAgent: flags.userAgent,
-    map: {
-      title: (item) => String(get(item, flags.titleKey) ?? ''),
-      url: (item) => String(get(item, flags.urlKey) ?? ''),
-      publishedAt: flags.publishedKey
-        ? (item) => {
-            const v = get(item, flags.publishedKey);
-            return typeof v === 'string' || v instanceof Date ? v : undefined;
-          }
-        : undefined,
-      summary: flags.summaryKey
-        ? (item) => {
-            const v = get(item, flags.summaryKey);
-            return v == null ? undefined : String(v);
-          }
-        : undefined,
+  const result = await withRun(
+    {
+      importSource: 'NOTICES',
+      job: `notices:json:${flags.authority.toLowerCase()}`,
+      params: { dest: flags.dest, authority: flags.authority, type: flags.type, url: flags.url },
     },
-  });
+    async () => {
+      const payload = await ingestJsonFeed({
+        dest: flags.dest,
+        authority: flags.authority,
+        type: flags.type,
+        lang: flags.lang,
+        url: flags.url,
+        arrayPath: flags.arrayPath,
+        userAgent: flags.userAgent,
+        map: {
+          title: (item) => String(get(item, flags.titleKey) ?? ''),
+          url: (item) => String(get(item, flags.urlKey) ?? ''),
+          publishedAt: flags.publishedKey
+            ? (item) => {
+                const v = get(item, flags.publishedKey);
+                return typeof v === 'string' || v instanceof Date ? v : undefined;
+              }
+            : undefined,
+          summary: flags.summaryKey
+            ? (item) => {
+                const v = get(item, flags.summaryKey);
+                return v == null ? undefined : String(v);
+              }
+            : undefined,
+        },
+      });
+
+      return { inserted: payload.inserted ?? 0, payload };
+    }
+  );
 
   console.log(result);
 };

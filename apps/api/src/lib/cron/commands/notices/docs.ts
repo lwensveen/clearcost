@@ -1,4 +1,5 @@
 import type { Command } from '../../runtime.js';
+import { withRun } from '../../runtime.js';
 import { parseFlags } from '../../utils.js';
 import { db, tradeNoticesTable } from '@clearcost/db';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
@@ -59,122 +60,138 @@ export const fetchNoticeDocsCmd: Command = async (argv) => {
   const attachNonPdf = Boolean(flags.attachNonPdf); // also open HTML pages and find PDFs
   const concurrency = Math.max(1, Math.min(8, Number(flags.concurrency ?? 3)));
 
-  // Build WHERE
-  const conds: any[] = [];
-  if (dest) conds.push(eq(tradeNoticesTable.dest, dest));
-  if (authority) conds.push(eq(tradeNoticesTable.authority, authority));
-  if (statuses.length) conds.push(inArray(tradeNoticesTable.status, statuses));
+  const result = await withRun(
+    {
+      importSource: 'CN_NOTICES',
+      job: `notices:docs:${(authority ?? 'any').toLowerCase()}`,
+      params: { dest, authority, statuses, limit, attachNonPdf, concurrency },
+    },
+    async () => {
+      // Build WHERE
+      const conds: any[] = [];
+      if (dest) conds.push(eq(tradeNoticesTable.dest, dest));
+      if (authority) conds.push(eq(tradeNoticesTable.authority, authority));
+      if (statuses.length) conds.push(inArray(tradeNoticesTable.status, statuses));
 
-  // Prefer PDF-looking URLs first
-  const pdfFirst = sql`(lower(${tradeNoticesTable.url}) like '%.pdf%' )`;
+      // Prefer PDF-looking URLs first
+      const pdfFirst = sql`(lower(${tradeNoticesTable.url}) like '%.pdf%' )`;
 
-  const notices = await db
-    .select()
-    .from(tradeNoticesTable)
-    .where(conds.length ? and(...conds) : sql`true`)
-    .orderBy(desc(pdfFirst), desc(tradeNoticesTable.publishedAt), desc(tradeNoticesTable.createdAt))
-    .limit(limit);
+      const notices = await db
+        .select()
+        .from(tradeNoticesTable)
+        .where(conds.length ? and(...conds) : sql`true`)
+        .orderBy(
+          desc(pdfFirst),
+          desc(tradeNoticesTable.publishedAt),
+          desc(tradeNoticesTable.createdAt)
+        )
+        .limit(limit);
 
-  let total = 0;
-  let okDirect = 0;
-  let okLinked = 0;
-  let noneFound = 0;
-  let failed = 0;
+      let total = 0;
+      let okDirect = 0;
+      let okLinked = 0;
+      let noneFound = 0;
+      let failed = 0;
 
-  // simple pool
-  let cursor = 0;
-  async function worker() {
-    while (cursor < notices.length) {
-      const idx = cursor++;
-      const n = notices[idx] as NoticeRow;
-      total++;
+      // simple pool
+      let cursor = 0;
+      async function worker() {
+        while (cursor < notices.length) {
+          const idx = cursor++;
+          const n = notices[idx] as NoticeRow;
+          total++;
 
-      const isDirectPdf = n.url.toLowerCase().includes('.pdf');
+          const isDirectPdf = n.url.toLowerCase().includes('.pdf');
 
-      try {
-        // Case A: direct PDF
-        if (isDirectPdf) {
-          const r = await fetchBuffer(n.url);
-          if (!r.ok || !r.buf) {
-            await markNoticeStatus(n.id, 'error', `download failed for ${n.url}`);
+          try {
+            // Case A: direct PDF
+            if (isDirectPdf) {
+              const r = await fetchBuffer(n.url);
+              if (!r.ok || !r.buf) {
+                await markNoticeStatus(n.id, 'error', `download failed for ${n.url}`);
+                failed++;
+                continue;
+              }
+              await attachNoticeDoc({
+                noticeId: n.id,
+                url: n.url,
+                mime: r.mime,
+                bytes: r.buf.length,
+                body: r.buf,
+              });
+              await markNoticeStatus(n.id, 'fetched');
+              okDirect++;
+              continue;
+            }
+
+            // Case B: HTML page → try to find PDF links if allowed
+            if (attachNonPdf) {
+              const page = await httpFetch(n.url, {
+                headers: { 'user-agent': USER_AGENT },
+                redirect: 'follow',
+              });
+
+              if (!page.ok) {
+                await markNoticeStatus(n.id, 'error', `page fetch failed ${page.status}`);
+                failed++;
+                continue;
+              }
+              const html = await page.text();
+              const pdfs = extractPdfLinks(html, n.url);
+
+              if (!pdfs.length) {
+                await markNoticeStatus(n.id, 'ignored', 'no pdf links found on page');
+                noneFound++;
+                continue;
+              }
+
+              // Attach all PDFs found; mark fetched if at least one attached
+              let attachedAny = false;
+              for (const pdfUrl of pdfs) {
+                const r = await fetchBuffer(pdfUrl);
+                if (!r.ok || !r.buf) continue;
+                await attachNoticeDoc({
+                  noticeId: n.id,
+                  url: pdfUrl,
+                  mime: r.mime,
+                  bytes: r.buf.length,
+                  body: r.buf,
+                });
+                attachedAny = true;
+              }
+              if (attachedAny) {
+                await markNoticeStatus(n.id, 'fetched');
+                okLinked++;
+              } else {
+                await markNoticeStatus(n.id, 'ignored', 'pdf links failed to download');
+                noneFound++;
+              }
+            } else {
+              // Not a pdf link and attachNonPdf=0 → ignore quietly
+              await markNoticeStatus(n.id, 'ignored', 'non-pdf link and attachNonPdf=0');
+              noneFound++;
+            }
+          } catch (err: any) {
+            await markNoticeStatus(n.id, 'error', err?.message ?? 'unknown error');
             failed++;
-            continue;
           }
-          await attachNoticeDoc({
-            noticeId: n.id,
-            url: n.url,
-            mime: r.mime,
-            bytes: r.buf.length,
-            body: r.buf,
-          });
-          await markNoticeStatus(n.id, 'fetched');
-          okDirect++;
-          continue;
         }
-
-        // Case B: HTML page → try to find PDF links if allowed
-        if (attachNonPdf) {
-          const page = await httpFetch(n.url, {
-            headers: { 'user-agent': USER_AGENT },
-            redirect: 'follow',
-          });
-
-          if (!page.ok) {
-            await markNoticeStatus(n.id, 'error', `page fetch failed ${page.status}`);
-            failed++;
-            continue;
-          }
-          const html = await page.text();
-          const pdfs = extractPdfLinks(html, n.url);
-
-          if (!pdfs.length) {
-            await markNoticeStatus(n.id, 'ignored', 'no pdf links found on page');
-            noneFound++;
-            continue;
-          }
-
-          // Attach all PDFs found; mark fetched if at least one attached
-          let attachedAny = false;
-          for (const pdfUrl of pdfs) {
-            const r = await fetchBuffer(pdfUrl);
-            if (!r.ok || !r.buf) continue;
-            await attachNoticeDoc({
-              noticeId: n.id,
-              url: pdfUrl,
-              mime: r.mime,
-              bytes: r.buf.length,
-              body: r.buf,
-            });
-            attachedAny = true;
-          }
-          if (attachedAny) {
-            await markNoticeStatus(n.id, 'fetched');
-            okLinked++;
-          } else {
-            await markNoticeStatus(n.id, 'ignored', 'pdf links failed to download');
-            noneFound++;
-          }
-        } else {
-          // Not a pdf link and attachNonPdf=0 → ignore quietly
-          await markNoticeStatus(n.id, 'ignored', 'non-pdf link and attachNonPdf=0');
-          noneFound++;
-        }
-      } catch (err: any) {
-        await markNoticeStatus(n.id, 'error', err?.message ?? 'unknown error');
-        failed++;
       }
+
+      await Promise.all(Array.from({ length: concurrency }, () => worker()));
+
+      const payload = {
+        ok: true,
+        total,
+        okDirect,
+        okLinked,
+        noneFound,
+        failed,
+        filtered: { dest, authority, statuses, limit, attachNonPdf, concurrency },
+      };
+      return { inserted: okDirect + okLinked, payload };
     }
-  }
+  );
 
-  await Promise.all(Array.from({ length: concurrency }, () => worker()));
-
-  console.log({
-    ok: true,
-    total,
-    okDirect,
-    okLinked,
-    noneFound,
-    failed,
-    filtered: { dest, authority, statuses, limit, attachNonPdf, concurrency },
-  });
+  console.log(result);
 };
