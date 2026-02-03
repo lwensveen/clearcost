@@ -2,30 +2,7 @@ import { notFound } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-
-type Quote = {
-  hs6: string;
-  currency?: string;
-  incoterm?: 'DAP' | 'DDP';
-  chargeableKg: number;
-  freight: number;
-  deMinimis?: {
-    duty: { thresholdDest: number; deMinimisBasis: 'CIF' | 'INTRINSIC'; under: boolean } | null;
-    vat: { thresholdDest: number; deMinimisBasis: 'CIF' | 'INTRINSIC'; under: boolean } | null;
-    suppressDuty: boolean;
-    suppressVAT: boolean;
-  };
-  components: {
-    CIF: number;
-    duty: number;
-    vat: number;
-    fees: number;
-    checkoutVAT?: number;
-  };
-  total: number;
-  guaranteedMax: number;
-  policy: string;
-};
+import type { QuoteResponse } from '@clearcost/types';
 
 function money(n?: number, c?: string) {
   if (n == null) return '—';
@@ -51,7 +28,7 @@ async function fetchReplay(key: string) {
 
   if (contentType.includes('application/json')) {
     try {
-      const data = JSON.parse(text) as Quote;
+      const data = JSON.parse(text) as QuoteResponse;
       return { ok: true as const, quote: data, raw: text };
     } catch {
       // ignore malformed JSON
@@ -59,7 +36,7 @@ async function fetchReplay(key: string) {
   }
 
   try {
-    const data = JSON.parse(text) as Quote;
+    const data = JSON.parse(text) as QuoteResponse;
     return { ok: true as const, quote: data, raw: text };
   } catch {
     return { ok: true as const, quote: null, raw: text };
@@ -87,7 +64,7 @@ export default async function ReplayQuote({
           </p>
         </div>
         <Link
-          href="//dashboard/quotes"
+          href="/dashboard/quotes"
           className="rounded-md border px-3 py-1 text-sm hover:bg-muted"
         >
           Back to Quotes

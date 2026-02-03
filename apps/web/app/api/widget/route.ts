@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireEnvStrict } from '@/lib/env';
 import { errorJson } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
@@ -9,9 +10,12 @@ function reqIdem(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const API = process.env.CLEARCOST_API_URL!;
-  const KEY = process.env.CLEARCOST_WEB_SERVER_KEY!;
-  if (!API || !KEY) {
+  let API: string;
+  let KEY: string;
+  try {
+    API = requireEnvStrict('CLEARCOST_API_URL');
+    KEY = requireEnvStrict('CLEARCOST_WEB_SERVER_KEY');
+  } catch {
     return errorJson('Server misconfigured', 500);
   }
 

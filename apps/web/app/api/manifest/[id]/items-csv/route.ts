@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exportManifestItemsCsv } from '@clearcost/sdk';
+import { requireEnvStrict } from '@/lib/env';
 
 function sdk() {
-  const baseUrl = process.env.CLEARCOST_API_URL!;
-  const apiKey = process.env.CLEARCOST_WEB_SERVER_KEY!;
-  if (!baseUrl || !apiKey) throw new Error('Missing CLEARCOST_API_URL / CLEARCOST_WEB_SERVER_KEY');
+  const baseUrl = requireEnvStrict('CLEARCOST_API_URL');
+  const apiKey = requireEnvStrict('CLEARCOST_WEB_SERVER_KEY');
   return { baseUrl, apiKey };
 }
 

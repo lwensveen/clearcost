@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server';
+import { requireEnvStrict } from '@/lib/env';
 import { errorJson } from '@/lib/http';
 
-const API = process.env.CLEARCOST_API_URL!;
-const KEY = process.env.CLEARCOST_WEB_SERVER_KEY!;
+function getBillingProxyConfig() {
+  return {
+    api: requireEnvStrict('CLEARCOST_API_URL'),
+    key: requireEnvStrict('CLEARCOST_WEB_SERVER_KEY'),
+  };
+}
 
 export async function GET() {
-  const r = await fetch(`${API}/v1/billing/compute-usage`, {
-    headers: { 'x-api-key': KEY },
+  const { api, key } = getBillingProxyConfig();
+  const r = await fetch(`${api}/v1/billing/compute-usage`, {
+    headers: { 'x-api-key': key },
     cache: 'no-store',
   });
   const body = await r.text();

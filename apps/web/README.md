@@ -115,11 +115,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const r = await fetch(`${process.env.CLEARCOST_API_URL}/v1/quote`, {
+  const r = await fetch(`${process.env.CLEARCOST_API_URL}/v1/quotes`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-api-key': process.env.CLEARCOST_API_KEY!,
+      'x-api-key': process.env.CLEARCOST_WEB_SERVER_KEY!,
     },
     body: JSON.stringify(body),
     // Keep this server-side only

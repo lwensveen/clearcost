@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod/v4';
+import { requireEnvStrict } from '@/lib/env';
 import { errorJson } from '@/lib/http';
 
-const API = process.env.CLEARCOST_API_URL!;
-const KEY = process.env.CLEARCOST_WEB_SERVER_KEY!;
+function getManifestProxyConfig() {
+  return {
+    api: requireEnvStrict('CLEARCOST_API_URL'),
+    key: requireEnvStrict('CLEARCOST_WEB_SERVER_KEY'),
+  };
+}
 export async function GET() {
-  const r = await fetch(`${API}/v1/manifests?limit=1`, {
-    headers: { 'x-api-key': KEY },
+  const { api, key } = getManifestProxyConfig();
+  const r = await fetch(`${api}/v1/manifests?limit=1`, {
+    headers: { 'x-api-key': key },
     cache: 'no-store',
   });
   if (!r.ok) return errorJson(await r.text(), r.status);
