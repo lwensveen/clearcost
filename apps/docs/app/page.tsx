@@ -36,6 +36,10 @@ export default function Home() {
             Get started by editing <code>apps/docs/app/page.tsx</code>
           </li>
           <li>Save and see your changes instantly.</li>
+          <li>
+            Read the <a href="/guides/quote-confidence">Quote confidence guide</a> for current lane
+            coverage and response interpretation.
+          </li>
         </ol>
 
         <div className={styles.ctas}>

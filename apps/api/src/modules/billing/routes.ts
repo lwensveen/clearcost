@@ -17,15 +17,42 @@ import {
   ErrorResponseSchema,
 } from '@clearcost/types';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2026-01-28.clover',
-});
-
-const PRICE: Record<string, string> = {
-  starter: process.env.STRIPE_PRICE_STARTER || '',
-  growth: process.env.STRIPE_PRICE_GROWTH || '',
-  scale: process.env.STRIPE_PRICE_SCALE || '',
+type BillingEnv = {
+  stripeSecretKey: string;
+  webhookSecret: string;
+  price: Record<'starter' | 'growth' | 'scale', string>;
 };
+
+export function validateBillingEnv(options: { webhookEnabled?: boolean } = {}): BillingEnv {
+  const webhookEnabled = options.webhookEnabled ?? true;
+  const missing: string[] = [];
+
+  const stripeSecretKey = (process.env.STRIPE_SECRET_KEY ?? '').trim();
+  const stripePriceStarter = (process.env.STRIPE_PRICE_STARTER ?? '').trim();
+  const stripePriceGrowth = (process.env.STRIPE_PRICE_GROWTH ?? '').trim();
+  const stripePriceScale = (process.env.STRIPE_PRICE_SCALE ?? '').trim();
+  const webhookSecret = (process.env.STRIPE_WEBHOOK_SECRET ?? '').trim();
+
+  if (!stripeSecretKey) missing.push('STRIPE_SECRET_KEY');
+  if (!stripePriceStarter) missing.push('STRIPE_PRICE_STARTER');
+  if (!stripePriceGrowth) missing.push('STRIPE_PRICE_GROWTH');
+  if (!stripePriceScale) missing.push('STRIPE_PRICE_SCALE');
+  if (webhookEnabled && !webhookSecret) missing.push('STRIPE_WEBHOOK_SECRET');
+
+  if (missing.length > 0) {
+    throw new Error(`Missing required billing env vars: ${missing.join(', ')}`);
+  }
+
+  return {
+    stripeSecretKey,
+    webhookSecret,
+    price: {
+      starter: stripePriceStarter,
+      growth: stripePriceGrowth,
+      scale: stripePriceScale,
+    },
+  };
+}
 
 function subscriptionPeriodEnd(sub: Stripe.Subscription): Date | null {
   const unix =
@@ -48,6 +75,12 @@ async function ensureBillingAccount(ownerId: string) {
 }
 
 export default async function billingRoutes(app: FastifyInstance) {
+  const billingEnv = validateBillingEnv({ webhookEnabled: true });
+  const stripe = new Stripe(billingEnv.stripeSecretKey, {
+    apiVersion: '2026-01-28.clover',
+  });
+  const PRICE: Record<string, string> = billingEnv.price;
+
   // Create Checkout session (subscription)
   app.post<{
     Body: z.infer<typeof BillingCheckoutBodySchema>;
@@ -181,15 +214,14 @@ export default async function billingRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const sig = req.headers['stripe-signature'] as string | undefined;
-      const whSecret = process.env.STRIPE_WEBHOOK_SECRET;
-      if (!sig || !whSecret) {
-        return reply.code(400).send(errorResponseForStatus(400, 'Missing signature or secret'));
+      if (!sig) {
+        return reply.code(400).send(errorResponseForStatus(400, 'Missing signature'));
       }
 
       let event: Stripe.Event;
       try {
         const raw = req.rawBody as string;
-        event = stripe.webhooks.constructEvent(raw, sig, whSecret);
+        event = stripe.webhooks.constructEvent(raw, sig, billingEnv.webhookSecret);
       } catch (err: any) {
         req.log.error({ err }, 'stripe_webhook_verify_failed');
         return reply.code(400).send(errorResponseForStatus(400, `Webhook Error: ${err.message}`));

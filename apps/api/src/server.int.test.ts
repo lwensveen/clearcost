@@ -9,6 +9,10 @@ const envSnapshot = { ...process.env };
 beforeEach(() => {
   process.env = { ...envSnapshot };
   process.env.STRIPE_SECRET_KEY = 'sk_test_dummy';
+  process.env.STRIPE_WEBHOOK_SECRET = 'whsec_dummy';
+  process.env.STRIPE_PRICE_STARTER = 'price_starter_dummy';
+  process.env.STRIPE_PRICE_GROWTH = 'price_growth_dummy';
+  process.env.STRIPE_PRICE_SCALE = 'price_scale_dummy';
   process.env.INTERNAL_SIGNING_SECRET = 'test-secret';
 });
 
