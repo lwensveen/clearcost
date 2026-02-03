@@ -24,7 +24,8 @@ apps/api/
       cron/                   # CLI runner + command registry
         commands/             # import/fx/hs/llm commands
         registry.ts           # maps command name -> implementation
-        runtime.ts            # CLI entry
+        runtime.ts            # CLI locking/provenance helpers
+      run-cron.ts             # CLI entrypoint
       metrics.ts              # import counters/timers helpers
       provenance.ts           # start/finish runs (+ heartbeat)
       refresh-fx.ts           # ECB FX fetch/parse/upsert
@@ -181,7 +182,7 @@ x-cc-sig: sha256(hex) of "<ts>:<method>:<url>:<sha256(body)>" + '|' + INTERNAL_S
 Compute a landed cost quote (idempotent via `Idempotency-Key` header).
 
 - **Auth:** `x-api-key: <key with scope quotes:write>`
-- **Body:** see `src/modules/quotes/schemas.ts`
+- **Body:** `QuoteInputSchema` from `@clearcost/types`
 - **Response:** `QuoteResponseSchema` (total, components, guardrail)
 
 ### `GET /v1/quotes/by-key/:key`
@@ -198,7 +199,7 @@ Fetch a cached response by key/scope for debugging.
 
 Prometheus scrape endpoint.
 
-- **Auth:** `x-api-key: <key with scope ops:metrics>` (signing not required for metrics)
+- **Auth:** `x-api-key: <key with scope ops:metrics>` (set `METRICS_REQUIRE_SIGNING=1` to also require internal signing)
 
 ---
 

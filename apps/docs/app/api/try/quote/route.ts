@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-const API = (process.env.CLEARCOST_API_URL ?? '').replace(/\/$/, '');
-const KEY = process.env.CLEARCOST_WEB_SERVER_KEY ?? '';
+function getProxyConfig() {
+  return {
+    api: (process.env.CLEARCOST_API_URL ?? '').replace(/\/$/, ''),
+    key: process.env.CLEARCOST_WEB_SERVER_KEY ?? '',
+  };
+}
 
 function bad(msg: string, status = 400) {
   return NextResponse.json({ error: msg }, { status });
@@ -26,7 +30,8 @@ function asRecord(v: unknown): Record<string, unknown> | null {
 }
 
 export async function POST(req: NextRequest) {
-  if (!API || !KEY) return bad('Server not configured');
+  const { api, key } = getProxyConfig();
+  if (!api || !key) return bad('Server not configured');
   let body: Record<string, unknown> | null = null;
   try {
     const raw = await req.json();
@@ -58,10 +63,10 @@ export async function POST(req: NextRequest) {
 
   const idem = 'ck_idem_' + crypto.randomUUID().replace(/-/g, '');
 
-  const res = await fetch(`${API}/v1/quotes`, {
+  const res = await fetch(`${api}/v1/quotes`, {
     method: 'POST',
     headers: {
-      'x-api-key': KEY,
+      'x-api-key': key,
       'content-type': 'application/json',
       'idempotency-key': idem,
     },

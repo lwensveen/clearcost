@@ -11,7 +11,7 @@ export default function ApiReference() {
     s.src = 'https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js';
     s.onload = () => {
       const redoc = (window as Window & { Redoc?: { init: RedocInit } }).Redoc;
-      redoc?.init('/api-meta/openapi.json', {}, ref.current!);
+      redoc?.init('/api/openapi.json', {}, ref.current!);
     };
     document.body.appendChild(s);
     return () => {

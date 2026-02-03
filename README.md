@@ -223,7 +223,7 @@ live on the internal server and require internal request signing in production.
 
 Hosted on the internal server (`INTERNAL_PORT`, default 3002). Access should be restricted by network ACLs.
 
-- `GET /metrics` — Prometheus metrics (**requires scope:** `ops:metrics` in `x-api-key`, no signature)
+- `GET /metrics` — Prometheus metrics (**requires scope:** `ops:metrics` in `x-api-key`; set `METRICS_REQUIRE_SIGNING=1` to also require internal signing)
 - `GET /v1/admin/health/imports` — import activity snapshot (**requires scope:** `ops:health`)
 - `GET /internal/healthz` — internal health check (no signature)
 
@@ -378,10 +378,10 @@ curl --fail -X POST -H "x-api-key: $API_KEY" -H 'content-type: application/json'
 
 ```bash
 cd apps/api
-bun run src/lib/cron/runtime.ts fx:refresh
-bun run src/lib/cron/runtime.ts import:vat
-bun run src/lib/cron/runtime.ts imports:sweep-stale --threshold 30
-bun run src/lib/cron/runtime.ts imports:prune --days 90
+bun run src/lib/run-cron.ts fx:refresh
+bun run src/lib/run-cron.ts import:vat
+bun run src/lib/run-cron.ts import:sweep-stale --threshold 30
+bun run src/lib/run-cron.ts import:prune --days 90
 ```
 
 ---
