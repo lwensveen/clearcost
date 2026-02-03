@@ -25,8 +25,7 @@
     "build": "bun run build:types && bun run build:esm && bun run build:umd",
     "build:esm": "esbuild src/index.ts --bundle --format=esm --target=es2020 --sourcemap --minify --outfile=dist/index.esm.js",
     "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
-    "build:umd": "esbuild src/index.ts --bundle --format=iife --global-name=ClearCostSDK --target=es2020 --sourcemap --minify --outfile=dist/index.umd.js",
-    "prepare": "bun run build"
+    "build:umd": "esbuild src/index.ts --bundle --format=iife --global-name=ClearCostSDK --target=es2020 --sourcemap --minify --outfile=dist/index.umd.js"
   },
   "sideEffects": false,
   "type": "module",

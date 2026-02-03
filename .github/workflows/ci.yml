@@ -16,10 +16,7 @@ jobs:
         uses: ./.github/actions/setup-node-bun
         with:
           node-version: '22'
-          bun-version: 'latest'
-
-      - name: Install
-        run: bun install --frozen-lockfile
+          bun-version: '1.3.8'
 
       - name: Set GIT_SHA
         run: echo "GIT_SHA=${GITHUB_SHA}" >> $GITHUB_ENV
@@ -27,23 +24,25 @@ jobs:
       - name: Validate turbo env lists
         run: bun run validate-envs
 
-      - name: Build
-        run: bun run build
-
-      - name: Build web (no turbo cache)
-        run: bun run --cwd apps/web build
-
       - name: Lint
         run: bun run lint
 
       - name: Type-check
         run: bun run check-types
 
-      - name: Coverage
+      - name: Test
+        run: bun run test
+
+      - name: Build
+        run: bun run build
+
+      - name: Coverage (non-blocking)
+        continue-on-error: true
         run: bun run test:coverage
 
       - name: Upload coverage reports to Codecov
+        if: always()
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: lwensveen/risk-scan
+          slug: lwensveen/clearcost

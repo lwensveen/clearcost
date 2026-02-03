@@ -26,7 +26,7 @@ jobs:
         uses: ./.github/actions/setup-node-bun
         with:
           node-version: '22'
-          bun-version: 'latest'
+          bun-version: '1.3.8'
 
       # ------------ HS ------------
       - name: HS — EU HS6 titles (TARIC)

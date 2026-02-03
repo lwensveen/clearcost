@@ -11,7 +11,7 @@ concurrency:
 
 env:
   NODE_VERSION: '22'
-  BUN_VERSION: 'latest'
+  BUN_VERSION: '1.3.8'
   TZ: UTC
   HTTP_USER_AGENT: 'clearcost-bot/1.0 (+https://clearcost.io; tariff research; contact: support@clearcost.io)'
 

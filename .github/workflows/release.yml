@@ -19,9 +19,7 @@ jobs:
         uses: ./.github/actions/setup-node-bun
         with:
           node-version: '22'
-          bun-version: 'latest'
-
-      - run: bun install --frozen-lockfile
+          bun-version: '1.3.8'
 
       - name: Version packages via Changesets
         run: bunx changeset version
