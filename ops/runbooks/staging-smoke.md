@@ -22,6 +22,12 @@ Use this runbook when `.github/workflows/staging-smoke.yml` fails.
 - Confirm billing env on API is valid (`STRIPE_*` and price IDs).
 - Check `/v1/billing/*` route logs for auth/stripe/env errors.
 
+### `billing checkout session`
+
+- Verify `STAGING_BILLING_WRITE_API_KEY` (or fallback billing key) has `billing:write`.
+- Confirm Stripe test mode is configured and reachable from the API.
+- Check `/v1/billing/checkout` logs for Stripe or validation failures.
+
 ### `internal healthz`
 
 - Verify `STAGING_INTERNAL_API_URL` points to the internal server.

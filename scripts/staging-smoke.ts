@@ -60,6 +60,7 @@ async function main() {
   const publicKey = requireEnv('STAGING_PUBLIC_API_KEY');
   const opsKey = requireEnv('STAGING_OPS_API_KEY');
   const billingKey = process.env.STAGING_BILLING_API_KEY?.trim() || publicKey;
+  const billingWriteKey = process.env.STAGING_BILLING_WRITE_API_KEY?.trim() || billingKey;
   const internalSigningSecret = process.env.STAGING_INTERNAL_SIGNING_SECRET?.trim() || '';
   const reportPath = process.env.STAGING_SMOKE_REPORT_PATH || 'artifacts/staging-smoke-report.json';
 
@@ -157,6 +158,40 @@ async function main() {
     if (r.status !== 200) {
       return { ok: false, status: r.status, expected: '200', detail: r.text.slice(0, 300) };
     }
+    return { ok: true, status: r.status };
+  });
+
+  await check('billing checkout session', async () => {
+    const r = await request(`${publicApi}/v1/billing/checkout`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': billingWriteKey,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        plan: 'starter',
+        returnUrl: `${publicApi}/admin/billing?smoke=1`,
+      }),
+    });
+    if (r.status !== 200) {
+      return {
+        ok: false,
+        status: r.status,
+        expected: '200',
+        detail: r.text.slice(0, 300),
+      };
+    }
+
+    const body = asObject(r.json);
+    if (typeof body?.url !== 'string' || body.url.length < 10) {
+      return {
+        ok: false,
+        status: r.status,
+        expected: 'response.url string',
+        detail: JSON.stringify(body),
+      };
+    }
+
     return { ok: true, status: r.status };
   });
 

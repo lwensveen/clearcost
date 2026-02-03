@@ -43,5 +43,6 @@ jobs:
           bun run test --
           apps/api/src/server.int.test.ts
           apps/api/src/lib/tests/idempotency.int.test.ts
+          apps/api/src/modules/billing/routes.unit.test.ts
           apps/api/src/plugins/tests/api-key-auth.unit.test.ts
           apps/api/src/modules/quotes/services/confidence.unit.test.ts
