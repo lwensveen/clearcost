@@ -12,7 +12,10 @@ export default function Home() {
         </p>
         <ol>
           <li>
-            Start with <Link href="/api-reference">API reference</Link>.
+            Start with <Link href="/guides/quickstart">Quickstart</Link>.
+          </li>
+          <li>
+            Review <Link href="/api-reference">API reference</Link>.
           </li>
           <li>
             Try live requests in <Link href="/playground">Playground</Link>.
@@ -34,6 +37,7 @@ export default function Home() {
       <footer className={styles.footer}>
         <Link href="/guides/errors">Error envelope</Link>
         <Link href="/guides/idempotency">Idempotency</Link>
+        <Link href="/guides/quickstart">Quickstart</Link>
       </footer>
     </div>
   );
