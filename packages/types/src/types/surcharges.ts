@@ -4,6 +4,7 @@ import {
   SurchargeInsertSchema,
   SurchargeSelectCoercedSchema,
   SurchargeSelectSchema,
+  SurchargesAdminImportBodySchema,
   SurchargesAdminImportResponseSchema,
   SurchargesAdminListQuerySchema,
   SurchargesAdminListResponseSchema,
@@ -19,4 +20,5 @@ export type SurchargeById = z.infer<typeof SurchargeByIdSchema>;
 export type SurchargesListQuery = z.infer<typeof SurchargesListQuerySchema>;
 export type SurchargesAdminListQuery = z.infer<typeof SurchargesAdminListQuerySchema>;
 export type SurchargesAdminListResponse = z.infer<typeof SurchargesAdminListResponseSchema>;
+export type SurchargesAdminImportBody = z.infer<typeof SurchargesAdminImportBodySchema>;
 export type SurchargesAdminImportResponse = z.infer<typeof SurchargesAdminImportResponseSchema>;

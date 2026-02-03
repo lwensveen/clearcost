@@ -51,6 +51,8 @@ export const ManifestItemsListResponseSchema = z.object({
   items: z.array(ManifestItemSelectCoercedSchema),
 });
 
+export const ManifestItemsCsvResponseSchema = z.string();
+
 export const ManifestItemsAddBodySchema = z.object({
   items: z
     .array(

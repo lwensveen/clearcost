@@ -23,6 +23,7 @@ import {
   FreightStepAdminUpdateSchema,
   FreightStepIdParamSchema,
   IdempotencyHeaderSchema,
+  NoContentResponseSchema,
 } from '@clearcost/types';
 
 // Require Idempotency-Key on write endpoints
@@ -212,7 +213,7 @@ export default function freightRoutes(app: FastifyInstance) {
       schema: {
         params: FreightCardAdminIdParamSchema,
         headers: IdempotencyHeaderSchema,
-        response: { 204: z.any(), 404: ErrorResponseSchema },
+        response: { 204: NoContentResponseSchema, 404: ErrorResponseSchema },
       },
       config: {
         rateLimit: { max: 60, timeWindow: '1 minute' },
@@ -377,7 +378,7 @@ export default function freightRoutes(app: FastifyInstance) {
       schema: {
         params: FreightStepIdParamSchema,
         headers: IdempotencyHeaderSchema,
-        response: { 204: z.any(), 404: ErrorResponseSchema },
+        response: { 204: NoContentResponseSchema, 404: ErrorResponseSchema },
       },
       config: {
         rateLimit: { max: 120, timeWindow: '1 minute' },

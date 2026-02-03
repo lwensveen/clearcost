@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { z } from 'zod/v4';
 import { db, vatRulesTable } from '@clearcost/db';
 import { and, desc, eq, gte, ilike, lte, sql } from 'drizzle-orm';
 import {
   ErrorResponseSchema,
+  NoContentResponseSchema,
   VatAdminCreateSchema,
+  VatAdminImportBodySchema,
   VatAdminIdParamSchema,
   VatAdminImportJsonBodySchema,
   VatAdminImportJsonResponseSchema,
@@ -123,7 +124,7 @@ export default function vatRoutes(app: FastifyInstance) {
       preHandler: app.requireApiKey(['admin:rates']),
       schema: {
         params: VatAdminIdParamSchema,
-        response: { 204: z.any(), 404: ErrorResponseSchema },
+        response: { 204: NoContentResponseSchema, 404: ErrorResponseSchema },
       },
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
     },
@@ -178,8 +179,7 @@ export default function vatRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['admin:rates']),
       schema: {
-        // Expect an array of rows, not a single row
-        body: z.array(VatRuleInsertSchema),
+        body: VatAdminImportBodySchema,
         response: { 200: VatAdminImportResponseSchema },
       },
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },

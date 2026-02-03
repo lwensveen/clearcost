@@ -61,3 +61,5 @@ export const VatAdminImportResponseSchema = z.object({
   ok: z.literal(true),
   count: z.number(),
 });
+
+export const VatAdminImportBodySchema = z.array(VatRuleInsertSchema);

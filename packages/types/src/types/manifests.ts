@@ -10,6 +10,7 @@ import {
   ManifestItemParamsSchema,
   ManifestItemsAddBodySchema,
   ManifestItemsAddResponseSchema,
+  ManifestItemsCsvResponseSchema,
   ManifestItemsListResponseSchema,
   ManifestOkResponseSchema,
   ManifestInsertSchema,
@@ -32,6 +33,7 @@ export type ManifestCreateResponse = z.infer<typeof ManifestCreateResponseSchema
 export type ManifestOkResponse = z.infer<typeof ManifestOkResponseSchema>;
 export type ManifestItemParams = z.infer<typeof ManifestItemParamsSchema>;
 export type ManifestItemsListResponse = z.infer<typeof ManifestItemsListResponseSchema>;
+export type ManifestItemsCsvResponse = z.infer<typeof ManifestItemsCsvResponseSchema>;
 export type ManifestItemsAddBody = z.infer<typeof ManifestItemsAddBodySchema>;
 export type ManifestItemsAddResponse = z.infer<typeof ManifestItemsAddResponseSchema>;
 export type ManifestFullResponse = z.infer<typeof ManifestFullResponseSchema>;

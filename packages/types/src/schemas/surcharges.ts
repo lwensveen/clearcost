@@ -86,3 +86,5 @@ export const SurchargesAdminImportResponseSchema = z.object({
   ok: z.literal(true),
   count: z.number(),
 });
+
+export const SurchargesAdminImportBodySchema = z.array(SurchargeInsertSchema);

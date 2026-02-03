@@ -8,6 +8,7 @@ import {
   ManifestByIdSchema,
   ManifestErrorResponseSchema,
   ManifestItemInsertSchema,
+  ManifestItemsCsvResponseSchema,
   ManifestItemSelectCoercedSchema,
   ManifestItemsImportResponseSchema,
   ManifestItemsReplaceBodySchema,
@@ -107,7 +108,7 @@ export default async function manifestsBulkRoutes(app: FastifyInstance) {
       preHandler: app.requireApiKey(['manifests:read']),
       schema: {
         params: ManifestByIdSchema,
-        response: { 200: z.string(), 404: NotFoundReply },
+        response: { 200: ManifestItemsCsvResponseSchema, 404: NotFoundReply },
       },
     },
     async (req, reply) => {

@@ -9,3 +9,5 @@ export const IdempotencyHeaderSchema = z
     (h) => !!(h['idempotency-key'] || h['x-idempotency-key']),
     'Idempotency-Key header required'
   );
+
+export const NoContentResponseSchema = z.void();

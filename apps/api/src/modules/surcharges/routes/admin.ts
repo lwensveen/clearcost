@@ -1,12 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { z } from 'zod/v4';
 import { db, surchargesTable } from '@clearcost/db';
 import { and, desc, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
 import {
   ErrorResponseSchema,
+  NoContentResponseSchema,
   SurchargeByIdSchema,
   SurchargeInsertSchema,
+  SurchargesAdminImportBodySchema,
   SurchargeSelectCoercedSchema,
   SurchargesAdminImportResponseSchema,
   SurchargesAdminListQuerySchema,
@@ -107,7 +108,7 @@ export default function surchargesAdminRoutes(app: FastifyInstance) {
       preHandler: app.requireApiKey(['admin:rates']),
       schema: {
         params: SurchargeByIdSchema,
-        response: { 204: z.any(), 404: ErrorResponseSchema },
+        response: { 204: NoContentResponseSchema, 404: ErrorResponseSchema },
       },
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
     },
@@ -129,7 +130,7 @@ export default function surchargesAdminRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['admin:rates']),
       schema: {
-        body: z.array(SurchargeInsertSchema),
+        body: SurchargesAdminImportBodySchema,
         response: { 200: SurchargesAdminImportResponseSchema },
       },
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },

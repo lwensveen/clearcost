@@ -4,6 +4,7 @@ import {
   VatAdminIdParamSchema,
   VatAdminImportJsonBodySchema,
   VatAdminImportJsonResponseSchema,
+  VatAdminImportBodySchema,
   VatAdminImportResponseSchema,
   VatAdminListQuerySchema,
   VatAdminListResponseSchema,
@@ -31,4 +32,5 @@ export type VatAdminListResponse = z.infer<typeof VatAdminListResponseSchema>;
 export type VatAdminIdParam = z.infer<typeof VatAdminIdParamSchema>;
 export type VatAdminImportJsonBody = z.infer<typeof VatAdminImportJsonBodySchema>;
 export type VatAdminImportJsonResponse = z.infer<typeof VatAdminImportJsonResponseSchema>;
+export type VatAdminImportBody = z.infer<typeof VatAdminImportBodySchema>;
 export type VatAdminImportResponse = z.infer<typeof VatAdminImportResponseSchema>;
