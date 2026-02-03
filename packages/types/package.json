@@ -16,7 +16,7 @@
   },
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     }
@@ -31,9 +31,10 @@
     "build:js": "esbuild src/index.ts --bundle --format=esm --platform=neutral --packages=external --target=es2020 --outfile=dist/index.js",
     "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
     "check-types": "tsc --noEmit",
-    "lint": "eslint src "
+    "lint": "eslint src ",
+    "prepare": "bun run build"
   },
   "sideEffects": false,
   "type": "module",
-  "types": "src/index.ts"
+  "types": "dist/index.d.ts"
 }

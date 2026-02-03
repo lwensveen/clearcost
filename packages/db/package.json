@@ -24,6 +24,13 @@
     "dist"
   ],
   "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "private": true,
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -49,9 +56,10 @@
     "drizzle-kit:up": "bun run build && drizzle-kit up --config ./drizzle.config.ts",
     "drizzle-kit:up:local": "bun run build && dotenvx run -f .env -f .env.local -- drizzle-kit up --config ./drizzle.config.ts",
     "drizzle-kit:up:staging": "bun run build && dotenvx run -f .env -f .env.staging -- drizzle-kit up --config ./drizzle.config.ts",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "prepare": "bun run build"
   },
   "sideEffects": false,
   "type": "module",
-  "types": "src/index.ts"
+  "types": "dist/index.d.ts"
 }
