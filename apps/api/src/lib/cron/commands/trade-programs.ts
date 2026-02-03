@@ -222,8 +222,8 @@ export const programsSeed: Command = async (args) => {
  */
 export const programsLoadMembersCsv: Command = async (args) => {
   const flags = parseFlags(args);
-  const url = (flags.url && true ? flags.url : args?.[0]) as string | undefined;
-  const defaultOwner = (flags.owner && true ? flags.owner : 'US').toUpperCase();
+  const url = flags.url || args?.[0];
+  const defaultOwner = (flags.owner || 'US').toUpperCase();
 
   if (!url) {
     console.error(
@@ -287,7 +287,7 @@ export const programsLoadMembersCsv: Command = async (args) => {
             .returning({ id: countriesTable.id });
           if (insCountry?.id) {
             countryId = insCountry.id;
-            countryIdByIso2.set(iso2, countryId);
+            countryIdByIso2.set(iso2, insCountry.id);
           } else {
             const [foundCountry] = await db
               .select({ id: countriesTable.id })
@@ -299,9 +299,10 @@ export const programsLoadMembersCsv: Command = async (args) => {
               continue;
             }
             countryId = foundCountry.id;
-            countryIdByIso2.set(iso2, countryId);
+            countryIdByIso2.set(iso2, foundCountry.id);
           }
         }
+        if (!countryId) continue;
 
         // Ensure program exists (insert minimal if needed)
         let programId: string | undefined;
@@ -332,8 +333,10 @@ export const programsLoadMembersCsv: Command = async (args) => {
           programId = foundProg.id;
         }
 
-        const fromRaw = (iFrom !== -1 ? cell(rec, iFrom) : '')?.slice(0, 10) || '1900-01-01';
-        const toRaw = (iTo !== -1 ? cell(rec, iTo) : '')?.slice(0, 10) || '';
+        if (!programId) continue;
+
+        const fromRaw = (iFrom !== -1 ? cell(rec, iFrom) : '').slice(0, 10) || '1900-01-01';
+        const toRaw = (iTo !== -1 ? cell(rec, iTo) : '').slice(0, 10) || '';
         const notes = (iNotes !== -1 ? cell(rec, iNotes) : '') || null;
 
         const ret = await db
