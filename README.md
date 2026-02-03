@@ -70,10 +70,11 @@ clearcost/
     prometheus/prometheus.yml  # local scrape config
 
   .github/workflows/
-    cron-hourly.yml            # stale sweep
-    cron-nightly.yml           # daily imports
-    cron-weekly.yml            # weekly deep jobs + prune
-    api-tests.yml              # CI tests for API
+    release-gate.yml           # required release checks (env/lint/types/build/core API tests)
+    staging-smoke.yml          # staging endpoint smoke checks + report artifact
+    ci.yml                     # full monorepo checks
+    api-tests.yml              # API-focused checks
+    cron-*.yml                 # scheduled import workflows
 ```
 
 ---
@@ -400,7 +401,10 @@ bun run src/lib/run-cron.ts import:prune --days 90
 ## Testing & CI
 
 - **Local**: `bun test`
-- **CI**: `.github/workflows/api-tests.yml`
+- **Release gate**: `.github/workflows/release-gate.yml`
+- **Staging smoke**: `.github/workflows/staging-smoke.yml`
+  - Required secrets: `STAGING_PUBLIC_API_URL`, `STAGING_INTERNAL_API_URL`, `STAGING_PUBLIC_API_KEY`, `STAGING_OPS_API_KEY`
+  - Optional secrets: `STAGING_BILLING_API_KEY`, `STAGING_INTERNAL_SIGNING_SECRET`
 
 ---
 
