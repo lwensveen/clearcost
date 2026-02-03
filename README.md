@@ -405,6 +405,7 @@ bun run src/lib/run-cron.ts import:prune --days 90
 - **Staging smoke**: `.github/workflows/staging-smoke.yml`
   - Required secrets: `STAGING_PUBLIC_API_URL`, `STAGING_INTERNAL_API_URL`, `STAGING_PUBLIC_API_KEY`, `STAGING_OPS_API_KEY`
   - Optional secrets: `STAGING_BILLING_API_KEY`, `STAGING_INTERNAL_SIGNING_SECRET`
+  - Failure runbook: `ops/runbooks/staging-smoke.md`
 
 ### Release TODO
 
