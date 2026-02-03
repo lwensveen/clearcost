@@ -17,6 +17,12 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import { errorResponseForStatus } from '../lib/errors.js';
+import {
+  canonicalInternalBody,
+  computeInternalSignature,
+  internalBodyHash,
+  timingSafeHexEqual,
+} from '../lib/internal-signing.js';
 
 function scryptAsync(
   password: BinaryLike,
@@ -184,8 +190,8 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
       const skewMs = Math.abs(Date.now() - tsNum);
       if (!Number.isFinite(skewMs) || skewMs > 5 * 60 * 1000) return false;
 
-      const bodyStr = typeof req.body === 'string' ? req.body : JSON.stringify(req.body ?? {});
-      const bodyHash = sha256Hex(Buffer.from(bodyStr));
+      const bodyStr = canonicalInternalBody(req.body);
+      const bodyHash = internalBodyHash(bodyStr);
       const method = String(req.method || 'GET').toUpperCase();
 
       const variants = new Set<string>();
@@ -206,17 +212,14 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
       }
 
       for (const u of variants) {
-        const payload = `${tsHdr}:${method}:${u}:${bodyHash}`;
-        const expectedHex = createHash('sha256')
-          .update(payload + '|' + INTERNAL_SIGNING_SECRET)
-          .digest('hex');
-        try {
-          if (timingSafeEqual(Buffer.from(expectedHex, 'hex'), Buffer.from(sigHdr, 'hex'))) {
-            return true;
-          }
-        } catch {
-          // fall through to try next variant
-        }
+        const expectedHex = computeInternalSignature({
+          ts: tsHdr,
+          method,
+          path: u,
+          bodyHash,
+          secret: INTERNAL_SIGNING_SECRET,
+        });
+        if (timingSafeHexEqual(expectedHex, sigHdr)) return true;
       }
       return false;
     }

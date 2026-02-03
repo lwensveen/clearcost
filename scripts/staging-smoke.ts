@@ -1,6 +1,10 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import {
+  computeInternalSignature,
+  internalBodyHash,
+} from '../apps/api/src/lib/internal-signing.ts';
 
 type CheckResult = {
   name: string;
@@ -17,10 +21,6 @@ function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`Missing required env: ${name}`);
   return value;
-}
-
-function sha256Hex(input: string): string {
-  return createHash('sha256').update(input).digest('hex');
 }
 
 function toBaseUrl(url: string): string {
@@ -263,8 +263,14 @@ async function main() {
     const path = '/metrics';
     const method = 'GET';
     const ts = String(Date.now());
-    const bodyHash = sha256Hex('{}');
-    const sig = sha256Hex(`${ts}:${method}:${path}:${bodyHash}|${internalSigningSecret}`);
+    const bodyHash = internalBodyHash('{}');
+    const sig = computeInternalSignature({
+      ts,
+      method,
+      path,
+      bodyHash,
+      secret: internalSigningSecret,
+    });
     const signed = await request(`${internalApi}${path}`, {
       method,
       headers: {

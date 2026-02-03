@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
-import { createHash } from 'node:crypto';
 import { apiKeyAuthPlugin, generateApiKey } from '../api-key-auth.js';
 import sensible from '@fastify/sensible';
+import { canonicalInternalBody, computeInternalSignature, internalBodyHash } from '../../lib/internal-signing.js';
 
 const { resetEnv } = vi.hoisted(() => {
   const OLD = { ...process.env };
@@ -79,9 +79,6 @@ vi.mock('@clearcost/db', () => {
   return { db, apiKeysTable, __state: dbState };
 });
 
-// helpers (only for internal signing)
-const sha256Hex = (buf: Buffer) => createHash('sha256').update(buf).digest('hex');
-
 async function makeApp() {
   const app = Fastify();
   await app.register(sensible);
@@ -119,11 +116,15 @@ function bearer(token: string) {
 }
 
 function signInternal(ts: number, method: string, url: string, body: unknown, secret: string) {
-  const bodyStr = typeof body === 'string' ? body : JSON.stringify(body ?? {});
-  const payload = `${ts}:${method}:${url}:${sha256Hex(Buffer.from(bodyStr))}`;
-  const sig = createHash('sha256')
-    .update(payload + '|' + secret)
-    .digest('hex');
+  const bodyStr = canonicalInternalBody(body);
+  const bodyHash = internalBodyHash(bodyStr);
+  const sig = computeInternalSignature({
+    ts: String(ts),
+    method,
+    path: url,
+    bodyHash,
+    secret,
+  });
   return { 'x-cc-ts': String(ts), 'x-cc-sig': sig };
 }
 

@@ -1,4 +1,8 @@
-import { createHash } from 'node:crypto';
+import {
+  canonicalInternalBody,
+  computeInternalSignature,
+  internalBodyHash,
+} from '../apps/api/src/lib/internal-signing.ts';
 
 type Args = {
   method: string;
@@ -19,24 +23,10 @@ function parseArgs(argv: string[]): Args {
   return out;
 }
 
-function sha256Hex(input: string) {
-  return createHash('sha256').update(input).digest('hex');
-}
-
 function requireEnv(name: string): string {
   const v = process.env[name];
   if (!v) throw new Error(`Missing required env: ${name}`);
   return v;
-}
-
-function canonicalizeBody(body: string | undefined): string {
-  if (!body) return '{}';
-  try {
-    const parsed = JSON.parse(body);
-    return JSON.stringify(parsed);
-  } catch {
-    return body;
-  }
 }
 
 async function main() {
@@ -64,10 +54,17 @@ async function main() {
   if (!secret) throw new Error('Missing required env: INTERNAL_SIGNING_SECRET');
 
   const method = args.method.toUpperCase();
-  const bodyStr = method === 'GET' || method === 'HEAD' ? '{}' : canonicalizeBody(args.body);
+  const bodyStr =
+    method === 'GET' || method === 'HEAD' ? '{}' : canonicalInternalBody(args.body ?? '{}');
   const ts = String(Date.now());
-  const bodyHash = sha256Hex(bodyStr);
-  const sig = sha256Hex(`${ts}:${method}:${args.path}:${bodyHash}|${secret}`);
+  const bodyHash = internalBodyHash(bodyStr);
+  const sig = computeInternalSignature({
+    ts,
+    method,
+    path: args.path,
+    bodyHash,
+    secret,
+  });
 
   const url = `${baseUrl.replace(/\/+$/, '')}${args.path}`;
   const headers: Record<string, string> = {
