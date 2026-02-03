@@ -4,6 +4,15 @@ import { buildFxCacheKey, fxCacheGet, fxCacheSet } from './utils.js';
 type ConvertOpts = { on?: Date; strict?: boolean; ttlMs?: number };
 const HUBS = ['EUR', 'USD'] as const;
 
+export type ConvertCurrencyMeta = {
+  missingRate: boolean;
+};
+
+type ConvertCurrencyResult = {
+  amount: number;
+  meta: ConvertCurrencyMeta;
+};
+
 /**
  * Convert an amount from one currency to another.
  * Strategy:
@@ -16,29 +25,29 @@ const HUBS = ['EUR', 'USD'] as const;
  * - Uses `fetchRate(from,to,on)` which should return the latest rate
  *   with `fxAsOf <= on` (or the latest available if `on` undefined).
  */
-export async function convertCurrency(
+async function convertCurrencyInternal(
   amount: number,
   from: string,
   to: string,
   opts: ConvertOpts = {}
-): Promise<number> {
-  if (!Number.isFinite(amount)) return 0;
+): Promise<ConvertCurrencyResult> {
+  if (!Number.isFinite(amount)) return { amount: 0, meta: { missingRate: false } };
 
   const src = from.toUpperCase();
   const dst = to.toUpperCase();
 
-  if (src === dst) return amount;
+  if (src === dst) return { amount, meta: { missingRate: false } };
 
   const cacheKey = buildFxCacheKey(opts.on, src, dst);
   const cached = fxCacheGet(cacheKey);
-  if (cached != null) return amount * cached;
+  if (cached != null) return { amount: amount * cached, meta: { missingRate: false } };
 
   // 1) direct
   const direct = await fetchRate(src, dst, opts.on);
   if (direct != null) {
     fxCacheSet(cacheKey, direct, opts.ttlMs);
     fxCacheSet(buildFxCacheKey(opts.on, dst, src), 1 / direct, opts.ttlMs);
-    return amount * direct;
+    return { amount: amount * direct, meta: { missingRate: false } };
   }
 
   // 2) reverse
@@ -47,7 +56,7 @@ export async function convertCurrency(
     const rate = 1 / reverse;
     fxCacheSet(cacheKey, rate, opts.ttlMs);
     fxCacheSet(buildFxCacheKey(opts.on, dst, src), reverse, opts.ttlMs);
-    return amount * rate;
+    return { amount: amount * rate, meta: { missingRate: false } };
   }
 
   // 3) triangulate via hubs
@@ -61,7 +70,7 @@ export async function convertCurrency(
       const rate = legA * legB;
       fxCacheSet(cacheKey, rate, opts.ttlMs);
       fxCacheSet(buildFxCacheKey(opts.on, dst, src), 1 / rate, opts.ttlMs);
-      return amount * rate;
+      return { amount: amount * rate, meta: { missingRate: false } };
     }
   }
 
@@ -71,5 +80,24 @@ export async function convertCurrency(
   }
 
   // fallback: return unconverted amount
-  return amount;
+  return { amount, meta: { missingRate: true } };
+}
+
+export async function convertCurrency(
+  amount: number,
+  from: string,
+  to: string,
+  opts: ConvertOpts = {}
+): Promise<number> {
+  const out = await convertCurrencyInternal(amount, from, to, opts);
+  return out.amount;
+}
+
+export async function convertCurrencyWithMeta(
+  amount: number,
+  from: string,
+  to: string,
+  opts: ConvertOpts = {}
+): Promise<ConvertCurrencyResult> {
+  return convertCurrencyInternal(amount, from, to, opts);
 }

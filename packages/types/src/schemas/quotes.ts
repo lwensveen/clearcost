@@ -32,6 +32,16 @@ export const DeMinimisRuleSchema = z.object({
   under: z.boolean(),
 });
 
+export const QuoteComponentConfidenceSchema = z.enum(['authoritative', 'estimated', 'missing']);
+export const QuoteMissingComponentSchema = z.enum(['duty', 'vat', 'surcharges', 'freight', 'fx']);
+
+export const QuoteSourceMetadataSchema = z.object({
+  provider: z.string().nullable().optional(),
+  dataset: z.string().nullable().optional(),
+  asOf: z.string().nullable().optional(),
+  effectiveFrom: z.string().nullable().optional(),
+});
+
 export const QuoteResponseSchema = z.object({
   hs6: z.string().regex(/^\d{6}$/),
 
@@ -62,6 +72,25 @@ export const QuoteResponseSchema = z.object({
   total: z.number(),
   guaranteedMax: z.number(),
   policy: z.string(),
+
+  componentConfidence: z
+    .object({
+      duty: QuoteComponentConfidenceSchema,
+      vat: QuoteComponentConfidenceSchema,
+      surcharges: QuoteComponentConfidenceSchema,
+      freight: QuoteComponentConfidenceSchema,
+      fx: QuoteComponentConfidenceSchema,
+    })
+    .optional(),
+  overallConfidence: QuoteComponentConfidenceSchema.optional(),
+  missingComponents: z.array(QuoteMissingComponentSchema).optional(),
+  sources: z
+    .object({
+      duty: QuoteSourceMetadataSchema.optional(),
+      vat: QuoteSourceMetadataSchema.optional(),
+      surcharges: QuoteSourceMetadataSchema.optional(),
+    })
+    .optional(),
 });
 
 export const QuoteRecentQuerySchema = z.object({

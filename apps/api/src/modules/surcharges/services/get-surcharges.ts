@@ -1,7 +1,8 @@
 import { db, surchargesTable } from '@clearcost/db';
-import { and, eq, gt, isNull, lte, or } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lte, or } from 'drizzle-orm';
 import { z } from 'zod/v4';
 import { SurchargeSelectCoercedSchema } from '@clearcost/types';
+import type { LookupResult } from '../../../lib/lookup-meta.js';
 
 const SelectRowSchema = SurchargeSelectCoercedSchema.pick({
   id: true,
@@ -39,6 +40,21 @@ export type GetSurchargesScopedInput = {
   applyLevel?: ApplyLevel | string | null; // allow string; normalize
 };
 
+export type SurchargesLookupResult = LookupResult<SurchargeRowOut[]>;
+
+export function latestSurchargeEffectiveFrom(
+  rows: Array<{ effectiveFrom: Date | null }>
+): Date | null {
+  let latest: Date | null = null;
+  for (const row of rows) {
+    if (!row.effectiveFrom) continue;
+    if (!latest || row.effectiveFrom.getTime() > latest.getTime()) {
+      latest = row.effectiveFrom;
+    }
+  }
+  return latest;
+}
+
 // ---- helpers ---------------------------------------------------------------
 const MODES = ['ALL', 'OCEAN', 'AIR', 'TRUCK', 'RAIL'] as const;
 const LEVELS = ['entry', 'line', 'shipment', 'program'] as const;
@@ -70,100 +86,150 @@ function normHs6(v?: string | null): string | null {
  *  - origin exact
  *  - hs6 exact
  */
+export async function getSurchargesScopedWithMeta(
+  input: GetSurchargesScopedInput
+): Promise<SurchargesLookupResult> {
+  try {
+    const destUp = input.dest.toUpperCase();
+    const originUp = input.origin ? String(input.origin).toUpperCase() : null;
+    const hs6Key = normHs6(input.hs6);
+    const mode = normMode(input.transportMode ?? null);
+    const level = normLevel(input.applyLevel ?? null);
+
+    // Base active-window filter
+    const baseWhere = and(
+      eq(surchargesTable.dest, destUp),
+      lte(surchargesTable.effectiveFrom, input.on),
+      or(isNull(surchargesTable.effectiveTo), gt(surchargesTable.effectiveTo, input.on))
+    );
+
+    // If mode supplied, include rows where mode=ALL OR mode=exact
+    const withMode = mode
+      ? and(
+          baseWhere,
+          or(eq(surchargesTable.transportMode, 'ALL'), eq(surchargesTable.transportMode, mode))
+        )
+      : baseWhere;
+
+    // If level supplied, require exact level match
+    const where = level ? and(withMode, eq(surchargesTable.applyLevel, level)) : withMode;
+
+    const rows = await db
+      .select({
+        id: surchargesTable.id,
+        dest: surchargesTable.dest,
+        origin: surchargesTable.origin,
+        hs6: surchargesTable.hs6,
+        surchargeCode: surchargesTable.surchargeCode,
+        rateType: surchargesTable.rateType,
+        applyLevel: surchargesTable.applyLevel,
+        valueBasis: surchargesTable.valueBasis,
+        transportMode: surchargesTable.transportMode,
+        currency: surchargesTable.currency,
+        fixedAmt: surchargesTable.fixedAmt,
+        pctAmt: surchargesTable.pctAmt,
+        minAmt: surchargesTable.minAmt,
+        maxAmt: surchargesTable.maxAmt,
+        unitAmt: surchargesTable.unitAmt,
+        unitCode: surchargesTable.unitCode,
+        sourceUrl: surchargesTable.sourceUrl,
+        sourceRef: surchargesTable.sourceRef,
+        effectiveFrom: surchargesTable.effectiveFrom,
+        effectiveTo: surchargesTable.effectiveTo,
+        notes: surchargesTable.notes,
+      })
+      .from(surchargesTable)
+      .where(where);
+
+    const coerced = rows.map((r) => SelectRowSchema.parse(r));
+
+    const ranked = coerced
+      .map((r) => {
+        let score = 0;
+
+        // transportMode specificity
+        if (mode) {
+          if (r.transportMode === mode)
+            score += 8; // exact mode
+          else if (r.transportMode === 'ALL') score += 2; // generic ok
+        } else {
+          // no mode requested: slight preference to non-ALL (more specific)
+          score += r.transportMode === 'ALL' ? 0 : 1;
+        }
+
+        // applyLevel specificity (only matters if requested)
+        if (level && r.applyLevel === level) score += 4;
+
+        // origin & hs6 specificity
+        const matchOrigin =
+          !!originUp && typeof r.origin === 'string' && r.origin.toUpperCase() === originUp;
+        const matchHs6 = !!hs6Key && r.hs6 === hs6Key;
+        if (matchOrigin) score += 2;
+        if (matchHs6) score += 1;
+
+        // Tie-breaker: more constrained rows win
+        const tiebreak = (r.transportMode === 'ALL' ? 0 : 1) + (r.origin ? 1 : 0) + (r.hs6 ? 1 : 0);
+
+        return { r, score, tiebreak };
+      })
+      .filter(({ r }) => {
+        // If origin/hs6 requested, allow exact matches or fall back to generic rows.
+        if (!originUp && !hs6Key) return true;
+        if (originUp && r.origin && r.origin.toUpperCase() === originUp) return true;
+        if (hs6Key && r.hs6 === hs6Key) return true;
+        // generic fallback (no origin & no hs6)
+        return !r.origin && !r.hs6;
+      })
+      .sort((a, b) => b.score - a.score || b.tiebreak - a.tiebreak);
+
+    const value = ranked.map(({ r }) => r);
+    if (value.length > 0) {
+      return {
+        value,
+        meta: {
+          status: 'ok',
+          dataset: value.find((row) => row.sourceRef)?.sourceRef ?? null,
+          effectiveFrom: latestSurchargeEffectiveFrom(value),
+        },
+      };
+    }
+
+    const [coverage] = await db
+      .select({
+        sourceRef: surchargesTable.sourceRef,
+        effectiveFrom: surchargesTable.effectiveFrom,
+      })
+      .from(surchargesTable)
+      .where(eq(surchargesTable.dest, destUp))
+      .orderBy(desc(surchargesTable.effectiveFrom))
+      .limit(1);
+
+    if (!coverage) {
+      return { value: [], meta: { status: 'no_dataset' } };
+    }
+
+    return {
+      value: [],
+      meta: {
+        status: 'no_match',
+        dataset: coverage.sourceRef ?? null,
+        effectiveFrom: coverage.effectiveFrom ?? null,
+      },
+    };
+  } catch (error: unknown) {
+    return {
+      value: [],
+      meta: {
+        status: 'error',
+        note: error instanceof Error ? error.message : String(error),
+      },
+    };
+  }
+}
+
 export async function getSurchargesScoped(
   input: GetSurchargesScopedInput
 ): Promise<SurchargeRowOut[]> {
-  const destUp = input.dest.toUpperCase();
-  const originUp = input.origin ? String(input.origin).toUpperCase() : null;
-  const hs6Key = normHs6(input.hs6);
-  const mode = normMode(input.transportMode ?? null);
-  const level = normLevel(input.applyLevel ?? null);
-
-  // Base active-window filter
-  const baseWhere = and(
-    eq(surchargesTable.dest, destUp),
-    lte(surchargesTable.effectiveFrom, input.on),
-    or(isNull(surchargesTable.effectiveTo), gt(surchargesTable.effectiveTo, input.on))
-  );
-
-  // If mode supplied, include rows where mode=ALL OR mode=exact
-  const withMode = mode
-    ? and(
-        baseWhere,
-        or(eq(surchargesTable.transportMode, 'ALL'), eq(surchargesTable.transportMode, mode))
-      )
-    : baseWhere;
-
-  // If level supplied, require exact level match
-  const where = level ? and(withMode, eq(surchargesTable.applyLevel, level)) : withMode;
-
-  const rows = await db
-    .select({
-      id: surchargesTable.id,
-      dest: surchargesTable.dest,
-      origin: surchargesTable.origin,
-      hs6: surchargesTable.hs6,
-      surchargeCode: surchargesTable.surchargeCode,
-      rateType: surchargesTable.rateType,
-      applyLevel: surchargesTable.applyLevel,
-      valueBasis: surchargesTable.valueBasis,
-      transportMode: surchargesTable.transportMode,
-      currency: surchargesTable.currency,
-      fixedAmt: surchargesTable.fixedAmt,
-      pctAmt: surchargesTable.pctAmt,
-      minAmt: surchargesTable.minAmt,
-      maxAmt: surchargesTable.maxAmt,
-      unitAmt: surchargesTable.unitAmt,
-      unitCode: surchargesTable.unitCode,
-      sourceUrl: surchargesTable.sourceUrl,
-      sourceRef: surchargesTable.sourceRef,
-      effectiveFrom: surchargesTable.effectiveFrom,
-      effectiveTo: surchargesTable.effectiveTo,
-      notes: surchargesTable.notes,
-    })
-    .from(surchargesTable)
-    .where(where);
-
-  const coerced = rows.map((r) => SelectRowSchema.parse(r));
-
-  const ranked = coerced
-    .map((r) => {
-      let score = 0;
-
-      // transportMode specificity
-      if (mode) {
-        if (r.transportMode === mode)
-          score += 8; // exact mode
-        else if (r.transportMode === 'ALL') score += 2; // generic ok
-      } else {
-        // no mode requested: slight preference to non-ALL (more specific)
-        score += r.transportMode === 'ALL' ? 0 : 1;
-      }
-
-      // applyLevel specificity (only matters if requested)
-      if (level && r.applyLevel === level) score += 4;
-
-      // origin & hs6 specificity
-      const matchOrigin =
-        !!originUp && typeof r.origin === 'string' && r.origin.toUpperCase() === originUp;
-      const matchHs6 = !!hs6Key && r.hs6 === hs6Key;
-      if (matchOrigin) score += 2;
-      if (matchHs6) score += 1;
-
-      // Tie-breaker: more constrained rows win
-      const tiebreak = (r.transportMode === 'ALL' ? 0 : 1) + (r.origin ? 1 : 0) + (r.hs6 ? 1 : 0);
-
-      return { r, score, tiebreak };
-    })
-    .filter(({ r }) => {
-      // If origin/hs6 requested, allow exact matches or fall back to generic rows.
-      if (!originUp && !hs6Key) return true;
-      if (originUp && r.origin && r.origin.toUpperCase() === originUp) return true;
-      if (hs6Key && r.hs6 === hs6Key) return true;
-      // generic fallback (no origin & no hs6)
-      return !r.origin && !r.hs6;
-    })
-    .sort((a, b) => b.score - a.score || b.tiebreak - a.tiebreak);
-
-  return ranked.map(({ r }) => r);
+  const out = await getSurchargesScopedWithMeta(input);
+  return out.value;
 }

@@ -3,16 +3,23 @@ import { db, merchantProfilesTable, taxRegistrationsTable } from '@clearcost/db'
 import { and, eq } from 'drizzle-orm';
 import { EU_ISO2, volumeM3, volumetricKg } from '../utils.js';
 import { resolveHs6 } from '../../hs-codes/services/resolve-hs6.js';
-import { convertCurrency } from '../../fx/services/convert-currency.js';
-import { getActiveDutyRate } from '../../duty-rates/services/get-active-duty-rate.js';
-import { getSurchargesScoped } from '../../surcharges/services/get-surcharges.js';
-import { getFreight } from '../../freight/services/get-freight.js';
-import { getVatForHs6 } from '../../vat/services/get-vat-for-hs6.js';
+import { convertCurrencyWithMeta } from '../../fx/services/convert-currency.js';
+import { getActiveDutyRateWithMeta } from '../../duty-rates/services/get-active-duty-rate.js';
+import { getSurchargesScopedWithMeta } from '../../surcharges/services/get-surcharges.js';
+import { getFreightWithMeta } from '../../freight/services/get-freight.js';
+import { getVatForHs6WithMeta } from '../../vat/services/get-vat-for-hs6.js';
 import { getCanonicalFxAsOf } from '../../fx/services/get-canonical-fx-asof.js';
 import { evaluateDeMinimis } from '../../de-minimis/services/evaluate.js';
+import {
+  deriveConfidenceFromStatus,
+  isMissingStatus,
+  overallConfidenceFrom,
+} from './confidence.js';
+import { toQuoteSourceMetadata } from './source-metadata.js';
 
 type Unit = 'kg' | 'm3';
 const BASE_CCY = process.env.CURRENCY_BASE ?? 'USD';
+type MissingComponent = 'duty' | 'vat' | 'surcharges' | 'freight' | 'fx';
 
 const roundMoney = (n: number, ccy: string) => {
   const dp = ccy === 'JPY' ? 0 : 2;
@@ -33,6 +40,7 @@ export async function quoteLandedCost(
 ) {
   const now = new Date();
   const fxAsOf = opts?.fxAsOf ?? (await getCanonicalFxAsOf());
+  let fxMissingRate = false;
 
   const [profile, regs] = await Promise.all([
     input.merchantId
@@ -68,7 +76,7 @@ export async function quoteLandedCost(
   const qty = input.mode === 'air' ? chargeableKg : volumeM3(input.dimsCm);
   const unit: Unit = input.mode === 'air' ? 'kg' : 'm3';
 
-  const freightRow = await getFreight({
+  const freightLookup = await getFreightWithMeta({
     origin: input.origin,
     dest: input.dest,
     freightMode: input.mode,
@@ -76,17 +84,25 @@ export async function quoteLandedCost(
     qty,
     on: now,
   });
+  const freightRow = freightLookup.value;
 
-  const freightInDest =
-    opts?.freightInDestOverride ??
-    (await convertCurrency(freightRow?.price ?? 0, BASE_CCY, input.dest, { on: fxAsOf }));
+  let freightInDest = opts?.freightInDestOverride ?? 0;
+  if (opts?.freightInDestOverride == null) {
+    const freightFx = await convertCurrencyWithMeta(freightRow?.price ?? 0, BASE_CCY, input.dest, {
+      on: fxAsOf,
+    });
+    freightInDest = freightFx.amount;
+    fxMissingRate ||= freightFx.meta.missingRate;
+  }
 
-  const itemValDest = await convertCurrency(
+  const itemDestFx = await convertCurrencyWithMeta(
     input.itemValue.amount,
     input.itemValue.currency,
     input.dest,
     { on: fxAsOf }
   );
+  const itemValDest = itemDestFx.amount;
+  fxMissingRate ||= itemDestFx.meta.missingRate;
 
   const CIF = itemValDest + freightInDest;
 
@@ -98,8 +114,10 @@ export async function quoteLandedCost(
     fxAsOf,
   });
 
-  const dutyRow = await getActiveDutyRate(input.dest, hs6, now);
-  const vatInfo = await getVatForHs6(input.dest, hs6, now); // { ratePct, base, source, effectiveFrom }
+  const dutyLookup = await getActiveDutyRateWithMeta(input.dest, hs6, now);
+  const dutyRow = dutyLookup.value;
+  const vatLookup = await getVatForHs6WithMeta(input.dest, hs6, now);
+  const vatInfo = vatLookup.value; // { ratePct, base, source, effectiveFrom }
 
   // -----------------
   // Duty (MFN first)
@@ -113,7 +131,9 @@ export async function quoteLandedCost(
   // -----------------
   // VAT / IOSS logic
   // -----------------
-  const itemValEUR = await convertCurrency(itemValDest, input.dest, 'EUR', { on: fxAsOf });
+  const itemEurFx = await convertCurrencyWithMeta(itemValDest, input.dest, 'EUR', { on: fxAsOf });
+  const itemValEUR = itemEurFx.amount;
+  fxMissingRate ||= itemEurFx.meta.missingRate;
   const iossEligible = wantsCheckoutVAT && itemValEUR <= 150;
 
   let vat = 0;
@@ -136,12 +156,13 @@ export async function quoteLandedCost(
   // -----------------
   // Surcharges/fees
   // -----------------
-  const sur = await getSurchargesScoped({
+  const surchargeLookup = await getSurchargesScopedWithMeta({
     dest: input.dest,
     origin: input.origin,
     hs6,
     on: now,
   });
+  const sur = surchargeLookup.value;
   const feesFixed = sur.reduce((s, r) => s + (r.fixedAmt ?? 0), 0);
   const feesPct = sur.reduce((s, r) => s + (r.pctAmt ?? 0), 0) * (CIF / 100);
   const fees = feesFixed + feesPct;
@@ -181,6 +202,25 @@ export async function quoteLandedCost(
         ? 'IOSS: VAT collected at checkout; no import VAT due.'
         : 'Standard import tax rules apply.';
 
+  const componentConfidence: Record<MissingComponent, 'authoritative' | 'estimated' | 'missing'> = {
+    duty: deriveConfidenceFromStatus(dutyLookup.meta.status),
+    vat: deriveConfidenceFromStatus(vatLookup.meta.status),
+    surcharges: deriveConfidenceFromStatus(surchargeLookup.meta.status),
+    freight:
+      opts?.freightInDestOverride != null
+        ? 'estimated'
+        : deriveConfidenceFromStatus(freightLookup.meta.status),
+    fx: fxMissingRate ? 'missing' : 'authoritative',
+  };
+  const missingComponents: MissingComponent[] = [];
+  if (isMissingStatus(dutyLookup.meta.status)) missingComponents.push('duty');
+  if (isMissingStatus(vatLookup.meta.status)) missingComponents.push('vat');
+  if (isMissingStatus(surchargeLookup.meta.status)) missingComponents.push('surcharges');
+  if (isMissingStatus(freightLookup.meta.status) && opts?.freightInDestOverride == null) {
+    missingComponents.push('freight');
+  }
+  if (fxMissingRate) missingComponents.push('fx');
+
   return {
     fxAsOf,
     quote: {
@@ -199,6 +239,23 @@ export async function quoteLandedCost(
       guaranteedMax: roundMoney(total * 1.02, currency),
       policy,
       incoterm,
+      componentConfidence,
+      overallConfidence: overallConfidenceFrom(componentConfidence),
+      missingComponents,
+      sources: {
+        duty: toQuoteSourceMetadata({
+          dataset: dutyLookup.meta.dataset,
+          effectiveFrom: dutyLookup.meta.effectiveFrom,
+        }),
+        vat: toQuoteSourceMetadata({
+          dataset: vatLookup.meta.dataset,
+          effectiveFrom: vatLookup.meta.effectiveFrom,
+        }),
+        surcharges: toQuoteSourceMetadata({
+          dataset: surchargeLookup.meta.dataset,
+          effectiveFrom: surchargeLookup.meta.effectiveFrom,
+        }),
+      },
     },
   };
 }
