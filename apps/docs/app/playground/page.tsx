@@ -1,7 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { formatError } from '../../../web/lib/errors';
+
+function formatError(value: unknown, fallback = 'Request failed'): string {
+  if (value instanceof Error && value.message) return value.message;
+  if (value == null) return fallback;
+  return String(value);
+}
 
 type FormState = {
   origin: string;

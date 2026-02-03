@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
 import { apiKeyAuthPlugin, generateApiKey } from '../api-key-auth.js';
 import sensible from '@fastify/sensible';
-import { canonicalInternalBody, computeInternalSignature, internalBodyHash } from '../../lib/internal-signing.js';
+import {
+  canonicalInternalBody,
+  computeInternalSignature,
+  internalBodyHash,
+} from '../../lib/internal-signing.js';
 
 const { resetEnv } = vi.hoisted(() => {
   const OLD = { ...process.env };
