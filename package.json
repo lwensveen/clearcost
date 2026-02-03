@@ -28,6 +28,7 @@
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint -- --fix",
     "prepare": "husky",
+    "smoke:staging": "bun run scripts/staging-smoke.ts",
     "test": "vitest run",
     "test:ci": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage",
