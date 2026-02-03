@@ -404,14 +404,18 @@ bun run src/lib/run-cron.ts import:prune --days 90
 - **Release gate**: `.github/workflows/release-gate.yml`
 - **Staging smoke**: `.github/workflows/staging-smoke.yml`
   - Required secrets: `STAGING_PUBLIC_API_URL`, `STAGING_INTERNAL_API_URL`, `STAGING_PUBLIC_API_KEY`, `STAGING_OPS_API_KEY`
-  - Optional secrets: `STAGING_BILLING_API_KEY`, `STAGING_INTERNAL_SIGNING_SECRET`
+  - Optional secrets: `STAGING_BILLING_API_KEY`, `STAGING_BILLING_WRITE_API_KEY`, `STAGING_INTERNAL_SIGNING_SECRET`
   - Failure runbook: `ops/runbooks/staging-smoke.md`
+- **Billing readiness runbook**: `ops/runbooks/billing-readiness.md`
+- **Data freshness runbook**: `ops/runbooks/data-freshness.md`
 
 ### Release TODO
 
 - [ ] Enable branch protection on `main` and require `Release Gate`.
 - [ ] Create `staging` environment secrets used by `staging-smoke.yml`.
 - [ ] Run one manual `Staging Smoke` workflow and verify artifact output.
+- [ ] Run billing readiness flow in Stripe test mode (`ops/runbooks/billing-readiness.md`).
+- [ ] Confirm data freshness thresholds and alert handling (`ops/runbooks/data-freshness.md`).
 
 ---
 
