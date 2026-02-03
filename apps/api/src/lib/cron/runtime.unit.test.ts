@@ -20,7 +20,9 @@ vi.mock('../provenance.js', () => ({
 
 vi.mock('../run-lock.js', () => ({
   acquireRunLock: vi.fn(async () => true),
-  makeLockKey: vi.fn((meta: { importSource: string; job: string }) => `${meta.importSource}:${meta.job}`),
+  makeLockKey: vi.fn(
+    (meta: { importSource: string; job: string }) => `${meta.importSource}:${meta.job}`
+  ),
   releaseRunLock: vi.fn(async () => {}),
 }));
 
@@ -121,7 +123,9 @@ describe('withRun', () => {
     const ctx = { importSource: 'WITS' as const, job: 'LOCKED' };
     const work = vi.fn(async () => ({ inserted: 1, payload: 'x' }));
 
-    await expect(withRun(ctx, work)).rejects.toThrow('Import already running for lock key: WITS:LOCKED');
+    await expect(withRun(ctx, work)).rejects.toThrow(
+      'Import already running for lock key: WITS:LOCKED'
+    );
 
     expect(startImportTimer).toHaveBeenCalledWith({ importSource: 'WITS', job: 'LOCKED' });
     expect(importErrors.inc).toHaveBeenCalledWith({

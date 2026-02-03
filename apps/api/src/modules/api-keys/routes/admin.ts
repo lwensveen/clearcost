@@ -318,12 +318,14 @@ export default function apiKeyAdminRoutes(app: FastifyInstance) {
       },
     },
     async (_req, reply) => {
-      return reply.code(400).send(
-        errorResponseForStatus(
-          400,
-          'Secret material cannot be retrieved. Issue a new key via /:id/rotate.'
-        )
-      );
+      return reply
+        .code(400)
+        .send(
+          errorResponseForStatus(
+            400,
+            'Secret material cannot be retrieved. Issue a new key via /:id/rotate.'
+          )
+        );
     }
   );
 }
