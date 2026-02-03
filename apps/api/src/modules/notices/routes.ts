@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
 import { db, tradeNoticeDocsTable, tradeNoticesTable } from '@clearcost/db';
 import { and, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm';
+import { errorResponseForStatus } from '../../lib/errors.js';
 import {
   TradeNoticeByIdSchema,
   TradeNoticeDetailResponseSchema,
@@ -159,7 +160,7 @@ export default function noticesBrowseRoutes(app: FastifyInstance) {
         .where(eq(tradeNoticesTable.id, id))
         .limit(1);
 
-      if (!notice) return reply.code(404).send({ ok: false, error: 'Not found' });
+      if (!notice) return reply.code(404).send(errorResponseForStatus(404, 'Not found'));
 
       const docs = await db
         .select()

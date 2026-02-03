@@ -31,26 +31,26 @@ jobs:
       # ------------ HS ------------
       - name: HS — EU HS6 titles (TARIC)
         working-directory: apps/api
-        run: bun run src/lib/cron/runtime.ts import:hs/eu-hs6
+        run: bun run src/lib/run-cron.ts import:hs:eu-hs6
 
       - name: HS — US HTS10 aliases
         working-directory: apps/api
-        run: bun run src/lib/cron/runtime.ts import:hs:us-hts10
+        run: bun run src/lib/run-cron.ts import:hs:us-hts10
 
       - name: HS — UK 10-digit aliases
         working-directory: apps/api
-        run: bun run src/lib/cron/runtime.ts import:hs:uk10
+        run: bun run src/lib/run-cron.ts import:hs:uk10
 
       - name: HS — AHTN8 (if URL provided)
         if: ${{ env.AHTN_SOURCE_URL != '' }}
         working-directory: apps/api
-        run: bun run src/lib/cron/runtime.ts import:hs:ahtn --url "$AHTN_SOURCE_URL"
+        run: bun run src/lib/run-cron.ts import:hs:ahtn --url "$AHTN_SOURCE_URL"
 
       # ---------- Duties (WITS) ----------
       - name: Duties — WITS (ASEAN)
         working-directory: apps/api
         run: |
-          bun run src/lib/cron/runtime.ts import:duties:wits \
+          bun run src/lib/run-cron.ts import:duties:wits \
             --dests SG,MY,TH,ID,PH,VN,BN,KH,LA,MM \
             --partners SG,MY,TH,ID,PH,VN,BN,KH,LA,MM \
             --backfillYears 1 \
@@ -59,7 +59,7 @@ jobs:
       - name: Duties — WITS (Japan + partners)
         working-directory: apps/api
         run: |
-          bun run src/lib/cron/runtime.ts import:duties:wits \
+          bun run src/lib/run-cron.ts import:duties:wits \
             --dests JP \
             --partners CN,KR,AU,NZ,TH,MY,ID,PH,VN,LA,KH,BN,SG,CA,MX,EU,GB,US \
             --backfillYears 1 \
@@ -68,7 +68,7 @@ jobs:
       - name: Duties — WITS (China + partners)
         working-directory: apps/api
         run: |
-          bun run src/lib/cron/runtime.ts import:duties:wits \
+          bun run src/lib/run-cron.ts import:duties:wits \
             --dests CN \
             --partners EU,US,GB,JP,KR,AU,NZ,CA,MX,CL,PE,PK,CH,NO,IS,LI,SG,MY,TH,ID,PH,VN,LA,KH,BN \
             --backfillYears 1 \
@@ -84,16 +84,16 @@ jobs:
           sudo apt-get update && sudo apt-get install -y default-jre
           curl -L "$TABULA_JAR_URL" -o tabula.jar
           export TABULA_JAR="$PWD/tabula.jar"
-          bun run src/lib/cron/runtime.ts import:duties:cn-mfn-pdf --url="$CN_MFN_PDF_URL" --mode=auto
+          bun run src/lib/run-cron.ts import:duties:cn-mfn-pdf --url="$CN_MFN_PDF_URL" --mode=auto
 
       # ----------- Surcharges -----------
       - name: Surcharges — US trade remedies
         working-directory: apps/api
-        run: bun run src/lib/cron/runtime.ts import:surcharges:us-trade-remedies
+        run: bun run src/lib/run-cron.ts import:surcharges:us-trade-remedies
 
       - name: Surcharges — US (all bundle)
         working-directory: apps/api
-        run: bun run src/lib/cron/runtime.ts import:surcharges:us-all
+        run: bun run src/lib/run-cron.ts import:surcharges:us-all
 
       - name: Slack (success)
         if: success()

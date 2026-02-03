@@ -4,8 +4,9 @@ import { z } from 'zod/v4';
 import { readFile } from 'node:fs/promises';
 import { crawlAuthorityPdfs } from '../notices/crawl-authorities.js';
 import { attachNoticeDoc, ensureNotice } from '../notices/registry.js';
-import { TasksNoticesCrawlBodySchema } from '@clearcost/types';
+import { ErrorResponseSchema, TasksNoticesCrawlBodySchema } from '@clearcost/types';
 import { httpFetch } from '../../lib/http.js';
+import { errorResponseForStatus } from '../../lib/errors.js';
 
 type CnAuthority = 'MOF' | 'GACC' | 'MOFCOM';
 
@@ -46,7 +47,7 @@ export default function noticesRoutes(app: FastifyInstance) {
 
     const seedUrls = body.urls ?? csvEnv(seedsEnvKey);
     if (seedUrls.length === 0) {
-      return reply.code(400).send({ ok: false, error: 'No seed URLs' });
+      return reply.code(400).send(errorResponseForStatus(400, 'No seed URLs'));
     }
 
     const crawlResult = await crawlAuthorityPdfs({
@@ -154,7 +155,7 @@ export default function noticesRoutes(app: FastifyInstance) {
     '/cron/notices/cn/mof',
     {
       preHandler: app.requireApiKey(['tasks:notices']),
-      schema: { body: BodySchema },
+      schema: { body: BodySchema, response: { 400: ErrorResponseSchema } },
       config: { importMeta: { importSource: 'CN_NOTICES', job: 'notices:cn-mof' } },
     },
     (req, reply) => handle(req, reply, 'MOF', 'CN_MOF_NOTICE_URLS')
@@ -165,7 +166,7 @@ export default function noticesRoutes(app: FastifyInstance) {
     '/cron/notices/cn/gacc',
     {
       preHandler: app.requireApiKey(['tasks:notices']),
-      schema: { body: BodySchema },
+      schema: { body: BodySchema, response: { 400: ErrorResponseSchema } },
       config: { importMeta: { importSource: 'CN_NOTICES', job: 'notices:cn-gacc' } },
     },
     (req, reply) => handle(req, reply, 'GACC', 'CN_GACC_NOTICE_URLS')
@@ -176,7 +177,7 @@ export default function noticesRoutes(app: FastifyInstance) {
     '/cron/notices/cn/mofcom',
     {
       preHandler: app.requireApiKey(['tasks:notices']),
-      schema: { body: BodySchema },
+      schema: { body: BodySchema, response: { 400: ErrorResponseSchema } },
       config: { importMeta: { importSource: 'CN_NOTICES', job: 'notices:cn-mofcom' } },
     },
     (req, reply) => handle(req, reply, 'MOFCOM', 'CN_MOFCOM_NOTICE_URLS')
