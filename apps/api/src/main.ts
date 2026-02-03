@@ -1,26 +1,26 @@
 import 'dotenv/config';
+import { validateApiRuntimeEnv } from './lib/env.js';
 import { buildInternalServer, buildPublicServer } from './server.js';
 
-const PORT = Number(process.env.PORT ?? 3001);
-const INTERNAL_PORT = Number(process.env.INTERNAL_PORT ?? 3002);
-const INTERNAL_HOST = process.env.INTERNAL_HOST ?? '0.0.0.0';
-const PUBLIC_HOST = process.env.HOST ?? '0.0.0.0';
-const NODE_ENV = process.env.NODE_ENV ?? 'development';
-const ALLOW_INTERNAL_BIND = process.env.ALLOW_INTERNAL_BIND === '1';
+const env = validateApiRuntimeEnv();
 
-if (NODE_ENV === 'production') {
-  if ((INTERNAL_HOST === '0.0.0.0' || INTERNAL_HOST === '::') && !ALLOW_INTERNAL_BIND) {
+if (env.nodeEnv === 'production') {
+  if ((env.internalHost === '0.0.0.0' || env.internalHost === '::') && !env.allowInternalBind) {
     throw new Error(
       'INTERNAL_HOST is set to a public bind in production. Set ALLOW_INTERNAL_BIND=1 to override.'
     );
   }
 
-  if ((INTERNAL_HOST === '0.0.0.0' || INTERNAL_HOST === '::') && ALLOW_INTERNAL_BIND) {
+  if ((env.internalHost === '0.0.0.0' || env.internalHost === '::') && env.allowInternalBind) {
     console.warn('ALLOW_INTERNAL_BIND=1 set in production: internal server is publicly bound.');
   }
 
-  if (!process.env.TRUST_PROXY) {
+  if (!env.trustProxy) {
     console.warn('TRUST_PROXY not set; trustProxy is disabled in production.');
+  }
+
+  if (!env.metricsRequireSigning) {
+    console.warn('METRICS_REQUIRE_SIGNING=1 is recommended in production.');
   }
 }
 
@@ -28,8 +28,8 @@ async function start() {
   const publicApp = await buildPublicServer();
   const internalApp = await buildInternalServer();
 
-  await publicApp.listen({ port: PORT, host: PUBLIC_HOST });
-  await internalApp.listen({ port: INTERNAL_PORT, host: INTERNAL_HOST });
+  await publicApp.listen({ port: env.publicPort, host: env.publicHost });
+  await internalApp.listen({ port: env.internalPort, host: env.internalHost });
 }
 
 start().catch((err) => {
