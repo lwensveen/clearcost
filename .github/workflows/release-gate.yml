@@ -66,11 +66,11 @@ jobs:
 
       - name: Core API tests
         run: >
-          bun run test --
-          apps/api/src/server.int.test.ts
-          apps/api/src/lib/tests/idempotency.int.test.ts
-          apps/api/src/lib/cron/runtime.unit.test.ts
-          apps/api/src/plugins/tests/import-instrumentation.unit.test.ts
-          apps/api/src/modules/billing/routes.unit.test.ts
-          apps/api/src/plugins/tests/api-key-auth.unit.test.ts
-          apps/api/src/modules/quotes/services/confidence.unit.test.ts
+          cd apps/api && bun run test --
+          src/server.int.test.ts
+          src/lib/tests/idempotency.int.test.ts
+          src/lib/cron/runtime.unit.test.ts
+          src/plugins/tests/import-instrumentation.unit.test.ts
+          src/modules/billing/routes.unit.test.ts
+          src/plugins/tests/api-key-auth.unit.test.ts
+          src/modules/quotes/services/confidence.unit.test.ts
