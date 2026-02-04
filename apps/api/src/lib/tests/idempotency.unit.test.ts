@@ -181,6 +181,25 @@ describe('withIdempotency (unit)', () => {
     });
   });
 
+  it('throws conflict when a claimed pending row has a different request hash', async () => {
+    dbState.rows.push({
+      scope: 's',
+      key: 'k-claimed-mismatch',
+      requestHash: 'different-hash',
+      status: 'pending',
+      response: null,
+      updatedAt: null,
+      lockedAt: null,
+    });
+
+    await expect(
+      withIdempotency('s', 'k-claimed-mismatch', { a: 1 }, async () => ({ ok: true }))
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: 'Idempotency key reused with different payload',
+    });
+  });
+
   it('in-flight: second call sees processing and gets 409 Processing', async () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
