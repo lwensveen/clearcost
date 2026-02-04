@@ -199,7 +199,7 @@ Fetch a cached response by key/scope for debugging.
 
 Prometheus scrape endpoint.
 
-- **Auth:** `x-api-key: <key with scope ops:metrics>` (set `METRICS_REQUIRE_SIGNING=1` to also require internal signing)
+- **Auth:** `x-api-key: <key with scope ops:metrics>` (internal signing is required by default in production; set `METRICS_REQUIRE_SIGNING=0` to opt out)
 
 ---
 

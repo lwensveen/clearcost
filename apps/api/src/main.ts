@@ -20,7 +20,7 @@ if (env.nodeEnv === 'production') {
   }
 
   if (!env.metricsRequireSigning) {
-    console.warn('METRICS_REQUIRE_SIGNING=1 is recommended in production.');
+    console.warn('METRICS_REQUIRE_SIGNING=0 set in production: /metrics does not require signing.');
   }
 }
 

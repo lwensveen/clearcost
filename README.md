@@ -168,7 +168,7 @@ These are the **minimum** env vars to boot each app locally. Feature‑specific 
 - **Env helpers (apps/web)**: `requireEnv` is build‑safe in non‑prod; `requireEnvStrict` always throws.
   Use `requireEnvStrict` only inside lazy/runtime helpers like `getAuth()`/`getDb()` and `getAdminEnv()`.
 - **Internal ops flags**: `ALLOW_INTERNAL_BIND=1` permits internal server public bind in production (logs a warning).
-  `METRICS_REQUIRE_SIGNING=1` requires internal signing for `/metrics`.
+  `/metrics` requires internal signing by default in production; set `METRICS_REQUIRE_SIGNING=0` to opt out.
 
 **API (`apps/api`)**
 
@@ -182,7 +182,7 @@ These are the **minimum** env vars to boot each app locally. Feature‑specific 
 
 - Required: `DATABASE_URL`, `CLEARCOST_API_URL`, `CLEARCOST_WEB_SERVER_KEY`
 - Admin screens: `CLEARCOST_ADMIN_API_KEY`
-- Auth/session: `REDIS_URL`, `REDIS_TOKEN`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `API_URL`, `EMAIL_OTP_API_SECRET`, `TURNSTILE_SECRET_KEY`
+- Auth/session: `REDIS_URL`, `REDIS_TOKEN`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_COOKIE_DOMAIN` (optional), `API_URL`, `EMAIL_OTP_API_SECRET`, `TURNSTILE_SECRET_KEY`
 
 **Docs (`apps/docs`)**
 
@@ -224,7 +224,7 @@ live on the internal server and require internal request signing in production.
 
 Hosted on the internal server (`INTERNAL_PORT`, default 3002). Access should be restricted by network ACLs.
 
-- `GET /metrics` — Prometheus metrics (**requires scope:** `ops:metrics` in `x-api-key`; set `METRICS_REQUIRE_SIGNING=1` to also require internal signing)
+- `GET /metrics` — Prometheus metrics (**requires scope:** `ops:metrics` in `x-api-key`; internal signing is required by default in production, disable with `METRICS_REQUIRE_SIGNING=0`)
 - `GET /v1/admin/health/imports` — import activity snapshot (**requires scope:** `ops:health`)
 - `GET /internal/healthz` — internal health check (no signature)
 

@@ -35,6 +35,10 @@ export function validateApiRuntimeEnv(): ApiRuntimeEnv {
     throw new Error(`Missing required API env vars: ${missing.join(', ')}`);
   }
 
+  const metricsRequireSigningRaw = (process.env.METRICS_REQUIRE_SIGNING ?? '').trim();
+  const metricsRequireSigning =
+    nodeEnv === 'production' ? metricsRequireSigningRaw !== '0' : metricsRequireSigningRaw === '1';
+
   return {
     nodeEnv,
     publicHost: (process.env.HOST ?? '0.0.0.0').trim() || '0.0.0.0',
@@ -42,7 +46,7 @@ export function validateApiRuntimeEnv(): ApiRuntimeEnv {
     internalHost: (process.env.INTERNAL_HOST ?? '0.0.0.0').trim() || '0.0.0.0',
     internalPort: parsePort('INTERNAL_PORT', 3002),
     allowInternalBind: process.env.ALLOW_INTERNAL_BIND === '1',
-    metricsRequireSigning: process.env.METRICS_REQUIRE_SIGNING === '1',
+    metricsRequireSigning,
     trustProxy: (process.env.TRUST_PROXY ?? '').trim(),
   };
 }
