@@ -8,8 +8,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  GIT_SHA: ${{ github.sha }}
+
 jobs:
-  build:
+  validate:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,29 +25,76 @@ jobs:
           node-version: '22'
           bun-version: '1.3.8'
 
-      - name: Set GIT_SHA
-        run: echo "GIT_SHA=${GITHUB_SHA}" >> $GITHUB_ENV
-
       - name: Validate turbo env lists
         run: bun run validate-envs
 
       - name: Validate test filename conventions
         run: bun run validate-tests
 
+  lint:
+    needs: [validate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Node & Bun
+        uses: ./.github/actions/setup-node-bun
+        with:
+          node-version: '22'
+          bun-version: '1.3.8'
       - name: Lint
         run: bun run lint
 
+  check-types:
+    needs: [validate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Node & Bun
+        uses: ./.github/actions/setup-node-bun
+        with:
+          node-version: '22'
+          bun-version: '1.3.8'
       - name: Type-check
         run: bun run check-types
 
+  test:
+    needs: [validate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Node & Bun
+        uses: ./.github/actions/setup-node-bun
+        with:
+          node-version: '22'
+          bun-version: '1.3.8'
       - name: Test
         run: bun run test
 
+  build:
+    needs: [validate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Node & Bun
+        uses: ./.github/actions/setup-node-bun
+        with:
+          node-version: '22'
+          bun-version: '1.3.8'
       - name: Build
         run: bun run build
 
+  coverage:
+    needs: [validate]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Node & Bun
+        uses: ./.github/actions/setup-node-bun
+        with:
+          node-version: '22'
+          bun-version: '1.3.8'
       - name: Coverage (non-blocking)
-        continue-on-error: true
         run: bun run test:coverage
 
       - name: Upload coverage reports to Codecov
