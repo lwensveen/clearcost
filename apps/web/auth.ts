@@ -19,6 +19,7 @@ type AuthInstance = ReturnType<typeof betterAuth>;
 let authInstance: AuthInstance | null = null;
 
 function getEnv() {
+  const cookieDomain = (process.env.BETTER_AUTH_COOKIE_DOMAIN ?? '').trim() || null;
   return {
     redisUrl: requireEnvStrict('REDIS_URL'),
     redisToken: requireEnvStrict('REDIS_TOKEN'),
@@ -27,6 +28,7 @@ function getEnv() {
     apiUrl: requireEnvStrict('API_URL'),
     emailOtpApiSecret: requireEnvStrict('EMAIL_OTP_API_SECRET'),
     turnstileSecretKey: requireEnvStrict('TURNSTILE_SECRET_KEY'),
+    cookieDomain,
   };
 }
 
@@ -41,6 +43,7 @@ export function getAuth(): AuthInstance {
     apiUrl,
     emailOtpApiSecret,
     turnstileSecretKey,
+    cookieDomain,
   } = getEnv();
 
   const upstash = new Redis({ url: redisUrl, token: redisToken });
@@ -93,8 +96,8 @@ export function getAuth(): AuthInstance {
     advanced: {
       database: { generateId: false },
       crossSubDomainCookies: {
-        enabled: true,
-        domain: 'containo.com',
+        enabled: !!cookieDomain,
+        ...(cookieDomain ? { domain: cookieDomain } : {}),
         // additionalCookies: ['custom_cookie'],
       },
     },

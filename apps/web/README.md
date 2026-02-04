@@ -38,6 +38,7 @@ CLEARCOST_ADMIN_API_KEY="ck_test_admin_..."
 # Better Auth + email flows
 BETTER_AUTH_URL="http://localhost:3000"
 BETTER_AUTH_SECRET="super-long-random-secret"
+BETTER_AUTH_COOKIE_DOMAIN="containo.com"
 API_URL="http://localhost:3000"
 EMAIL_OTP_API_SECRET="email-otp-secret"
 TURNSTILE_SECRET_KEY="turnstile-secret"
