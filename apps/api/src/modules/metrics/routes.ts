@@ -1,12 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { registry } from '../../lib/metrics.js';
+import { resolveMetricsRequireSigning } from '../../lib/env.js';
 
 export default function metricsRoutes(app: FastifyInstance) {
   // Prometheus scrape (protected)
-  const requireSigning =
-    process.env.NODE_ENV === 'production'
-      ? process.env.METRICS_REQUIRE_SIGNING !== '0'
-      : process.env.METRICS_REQUIRE_SIGNING === '1';
+  const requireSigning = resolveMetricsRequireSigning();
   app.get(
     '/metrics',
     {

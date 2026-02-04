@@ -9,6 +9,16 @@ type ApiRuntimeEnv = {
   trustProxy: string;
 };
 
+export function resolveMetricsRequireSigning(
+  env: { NODE_ENV?: string; METRICS_REQUIRE_SIGNING?: string } = process.env
+): boolean {
+  const nodeEnv = (env.NODE_ENV ?? 'development').trim();
+  const metricsRequireSigningRaw = (env.METRICS_REQUIRE_SIGNING ?? '').trim();
+  return nodeEnv === 'production'
+    ? metricsRequireSigningRaw !== '0'
+    : metricsRequireSigningRaw === '1';
+}
+
 function parsePort(name: string, fallback: number): number {
   const raw = (process.env[name] ?? '').trim();
   if (!raw) return fallback;
@@ -35,9 +45,10 @@ export function validateApiRuntimeEnv(): ApiRuntimeEnv {
     throw new Error(`Missing required API env vars: ${missing.join(', ')}`);
   }
 
-  const metricsRequireSigningRaw = (process.env.METRICS_REQUIRE_SIGNING ?? '').trim();
-  const metricsRequireSigning =
-    nodeEnv === 'production' ? metricsRequireSigningRaw !== '0' : metricsRequireSigningRaw === '1';
+  const metricsRequireSigning = resolveMetricsRequireSigning({
+    NODE_ENV: nodeEnv,
+    METRICS_REQUIRE_SIGNING: process.env.METRICS_REQUIRE_SIGNING,
+  });
 
   return {
     nodeEnv,

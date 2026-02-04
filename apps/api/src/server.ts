@@ -178,7 +178,7 @@ export async function buildInternalServer(
   await app.register(healthPublicRoutes); // /healthz, /health
   app.get('/internal/healthz', async () => ({ ok: true, internal: true }));
 
-  // Metrics remain on the internal server but do not require internal signing.
+  // Metrics remain on the internal server; signing follows METRICS_REQUIRE_SIGNING policy.
   await app.register(metricsRoutes); // /metrics (ops)
 
   await app.register(async (internal) => {
