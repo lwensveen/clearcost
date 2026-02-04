@@ -11,15 +11,12 @@ import { getVatForHs6WithMeta } from '../../vat/services/get-vat-for-hs6.js';
 import { getCanonicalFxAsOf } from '../../fx/services/get-canonical-fx-asof.js';
 import { evaluateDeMinimis } from '../../de-minimis/services/evaluate.js';
 import {
-  deriveConfidenceFromStatus,
-  isMissingStatus,
-  overallConfidenceFrom,
+  deriveQuoteConfidenceParts,
 } from './confidence.js';
 import { toQuoteSourceMetadata } from './source-metadata.js';
 
 type Unit = 'kg' | 'm3';
 const BASE_CCY = process.env.CURRENCY_BASE ?? 'USD';
-type MissingComponent = 'duty' | 'vat' | 'surcharges' | 'freight' | 'fx';
 
 const roundMoney = (n: number, ccy: string) => {
   const dp = ccy === 'JPY' ? 0 : 2;
@@ -202,24 +199,16 @@ export async function quoteLandedCost(
         ? 'IOSS: VAT collected at checkout; no import VAT due.'
         : 'Standard import tax rules apply.';
 
-  const componentConfidence: Record<MissingComponent, 'authoritative' | 'estimated' | 'missing'> = {
-    duty: deriveConfidenceFromStatus(dutyLookup.meta.status),
-    vat: deriveConfidenceFromStatus(vatLookup.meta.status),
-    surcharges: deriveConfidenceFromStatus(surchargeLookup.meta.status),
-    freight:
-      opts?.freightInDestOverride != null
-        ? 'estimated'
-        : deriveConfidenceFromStatus(freightLookup.meta.status),
-    fx: fxMissingRate ? 'missing' : 'authoritative',
-  };
-  const missingComponents: MissingComponent[] = [];
-  if (isMissingStatus(dutyLookup.meta.status)) missingComponents.push('duty');
-  if (isMissingStatus(vatLookup.meta.status)) missingComponents.push('vat');
-  if (isMissingStatus(surchargeLookup.meta.status)) missingComponents.push('surcharges');
-  if (isMissingStatus(freightLookup.meta.status) && opts?.freightInDestOverride == null) {
-    missingComponents.push('freight');
-  }
-  if (fxMissingRate) missingComponents.push('fx');
+  const confidence = deriveQuoteConfidenceParts({
+    statuses: {
+      duty: dutyLookup.meta.status,
+      vat: vatLookup.meta.status,
+      surcharges: surchargeLookup.meta.status,
+      freight: freightLookup.meta.status,
+    },
+    fxMissingRate,
+    freightOverridden: opts?.freightInDestOverride != null,
+  });
 
   return {
     fxAsOf,
@@ -239,9 +228,9 @@ export async function quoteLandedCost(
       guaranteedMax: roundMoney(total * 1.02, currency),
       policy,
       incoterm,
-      componentConfidence,
-      overallConfidence: overallConfidenceFrom(componentConfidence),
-      missingComponents,
+      componentConfidence: confidence.componentConfidence,
+      overallConfidence: confidence.overallConfidence,
+      missingComponents: confidence.missingComponents,
       sources: {
         duty: toQuoteSourceMetadata({
           dataset: dutyLookup.meta.dataset,
