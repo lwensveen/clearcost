@@ -23,6 +23,8 @@ type BillingEnv = {
   price: Record<'starter' | 'growth' | 'scale', string>;
 };
 
+type StripeWebhookDeps = Pick<Stripe, 'subscriptions'>;
+
 export function validateBillingEnv(options: { webhookEnabled?: boolean } = {}): BillingEnv {
   const webhookEnabled = options.webhookEnabled ?? true;
   const missing: string[] = [];
@@ -85,6 +87,83 @@ export function resolveSubscriptionState(
     priceId,
     currentPeriodEnd: subscriptionPeriodEnd(sub),
   };
+}
+
+export async function handleStripeWebhookEvent(
+  event: Stripe.Event,
+  deps: { stripe: StripeWebhookDeps; price: BillingEnv['price'] }
+) {
+  switch (event.type) {
+    case 'checkout.session.completed': {
+      const s = event.data.object as Stripe.Checkout.Session;
+      const ownerId = (s.metadata?.ownerId as string) || (s.client_reference_id as string);
+      if (ownerId && s.subscription) {
+        const subResp = await deps.stripe.subscriptions.retrieve(
+          typeof s.subscription === 'string' ? s.subscription : s.subscription.id
+        );
+
+        // Narrow: treat the response as Subscription to access snake_case fields safely
+        const sub = subResp as unknown as Stripe.Subscription;
+        const next = resolveSubscriptionState(sub, deps.price, 'unknown');
+
+        await db
+          .insert(billingAccountsTable)
+          .values({
+            ownerId,
+            stripeCustomerId: String(s.customer),
+            plan: next.plan,
+            status: next.status,
+            priceId: next.priceId,
+            currentPeriodEnd: next.currentPeriodEnd,
+          })
+          .onConflictDoUpdate({
+            target: billingAccountsTable.ownerId,
+            set: {
+              stripeCustomerId: String(s.customer),
+              plan: next.plan,
+              status: next.status,
+              priceId: next.priceId,
+              currentPeriodEnd: next.currentPeriodEnd,
+            },
+          });
+      }
+      return;
+    }
+
+    case 'customer.subscription.updated':
+    case 'customer.subscription.created':
+    case 'customer.subscription.deleted': {
+      // As above, narrow to Subscription for snake_case fields
+      const sub = event.data.object as Stripe.Subscription;
+      const customerId = String(sub.customer);
+
+      const [row] = await db
+        .select()
+        .from(billingAccountsTable)
+        .where(eq(billingAccountsTable.stripeCustomerId, customerId))
+        .limit(1);
+
+      if (row) {
+        const next = resolveSubscriptionState(sub, deps.price, row.plan ?? 'free');
+
+        await db
+          .update(billingAccountsTable)
+          .set({
+            plan: next.plan,
+            status: next.status,
+            priceId: next.priceId,
+            currentPeriodEnd: next.currentPeriodEnd,
+            updatedAt: new Date(),
+          })
+          .where(eq(billingAccountsTable.ownerId, row.ownerId));
+      }
+      return;
+    }
+
+    default:
+      // ignore others
+      return;
+  }
 }
 
 async function ensureBillingAccount(ownerId: string) {
@@ -235,7 +314,13 @@ export default async function billingRoutes(app: FastifyInstance) {
     '/webhook/stripe',
     {
       config: { rawBody: true },
-      schema: { response: { 200: BillingWebhookResponseSchema, 400: ErrorResponseSchema } },
+      schema: {
+        response: {
+          200: BillingWebhookResponseSchema,
+          400: ErrorResponseSchema,
+          500: ErrorResponseSchema,
+        },
+      },
     },
     async (req, reply) => {
       const sig = req.headers['stripe-signature'] as string | undefined;
@@ -253,80 +338,13 @@ export default async function billingRoutes(app: FastifyInstance) {
       }
 
       try {
-        switch (event.type) {
-          case 'checkout.session.completed': {
-            const s = event.data.object as Stripe.Checkout.Session;
-            const ownerId = (s.metadata?.ownerId as string) || (s.client_reference_id as string);
-            if (ownerId && s.subscription) {
-              const subResp = await stripe.subscriptions.retrieve(
-                typeof s.subscription === 'string' ? s.subscription : s.subscription.id
-              );
-
-              // Narrow: treat the response as Subscription to access snake_case fields safely
-              const sub = subResp as unknown as Stripe.Subscription;
-              const next = resolveSubscriptionState(sub, billingEnv.price, 'unknown');
-
-              await db
-                .insert(billingAccountsTable)
-                .values({
-                  ownerId,
-                  stripeCustomerId: String(s.customer),
-                  plan: next.plan,
-                  status: next.status,
-                  priceId: next.priceId,
-                  currentPeriodEnd: next.currentPeriodEnd,
-                })
-                .onConflictDoUpdate({
-                  target: billingAccountsTable.ownerId,
-                  set: {
-                    stripeCustomerId: String(s.customer),
-                    plan: next.plan,
-                    status: next.status,
-                    priceId: next.priceId,
-                    currentPeriodEnd: next.currentPeriodEnd,
-                  },
-                });
-            }
-            break;
-          }
-
-          case 'customer.subscription.updated':
-          case 'customer.subscription.created':
-          case 'customer.subscription.deleted': {
-            // As above, narrow to Subscription for snake_case fields
-            const sub = event.data.object as Stripe.Subscription;
-            const customerId = String(sub.customer);
-
-            const [row] = await db
-              .select()
-              .from(billingAccountsTable)
-              .where(eq(billingAccountsTable.stripeCustomerId, customerId))
-              .limit(1);
-
-            if (row) {
-              const next = resolveSubscriptionState(sub, billingEnv.price, row.plan ?? 'free');
-
-              await db
-                .update(billingAccountsTable)
-                .set({
-                  plan: next.plan,
-                  status: next.status,
-                  priceId: next.priceId,
-                  currentPeriodEnd: next.currentPeriodEnd,
-                  updatedAt: new Date(),
-                })
-                .where(eq(billingAccountsTable.ownerId, row.ownerId));
-            }
-            break;
-          }
-
-          default:
-            // ignore others
-            break;
-        }
+        await handleStripeWebhookEvent(event, {
+          stripe,
+          price: billingEnv.price,
+        });
       } catch (err: any) {
         req.log.error({ err, type: event.type }, 'stripe_webhook_handle_failed');
-        // Still 200 to avoid repeated retries from Stripe. Adjust if desired.
+        return reply.code(500).send(errorResponseForStatus(500, 'Webhook processing failed'));
       }
 
       return reply.send({ received: true });

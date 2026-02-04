@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mapPlanFromPrice, resolveSubscriptionState, validateBillingEnv } from './routes.js';
+import {
+  handleStripeWebhookEvent,
+  mapPlanFromPrice,
+  resolveSubscriptionState,
+  validateBillingEnv,
+} from './routes.js';
 
 const envSnapshot = { ...process.env };
 
@@ -87,5 +92,56 @@ describe('billing subscription mapping', () => {
     expect(out.status).toBe('active');
     expect(out.priceId).toBe('price_growth');
     expect(out.currentPeriodEnd?.toISOString()).toBe('2025-01-01T00:00:00.000Z');
+  });
+});
+
+describe('handleStripeWebhookEvent', () => {
+  const price = {
+    starter: 'price_starter',
+    growth: 'price_growth',
+    scale: 'price_scale',
+  } as const;
+
+  it('ignores unrelated event types', async () => {
+    const event = {
+      type: 'invoice.created',
+      data: { object: {} },
+    } as unknown as import('stripe').default.Event;
+
+    const stripe = {
+      subscriptions: {
+        retrieve: async () => {
+          throw new Error('should not be called');
+        },
+      },
+    } as unknown as import('stripe').default;
+
+    await expect(handleStripeWebhookEvent(event, { stripe, price })).resolves.toBeUndefined();
+  });
+
+  it('throws when checkout session processing fails', async () => {
+    const event = {
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { ownerId: 'owner_1' },
+          client_reference_id: 'owner_1',
+          subscription: 'sub_123',
+          customer: 'cus_123',
+        },
+      },
+    } as unknown as import('stripe').default.Event;
+
+    const stripe = {
+      subscriptions: {
+        retrieve: async () => {
+          throw new Error('stripe downstream unavailable');
+        },
+      },
+    } as unknown as import('stripe').default;
+
+    await expect(handleStripeWebhookEvent(event, { stripe, price })).rejects.toThrow(
+      'stripe downstream unavailable'
+    );
   });
 });
