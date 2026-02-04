@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createVAT } from '@/lib/vat';
 import { errorJson } from '@/lib/http';
+import { requireAdmin } from '@/lib/route-auth';
 
 export async function POST(req: Request) {
+  const authResult = await requireAdmin(req);
+  if (!authResult.ok) return authResult.response;
+
   const fd = await req.formData();
   const dest = String(fd.get('dest') ?? '');
   const ratePct = Number(fd.get('ratePct') ?? 0);

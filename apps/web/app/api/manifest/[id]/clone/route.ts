@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod/v4';
+import { ManifestCloneResponseSchema } from '@clearcost/types';
 import { requireEnvStrict } from '@/lib/env';
 import { errorJson } from '@/lib/http';
+import { requireSession } from '@/lib/route-auth';
 
 function getManifestProxyConfig() {
   return {
@@ -10,7 +11,10 @@ function getManifestProxyConfig() {
   };
 }
 
-export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const authResult = await requireSession(req);
+  if (!authResult.ok) return authResult.response;
+
   const { id } = await params;
   const { api, key } = getManifestProxyConfig();
 
@@ -22,10 +26,6 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const raw = await r.json().catch(() => ({}));
   if (!r.ok) return errorJson('Clone failed', r.status);
 
-  const Parsed = z.object({
-    id: z.string().uuid(),
-    itemsCopied: z.number().int().optional(),
-  });
-  const j = Parsed.parse(raw);
+  const j = ManifestCloneResponseSchema.parse(raw);
   return NextResponse.json({ ok: true, id: j.id, itemsCopied: j.itemsCopied ?? 0 });
 }

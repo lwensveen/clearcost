@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { importVAT } from '@/lib/vat';
 import { errorJson } from '@/lib/http';
+import { requireAdmin } from '@/lib/route-auth';
 
 type VatImportRow = {
   dest: string;
@@ -46,6 +47,9 @@ function parseCsv(csv: string) {
 }
 
 export async function POST(req: Request) {
+  const authResult = await requireAdmin(req);
+  if (!authResult.ok) return authResult.response;
+
   const fd = await req.formData();
   const csv = String(fd.get('csv') ?? '');
 

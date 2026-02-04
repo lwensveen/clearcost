@@ -2,13 +2,14 @@ import { headers } from 'next/headers';
 import { getAuth } from '@/auth';
 import { DashboardHeader } from '@/components/layout/dashboard/dashboard-header';
 import { DashboardNav } from '@/components/layout/dashboard/dashboard-nav';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const auth = getAuth();
-  await auth.api.getSession({ headers: await headers() });
-  // if (!session) redirect('/login');
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user?.id) redirect('/login');
 
   return (
     <>

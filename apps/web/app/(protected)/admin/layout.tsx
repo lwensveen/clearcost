@@ -2,13 +2,18 @@ import { headers } from 'next/headers';
 import { getAuth } from '@/auth';
 import Link from 'next/link';
 import { AdminHeader } from '@/components/layout/admin-header';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const auth = getAuth();
-  await auth.api.getSession({ headers: await headers() });
-  // if (!session) redirect('/login');
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user?.id) redirect('/login');
+  const roleValue = (session.user as Record<string, unknown>).role;
+  if (typeof roleValue !== 'string' || !roleValue.toLowerCase().includes('admin')) {
+    redirect('/dashboard');
+  }
 
   return (
     <>

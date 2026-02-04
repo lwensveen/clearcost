@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createKey } from '@/lib/api-keys';
 import { errorJson } from '@/lib/http';
+import { requireAdmin } from '@/lib/route-auth';
 
 export async function POST(req: Request) {
+  const authResult = await requireAdmin(req);
+  if (!authResult.ok) return authResult.response;
+
   const form = await req.formData();
   const ownerId = String(form.get('ownerId') ?? '');
   const name = String(form.get('name') ?? '');

@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { importFreight } from '@/lib/freight';
 import { errorJson } from '@/lib/http';
+import { requireAdmin } from '@/lib/route-auth';
 
 export async function POST(req: Request) {
+  const authResult = await requireAdmin(req);
+  if (!authResult.ok) return authResult.response;
+
   const fd = await req.formData();
   const json = String(fd.get('json') ?? '[]');
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exportManifestItemsCsv } from '@clearcost/sdk';
 import { requireEnvStrict } from '@/lib/env';
+import { requireSession } from '@/lib/route-auth';
 
 function sdk() {
   const baseUrl = requireEnvStrict('CLEARCOST_API_URL');
@@ -8,7 +9,10 @@ function sdk() {
   return { baseUrl, apiKey };
 }
 
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const authResult = await requireSession(req);
+  if (!authResult.ok) return authResult.response;
+
   const { id } = await ctx.params;
   const csv = await exportManifestItemsCsv(sdk(), id);
 

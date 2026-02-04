@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { importSurcharges } from '@/lib/surcharges';
 import { errorJson } from '@/lib/http';
+import { requireAdmin } from '@/lib/route-auth';
 
 type SurchargeImportRow = {
   dest: string;
@@ -48,6 +49,9 @@ function parseCsv(csv: string) {
 }
 
 export async function POST(req: Request) {
+  const authResult = await requireAdmin(req);
+  if (!authResult.ok) return authResult.response;
+
   const fd = await req.formData();
   const csv = String(fd.get('csv') ?? '');
 

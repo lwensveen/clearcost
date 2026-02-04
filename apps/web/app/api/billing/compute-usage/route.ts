@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireEnvStrict } from '@/lib/env';
 import { errorJson } from '@/lib/http';
+import { requireSession } from '@/lib/route-auth';
 
 function getBillingProxyConfig() {
   return {
@@ -9,7 +10,10 @@ function getBillingProxyConfig() {
   };
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const authResult = await requireSession(req);
+  if (!authResult.ok) return authResult.response;
+
   const { api, key } = getBillingProxyConfig();
   const r = await fetch(`${api}/v1/billing/compute-usage`, {
     headers: { 'x-api-key': key },
