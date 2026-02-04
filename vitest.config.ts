@@ -14,6 +14,8 @@ export default defineConfig({
         'apps/api/src/modules/quotes/{routes,utils}.ts',
         'apps/api/src/modules/quotes/services/{confidence,quote-landed-cost,source-metadata}.ts',
         'apps/api/src/modules/classify/services/classify-hs6.ts',
+        'apps/api/src/modules/duty-rates/services/us/usitc-client.ts',
+        'apps/api/src/modules/duty-rates/services/wits/base.ts',
         'apps/api/src/modules/usage/services/usage-range.ts',
         'apps/api/src/modules/api-keys/services/issue-api-key.ts',
         'apps/api/src/modules/webhooks/services/{dispatch,secret-kms}.ts',
