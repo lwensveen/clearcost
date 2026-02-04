@@ -93,7 +93,8 @@
     "seed:countries:basic": "bun run src/lib/cron/index.ts seed:countries:basic",
     "seed:trade-programs:us": "bun run src/lib/cron/index.ts seed:trade-programs:us",
     "start": "node dist/src/main.js",
-    "test": "vitest",
+    "test": "vitest run --root ../.. --config apps/api/vitest.config.ts",
+    "test:watch": "vitest --root ../.. --config apps/api/vitest.config.ts",
     "test:coverage": "vitest run --coverage"
   },
   "type": "module"
