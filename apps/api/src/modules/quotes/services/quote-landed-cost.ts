@@ -10,9 +10,7 @@ import { getFreightWithMeta } from '../../freight/services/get-freight.js';
 import { getVatForHs6WithMeta } from '../../vat/services/get-vat-for-hs6.js';
 import { getCanonicalFxAsOf } from '../../fx/services/get-canonical-fx-asof.js';
 import { evaluateDeMinimis } from '../../de-minimis/services/evaluate.js';
-import {
-  deriveQuoteConfidenceParts,
-} from './confidence.js';
+import { deriveQuoteConfidenceParts } from './confidence.js';
 import { toQuoteSourceMetadata } from './source-metadata.js';
 
 type Unit = 'kg' | 'm3';

@@ -138,4 +138,36 @@ describe('withRun', () => {
     expect(releaseRunLock).not.toHaveBeenCalled();
     expect(endTimerSpy).toHaveBeenCalledTimes(1);
   });
+
+  it('uses provided lockKey override for acquire/release', async () => {
+    const ctx = {
+      importSource: 'WITS' as const,
+      job: 'JOB',
+      lockKey: 'custom:import-lock',
+    };
+    const work = vi.fn(async () => ({ inserted: 2, payload: { ok: true } }));
+
+    await withRun(ctx, work);
+
+    expect(acquireRunLock).toHaveBeenCalledWith('custom:import-lock');
+    expect(releaseRunLock).toHaveBeenCalledWith('custom:import-lock');
+  });
+
+  it('releases lock when provenance start fails', async () => {
+    vi.mocked(startImportRun).mockRejectedValue(new Error('db unavailable'));
+
+    const ctx = { importSource: 'WITS' as const, job: 'JOB' };
+    const work = vi.fn(async () => ({ inserted: 1, payload: { ok: true } }));
+
+    await expect(withRun(ctx, work)).rejects.toThrow('db unavailable');
+
+    expect(work).not.toHaveBeenCalled();
+    expect(importErrors.inc).toHaveBeenCalledWith({
+      importSource: 'WITS',
+      job: 'JOB',
+      stage: 'script',
+    });
+    expect(finishImportRun).not.toHaveBeenCalled();
+    expect(releaseRunLock).toHaveBeenCalledWith('WITS:JOB');
+  });
 });

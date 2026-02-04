@@ -3,10 +3,7 @@ import type { LookupStatus } from '../../../lib/lookup-meta.js';
 export type QuoteComponentConfidence = 'authoritative' | 'estimated' | 'missing';
 export type QuoteConfidenceComponent = 'duty' | 'vat' | 'surcharges' | 'freight' | 'fx';
 
-type QuoteComponentStatuses = Record<
-  Exclude<QuoteConfidenceComponent, 'fx'>,
-  LookupStatus
->;
+type QuoteComponentStatuses = Record<Exclude<QuoteConfidenceComponent, 'fx'>, LookupStatus>;
 
 export function deriveQuoteConfidenceParts(input: {
   statuses: QuoteComponentStatuses;

@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { db } from '@clearcost/db';
 import {
   handleStripeWebhookEvent,
   mapPlanFromPrice,
@@ -102,6 +103,10 @@ describe('handleStripeWebhookEvent', () => {
     scale: 'price_scale',
   } as const;
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('ignores unrelated event types', async () => {
     const event = {
       type: 'invoice.created',
@@ -143,5 +148,86 @@ describe('handleStripeWebhookEvent', () => {
     await expect(handleStripeWebhookEvent(event, { stripe, price })).rejects.toThrow(
       'stripe downstream unavailable'
     );
+  });
+
+  it('creates/updates billing account on checkout completion', async () => {
+    const event = {
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { ownerId: 'owner_1' },
+          client_reference_id: 'owner_1',
+          subscription: 'sub_123',
+          customer: 'cus_123',
+        },
+      },
+    } as unknown as import('stripe').default.Event;
+
+    const retrieve = vi.fn(async () => ({
+      status: 'active',
+      current_period_end: 1_735_689_600,
+      items: { data: [{ price: { id: 'price_growth' } }] },
+    }));
+    const stripe = {
+      subscriptions: { retrieve },
+    } as unknown as import('stripe').default;
+
+    const onConflictDoUpdate = vi.fn(async () => undefined);
+    const values = vi.fn(() => ({ onConflictDoUpdate }));
+    vi.spyOn(db, 'insert').mockReturnValue({ values } as any);
+
+    await expect(handleStripeWebhookEvent(event, { stripe, price })).resolves.toBeUndefined();
+
+    expect(retrieve).toHaveBeenCalledWith('sub_123');
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ownerId: 'owner_1',
+        stripeCustomerId: 'cus_123',
+        plan: 'growth',
+        status: 'active',
+        priceId: 'price_growth',
+      })
+    );
+    expect(onConflictDoUpdate).toHaveBeenCalled();
+  });
+
+  it('updates existing account on subscription update events', async () => {
+    const event = {
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          customer: 'cus_123',
+          status: 'past_due',
+          current_period_end: 1_736_121_600,
+          items: { data: [{ price: { id: 'price_scale' } }] },
+        },
+      },
+    } as unknown as import('stripe').default.Event;
+
+    const stripe = {
+      subscriptions: { retrieve: vi.fn() },
+    } as unknown as import('stripe').default;
+
+    const selectLimit = vi.fn(async () => [{ ownerId: 'owner_1', plan: 'starter' }]);
+    const selectWhere = vi.fn(() => ({ limit: selectLimit }));
+    const selectFrom = vi.fn(() => ({ where: selectWhere }));
+    vi.spyOn(db, 'select').mockReturnValue({ from: selectFrom } as any);
+
+    const updateWhere = vi.fn(async () => undefined);
+    const set = vi.fn(() => ({ where: updateWhere }));
+    vi.spyOn(db, 'update').mockReturnValue({ set } as any);
+
+    await expect(handleStripeWebhookEvent(event, { stripe, price })).resolves.toBeUndefined();
+
+    expect(selectLimit).toHaveBeenCalledWith(1);
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plan: 'scale',
+        status: 'past_due',
+        priceId: 'price_scale',
+        currentPeriodEnd: expect.any(Date),
+      })
+    );
+    expect(updateWhere).toHaveBeenCalled();
   });
 });
