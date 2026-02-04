@@ -33,6 +33,7 @@
     "test:ci": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
+    "validate-tests": "bun run scripts/validate-test-files.ts",
     "validate-docs": "bun run scripts/validate-docs.ts",
     "validate-envs": "bun run scripts/validate-turbo-envs.ts"
   },

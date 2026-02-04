@@ -29,6 +29,9 @@ jobs:
       - name: Validate turbo env lists
         run: bun run validate-envs
 
+      - name: Validate test filename conventions
+        run: bun run validate-tests
+
       - name: Lint
         run: bun run lint
 

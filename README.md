@@ -402,6 +402,11 @@ bun run src/lib/run-cron.ts import:prune --days 90
 
 - **Local**: `bun test`
 - **Release gate**: `.github/workflows/release-gate.yml`
+- **Test conventions**:
+  - Unit tests: `*.unit.test.ts`
+  - Integration tests: `*.int.test.ts`
+  - Keep tests close to the module/service they verify
+  - Validate naming in CI: `bun run validate-tests`
 - **Staging smoke**: `.github/workflows/staging-smoke.yml`
   - Required secrets: `STAGING_PUBLIC_API_URL`, `STAGING_INTERNAL_API_URL`, `STAGING_PUBLIC_API_KEY`, `STAGING_OPS_API_KEY`
   - Optional secrets: `STAGING_BILLING_API_KEY`, `STAGING_BILLING_WRITE_API_KEY`, `STAGING_INTERNAL_SIGNING_SECRET`
