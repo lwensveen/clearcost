@@ -10,7 +10,7 @@
   },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./src/index.ts",
       "import": "./dist/index.esm.js",
       "default": "./dist/index.esm.js"
     }
@@ -29,6 +29,6 @@
   },
   "sideEffects": false,
   "type": "module",
-  "types": "dist/index.d.ts",
+  "types": "src/index.ts",
   "unpkg": "dist/index.umd.js"
 }
