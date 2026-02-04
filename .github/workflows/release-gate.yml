@@ -13,12 +13,35 @@ concurrency:
 jobs:
   release-gate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      - name: Enforce main updates via PRs
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const sha = context.sha;
+            const pulls = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner,
+              repo,
+              commit_sha: sha,
+            });
+            if (!pulls.data.length) {
+              core.setFailed(
+                `Commit ${sha} is not associated with a pull request. Push to main should come from a merged PR.`
+              );
+              return;
+            }
+            core.notice(`Found ${pulls.data.length} PR association(s) for ${sha}.`);
 
       - name: Setup Node & Bun
         uses: ./.github/actions/setup-node-bun

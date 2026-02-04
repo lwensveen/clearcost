@@ -1,7 +1,7 @@
 name: Release
 on:
   workflow_run:
-    workflows: ['Release Gate']
+    workflows: ['Staging Smoke']
     types: [completed]
   workflow_dispatch: {}
 
@@ -13,10 +13,41 @@ jobs:
        github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: write
       packages: write
 
     steps:
+      - name: Require recent successful staging smoke (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: 'staging-smoke.yml',
+              branch: 'main',
+              per_page: 20,
+            });
+            const latestSuccess = runs.data.workflow_runs.find((run) => run.conclusion === 'success');
+            if (!latestSuccess) {
+              core.setFailed('No successful Staging Smoke run found on main.');
+              return;
+            }
+            const ageMs = Date.now() - new Date(latestSuccess.updated_at).getTime();
+            const ageHours = ageMs / (1000 * 60 * 60);
+            if (ageHours > 24) {
+              core.setFailed(
+                `Latest successful Staging Smoke run is older than 24h (${ageHours.toFixed(1)}h).`
+              );
+              return;
+            }
+            core.notice(
+              `Using recent Staging Smoke evidence: run #${latestSuccess.run_number} (${ageHours.toFixed(1)}h old).`
+            );
+
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
