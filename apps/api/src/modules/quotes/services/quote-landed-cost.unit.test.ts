@@ -100,7 +100,11 @@ beforeEach(() => {
   });
   mocks.getActiveDutyRateWithMetaMock.mockResolvedValue({
     value: { ratePct: 5, source: 'official', effectiveFrom: new Date('2025-01-01T00:00:00.000Z') },
-    meta: { status: 'ok', dataset: 'official', effectiveFrom: new Date('2025-01-01T00:00:00.000Z') },
+    meta: {
+      status: 'ok',
+      dataset: 'official',
+      effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+    },
   });
   mocks.getVatForHs6WithMetaMock.mockResolvedValue({
     value: {
@@ -113,7 +117,11 @@ beforeEach(() => {
   });
   mocks.getSurchargesScopedWithMetaMock.mockResolvedValue({
     value: [{ fixedAmt: 5, pctAmt: 2 }],
-    meta: { status: 'ok', dataset: 'trade-remedy', effectiveFrom: new Date('2025-01-03T00:00:00.000Z') },
+    meta: {
+      status: 'ok',
+      dataset: 'trade-remedy',
+      effectiveFrom: new Date('2025-01-03T00:00:00.000Z'),
+    },
   });
   mocks.evaluateDeMinimisMock.mockResolvedValue({
     duty: null,
@@ -233,10 +241,9 @@ describe('quoteLandedCost', () => {
   });
 
   it('calculates IOSS checkout VAT when merchant and registration allow it', async () => {
-    mockMerchantContext(
-      { collectVatAtCheckout: 'always', chargeShippingAtCheckout: true },
-      [{ jurisdiction: 'EU', scheme: 'IOSS' }]
-    );
+    mockMerchantContext({ collectVatAtCheckout: 'always', chargeShippingAtCheckout: true }, [
+      { jurisdiction: 'EU', scheme: 'IOSS' },
+    ]);
 
     const out = await quoteLandedCost(baseInput);
 
