@@ -73,22 +73,20 @@ export const QuoteResponseSchema = z.object({
   guaranteedMax: z.number(),
   policy: z.string(),
 
-  componentConfidence: z
-    .object({
-      duty: QuoteComponentConfidenceSchema,
-      vat: QuoteComponentConfidenceSchema,
-      surcharges: QuoteComponentConfidenceSchema,
-      freight: QuoteComponentConfidenceSchema,
-      fx: QuoteComponentConfidenceSchema,
-    }),
+  componentConfidence: z.object({
+    duty: QuoteComponentConfidenceSchema,
+    vat: QuoteComponentConfidenceSchema,
+    surcharges: QuoteComponentConfidenceSchema,
+    freight: QuoteComponentConfidenceSchema,
+    fx: QuoteComponentConfidenceSchema,
+  }),
   overallConfidence: QuoteComponentConfidenceSchema,
   missingComponents: z.array(QuoteMissingComponentSchema),
-  sources: z
-    .object({
-      duty: QuoteSourceMetadataSchema,
-      vat: QuoteSourceMetadataSchema,
-      surcharges: QuoteSourceMetadataSchema,
-    }),
+  sources: z.object({
+    duty: QuoteSourceMetadataSchema,
+    vat: QuoteSourceMetadataSchema,
+    surcharges: QuoteSourceMetadataSchema,
+  }),
 });
 
 export const QuoteRecentQuerySchema = z.object({
