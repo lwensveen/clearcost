@@ -1,24 +1,16 @@
 import { publicApi } from './api-client';
-import type { QuoteInput, QuoteResponse } from '@clearcost/types';
+import type {
+  QuoteInput,
+  QuoteRecentListResponse,
+  QuoteRecentRow,
+  QuoteResponse,
+} from '@clearcost/types';
 
-export type RecentQuoteRow = {
-  createdAt: string;
-  idemKey: string;
-  origin: string;
-  dest: string;
-  mode?: 'air' | 'sea' | null;
-  hs6?: string | null;
-  currency?: string | null;
-  itemValue?: number | null;
-  total: number;
-  duty: number;
-  vat?: number | null;
-  fees: number;
-};
+export type RecentQuoteRow = QuoteRecentRow;
 
-export async function listRecent(limit = 50): Promise<{ rows: RecentQuoteRow[] }> {
+export async function listRecent(limit = 50): Promise<QuoteRecentListResponse> {
   const api = publicApi();
-  return api.fetchJson(`/v1/quotes/recent?limit=${limit}`);
+  return api.fetchJson<QuoteRecentListResponse>(`/v1/quotes/recent?limit=${limit}`);
 }
 
 export async function getByKey(key: string): Promise<QuoteResponse> {

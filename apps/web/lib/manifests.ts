@@ -1,13 +1,18 @@
 import { publicApi } from '@/lib/api-client';
 import type { ManifestCreateInput } from '@clearcost/types';
 import {
+  ManifestCloneResponseSchema,
+  ManifestComputeResponseSchema,
+  ManifestItemsImportResponseSchema,
   Manifest,
   ManifestCoerced,
+  ManifestItemsImportResponse,
   ManifestItemCoerced,
   ManifestItemQuoteCoerced,
   ManifestQuoteCoerced,
+  ManifestsListResponse,
+  ManifestsListResponseSchema,
 } from '@clearcost/types';
-import { z } from 'zod/v4';
 
 export type ManifestFull = ManifestCoerced & {
   items: ManifestItemCoerced[];
@@ -26,7 +31,9 @@ export async function listManifests(params?: { limit?: number; cursor?: string }
   if (params?.limit != null) qs.set('limit', String(params.limit));
   if (params?.cursor) qs.set('cursor', params.cursor);
   const path = `/v1/manifests${qs.toString() ? `?${qs.toString()}` : ''}`;
-  return api.fetchJson<{ rows: ManifestCoerced[]; nextCursor?: string | null }>(path);
+  const raw = await api.fetchJson<ManifestsListResponse>(path);
+  const parsed = ManifestsListResponseSchema.parse(raw);
+  return { rows: parsed.items, nextCursor: null as string | null };
 }
 
 export async function createManifest(body: ManifestCreateInput) {
@@ -65,23 +72,13 @@ export async function importItemsCsv(
     q.toString() ? `?${q.toString()}` : ''
   }`;
 
-  const ImportResponseSchema = z.object({
-    mode: z.enum(['append', 'replace']),
-    dryRun: z.boolean(),
-    valid: z.number().int(),
-    invalid: z.number().int(),
-    inserted: z.number().int(),
-    replaced: z.number().int().optional(),
-    errors: z.array(z.object({ line: z.number().int(), message: z.string() })),
-  });
-
-  const raw = await api.fetchJson(path, {
+  const raw = await api.fetchJson<ManifestItemsImportResponse>(path, {
     method: 'POST',
     headers: { 'content-type': 'text/csv' },
     body: csv,
   });
 
-  return ImportResponseSchema.parse(raw);
+  return ManifestItemsImportResponseSchema.parse(raw);
 }
 
 export async function computeManifest(
@@ -91,22 +88,13 @@ export async function computeManifest(
 ) {
   const api = publicApi();
   const idem = api.genIdemKey();
-  const ComputeResponseSchema = z.object({
-    ok: z.literal(true),
-    manifestId: z.string().uuid(),
-    allocation: z.enum(['chargeable', 'volumetric', 'weight']),
-    dryRun: z.boolean(),
-    summary: z.unknown().nullable(),
-    items: z.array(z.unknown()),
-  });
-
   const raw = await api.fetchJson(`/v1/manifests/${encodeURIComponent(id)}/compute`, {
     method: 'POST',
     headers: { 'Idempotency-Key': idem },
     body: JSON.stringify({ allocation, dryRun: !!opts?.dryRun }),
   });
 
-  return ComputeResponseSchema.parse(raw);
+  return ManifestComputeResponseSchema.parse(raw);
 }
 
 export async function getManifestQuotes(id: string) {
@@ -123,12 +111,11 @@ export async function getManifestQuotesHistory(id: string) {
 
 export async function cloneManifest(id: string, name?: string) {
   const api = publicApi();
-  const CloneResponseSchema = z.object({ id: z.string().uuid() });
   const raw = await api.fetchJson(`/v1/manifests/${encodeURIComponent(id)}/clone`, {
     method: 'POST',
     body: JSON.stringify(name ? { name } : {}),
   });
-  return CloneResponseSchema.parse(raw);
+  return ManifestCloneResponseSchema.parse(raw);
 }
 
 export async function deleteManifest(id: string) {

@@ -1,25 +1,11 @@
 import type { Metadata } from 'next';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatError } from '@/lib/errors';
+import type { Health } from '@clearcost/types';
 
 export const metadata: Metadata = {
   title: 'Status — ClearCost',
   description: 'Live service status and uptime information',
-};
-
-type Health = {
-  ok: boolean;
-  service: string;
-  time: { server: string; uptimeSec: number; tz: string };
-  db: { ok: boolean; latencyMs: number | null };
-  fxCache: {
-    ok: boolean | null;
-    latest: string | null;
-    ageHours: number | null;
-    maxAgeHours: number;
-  };
-  version: { commit: string | null; env: string };
-  durationMs: number;
 };
 
 type Status = 'operational' | 'degraded' | 'outage' | 'maintenance';
