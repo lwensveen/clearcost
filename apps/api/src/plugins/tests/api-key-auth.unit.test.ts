@@ -98,6 +98,11 @@ async function makeApp() {
     authed: !!req.apiKey,
   }));
 
+  app.get('/auth-any', { preHandler: app.requireApiKey([]) }, async (req) => ({
+    ok: true,
+    authed: !!req.apiKey,
+  }));
+
   app.get(
     '/owner',
     { preHandler: app.requireApiKey([], { ownerFrom: (r) => r.headers['x-owner-id'] as string }) },
@@ -111,6 +116,10 @@ async function makeApp() {
     { preHandler: app.requireApiKey([], { internalSigned: true, optional: true }) },
     async () => ({ ok: true })
   );
+
+  app.post('/internal/strict', { preHandler: app.requireInternalSignature() }, async () => ({
+    ok: true,
+  }));
 
   return app;
 }
@@ -192,6 +201,18 @@ describe('apiKeyAuthPlugin (unit, DB mocked)', () => {
     await app.close();
   });
 
+  it('optional route ignores malformed keys and remains anonymous', async () => {
+    const app = await makeApp();
+    const r = await app.inject({
+      method: 'GET',
+      url: '/optional',
+      headers: { authorization: 'Bearer not-a-clearcost-token' },
+    });
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toEqual({ ok: true, authed: false });
+    await app.close();
+  });
+
   it('401 for inactive / expired / revoked', async () => {
     const app = await makeApp();
 
@@ -219,6 +240,40 @@ describe('apiKeyAuthPlugin (unit, DB mocked)', () => {
     const app = await makeApp();
     const r = await app.inject({ method: 'GET', url: '/private', headers: bearer(liveToken) });
     expect(r.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it('accepts token via x-api-key header', async () => {
+    const { token } = await seedKey();
+    const app = await makeApp();
+    const r = await app.inject({ method: 'GET', url: '/private', headers: { 'x-api-key': token } });
+    expect(r.statusCode).toBe(200);
+    await app.close();
+  });
+
+  it('accepts authorization header when provided as an array value', async () => {
+    const { token } = await seedKey();
+    const app = await makeApp();
+    const r = await app.inject({
+      method: 'GET',
+      url: '/auth-any',
+      headers: { authorization: [`Bearer ${token}`] as any },
+    });
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toMatchObject({ ok: true, authed: true });
+    await app.close();
+  });
+
+  it('accepts x-api-key header when provided as an array value', async () => {
+    const { token } = await seedKey();
+    const app = await makeApp();
+    const r = await app.inject({
+      method: 'GET',
+      url: '/auth-any',
+      headers: { 'x-api-key': [token] as any },
+    });
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toMatchObject({ ok: true, authed: true });
     await app.close();
   });
 
@@ -314,6 +369,87 @@ describe('apiKeyAuthPlugin (unit, DB mocked)', () => {
     });
     expect(ok.statusCode).toBe(200);
 
+    await app.close();
+  });
+
+  it('requireInternalSignature decorator enforces signed requests', async () => {
+    const app = await makeApp();
+    const url = '/internal/strict?x=1';
+    const body = { ping: 'pong' };
+    const ts = Date.now();
+    const secret = process.env.INTERNAL_SIGNING_SECRET!;
+
+    const missing = await app.inject({ method: 'POST', url, payload: body });
+    expect(missing.statusCode).toBe(401);
+
+    const ok = await app.inject({
+      method: 'POST',
+      url,
+      payload: body,
+      headers: signInternal(ts, 'POST', url, body, secret),
+    });
+    expect(ok.statusCode).toBe(200);
+
+    await app.close();
+  });
+
+  it('returns 401 when token row has no tokenPhc', async () => {
+    const { token, keyId, prefix, ownerId } = await seedKey();
+    const row = dbState.rows.find((r) => r.keyId === keyId)!;
+    row.tokenPhc = '' as any;
+
+    const app = await makeApp();
+    const res = await app.inject({ method: 'GET', url: '/private', headers: bearer(token) });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toMatchObject({ error: { message: 'Invalid API key' } });
+    expect(prefix).toBeDefined();
+    expect(ownerId).toBeDefined();
+    await app.close();
+  });
+
+  it('returns 401 when token PHC is valid but does not match presented secret', async () => {
+    const seededA = await seedKey();
+    const seededB = await seedKey();
+    const rowA = dbState.rows.find((r) => r.keyId === seededA.keyId)!;
+    const rowB = dbState.rows.find((r) => r.keyId === seededB.keyId)!;
+    rowA.tokenPhc = rowB.tokenPhc;
+
+    const app = await makeApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: '/private',
+      headers: bearer(seededA.token),
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toMatchObject({ error: { message: 'Invalid API key' } });
+    await app.close();
+  });
+
+  it('returns 500 when stored PHC string is invalid', async () => {
+    const { token, keyId } = await seedKey();
+    const row = dbState.rows.find((r) => r.keyId === keyId)!;
+    row.tokenPhc = 'invalid-phc';
+
+    const app = await makeApp();
+    const res = await app.inject({ method: 'GET', url: '/private', headers: bearer(token) });
+
+    expect(res.statusCode).toBe(500);
+    await app.close();
+  });
+
+  it('handles rows with undefined scopes/origins by defaulting to empty arrays', async () => {
+    const { token, keyId } = await seedKey();
+    const row = dbState.rows.find((r) => r.keyId === keyId)!;
+    (row as any).scopes = undefined;
+    (row as any).allowedOrigins = undefined;
+
+    const app = await makeApp();
+    const res = await app.inject({ method: 'GET', url: '/auth-any', headers: bearer(token) });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true, authed: true });
     await app.close();
   });
 });

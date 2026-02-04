@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
 import usagePlugin from '../api-usage.js';
-import { __calls } from '@clearcost/db';
+import { __calls, __state } from '@clearcost/db';
 
 vi.mock('drizzle-orm', () => {
   const sql = (lits: TemplateStringsArray, ...vals: any[]) => {
@@ -19,6 +19,7 @@ vi.mock('drizzle-orm', () => {
 // --- Mock @clearcost/db: capture insert + onConflictDoUpdate calls -----------------
 declare module '@clearcost/db' {
   export const __calls: any[];
+  export const __state: { failUpsert: boolean };
 }
 vi.mock('@clearcost/db', () => {
   const apiUsageTable = {
@@ -34,11 +35,13 @@ vi.mock('@clearcost/db', () => {
   } as const;
 
   const __calls: any[] = [];
+  const __state = { failUpsert: false };
 
   const db = {
     insert: (tbl: any) => ({
       values: (vals: any) => ({
         onConflictDoUpdate: (args: any) => {
+          if (__state.failUpsert) throw new Error('upsert failed');
           __calls.push({ tbl, vals, args });
           return Promise.resolve();
         },
@@ -46,7 +49,7 @@ vi.mock('@clearcost/db', () => {
     }),
   };
 
-  return { apiUsageTable, db, __calls };
+  return { apiUsageTable, db, __calls, __state };
 });
 
 // Helpers
@@ -63,6 +66,7 @@ function bearerApiKey(app: any, keyId = 'unit-key-1') {
 describe('usage-plugin (unit)', () => {
   beforeEach(() => {
     __calls.length = 0;
+    __state.failUpsert = false;
   });
 
   it('skips when no apiKey on request', async () => {
@@ -123,6 +127,64 @@ describe('usage-plugin (unit)', () => {
     expect(String(set.sumBytesIn)).toContain('sumBytesIn + 7');
     expect(String(set.sumBytesOut)).toContain('sumBytesOut + 4');
 
+    await app.close();
+  });
+
+  it('counts bytesOut when payload is a Buffer', async () => {
+    const app = Fastify();
+    await app.register(usagePlugin);
+    bearerApiKey(app, 'unit-key-buffer');
+    app.get('/bin', async (_req, reply) => reply.send(Buffer.from([1, 2, 3, 4, 5])));
+
+    const res = await app.inject({ method: 'GET', url: '/bin' });
+    expect(res.statusCode).toBe(200);
+    expect(__calls.length).toBe(1);
+    expect(__calls[0].vals.sumBytesOut).toBe(5);
+    await app.close();
+  });
+
+  it('swallows metering failures and keeps request successful', async () => {
+    __state.failUpsert = true;
+
+    const app = Fastify();
+    await app.register(usagePlugin);
+    bearerApiKey(app, 'unit-key-fail');
+    app.get('/ok', async () => ({ ok: true }));
+
+    const res = await app.inject({ method: 'GET', url: '/ok' });
+    expect(res.statusCode).toBe(200);
+    expect(__calls.length).toBe(0);
+    await app.close();
+  });
+
+  it('recreates usage state when another hook clears req._usage', async () => {
+    const app = Fastify();
+    await app.register(usagePlugin);
+    bearerApiKey(app, 'unit-key-reset');
+    app.addHook('preHandler', async (req: any) => {
+      req._usage = undefined;
+    });
+    app.get('/reset', async () => 'ok');
+
+    const res = await app.inject({ method: 'GET', url: '/reset' });
+    expect(res.statusCode).toBe(200);
+    expect(__calls.length).toBe(1);
+    expect(__calls[0].vals.sumBytesIn).toBe(0);
+    expect(__calls[0].vals.sumBytesOut).toBe(2);
+    await app.close();
+  });
+
+  it('handles empty string payload with zero-byte fallback counters', async () => {
+    const app = Fastify();
+    await app.register(usagePlugin);
+    bearerApiKey(app, 'unit-key-empty');
+    app.get('/empty', async () => '');
+
+    const res = await app.inject({ method: 'GET', url: '/empty' });
+    expect(res.statusCode).toBe(200);
+    expect(__calls.length).toBe(1);
+    expect(__calls[0].vals.sumBytesOut).toBe(0);
+    expect(String(__calls[0].args.set.sumBytesOut)).toContain('sumBytesOut + 0');
     await app.close();
   });
 });

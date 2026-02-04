@@ -255,6 +255,47 @@ describe('import-instrumentation plugin (unit)', () => {
     await app.close();
   });
 
+  it('onError string throw uses string fallback in provenance error text', async () => {
+    const plugin = await loadPlugin();
+    const app = Fastify();
+    await app.register(plugin);
+    app.get(
+      '/throw-string',
+      { config: { importMeta: { importSource: 'WITS', job: 'seed' } } },
+      async () => {
+        throw 'kaboom-string';
+      }
+    );
+
+    const r = await app.inject({ method: 'GET', url: '/throw-string' });
+    expect(r.statusCode).toBe(500);
+    expect(finishImportRun).toHaveBeenCalledWith('run-1', {
+      importStatus: 'failed',
+      error: 'kaboom-string',
+    });
+    await app.close();
+  });
+
+  it('onError with empty lock key does not call releaseRunLock', async () => {
+    makeLockKeyMock.mockReturnValueOnce('');
+
+    const plugin = await loadPlugin();
+    const app = Fastify();
+    await app.register(plugin);
+    app.get(
+      '/throw-empty-lock',
+      { config: { importMeta: { importSource: 'WITS', job: 'seed' } } },
+      async () => {
+        throw new Error('boom-empty-lock');
+      }
+    );
+
+    const r = await app.inject({ method: 'GET', url: '/throw-empty-lock' });
+    expect(r.statusCode).toBe(500);
+    expect(releaseRunLockMock).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it('heartbeats fire while handler is in-flight (interval every 30s)', async () => {
     vi.useFakeTimers();
 
@@ -327,6 +368,76 @@ describe('import-instrumentation plugin (unit)', () => {
     const r = await app.inject({ method: 'GET', url: '/badjson' });
     expect(r.statusCode).toBe(200);
     expect(importRowsInserted.inc).toHaveBeenCalledWith({ importSource: 'WITS', job: 'seed' }, 0);
+    await app.close();
+  });
+
+  it('parses JSON from Buffer payloads', async () => {
+    const plugin = await loadPlugin();
+    const app = Fastify();
+    await app.register(plugin);
+    app.get(
+      '/buffer-json',
+      { config: { importMeta: { importSource: 'WITS', job: 'seed' } } },
+      async (_req, reply) =>
+        reply.type('application/json').send(Buffer.from(JSON.stringify({ inserted: 4 })))
+    );
+
+    const r = await app.inject({ method: 'GET', url: '/buffer-json' });
+    expect(r.statusCode).toBe(200);
+    expect(importRowsInserted.inc).toHaveBeenCalledWith({ importSource: 'WITS', job: 'seed' }, 4);
+    await app.close();
+  });
+
+  it('skips lock release when lock key is empty string', async () => {
+    makeLockKeyMock.mockReturnValueOnce('');
+
+    const plugin = await loadPlugin();
+    const app = Fastify();
+    await app.register(plugin);
+    app.get(
+      '/empty-lock',
+      { config: { importMeta: { importSource: 'WITS', job: 'seed' } } },
+      async (_req, reply) => reply.type('application/json').send({ inserted: 1 })
+    );
+
+    const r = await app.inject({ method: 'GET', url: '/empty-lock' });
+    expect(r.statusCode).toBe(200);
+    expect(acquireRunLockMock).toHaveBeenCalledWith('');
+    expect(releaseRunLockMock).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('returns early in onError when route has no importMeta context', async () => {
+    const plugin = await loadPlugin();
+    const app = Fastify();
+    await app.register(plugin);
+    app.get('/plain-throw', async () => {
+      throw new Error('plain-error');
+    });
+
+    const r = await app.inject({ method: 'GET', url: '/plain-throw' });
+    expect(r.statusCode).toBe(500);
+    expect(importErrors.inc).not.toHaveBeenCalled();
+    expect(finishImportRun).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('handles missing heartbeat handle without crashing stopHeartbeat', async () => {
+    const plugin = await loadPlugin();
+    const app = Fastify();
+    await app.register(plugin);
+    app.get(
+      '/no-heartbeat',
+      { config: { importMeta: { importSource: 'WITS', job: 'seed' } } },
+      async (req, reply) => {
+        (req as any)._importHeartbeat = undefined;
+        return reply.type('application/json').send({ inserted: 1 });
+      }
+    );
+
+    const r = await app.inject({ method: 'GET', url: '/no-heartbeat' });
+    expect(r.statusCode).toBe(200);
+    expect(releaseRunLockMock).toHaveBeenCalledWith('WITS:seed');
     await app.close();
   });
 });
