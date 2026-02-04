@@ -75,4 +75,4 @@ jobs:
         run: cd apps/api && bun run check-types
 
       - name: Run API tests
-        run: cd apps/api && bun run test
+        run: bun run test -- --filter=@clearcost/api
