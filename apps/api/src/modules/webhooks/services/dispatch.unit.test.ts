@@ -239,6 +239,7 @@ describe('emitWebhook', () => {
     decryptSpy.mockReset();
     decryptSpy.mockImplementation(() => 'sekret-123');
     fetchMock.mockClear();
+    process.env.NODE_ENV = 'test';
   });
 
   it('creates a delivery and marks success on 2xx; signs request correctly', async () => {
@@ -381,5 +382,64 @@ describe('emitWebhook', () => {
 
     expect(state.deliveries.length).toBe(1);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses fire-and-forget path outside test env', async () => {
+    process.env.NODE_ENV = 'production';
+    const { emitWebhook } = await importSut();
+
+    seedEndpoint({ events: null });
+    state.fetchQueue.push({ status: 200, body: 'ok' });
+
+    await emitWebhook('owner-1', 'quote.created', { p: 1 });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(state.deliveries.length).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('records transport exceptions as status=0 and schedules retry', async () => {
+    const { emitWebhook } = await importSut();
+
+    seedEndpoint({ events: null });
+    state.fetchQueue.push(() => {
+      throw new Error('socket hang up');
+    });
+
+    await emitWebhook('owner-1', 'quote.created', { p: 1 });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(state.deliveries.length).toBe(1);
+    const del = state.deliveries[0]!;
+    expect(del.attempt).toBe(1);
+    expect(del.status).toBe('pending');
+    expect(del.responseStatus).toBe(0);
+    expect(String(del.responseBody)).toContain('socket hang up');
+    expect(del.nextAttemptAt).toBeInstanceOf(Date);
+  });
+
+  it('marks delivery failed after max retry attempts', async () => {
+    const { emitWebhook } = await importSut();
+    seedEndpoint({ events: null });
+    state.fetchQueue.push(500, 500, 500);
+
+    await emitWebhook('owner-1', 'quote.created', { p: 1 });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const del = state.deliveries[0]!;
+    expect(del.attempt).toBe(3);
+    expect(del.status).toBe('failed');
+    expect(del.nextAttemptAt).toBeNull();
   });
 });
