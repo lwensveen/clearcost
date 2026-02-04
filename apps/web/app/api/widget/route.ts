@@ -10,6 +10,12 @@ function reqIdem(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const widgetProxyEnabled =
+    process.env.NODE_ENV !== 'production' || process.env.ENABLE_PUBLIC_WIDGET_PROXY === '1';
+  if (!widgetProxyEnabled) {
+    return errorJson('Widget proxy is disabled', 403);
+  }
+
   let API: string;
   let KEY: string;
   try {

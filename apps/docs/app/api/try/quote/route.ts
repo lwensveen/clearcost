@@ -10,7 +10,15 @@ function getProxyConfig() {
 }
 
 function bad(msg: string, status = 400) {
-  return NextResponse.json({ error: msg }, { status });
+  const code =
+    status === 400
+      ? 'ERR_BAD_REQUEST'
+      : status === 403
+        ? 'ERR_FORBIDDEN'
+        : status >= 500
+          ? 'ERR_INTERNAL'
+          : 'ERR_REQUEST';
+  return NextResponse.json({ error: { code, message: msg } }, { status });
 }
 
 function num(v: unknown, min = 0) {
@@ -30,6 +38,10 @@ function asRecord(v: unknown): Record<string, unknown> | null {
 }
 
 export async function POST(req: NextRequest) {
+  const docsProxyEnabled =
+    process.env.NODE_ENV !== 'production' || process.env.ENABLE_DOCS_PLAYGROUND_PROXY === '1';
+  if (!docsProxyEnabled) return bad('Playground proxy is disabled', 403);
+
   const { api, key } = getProxyConfig();
   if (!api || !key) return bad('Server not configured');
   let body: Record<string, unknown> | null = null;
