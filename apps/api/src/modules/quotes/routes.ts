@@ -152,7 +152,7 @@ export default function quoteRoutes(app: FastifyInstance) {
       preHandler: app.requireApiKey(['quotes:read']),
       schema: {
         params: QuoteByKeyParamsSchema,
-        response: { 200: QuoteResponseSchema, 404: ErrorResponseSchema },
+        response: { 200: QuoteResponseSchema, 404: ErrorResponseSchema, 409: ErrorResponseSchema },
       },
       config: { rateLimit: { max: 600, timeWindow: '1 minute' } },
     },
@@ -182,7 +182,9 @@ export default function quoteRoutes(app: FastifyInstance) {
           issues: parsed.error.issues,
           msg: 'cached quote failed schema',
         });
-        return reply.code(500).send(errorResponseForStatus(500, 'Cached response invalid'));
+        return reply
+          .code(409)
+          .send(errorResponseForStatus(409, 'Cached response incompatible with current schema'));
       }
 
       reply
