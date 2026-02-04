@@ -115,15 +115,15 @@ describe('refreshFx (integration of parse + upsert)', () => {
   });
 
   it('fetches, parses, upserts, and returns summary', async () => {
-    // Spy the module-local exported function so refreshFx uses the stub
-    const spy = vi.spyOn(fx, 'fetchEcbXml').mockResolvedValue(SAMPLE_XML);
+    const fetchMock = vi.fn(async () => ({ ok: true, text: async () => SAMPLE_XML }));
+    vi.stubGlobal('fetch', fetchMock);
 
     const res = await fx.refreshFx();
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
     expect(res).toEqual({ fxAsOf: '2025-08-31', inserted: 2, base: 'EUR' });
     expect(calls.length).toBe(2); // USD + JPY rows
 
-    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 });
