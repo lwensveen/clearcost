@@ -1,11 +1,16 @@
 name: Release
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: ['Release Gate']
+    types: [completed]
+  workflow_dispatch: {}
 
 jobs:
   release:
-    if: "github.event.head_commit.message != 'chore(release): version bump and changelogs'"
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -13,7 +18,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
-        with: { fetch-depth: 0 }
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup Node & Bun
         uses: ./.github/actions/setup-node-bun
