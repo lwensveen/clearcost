@@ -36,10 +36,10 @@ export const QuoteComponentConfidenceSchema = z.enum(['authoritative', 'estimate
 export const QuoteMissingComponentSchema = z.enum(['duty', 'vat', 'surcharges', 'freight', 'fx']);
 
 export const QuoteSourceMetadataSchema = z.object({
-  provider: z.string().nullable().optional(),
-  dataset: z.string().nullable().optional(),
-  asOf: z.string().nullable().optional(),
-  effectiveFrom: z.string().nullable().optional(),
+  provider: z.string().nullable(),
+  dataset: z.string().nullable(),
+  asOf: z.string().nullable(),
+  effectiveFrom: z.string().nullable(),
 });
 
 export const QuoteResponseSchema = z.object({
@@ -80,17 +80,15 @@ export const QuoteResponseSchema = z.object({
       surcharges: QuoteComponentConfidenceSchema,
       freight: QuoteComponentConfidenceSchema,
       fx: QuoteComponentConfidenceSchema,
-    })
-    .optional(),
-  overallConfidence: QuoteComponentConfidenceSchema.optional(),
-  missingComponents: z.array(QuoteMissingComponentSchema).optional(),
+    }),
+  overallConfidence: QuoteComponentConfidenceSchema,
+  missingComponents: z.array(QuoteMissingComponentSchema),
   sources: z
     .object({
-      duty: QuoteSourceMetadataSchema.optional(),
-      vat: QuoteSourceMetadataSchema.optional(),
-      surcharges: QuoteSourceMetadataSchema.optional(),
-    })
-    .optional(),
+      duty: QuoteSourceMetadataSchema,
+      vat: QuoteSourceMetadataSchema,
+      surcharges: QuoteSourceMetadataSchema,
+    }),
 });
 
 export const QuoteRecentQuerySchema = z.object({
