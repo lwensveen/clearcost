@@ -393,7 +393,7 @@ bun run src/lib/run-cron.ts import:prune --days 90
 - Key metrics:
   - `http_server_request_duration_seconds`
   - `http_server_requests_total`
-  - `clearcost_import_last_run_timestamp{import_id="…"}`
+  - `clearcost_import_last_run_timestamp{importSource="…",job="…",dest="…"}`
   - `clearcost_imports_running{age_bucket="…"}`
 
 ---
@@ -402,6 +402,7 @@ bun run src/lib/run-cron.ts import:prune --days 90
 
 - **Local**: `bun test`
 - **Release gate**: `.github/workflows/release-gate.yml`
+- **Release workflow**: `.github/workflows/release.yml` (runs only after successful `Staging Smoke`)
 - **Test conventions**:
   - Unit tests: `*.unit.test.ts`
   - Integration tests: `*.int.test.ts`
@@ -416,11 +417,11 @@ bun run src/lib/run-cron.ts import:prune --days 90
 
 ### Release TODO
 
-- [ ] Enable branch protection on `main` and require `Release Gate`.
+- [ ] Enable branch protection on `main` and require `Release Gate` + `Staging Smoke`; disable direct-push bypass for non-admin maintainers.
 - [ ] Create `staging` environment secrets used by `staging-smoke.yml`.
 - [ ] Run one manual `Staging Smoke` workflow and verify artifact output.
 - [ ] Run billing readiness flow in Stripe test mode (`ops/runbooks/billing-readiness.md`).
-- [ ] Confirm data freshness thresholds and alert handling (`ops/runbooks/data-freshness.md`).
+- [x] Confirm data freshness thresholds and alert handling (`ops/runbooks/data-freshness.md`).
 
 ---
 
