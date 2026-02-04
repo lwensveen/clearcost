@@ -6,7 +6,8 @@ const FX_MAX_AGE_HOURS = Number(process.env.FX_MAX_AGE_HOURS ?? 48);
 
 export { HealthSchema };
 
-export async function checkHealth(): Promise<Health> {
+export async function checkHealth(opts: { publicView?: boolean } = {}): Promise<Health> {
+  const publicView = opts.publicView ?? false;
   const startedAt = Date.now();
 
   let dbOk = false;
@@ -41,6 +42,14 @@ export async function checkHealth(): Promise<Health> {
 
   const ok = dbOk && (fxOk === null || fxOk);
 
+  const dbLatencyPublic = publicView ? null : dbLatencyMs;
+  const fxLatestPublic = publicView ? null : fxLatest;
+  const fxAgeHoursPublic = publicView ? null : fxAgeHours;
+  const commitPublic = publicView
+    ? null
+    : process.env.VERCEL_GIT_COMMIT_SHA || process.env.COMMIT_SHA;
+  const envPublic = publicView ? 'public' : process.env.NODE_ENV || 'development';
+
   return {
     ok,
     service: 'clearcost-api',
@@ -49,16 +58,16 @@ export async function checkHealth(): Promise<Health> {
       uptimeSec: Math.floor(process.uptime()),
       tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     },
-    db: { ok: dbOk, latencyMs: dbLatencyMs },
+    db: { ok: dbOk, latencyMs: dbLatencyPublic },
     fxCache: {
       ok: fxOk,
-      latest: fxLatest,
-      ageHours: fxAgeHours,
+      latest: fxLatestPublic,
+      ageHours: fxAgeHoursPublic,
       maxAgeHours: FX_MAX_AGE_HOURS,
     },
     version: {
-      commit: process.env.VERCEL_GIT_COMMIT_SHA || process.env.COMMIT_SHA || null,
-      env: process.env.NODE_ENV || 'development',
+      commit: commitPublic ?? null,
+      env: envPublic,
     },
     durationMs: Date.now() - startedAt,
   };

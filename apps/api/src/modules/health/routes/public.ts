@@ -10,7 +10,7 @@ export default function healthPublicRoutes(app: FastifyInstance) {
       config: { rateLimit: { max: 600, timeWindow: '1 minute' } },
     },
     async (_req, reply) => {
-      const report = await checkHealth();
+      const report = await checkHealth({ publicView: true });
       reply.header('cache-control', 'no-store');
       return reply.code(report.ok ? 200 : 503).send(report);
     }
@@ -24,7 +24,7 @@ export default function healthPublicRoutes(app: FastifyInstance) {
       config: { rateLimit: { max: 300, timeWindow: '1 minute' } },
     },
     async (_req, reply) => {
-      const report = await checkHealth();
+      const report = await checkHealth({ publicView: true });
       reply.header('cache-control', 'no-store');
       return reply.code(report.ok ? 200 : 503).send(report);
     }
