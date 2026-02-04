@@ -14,6 +14,10 @@ describe('quote confidence mapping', () => {
     expect(deriveConfidenceFromStatus('error')).toBe('missing');
   });
 
+  it('falls back to missing for unknown status values', () => {
+    expect(deriveConfidenceFromStatus('unexpected_status' as any)).toBe('missing');
+  });
+
   it('computes overall confidence as worst-of', () => {
     expect(
       overallConfidenceFrom({

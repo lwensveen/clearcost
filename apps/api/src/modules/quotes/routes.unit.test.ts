@@ -90,6 +90,17 @@ function mockInsertSuccess() {
   mocks.insertMock.mockReturnValue({ values });
 }
 
+function mockInsertAsyncCatch() {
+  const catchable = {
+    catch: vi.fn((cb: (err: Error) => void) => {
+      cb(new Error('insert failed'));
+      return Promise.resolve();
+    }),
+  };
+  const values = vi.fn(() => catchable);
+  mocks.insertMock.mockReturnValue({ values });
+}
+
 function mockReplayRow(row: unknown) {
   mocks.selectMock.mockImplementationOnce(() => ({
     from: () => ({
@@ -167,6 +178,60 @@ describe('quotes routes', () => {
     await app.close();
   });
 
+  it('POST / accepts x-idempotency-key header', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/',
+      headers: { 'x-idempotency-key': 'idem_x_1' },
+      payload: quoteInput,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['idempotency-key']).toBe('idem_x_1');
+    await app.close();
+  });
+
+  it('POST / tolerates best-effort audit/snapshot insert failures', async () => {
+    mockInsertAsyncCatch();
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/',
+      headers: { 'idempotency-key': 'idem_warn' },
+      payload: quoteInput,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.insertMock).toHaveBeenCalledTimes(2);
+    await app.close();
+  });
+
+  it('POST / writes audit notes when checkout VAT is present', async () => {
+    mocks.quoteLandedCostMock.mockResolvedValueOnce({
+      quote: {
+        ...sampleQuote,
+        components: { ...sampleQuote.components, checkoutVAT: 12 },
+      },
+      fxAsOf: new Date('2025-01-01T00:00:00.000Z'),
+    });
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/',
+      headers: { 'idempotency-key': 'idem_checkout_vat' },
+      payload: quoteInput,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const firstInsert = mocks.insertMock.mock.results[0]?.value;
+    const valuesFn = firstInsert?.values;
+    const payloadArg = valuesFn?.mock?.calls?.[0]?.[0];
+    expect(payloadArg?.notes).toBe('IOSS checkout VAT included');
+    await app.close();
+  });
+
   it('POST / marks replay responses with Idempotent-Replayed header', async () => {
     mocks.withIdempotencyMock.mockImplementation(async (_scope, _key, _body, _compute, opts) => {
       return opts.onReplay(sampleQuote);
@@ -201,6 +266,22 @@ describe('quotes routes', () => {
     await app.close();
   });
 
+  it('POST / uses default conflict message when idempotency error has no message', async () => {
+    mocks.withIdempotencyMock.mockRejectedValue({ statusCode: 409 });
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/',
+      headers: { 'idempotency-key': 'idem_conflict_fallback' },
+      payload: quoteInput,
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({ error: { message: 'Processing' } });
+    await app.close();
+  });
+
   it('POST / returns 500 on unexpected quote failures', async () => {
     mocks.withIdempotencyMock.mockRejectedValue(new Error('boom'));
 
@@ -217,6 +298,22 @@ describe('quotes routes', () => {
     await app.close();
   });
 
+  it('POST / uses default 500 message when error has no message', async () => {
+    mocks.withIdempotencyMock.mockRejectedValue({ statusCode: 500 });
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/',
+      headers: { 'idempotency-key': 'idem_fail_fallback' },
+      payload: quoteInput,
+    });
+
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toMatchObject({ error: { message: 'quote failed' } });
+    await app.close();
+  });
+
   it('GET /by-key/:key returns 404 when cached quote is missing', async () => {
     mocks.findFirstMock.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
 
@@ -224,6 +321,37 @@ describe('quotes routes', () => {
     const res = await app.inject({ method: 'GET', url: '/by-key/k_missing' });
 
     expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it('GET /by-key/:key evaluates tenant and legacy-scope predicates', async () => {
+    mocks.findFirstMock
+      .mockImplementationOnce(async (opts: any) => {
+        opts?.where?.(
+          { scope: 'scope', key: 'key', status: 'status' },
+          {
+            and: (...args: unknown[]) => args,
+            eq: (_a: unknown, _b: unknown) => true,
+          }
+        );
+        return undefined;
+      })
+      .mockImplementationOnce(async (opts: any) => {
+        opts?.where?.(
+          { scope: 'scope', key: 'key', status: 'status' },
+          {
+            and: (...args: unknown[]) => args,
+            eq: (_a: unknown, _b: unknown) => true,
+          }
+        );
+        return { response: sampleQuote, status: 'completed' };
+      });
+
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/by-key/k_legacy' });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.findFirstMock).toHaveBeenCalledTimes(2);
     await app.close();
   });
 
@@ -332,6 +460,17 @@ describe('quotes routes', () => {
     expect(json.rows).toHaveLength(2);
     expect(json.rows[0]).toMatchObject({ idemKey: 'a', total: 158.6, duty: 6, fees: 7.4 });
     expect(json.rows[1]).toMatchObject({ idemKey: 'b', total: 0, duty: 0, fees: 0 });
+    await app.close();
+  });
+
+  it('GET /recent supports sinceHours filter branch', async () => {
+    mockRecentRows([]);
+
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/recent?limit=5&sinceHours=24' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ rows: [] });
     await app.close();
   });
 

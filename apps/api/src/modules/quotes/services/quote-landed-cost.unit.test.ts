@@ -267,4 +267,99 @@ describe('quoteLandedCost', () => {
     expect(out.quote.components.vat).toBe(0);
     expect(out.quote.policy).toContain('De minimis: duty & VAT');
   });
+
+  it('uses VAT base CIF when returned by VAT lookup', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.getVatForHs6WithMetaMock.mockResolvedValue({
+      value: {
+        ratePct: 20,
+        vatBase: 'CIF',
+        source: 'default',
+        effectiveFrom: new Date('2025-01-02T00:00:00.000Z'),
+      },
+      meta: { status: 'ok', dataset: null, effectiveFrom: new Date('2025-01-02T00:00:00.000Z') },
+    });
+
+    const out = await quoteLandedCost(baseInput);
+
+    expect(out.quote.components.vat).toBe(24);
+  });
+
+  it('uses JPY rounding rules (0 decimals)', async () => {
+    mockMerchantContext(undefined, []);
+    const out = await quoteLandedCost({ ...baseInput, dest: 'JPY' });
+
+    expect(Number.isInteger(out.quote.total)).toBe(true);
+    expect(Number.isInteger(out.quote.components.CIF)).toBe(true);
+  });
+
+  it('supports merchant-less flow and sea mode chargeable calculation', async () => {
+    mocks.getFreightWithMetaMock.mockResolvedValue({
+      value: { price: 15 },
+      meta: { status: 'ok' },
+    });
+    const out = await quoteLandedCost({
+      ...baseInput,
+      merchantId: undefined,
+      mode: 'sea',
+    });
+
+    expect(mocks.selectMock).not.toHaveBeenCalled();
+    expect(out.quote.chargeableKg).toBe(baseInput.weightKg);
+    expect(out.quote.freight).toBe(15);
+  });
+
+  it('de minimis policy message handles duty-only and VAT-only suppression', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.evaluateDeMinimisMock.mockResolvedValueOnce({
+      duty: { thresholdDest: 800, deMinimisBasis: 'CIF', under: true },
+      vat: null,
+      suppressDuty: true,
+      suppressVAT: false,
+    });
+    const dutyOnly = await quoteLandedCost(baseInput);
+    expect(dutyOnly.quote.policy).toContain('duty not charged');
+
+    mockMerchantContext(undefined, []);
+    mocks.evaluateDeMinimisMock.mockResolvedValueOnce({
+      duty: null,
+      vat: { thresholdDest: 800, deMinimisBasis: 'CIF', under: true },
+      suppressDuty: false,
+      suppressVAT: true,
+    });
+    const vatOnly = await quoteLandedCost(baseInput);
+    expect(vatOnly.quote.policy).toContain('VAT not charged');
+  });
+
+  it('handles missing freight row and sparse surcharge rows without NaN', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.getFreightWithMetaMock.mockResolvedValue({
+      value: null,
+      meta: { status: 'no_match' },
+    });
+    mocks.getSurchargesScopedWithMetaMock.mockResolvedValue({
+      value: [{}, { fixedAmt: undefined, pctAmt: undefined }],
+      meta: { status: 'ok', dataset: null, effectiveFrom: null },
+    });
+
+    const out = await quoteLandedCost(baseInput);
+
+    expect(out.quote.freight).toBe(0);
+    expect(out.quote.components.fees).toBe(0);
+  });
+
+  it('IOSS path tolerates missing VAT info and omits checkoutVAT when zero', async () => {
+    mockMerchantContext({ collectVatAtCheckout: 'always', chargeShippingAtCheckout: false }, [
+      { jurisdiction: 'EU', scheme: 'IOSS' },
+    ]);
+    mocks.getVatForHs6WithMetaMock.mockResolvedValue({
+      value: null,
+      meta: { status: 'no_match', dataset: null, effectiveFrom: null },
+    });
+
+    const out = await quoteLandedCost(baseInput);
+
+    expect(out.quote.policy).toContain('IOSS');
+    expect(out.quote.components.checkoutVAT).toBeUndefined();
+  });
 });
