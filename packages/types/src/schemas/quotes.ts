@@ -42,6 +42,40 @@ export const QuoteSourceMetadataSchema = z.object({
   effectiveFrom: z.string().nullable(),
 });
 
+export const QuoteExplainabilitySchema = z.object({
+  duty: z.object({
+    dutyRule: z.string().nullable(),
+    partner: z.string().nullable(),
+    source: z.string().nullable(),
+    effectiveFrom: z.string().nullable(),
+    suppressedByDeMinimis: z.boolean(),
+  }),
+  vat: z.object({
+    source: z.string().nullable(),
+    vatBase: z.enum(['CIF', 'CIF_PLUS_DUTY']).nullable(),
+    effectiveFrom: z.string().nullable(),
+    checkoutCollected: z.boolean(),
+    suppressedByDeMinimis: z.boolean(),
+  }),
+  deMinimis: z.object({
+    suppressDuty: z.boolean(),
+    suppressVAT: z.boolean(),
+    dutyBasis: z.enum(['CIF', 'INTRINSIC']).nullable(),
+    vatBasis: z.enum(['CIF', 'INTRINSIC']).nullable(),
+  }),
+  surcharges: z.object({
+    appliedCodes: z.array(z.string()),
+    appliedCount: z.number().int().nonnegative(),
+    sourceRefs: z.array(z.string()),
+  }),
+  freight: z.object({
+    model: z.enum(['card', 'override']),
+    lookupStatus: z.enum(['ok', 'no_match', 'no_dataset', 'out_of_scope', 'error']),
+    unit: z.enum(['kg', 'm3']),
+    qty: z.number(),
+  }),
+});
+
 export const QuoteResponseSchema = z.object({
   hs6: z.string().regex(/^\d{6}$/),
 
@@ -87,6 +121,7 @@ export const QuoteResponseSchema = z.object({
     vat: QuoteSourceMetadataSchema,
     surcharges: QuoteSourceMetadataSchema,
   }),
+  explainability: QuoteExplainabilitySchema.optional(),
 });
 
 export const QuoteRecentQuerySchema = z.object({

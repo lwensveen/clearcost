@@ -137,6 +137,7 @@
         "PH_TARIFF_ATTRIBUTION",
         "PH_TARIFF_EXCEL_URL",
         "PH_TARIFF_SHEET",
+        "QUOTE_STRICT_FRESHNESS",
         "RATE_LIMIT_MAX",
         "RATE_LIMIT_WINDOW",
         "REDIS_TOKEN",

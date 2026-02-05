@@ -10,8 +10,13 @@ import { getFreightWithMeta } from '../../freight/services/get-freight.js';
 import { getVatForHs6WithMeta } from '../../vat/services/get-vat-for-hs6.js';
 import { getCanonicalFxAsOf } from '../../fx/services/get-canonical-fx-asof.js';
 import { evaluateDeMinimis } from '../../de-minimis/services/evaluate.js';
-import { deriveQuoteConfidenceParts } from './confidence.js';
+import {
+  deriveQuoteConfidenceParts,
+  overallConfidenceFrom,
+  type QuoteConfidenceComponent,
+} from './confidence.js';
 import { toQuoteSourceMetadata } from './source-metadata.js';
+import { getDatasetFreshnessSnapshot } from '../../health/services.js';
 
 type Unit = 'kg' | 'm3';
 const BASE_CCY = process.env.CURRENCY_BASE ?? 'USD';
@@ -22,11 +27,39 @@ const roundMoney = (n: number, ccy: string) => {
   return Math.round(n * f) / f;
 };
 
+function isStrictFreshnessEnabled() {
+  return process.env.QUOTE_STRICT_FRESHNESS === '1';
+}
+
+function strictStaleComponentsFromSnapshot(
+  snapshot: Awaited<ReturnType<typeof getDatasetFreshnessSnapshot>>
+) {
+  const out: Array<{ component: QuoteConfidenceComponent; dataset: string }> = [];
+
+  const pushIfStale = (
+    component: QuoteConfidenceComponent,
+    dataset: keyof typeof snapshot.datasets
+  ) => {
+    if (snapshot.datasets[dataset].stale === true) {
+      out.push({ component, dataset });
+    }
+  };
+
+  pushIfStale('duty', 'duties');
+  pushIfStale('vat', 'vat');
+  pushIfStale('surcharges', 'surcharges');
+  pushIfStale('fx', 'fx');
+
+  return out;
+}
+
 export type QuoteCalcOpts = {
   /** Inject a pre-allocated freight amount already in destination currency. */
   freightInDestOverride?: number;
   /** Pin all FX conversions to this date (e.g., manifest-wide “as of”). */
   fxAsOf?: Date;
+  /** Test/runtime override for strict freshness behavior (defaults to env flag). */
+  strictFreshness?: boolean;
 };
 
 export async function quoteLandedCost(
@@ -197,7 +230,7 @@ export async function quoteLandedCost(
         ? 'IOSS: VAT collected at checkout; no import VAT due.'
         : 'Standard import tax rules apply.';
 
-  const confidence = deriveQuoteConfidenceParts({
+  let confidence = deriveQuoteConfidenceParts({
     statuses: {
       duty: dutyLookup.meta.status,
       vat: vatLookup.meta.status,
@@ -207,6 +240,47 @@ export async function quoteLandedCost(
     fxMissingRate,
     freightOverridden: opts?.freightInDestOverride != null,
   });
+
+  let strictFreshnessNote: string | null = null;
+  const strictFreshnessEnabled = opts?.strictFreshness ?? isStrictFreshnessEnabled();
+  if (strictFreshnessEnabled) {
+    const strictStale = strictStaleComponentsFromSnapshot(await getDatasetFreshnessSnapshot());
+    if (strictStale.length > 0) {
+      const componentConfidence = { ...confidence.componentConfidence };
+      const missing = new Set<QuoteConfidenceComponent>(confidence.missingComponents);
+      for (const { component } of strictStale) {
+        componentConfidence[component] = 'missing';
+        missing.add(component);
+      }
+      confidence = {
+        componentConfidence,
+        missingComponents: [...missing],
+        overallConfidence: overallConfidenceFrom(componentConfidence),
+      };
+      strictFreshnessNote = `Strict freshness mode: stale datasets (${strictStale
+        .map((entry) => entry.dataset)
+        .join(', ')}).`;
+    }
+  }
+
+  const surchargeCodes = [
+    ...new Set(
+      sur
+        .map((row) => (typeof row.surchargeCode === 'string' ? row.surchargeCode : ''))
+        .filter((code) => code.length > 0)
+    ),
+  ];
+  const surchargeSourceRefs = [
+    ...new Set(
+      sur
+        .map((row) => (typeof row.sourceRef === 'string' ? row.sourceRef : ''))
+        .filter((sourceRef) => sourceRef.length > 0)
+    ),
+  ];
+  const dutyEffectiveFrom = dutyRow?.effectiveFrom ? new Date(dutyRow.effectiveFrom) : null;
+  const vatEffectiveFrom = vatInfo?.effectiveFrom ? new Date(vatInfo.effectiveFrom) : null;
+  const freightModel: 'card' | 'override' =
+    opts?.freightInDestOverride == null ? 'card' : 'override';
 
   return {
     fxAsOf,
@@ -224,7 +298,7 @@ export async function quoteLandedCost(
       components,
       total,
       guaranteedMax: roundMoney(total * 1.02, currency),
-      policy,
+      policy: strictFreshnessNote ? `${policy} ${strictFreshnessNote}` : policy,
       incoterm,
       componentConfidence: confidence.componentConfidence,
       overallConfidence: confidence.overallConfidence,
@@ -242,6 +316,39 @@ export async function quoteLandedCost(
           dataset: surchargeLookup.meta.dataset,
           effectiveFrom: surchargeLookup.meta.effectiveFrom,
         }),
+      },
+      explainability: {
+        duty: {
+          dutyRule: dutyRow?.dutyRule ?? null,
+          partner: dutyRow?.partner ?? null,
+          source: dutyRow?.source ?? null,
+          effectiveFrom: dutyEffectiveFrom ? dutyEffectiveFrom.toISOString() : null,
+          suppressedByDeMinimis: dem.suppressDuty,
+        },
+        vat: {
+          source: vatInfo?.source ?? null,
+          vatBase: vatInfo?.vatBase ?? null,
+          effectiveFrom: vatEffectiveFrom ? vatEffectiveFrom.toISOString() : null,
+          checkoutCollected: iossEligible,
+          suppressedByDeMinimis: dem.suppressVAT,
+        },
+        deMinimis: {
+          suppressDuty: dem.suppressDuty,
+          suppressVAT: dem.suppressVAT,
+          dutyBasis: dem.duty?.deMinimisBasis ?? null,
+          vatBasis: dem.vat?.deMinimisBasis ?? null,
+        },
+        surcharges: {
+          appliedCodes: surchargeCodes,
+          appliedCount: sur.length,
+          sourceRefs: surchargeSourceRefs,
+        },
+        freight: {
+          model: freightModel,
+          lookupStatus: freightLookup.meta.status,
+          unit,
+          qty,
+        },
       },
     },
   };

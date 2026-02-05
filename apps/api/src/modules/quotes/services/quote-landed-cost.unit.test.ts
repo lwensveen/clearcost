@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getVatForHs6WithMetaMock: vi.fn(),
   getCanonicalFxAsOfMock: vi.fn(),
   evaluateDeMinimisMock: vi.fn(),
+  getDatasetFreshnessSnapshotMock: vi.fn(),
 }));
 
 vi.mock('@clearcost/db', async () => {
@@ -55,6 +56,10 @@ vi.mock('../../de-minimis/services/evaluate.js', () => ({
   evaluateDeMinimis: mocks.evaluateDeMinimisMock,
 }));
 
+vi.mock('../../health/services.js', () => ({
+  getDatasetFreshnessSnapshot: mocks.getDatasetFreshnessSnapshotMock,
+}));
+
 import { quoteLandedCost } from './quote-landed-cost.js';
 
 function mockMerchantContext(profile: unknown = undefined, regs: unknown[] = []) {
@@ -86,7 +91,7 @@ const baseInput = {
 };
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
 
   mocks.resolveHs6Mock.mockResolvedValue('123456');
   mocks.getCanonicalFxAsOfMock.mockResolvedValue(new Date('2025-01-01T00:00:00.000Z'));
@@ -129,6 +134,92 @@ beforeEach(() => {
     suppressDuty: false,
     suppressVAT: false,
   });
+  mocks.getDatasetFreshnessSnapshotMock.mockResolvedValue({
+    now: new Date('2025-01-01T00:00:00.000Z'),
+    datasets: {
+      duties: {
+        scheduled: true,
+        freshnessThresholdHours: 192,
+        lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+        lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+        source: 'WITS',
+        latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+        ageHours: 0,
+        stale: false,
+      },
+      vat: {
+        scheduled: true,
+        freshnessThresholdHours: 48,
+        lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+        lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+        source: null,
+        latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+        ageHours: 0,
+        stale: false,
+      },
+      'de-minimis': {
+        scheduled: true,
+        freshnessThresholdHours: 48,
+        lastSuccessAt: null,
+        lastAttemptAt: null,
+        source: null,
+        latestRunAt: null,
+        ageHours: null,
+        stale: true,
+      },
+      surcharges: {
+        scheduled: true,
+        freshnessThresholdHours: 192,
+        lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+        lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+        source: null,
+        latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+        ageHours: 0,
+        stale: false,
+      },
+      'hs-aliases': {
+        scheduled: true,
+        freshnessThresholdHours: 192,
+        lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+        lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+        source: null,
+        latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+        ageHours: 0,
+        stale: false,
+      },
+      freight: {
+        scheduled: false,
+        freshnessThresholdHours: null,
+        lastSuccessAt: null,
+        lastAttemptAt: null,
+        source: null,
+        latestRunAt: null,
+        ageHours: null,
+        stale: null,
+      },
+      fx: {
+        scheduled: true,
+        freshnessThresholdHours: 30,
+        lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+        lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+        source: 'ECB',
+        latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+        ageHours: 0,
+        stale: false,
+      },
+      notices: {
+        scheduled: true,
+        freshnessThresholdHours: 48,
+        lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+        lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+        source: null,
+        latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+        ageHours: 0,
+        stale: false,
+      },
+    },
+  });
+  delete process.env.QUOTE_STRICT_FRESHNESS;
 });
 
 describe('quoteLandedCost', () => {
@@ -165,6 +256,39 @@ describe('quoteLandedCost', () => {
         dataset: 'trade-remedy',
         asOf: null,
         effectiveFrom: '2025-01-03T00:00:00.000Z',
+      },
+    });
+    expect(out.quote.explainability).toEqual({
+      duty: {
+        dutyRule: null,
+        partner: null,
+        source: 'official',
+        effectiveFrom: '2025-01-01T00:00:00.000Z',
+        suppressedByDeMinimis: false,
+      },
+      vat: {
+        source: 'default',
+        vatBase: 'CIF_PLUS_DUTY',
+        effectiveFrom: '2025-01-02T00:00:00.000Z',
+        checkoutCollected: false,
+        suppressedByDeMinimis: false,
+      },
+      deMinimis: {
+        suppressDuty: false,
+        suppressVAT: false,
+        dutyBasis: null,
+        vatBasis: null,
+      },
+      surcharges: {
+        appliedCodes: [],
+        appliedCount: 1,
+        sourceRefs: [],
+      },
+      freight: {
+        model: 'card',
+        lookupStatus: 'ok',
+        unit: 'kg',
+        qty: 2,
       },
     });
   });
@@ -361,5 +485,370 @@ describe('quoteLandedCost', () => {
 
     expect(out.quote.policy).toContain('IOSS');
     expect(out.quote.components.checkoutVAT).toBeUndefined();
+  });
+
+  it.each([
+    {
+      name: 'CN->DE authoritative baseline',
+      input: { origin: 'CN', dest: 'DE' },
+      duty: 'ok',
+      vat: 'ok',
+      surcharges: 'ok',
+      freight: 'ok',
+      fxMissingRate: false,
+      expectedOverall: 'authoritative',
+      expectedMissing: [] as string[],
+    },
+    {
+      name: 'CN->DE no_match duty still authoritative',
+      input: { origin: 'CN', dest: 'DE' },
+      duty: 'no_match',
+      vat: 'ok',
+      surcharges: 'ok',
+      freight: 'ok',
+      fxMissingRate: false,
+      expectedOverall: 'authoritative',
+      expectedMissing: [] as string[],
+    },
+    {
+      name: 'CN->DE no_dataset duty is missing',
+      input: { origin: 'CN', dest: 'DE' },
+      duty: 'no_dataset',
+      vat: 'ok',
+      surcharges: 'ok',
+      freight: 'ok',
+      fxMissingRate: false,
+      expectedOverall: 'missing',
+      expectedMissing: ['duty'],
+    },
+    {
+      name: 'CN->US vat out_of_scope yields estimated',
+      input: { origin: 'CN', dest: 'US' },
+      duty: 'ok',
+      vat: 'out_of_scope',
+      surcharges: 'ok',
+      freight: 'ok',
+      fxMissingRate: false,
+      expectedOverall: 'estimated',
+      expectedMissing: [] as string[],
+    },
+    {
+      name: 'CN->US no_match surcharges does not mark missing',
+      input: { origin: 'CN', dest: 'US' },
+      duty: 'ok',
+      vat: 'out_of_scope',
+      surcharges: 'no_match',
+      freight: 'ok',
+      fxMissingRate: false,
+      expectedOverall: 'estimated',
+      expectedMissing: [] as string[],
+    },
+    {
+      name: 'JP->UK freight dataset missing marks missing freight',
+      input: { origin: 'JP', dest: 'UK' },
+      duty: 'ok',
+      vat: 'ok',
+      surcharges: 'ok',
+      freight: 'no_dataset',
+      fxMissingRate: false,
+      expectedOverall: 'missing',
+      expectedMissing: ['freight'],
+    },
+    {
+      name: 'ID->DE surcharge dataset missing marks missing',
+      input: { origin: 'ID', dest: 'DE' },
+      duty: 'ok',
+      vat: 'ok',
+      surcharges: 'no_dataset',
+      freight: 'ok',
+      fxMissingRate: false,
+      expectedOverall: 'missing',
+      expectedMissing: ['surcharges'],
+    },
+    {
+      name: 'SG->US fx fallback marks missing fx only',
+      input: { origin: 'SG', dest: 'US' },
+      duty: 'ok',
+      vat: 'out_of_scope',
+      surcharges: 'ok',
+      freight: 'ok',
+      fxMissingRate: true,
+      expectedOverall: 'missing',
+      expectedMissing: ['fx'],
+    },
+    {
+      name: 'VN->EU vat lookup error marks missing vat',
+      input: { origin: 'VN', dest: 'DE' },
+      duty: 'ok',
+      vat: 'error',
+      surcharges: 'ok',
+      freight: 'ok',
+      fxMissingRate: false,
+      expectedOverall: 'missing',
+      expectedMissing: ['vat'],
+    },
+    {
+      name: 'TH->EU strict freshness escalates stale duty to missing',
+      input: { origin: 'TH', dest: 'DE' },
+      duty: 'ok',
+      vat: 'ok',
+      surcharges: 'ok',
+      freight: 'ok',
+      fxMissingRate: false,
+      strictStaleDuties: true,
+      expectedOverall: 'missing',
+      expectedMissing: ['duty'],
+    },
+  ])(
+    'lane confidence: $name',
+    async ({
+      input,
+      duty,
+      vat,
+      surcharges,
+      freight,
+      fxMissingRate,
+      strictStaleDuties,
+      expectedOverall,
+      expectedMissing,
+    }) => {
+      mockMerchantContext(undefined, []);
+
+      mocks.getActiveDutyRateWithMetaMock.mockResolvedValue({
+        value:
+          duty === 'ok'
+            ? {
+                ratePct: 5,
+                source: 'official',
+                effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+              }
+            : null,
+        meta: { status: duty, dataset: duty === 'ok' ? 'official' : null, effectiveFrom: null },
+      });
+      mocks.getVatForHs6WithMetaMock.mockResolvedValue({
+        value:
+          vat === 'ok'
+            ? {
+                ratePct: 20,
+                vatBase: 'CIF_PLUS_DUTY',
+                source: 'default',
+                effectiveFrom: new Date('2025-01-02T00:00:00.000Z'),
+              }
+            : null,
+        meta: { status: vat, dataset: null, effectiveFrom: null },
+      });
+      mocks.getSurchargesScopedWithMetaMock.mockResolvedValue({
+        value: surcharges === 'ok' ? [{ fixedAmt: 5, pctAmt: 2 }] : [],
+        meta: { status: surcharges, dataset: null, effectiveFrom: null },
+      });
+      mocks.getFreightWithMetaMock.mockResolvedValue({
+        value: freight === 'ok' ? { price: 20 } : null,
+        meta: { status: freight },
+      });
+      mocks.convertCurrencyWithMetaMock.mockImplementation(
+        async (amount: number, from: string, to: string) => {
+          const markMissing = fxMissingRate && from !== to;
+          return { amount: Number(amount), meta: { missingRate: markMissing } };
+        }
+      );
+      mocks.getDatasetFreshnessSnapshotMock.mockResolvedValueOnce({
+        now: new Date('2025-01-01T00:00:00.000Z'),
+        datasets: {
+          duties: {
+            scheduled: true,
+            freshnessThresholdHours: 192,
+            lastSuccessAt: strictStaleDuties ? null : new Date('2025-01-01T00:00:00.000Z'),
+            lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+            source: null,
+            latestRunAt: strictStaleDuties ? null : new Date('2025-01-01T00:00:00.000Z'),
+            ageHours: strictStaleDuties ? null : 0,
+            stale: Boolean(strictStaleDuties),
+          },
+          vat: {
+            scheduled: true,
+            freshnessThresholdHours: 48,
+            lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+            lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+            source: null,
+            latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+            ageHours: 0,
+            stale: false,
+          },
+          'de-minimis': {
+            scheduled: true,
+            freshnessThresholdHours: 48,
+            lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+            lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+            source: null,
+            latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+            ageHours: 0,
+            stale: false,
+          },
+          surcharges: {
+            scheduled: true,
+            freshnessThresholdHours: 192,
+            lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+            lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+            source: null,
+            latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+            ageHours: 0,
+            stale: false,
+          },
+          'hs-aliases': {
+            scheduled: true,
+            freshnessThresholdHours: 192,
+            lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+            lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+            source: null,
+            latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+            ageHours: 0,
+            stale: false,
+          },
+          freight: {
+            scheduled: false,
+            freshnessThresholdHours: null,
+            lastSuccessAt: null,
+            lastAttemptAt: null,
+            source: null,
+            latestRunAt: null,
+            ageHours: null,
+            stale: null,
+          },
+          fx: {
+            scheduled: true,
+            freshnessThresholdHours: 30,
+            lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+            lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+            source: null,
+            latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+            ageHours: 0,
+            stale: false,
+          },
+          notices: {
+            scheduled: true,
+            freshnessThresholdHours: 48,
+            lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+            lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+            source: null,
+            latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+            ageHours: 0,
+            stale: false,
+          },
+        },
+      });
+
+      const out = await quoteLandedCost(
+        { ...baseInput, ...input },
+        strictStaleDuties ? { strictFreshness: true } : undefined
+      );
+      if (strictStaleDuties) {
+        expect(mocks.getDatasetFreshnessSnapshotMock).toHaveBeenCalledTimes(1);
+      }
+      expect(out.quote.overallConfidence).toBe(expectedOverall);
+      for (const component of expectedMissing) {
+        expect(out.quote.missingComponents).toContain(component);
+      }
+    }
+  );
+
+  it('strict freshness mode marks stale required datasets as missing', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.getDatasetFreshnessSnapshotMock.mockResolvedValueOnce({
+      now: new Date('2025-01-01T00:00:00.000Z'),
+      datasets: {
+        duties: {
+          scheduled: true,
+          freshnessThresholdHours: 192,
+          lastSuccessAt: null,
+          lastAttemptAt: null,
+          source: null,
+          latestRunAt: null,
+          ageHours: null,
+          stale: true,
+        },
+        vat: {
+          scheduled: true,
+          freshnessThresholdHours: 48,
+          lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+          lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+          source: null,
+          latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+          ageHours: 0,
+          stale: false,
+        },
+        'de-minimis': {
+          scheduled: true,
+          freshnessThresholdHours: 48,
+          lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+          lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+          source: null,
+          latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+          ageHours: 0,
+          stale: false,
+        },
+        surcharges: {
+          scheduled: true,
+          freshnessThresholdHours: 192,
+          lastSuccessAt: null,
+          lastAttemptAt: null,
+          source: null,
+          latestRunAt: null,
+          ageHours: null,
+          stale: true,
+        },
+        'hs-aliases': {
+          scheduled: true,
+          freshnessThresholdHours: 192,
+          lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+          lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+          source: null,
+          latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+          ageHours: 0,
+          stale: false,
+        },
+        freight: {
+          scheduled: false,
+          freshnessThresholdHours: null,
+          lastSuccessAt: null,
+          lastAttemptAt: null,
+          source: null,
+          latestRunAt: null,
+          ageHours: null,
+          stale: null,
+        },
+        fx: {
+          scheduled: true,
+          freshnessThresholdHours: 30,
+          lastSuccessAt: null,
+          lastAttemptAt: null,
+          source: null,
+          latestRunAt: null,
+          ageHours: null,
+          stale: true,
+        },
+        notices: {
+          scheduled: true,
+          freshnessThresholdHours: 48,
+          lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+          lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+          source: null,
+          latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+          ageHours: 0,
+          stale: false,
+        },
+      },
+    });
+
+    const out = await quoteLandedCost(baseInput, { strictFreshness: true });
+    expect(mocks.getDatasetFreshnessSnapshotMock).toHaveBeenCalledTimes(1);
+
+    expect(out.quote.componentConfidence.duty).toBe('missing');
+    expect(out.quote.componentConfidence.surcharges).toBe('missing');
+    expect(out.quote.componentConfidence.fx).toBe('missing');
+    expect(out.quote.missingComponents).toEqual(
+      expect.arrayContaining(['duty', 'surcharges', 'fx'])
+    );
+    expect(out.quote.overallConfidence).toBe('missing');
+    expect(out.quote.policy).toContain('Strict freshness mode');
   });
 });

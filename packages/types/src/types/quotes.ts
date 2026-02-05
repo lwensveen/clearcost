@@ -1,6 +1,7 @@
 import z from 'zod/v4';
 import {
   QuoteByKeyParamsSchema,
+  QuoteExplainabilitySchema,
   QuoteInputSchema,
   QuoteRecentListResponseSchema,
   QuoteRecentQuerySchema,
@@ -12,6 +13,7 @@ import {
 
 export type QuoteInput = z.infer<typeof QuoteInputSchema>;
 export type QuoteResponse = z.infer<typeof QuoteResponseSchema>;
+export type QuoteExplainability = z.infer<typeof QuoteExplainabilitySchema>;
 export type QuoteRecentQuery = z.infer<typeof QuoteRecentQuerySchema>;
 export type QuoteRecentRow = z.infer<typeof QuoteRecentRowSchema>;
 export type QuoteRecentListResponse = z.infer<typeof QuoteRecentListResponseSchema>;
