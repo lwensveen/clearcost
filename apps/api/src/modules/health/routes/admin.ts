@@ -2,7 +2,12 @@ import type { FastifyInstance } from 'fastify';
 import { db, provenanceTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
 import { z } from 'zod/v4';
-import { HealthImportsQuerySchema, HealthImportsResponseSchema } from '@clearcost/types';
+import {
+  HealthFreshnessResponseSchema,
+  HealthImportsQuerySchema,
+  HealthImportsResponseSchema,
+} from '@clearcost/types';
+import { getDatasetFreshnessSnapshot } from '../services.js';
 
 function toDate(v: unknown): Date | null {
   if (v == null) return null;
@@ -72,6 +77,23 @@ export default function healthAdminRoutes(app: FastifyInstance) {
 
       reply.header('cache-control', 'public, max-age=15, stale-while-revalidate=60');
       return HealthImportsResponseSchema.parse({ now, thresholdHours, imports });
+    }
+  );
+
+  // Dataset freshness snapshot (admin/ops only)
+  app.get(
+    '/freshness',
+    {
+      preHandler: app.requireApiKey(['ops:health']),
+      schema: {
+        response: { 200: HealthFreshnessResponseSchema },
+      },
+      config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
+    },
+    async (req, reply) => {
+      const snapshot = await getDatasetFreshnessSnapshot();
+      reply.header('cache-control', 'public, max-age=30, stale-while-revalidate=120');
+      return HealthFreshnessResponseSchema.parse(snapshot);
     }
   );
 }

@@ -47,3 +47,29 @@ export const HealthImportsResponseSchema = z.object({
     })
   ),
 });
+
+export const HealthDatasetFreshnessSchema = z.object({
+  scheduled: z.boolean(),
+  thresholdHours: z.number().int().positive().nullable(),
+  freshnessThresholdHours: z.number().int().positive().nullable(),
+  lastSuccessAt: z.coerce.date().nullable(),
+  lastAttemptAt: z.coerce.date().nullable(),
+  source: z.string().nullable(),
+  latestRunAt: z.coerce.date().nullable(),
+  ageHours: z.number().nullable(),
+  stale: z.boolean().nullable(),
+});
+
+export const HealthFreshnessResponseSchema = z.object({
+  now: z.coerce.date(),
+  datasets: z.object({
+    duties: HealthDatasetFreshnessSchema,
+    vat: HealthDatasetFreshnessSchema,
+    'de-minimis': HealthDatasetFreshnessSchema,
+    surcharges: HealthDatasetFreshnessSchema,
+    'hs-aliases': HealthDatasetFreshnessSchema,
+    freight: HealthDatasetFreshnessSchema,
+    fx: HealthDatasetFreshnessSchema,
+    notices: HealthDatasetFreshnessSchema,
+  }),
+});
