@@ -1,5 +1,10 @@
 import type { FastifyInstance } from 'fastify';
-import { MetaHealthResponseSchema, MetaVersionResponseSchema } from '@clearcost/types';
+import {
+  MetaCapabilitiesResponseSchema,
+  MetaHealthResponseSchema,
+  MetaVersionResponseSchema,
+} from '@clearcost/types';
+import { getMetaCapabilitiesDocument } from './capabilities.js';
 
 export default async function metaRoutes(app: FastifyInstance) {
   // GET /v1/_meta/healthz
@@ -34,5 +39,16 @@ export default async function metaRoutes(app: FastifyInstance) {
       const spec = app.swagger();
       reply.type('application/json').send(spec);
     },
+  });
+
+  // GET /v1/_meta/capabilities
+  app.get('/v1/_meta/capabilities', {
+    schema: {
+      tags: ['_meta'],
+      response: {
+        200: MetaCapabilitiesResponseSchema,
+      },
+    },
+    handler: async () => MetaCapabilitiesResponseSchema.parse(getMetaCapabilitiesDocument()),
   });
 }
