@@ -31,6 +31,9 @@ jobs:
       - name: Validate test filename conventions
         run: bun run validate-tests
 
+      - name: Validate docs wiring
+        run: bun run validate-docs
+
   lint:
     needs: [validate]
     runs-on: ubuntu-latest

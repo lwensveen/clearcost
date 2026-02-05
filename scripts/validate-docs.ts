@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { MetaCapabilitiesResponseSchema } from '../packages/types/src/schemas/meta.js';
+import { getMetaCapabilitiesDocument } from '../apps/api/src/modules/meta/capabilities.js';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -59,4 +61,27 @@ if (missing.length) {
   process.exit(1);
 }
 
-console.log(`Docs scopes OK (${docsScopes.size} scopes).`);
+const quoteConfidencePath = join(
+  repoRoot,
+  'apps',
+  'docs',
+  'app',
+  'guides',
+  'quote-confidence',
+  'page.tsx'
+);
+const quoteConfidenceText = readFileSync(quoteConfidencePath, 'utf8');
+
+if (!quoteConfidenceText.includes('/v1/_meta/capabilities')) {
+  console.error('Quote confidence guide must reference /v1/_meta/capabilities as the data source.');
+  process.exit(1);
+}
+
+if (!quoteConfidenceText.includes('datasetEntries.map')) {
+  console.error('Quote confidence guide must render dataset rows from capabilities dynamically.');
+  process.exit(1);
+}
+
+MetaCapabilitiesResponseSchema.parse(getMetaCapabilitiesDocument());
+
+console.log(`Docs scopes OK (${docsScopes.size} scopes) and capabilities guide wiring is valid.`);
