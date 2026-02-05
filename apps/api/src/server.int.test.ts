@@ -48,7 +48,9 @@ describe('server boundaries', () => {
     });
 
     const res = await app.inject({ method: 'GET', url: '/internal/notices' });
+    const dutiesRoute = await app.inject({ method: 'POST', url: '/internal/cron/import/duties' });
     expect(res.statusCode).toBe(401);
+    expect(dutiesRoute.statusCode).toBe(401);
 
     const payload = res.json() as { message?: string; error?: string };
     expect(payload).toBeTruthy();

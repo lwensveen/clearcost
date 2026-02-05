@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import aseanDutyRoutes from './duties/asean/index.js';
 import cnDutyRoutes from './duties/cn-routes.js';
 import deMinimisRoutes from './de-minimis-routes.js';
+import dutyJsonRoute from './duties/generic-json.js';
 import euDutyRoutes from './duties/eu-routes.js';
 import freightRoutes from './freight-routes.js';
 import fxRoutes from './fx-routes.js';
@@ -28,6 +29,7 @@ export default function taskRoutes(app: FastifyInstance) {
   ukDutyRoutes(app);
   usDutyRoutes(app);
   witsDutyRoutes(app);
+  dutyJsonRoute(app);
 
   // Surcharges
   surchargeEuRoutes(app);
