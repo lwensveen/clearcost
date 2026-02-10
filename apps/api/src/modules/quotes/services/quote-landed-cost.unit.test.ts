@@ -323,6 +323,28 @@ describe('quoteLandedCost', () => {
     );
   });
 
+  it('converts freight using freight card currency when available', async () => {
+    mockMerchantContext(undefined, []);
+    const fxAsOf = new Date('2025-01-01T00:00:00.000Z');
+
+    mocks.getFreightWithMetaMock.mockResolvedValue({
+      value: { price: 20, currency: 'GBP' },
+      meta: { status: 'ok' },
+    });
+    mocks.convertCurrencyWithMetaMock
+      .mockResolvedValueOnce({ amount: 25, meta: { missingRate: false, error: null } }) // freight: GBP->EUR
+      .mockResolvedValueOnce({ amount: 100, meta: { missingRate: false, error: null } }) // goods: USD->EUR
+      .mockResolvedValueOnce({ amount: 100, meta: { missingRate: false, error: null } }); // EUR->EUR
+
+    const out = await quoteLandedCost(baseInput);
+
+    expect(mocks.convertCurrencyWithMetaMock).toHaveBeenNthCalledWith(1, 20, 'GBP', 'EUR', {
+      on: fxAsOf,
+      strict: true,
+    });
+    expect(out.quote.freight).toBe(25);
+  });
+
   it('normalizes ISO2 lanes to ISO3 for freight lookup matching', async () => {
     mockMerchantContext(undefined, []);
 

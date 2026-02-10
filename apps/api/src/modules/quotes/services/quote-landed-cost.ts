@@ -48,6 +48,14 @@ function resolveDestinationCurrency(destCountryIso2: string): string {
   );
 }
 
+function resolveFreightSourceCurrency(rawCurrency: string | null | undefined): string {
+  const normalized = String(rawCurrency ?? '')
+    .trim()
+    .toUpperCase();
+  if (/^[A-Z]{3}$/.test(normalized)) return normalized;
+  return BASE_CCY;
+}
+
 function toFreightIso3(countryCode: string): string {
   const normalized = String(countryCode ?? '')
     .trim()
@@ -298,9 +306,10 @@ export async function quoteLandedCost(
 
   let freightInDest = opts?.freightInDestOverride ?? 0;
   if (opts?.freightInDestOverride == null) {
+    const freightSourceCurrency = resolveFreightSourceCurrency(freightRow?.currency);
     const freightFx = await convertCurrencyWithMeta(
       freightRow?.price ?? 0,
-      BASE_CCY,
+      freightSourceCurrency,
       destCurrency,
       { on: fxAsOf, strict: true }
     );
