@@ -121,16 +121,16 @@ describe('importJpPreferential', () => {
     });
   });
 
-  it('throws when official and fallback sources both produce zero rows', async () => {
-    await expect(
-      importJpPreferential({ partnerGeoIds: ['AU'], useWitsFallback: true })
-    ).rejects.toThrow(/official and WITS fallback sources/i);
+  it('throws when WITS source produces zero rows', async () => {
+    await expect(importJpPreferential({ partnerGeoIds: ['AU'] })).rejects.toThrow(
+      /0 rows from WITS source/i
+    );
     expect(mocks.batchUpsertDutyRatesFromStreamMock).not.toHaveBeenCalled();
   });
 
-  it('throws when fallback is disabled and official source has no rows', async () => {
+  it('throws when WITS source is explicitly disabled', async () => {
     await expect(importJpPreferential({ useWitsFallback: false })).rejects.toThrow(
-      /produced 0 official rows/i
+      /official source is not implemented/i
     );
     expect(mocks.fetchWitsPreferentialDutyRatesMock).not.toHaveBeenCalled();
     expect(mocks.batchUpsertDutyRatesFromStreamMock).not.toHaveBeenCalled();

@@ -8,7 +8,7 @@ type Params = {
   batchSize?: number;
   importId?: string;
   dryRun?: boolean;
-  useWitsFallback?: boolean; // default true
+  useWitsFallback?: boolean; // temporary compatibility flag; must remain true
 };
 
 export const JP_FTA_DEFAULT_PARTNER_GEOIDS = [
@@ -46,14 +46,6 @@ function normalizePartnerGeoIds(partnerGeoIds?: string[]): string[] {
   return [...out];
 }
 
-async function fetchJpPreferentialOfficial(
-  _partners?: string[],
-  _hs6List?: string[]
-): Promise<DutyRateInsert[]> {
-  // Placeholder until an official JP feed is wired
-  return [];
-}
-
 export async function importJpPreferential({
   hs6List,
   partnerGeoIds,
@@ -62,40 +54,36 @@ export async function importJpPreferential({
   dryRun,
   useWitsFallback = true,
 }: Params) {
+  if (!useWitsFallback) {
+    throw new Error(
+      '[JP Duties] Preferential official source is not implemented; WITS source cannot be disabled.'
+    );
+  }
+
   const partners = normalizePartnerGeoIds(partnerGeoIds);
-  const officialRows = await fetchJpPreferentialOfficial(partners, hs6List);
 
   const witsRows: DutyRateInsert[] = [];
-  if (useWitsFallback) {
-    for (const partner of partners) {
-      const rows = await fetchWitsPreferentialDutyRates({
-        dest: 'JP',
-        partner,
-        backfillYears: 1,
-        hs6List,
-      });
-      witsRows.push(...rows);
-    }
+  for (const partner of partners) {
+    const rows = await fetchWitsPreferentialDutyRates({
+      dest: 'JP',
+      partner,
+      backfillYears: 1,
+      hs6List,
+    });
+    witsRows.push(...rows);
   }
 
-  const merged = [...officialRows, ...witsRows];
-
-  if (merged.length === 0) {
-    if (useWitsFallback) {
-      throw new Error(
-        '[JP Duties] Preferential produced 0 rows from official and WITS fallback sources.'
-      );
-    }
-    throw new Error('[JP Duties] Preferential produced 0 official rows.');
+  if (witsRows.length === 0) {
+    throw new Error('[JP Duties] Preferential produced 0 rows from WITS source.');
   }
 
-  const res = await batchUpsertDutyRatesFromStream(merged, {
+  const res = await batchUpsertDutyRatesFromStream(witsRows, {
     batchSize,
     importId,
     dryRun,
     makeSourceRef: (r) =>
       [
-        r.source === 'wits' ? 'wits' : 'jp-customs',
+        'wits',
         'JP',
         r.partner && r.partner !== '' ? r.partner : 'ERGA',
         r.dutyRule ?? 'fta',
