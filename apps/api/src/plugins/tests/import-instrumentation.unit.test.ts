@@ -433,6 +433,28 @@ describe('import-instrumentation plugin (unit)', () => {
     await app.close();
   });
 
+  it('records updated row counts when payload includes inserted and updated', async () => {
+    const plugin = await loadPlugin();
+    const app = Fastify();
+    await app.register(plugin);
+    app.get(
+      '/with-updated',
+      { config: { importMeta: { importSource: 'WITS', job: 'seed' } } },
+      async (_req, reply) =>
+        reply.type('application/json').send({ inserted: 2, updated: 5, count: 7 })
+    );
+
+    const r = await app.inject({ method: 'GET', url: '/with-updated' });
+    expect(r.statusCode).toBe(200);
+    expect(importRowsInserted.inc).toHaveBeenCalledWith({ importSource: 'WITS', job: 'seed' }, 2);
+    expect(finishImportRun).toHaveBeenCalledWith('run-1', {
+      importStatus: 'succeeded',
+      inserted: 2,
+      updated: 5,
+    });
+    await app.close();
+  });
+
   it('ignores invalid JSON body safely (inserted defaults to 0)', async () => {
     const plugin = await loadPlugin();
     const app = Fastify();

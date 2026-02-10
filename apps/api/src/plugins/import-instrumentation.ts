@@ -120,12 +120,15 @@ const plugin: FastifyPluginAsync = async (app) => {
 
     try {
       let inserted = 0;
+      let updated: number | undefined;
       const ct = String(reply.getHeader('content-type') ?? '');
       if (ct.includes('application/json') && payload && typeof payload !== 'function') {
         const s = Buffer.isBuffer(payload) ? payload.toString('utf8') : String(payload);
         try {
           const json = JSON.parse(s);
           inserted = Number(json?.inserted ?? json?.count ?? 0);
+          const maybeUpdated = Number(json?.updated);
+          if (Number.isFinite(maybeUpdated)) updated = maybeUpdated;
         } catch {
           /* ignore parse errors */
         }
@@ -135,7 +138,7 @@ const plugin: FastifyPluginAsync = async (app) => {
       if (ok) {
         importRowsInserted.inc(ctx.meta, inserted);
         setLastRunNow(ctx.meta);
-        await finishImportRun(ctx.runId, { importStatus: 'succeeded', inserted });
+        await finishImportRun(ctx.runId, { importStatus: 'succeeded', inserted, updated });
       } else {
         importErrors.inc({ ...ctx.meta, stage: 'response' });
         await finishImportRun(ctx.runId, {
