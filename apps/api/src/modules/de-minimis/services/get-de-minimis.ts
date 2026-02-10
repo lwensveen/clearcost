@@ -1,4 +1,5 @@
 import { db, deMinimisTable } from '@clearcost/db';
+import { normalizeCountryIso2 } from '@clearcost/types';
 import { and, desc, eq, gt, isNull, lte, or } from 'drizzle-orm';
 
 export type DeMinimisThreshold = {
@@ -25,6 +26,7 @@ export async function getDeMinimisForKind(
   kind: 'DUTY' | 'VAT',
   on = new Date()
 ): Promise<DeMinimisThreshold | null> {
+  const destIso2 = normalizeCountryIso2(dest) ?? dest.toUpperCase();
   const day = toMidnightUTC(on);
 
   const [row] = await db
@@ -37,7 +39,7 @@ export async function getDeMinimisForKind(
     .from(deMinimisTable)
     .where(
       and(
-        eq(deMinimisTable.dest, dest.toUpperCase()),
+        eq(deMinimisTable.dest, destIso2),
         eq(deMinimisTable.deMinimisKind, kind),
         lte(deMinimisTable.effectiveFrom, day),
         or(isNull(deMinimisTable.effectiveTo), gt(deMinimisTable.effectiveTo, day)) // <-- exclusive end

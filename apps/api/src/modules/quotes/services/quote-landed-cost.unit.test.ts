@@ -402,6 +402,47 @@ describe('quoteLandedCost', () => {
       expect.any(Date),
       { partner: 'GB' }
     );
+    expect(mocks.getSurchargesScopedWithMetaMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        origin: 'GB',
+      })
+    );
+  });
+
+  it('normalizes UK destination alias for duty/vat/de-minimis/surcharge lookups', async () => {
+    mockMerchantContext(undefined, []);
+
+    await quoteLandedCost({ ...baseInput, dest: 'UK' });
+
+    expect(mocks.getActiveDutyRateWithMetaMock).toHaveBeenCalledWith(
+      'GB',
+      '123456',
+      expect.any(Date),
+      { partner: 'CN' }
+    );
+    expect(mocks.getVatForHs6WithMetaMock).toHaveBeenCalledWith('GB', '123456', expect.any(Date));
+    expect(mocks.getSurchargesScopedWithMetaMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dest: 'GB',
+      })
+    );
+    expect(mocks.evaluateDeMinimisMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dest: 'GB',
+        destCurrency: 'GBP',
+      })
+    );
+  });
+
+  it('normalizes lowercase EU destinations for IOSS eligibility', async () => {
+    mockMerchantContext({ collectVatAtCheckout: 'always', chargeShippingAtCheckout: true }, [
+      { jurisdiction: 'EU', scheme: 'IOSS' },
+    ]);
+
+    const out = await quoteLandedCost({ ...baseInput, dest: 'nl' });
+
+    expect(out.quote.components.checkoutVAT).toBe(24);
+    expect(out.quote.policy).toContain('IOSS');
   });
 
   it('treats no_match surcharges as authoritative with empty fee result', async () => {

@@ -91,6 +91,24 @@ describe('evaluateDeMinimis', () => {
     expect(out.suppressDuty).toBe(false);
   });
 
+  it('normalizes UK destination alias to GB for currency resolution', async () => {
+    mockRows([dutyRowUsd]);
+    mocks.convertCurrencyMock.mockResolvedValueOnce(80);
+
+    const out = await evaluateDeMinimis({
+      dest: 'UK',
+      goodsDest: 70,
+      freightDest: 0,
+      fxAsOf: FX_AS_OF,
+    });
+
+    expect(mocks.convertCurrencyMock).toHaveBeenCalledWith(100, 'USD', 'GBP', {
+      on: FX_DAY,
+      strict: true,
+    });
+    expect(out.suppressDuty).toBe(true);
+  });
+
   it('fails clearly when destination country has no currency mapping', async () => {
     await expect(
       evaluateDeMinimis({

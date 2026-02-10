@@ -1,5 +1,5 @@
 import { db, deMinimisTable } from '@clearcost/db';
-import { getCurrencyForCountry } from '@clearcost/types';
+import { getCurrencyForCountry, normalizeCountryIso2 } from '@clearcost/types';
 import { and, desc, eq, gte, isNull, lte, or } from 'drizzle-orm';
 import { convertCurrency } from '../../fx/services/convert-currency.js';
 
@@ -24,7 +24,7 @@ function resolveDestinationCurrency(destCountryIso2: string, explicitCurrency?: 
     return explicit;
   }
 
-  const countryIso2 = destCountryIso2.toUpperCase();
+  const countryIso2 = normalizeCountryIso2(destCountryIso2) ?? destCountryIso2.toUpperCase();
   const mapped = getCurrencyForCountry(countryIso2);
   if (mapped) return mapped;
 
@@ -45,14 +45,15 @@ export async function evaluateDeMinimis(opts: {
   fxAsOf: Date; // FX date for converting thresholds -> destCurrency
 }): Promise<DeMinimisDecision> {
   const day = toMidnightUTC(opts.fxAsOf);
-  const destCurrency = resolveDestinationCurrency(opts.dest, opts.destCurrency);
+  const destCountryIso2 = normalizeCountryIso2(opts.dest) ?? opts.dest.toUpperCase();
+  const destCurrency = resolveDestinationCurrency(destCountryIso2, opts.destCurrency);
 
   const rows = await db
     .select()
     .from(deMinimisTable)
     .where(
       and(
-        eq(deMinimisTable.dest, opts.dest.toUpperCase()),
+        eq(deMinimisTable.dest, destCountryIso2),
         lte(deMinimisTable.effectiveFrom, day),
         or(isNull(deMinimisTable.effectiveTo), gte(deMinimisTable.effectiveTo, day))
       )
@@ -71,7 +72,7 @@ export async function evaluateDeMinimis(opts: {
     const rawVal = Number(row.value); // DB numeric -> string; coerce to number
     if (!Number.isFinite(rawVal)) {
       throw new Error(
-        `Invalid de minimis threshold value for ${opts.dest.toUpperCase()} (${rowCurrency})`
+        `Invalid de minimis threshold value for ${destCountryIso2} (${rowCurrency})`
       );
     }
 
@@ -82,7 +83,7 @@ export async function evaluateDeMinimis(opts: {
       } catch (error) {
         throw Object.assign(
           new Error(
-            `Unable to convert de minimis threshold ${rowCurrency}->${destCurrency} for ${opts.dest.toUpperCase()}`
+            `Unable to convert de minimis threshold ${rowCurrency}->${destCurrency} for ${destCountryIso2}`
           ),
           {
             statusCode: 500,

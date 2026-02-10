@@ -1,4 +1,4 @@
-import { getCurrencyForCountry, type QuoteInput } from '@clearcost/types';
+import { getCurrencyForCountry, normalizeCountryIso2, type QuoteInput } from '@clearcost/types';
 import { db, merchantProfilesTable, taxRegistrationsTable } from '@clearcost/db';
 import { and, eq } from 'drizzle-orm';
 import countries from 'i18n-iso-countries';
@@ -239,9 +239,11 @@ export async function quoteLandedCost(
   input: QuoteInput & { merchantId?: string },
   opts?: QuoteCalcOpts
 ) {
+  const destCountry = normalizeCountryIso2(input.dest) ?? input.dest.toUpperCase();
+  const originCountry = normalizeCountryIso2(input.origin) ?? input.origin.toUpperCase();
   const now = new Date();
   const fxAsOf = opts?.fxAsOf ?? (await getCanonicalFxAsOf());
-  const destCurrency = resolveDestinationCurrency(input.dest);
+  const destCurrency = resolveDestinationCurrency(destCountry);
   let fxMissingRate = false;
 
   const [profile, regs] = await Promise.all([
@@ -268,7 +270,7 @@ export async function quoteLandedCost(
 
   const wantsCheckoutVAT =
     (profile?.collectVatAtCheckout ?? 'auto') !== 'never' &&
-    EU_ISO2.has(input.dest) &&
+    EU_ISO2.has(destCountry) &&
     regs.some((r) => r.jurisdiction === 'EU' && r.scheme?.toUpperCase() === 'IOSS');
 
   const hs6 = await resolveHs6(input.categoryKey, input.hs6);
@@ -280,8 +282,8 @@ export async function quoteLandedCost(
 
   const freightLookup = await getFreightWithMeta({
     // Quote API uses ISO2 lanes while freight cards are keyed by ISO3.
-    origin: toFreightIso3(input.origin),
-    dest: toFreightIso3(input.dest),
+    origin: toFreightIso3(originCountry),
+    dest: toFreightIso3(destCountry),
     freightMode: input.mode,
     freightUnit: unit,
     qty,
@@ -314,18 +316,18 @@ export async function quoteLandedCost(
 
   // De minimis decision (FX-pinned and CIF-based)
   const dem = await evaluateDeMinimis({
-    dest: input.dest,
+    dest: destCountry,
     destCurrency,
     goodsDest: itemValDest,
     freightDest: freightInDest,
     fxAsOf,
   });
 
-  const dutyLookup = await getActiveDutyRateWithMeta(input.dest, hs6, now, {
-    partner: toDutyPartnerIso2(input.origin),
+  const dutyLookup = await getActiveDutyRateWithMeta(destCountry, hs6, now, {
+    partner: toDutyPartnerIso2(originCountry),
   });
   const dutyRow = dutyLookup.value;
-  const vatLookup = await getVatForHs6WithMeta(input.dest, hs6, now);
+  const vatLookup = await getVatForHs6WithMeta(destCountry, hs6, now);
   const vatInfo = vatLookup.value; // { ratePct, base, source, effectiveFrom }
 
   // -----------------
@@ -369,8 +371,8 @@ export async function quoteLandedCost(
   // Surcharges/fees
   // -----------------
   const surchargeLookup = await getSurchargesScopedWithMeta({
-    dest: input.dest,
-    origin: input.origin,
+    dest: destCountry,
+    origin: originCountry,
     hs6,
     on: now,
     transportMode: toSurchargeTransportMode(input.mode),
