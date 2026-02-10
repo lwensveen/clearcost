@@ -124,6 +124,52 @@ describe('import-instrumentation plugin (unit)', () => {
     await app.close();
   });
 
+  it('records sourceUrl/version provenance from query or meta when starting a run', async () => {
+    const plugin = await loadPlugin();
+    const app = Fastify();
+    await app.register(plugin);
+    app.post(
+      '/imp',
+      {
+        config: {
+          importMeta: {
+            importSource: 'MANUAL',
+            job: 'duties:json',
+            sourceUrl: 'https://meta.example/source.csv',
+            version: 'meta-v1',
+          },
+        },
+      },
+      async (_req, reply) => reply.type('application/json').send({ inserted: 1 })
+    );
+
+    const r = await app.inject({
+      method: 'POST',
+      url: '/imp?source=https%3A%2F%2Fquery.example%2Foverride.csv&version=query-v2',
+      headers: jsonCT(),
+      payload: JSON.stringify({ source: 'body-source', version: 'body-v3' }),
+    });
+    expect(r.statusCode).toBe(200);
+
+    expect(startImportRun).toHaveBeenCalledWith({
+      importSource: 'MANUAL',
+      job: 'duties:json',
+      sourceUrl: 'https://meta.example/source.csv',
+      version: 'meta-v1',
+      params: {
+        query: {
+          source: 'https://query.example/override.csv',
+          version: 'query-v2',
+        },
+        body: {
+          source: 'body-source',
+          version: 'body-v3',
+        },
+      },
+    });
+    await app.close();
+  });
+
   it('supports custom importLockKey (string and function)', async () => {
     // string key
     {
@@ -252,6 +298,38 @@ describe('import-instrumentation plugin (unit)', () => {
     });
     expect(endTimerSpy).toHaveBeenCalledTimes(1);
     expect(releaseRunLockMock).toHaveBeenCalledWith('WITS:seed');
+    await app.close();
+  });
+
+  it('releases lock and records start-stage error when startImportRun fails in preHandler', async () => {
+    vi.mocked(startImportRun).mockRejectedValueOnce(new Error('db unavailable'));
+
+    const plugin = await loadPlugin();
+    const app = Fastify();
+    await app.register(plugin);
+    app.post(
+      '/start-fail',
+      { config: { importMeta: { importSource: 'WITS', job: 'seed' } } },
+      async (_req, reply) => reply.type('application/json').send({ inserted: 1 })
+    );
+
+    const r = await app.inject({
+      method: 'POST',
+      url: '/start-fail',
+      headers: jsonCT(),
+      payload: '{}',
+    });
+    expect(r.statusCode).toBe(500);
+
+    expect(startImportRun).toHaveBeenCalledTimes(1);
+    expect(importErrors.inc).toHaveBeenCalledWith({
+      importSource: 'WITS',
+      job: 'seed',
+      stage: 'start',
+    });
+    expect(endTimerSpy).toHaveBeenCalledTimes(1);
+    expect(releaseRunLockMock).toHaveBeenCalledWith('WITS:seed');
+    expect(finishImportRun).not.toHaveBeenCalled();
     await app.close();
   });
 

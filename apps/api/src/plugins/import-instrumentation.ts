@@ -6,16 +6,62 @@ import {
   setLastRunNow,
   startImportTimer,
 } from '../lib/metrics.js';
-import { finishImportRun, heartBeatImportRun, startImportRun } from '../lib/provenance.js';
+import {
+  finishImportRun,
+  heartBeatImportRun,
+  startImportRun,
+  type ImportSource,
+} from '../lib/provenance.js';
 import { acquireRunLock, makeLockKey, releaseRunLock } from '../lib/run-lock.js'; // 👈 NEW
 import { errorResponseForStatus } from '../lib/errors.js';
+
+type ImportMetaConfig = {
+  importSource: ImportSource;
+  job: string;
+  source?: string;
+  sourceUrl?: string;
+  version?: string;
+};
+
+function firstNonEmptyString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    const v = value.trim();
+    if (v.length > 0) return v;
+  }
+  return undefined;
+}
+
+function toRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  return value as Record<string, unknown>;
+}
+
+function resolveSourceUrl(meta: ImportMetaConfig, req: any): string | undefined {
+  const q = toRecord(req.query);
+  const b = toRecord(req.body);
+  return firstNonEmptyString(
+    meta.sourceUrl,
+    meta.source,
+    q?.sourceUrl,
+    q?.source,
+    b?.sourceUrl,
+    b?.source
+  );
+}
+
+function resolveVersion(meta: ImportMetaConfig, req: any): string | undefined {
+  const q = toRecord(req.query);
+  const b = toRecord(req.body);
+  return firstNonEmptyString(meta.version, q?.version, b?.version);
+}
 
 const plugin: FastifyPluginAsync = async (app) => {
   app.decorateRequest('importCtx', undefined);
 
   // Start timer + provenance if route declares config.importMeta
   app.addHook('preHandler', async (req, reply) => {
-    const meta = req.routeOptions?.config?.importMeta;
+    const meta = req.routeOptions?.config?.importMeta as ImportMetaConfig | undefined;
     if (!meta) return;
 
     const cfg = req.routeOptions?.config;
@@ -32,11 +78,24 @@ const plugin: FastifyPluginAsync = async (app) => {
 
     // 3) start metrics + provenance
     const end = startImportTimer(meta);
-    const run = await startImportRun({
-      importSource: meta.importSource,
-      job: meta.job,
-      params: (req.body ?? {}) as Record<string, unknown>,
-    });
+    let run: { id: string };
+    try {
+      run = await startImportRun({
+        importSource: meta.importSource,
+        job: meta.job,
+        version: resolveVersion(meta, req),
+        sourceUrl: resolveSourceUrl(meta, req),
+        params: {
+          query: req.query ?? null,
+          body: req.body ?? null,
+        },
+      });
+    } catch (err) {
+      importErrors.inc({ ...meta, stage: 'start' });
+      end();
+      await releaseRunLock(lockKey).catch(() => undefined);
+      throw err;
+    }
 
     // 4) heartbeat every 30s so "stuck" runs can be detected
     const hb = setInterval(() => {

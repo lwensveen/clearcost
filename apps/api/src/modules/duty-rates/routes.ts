@@ -36,10 +36,6 @@ export default function dutyRoutes(app: FastifyInstance) {
       const { dryRun, source } = DutyRatesImportQuerySchema.parse(req.query);
       const rows = DutyRatesImportBodySchema.parse(req.body);
 
-      if (source && req.routeOptions?.config?.importMeta) {
-        req.routeOptions.config.importMeta.source = source;
-      }
-
       const idem = headers['idempotency-key'] ?? headers['x-idempotency-key']!;
       const ns = `import:duties:${req.apiKey!.ownerId}`;
 
