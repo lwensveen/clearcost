@@ -143,6 +143,10 @@ export async function importDeMinimisFromOfficial(
     effectiveTo: toDate(r.effectiveTo ?? null) ?? null,
   }));
 
+  if (rows.length === 0) {
+    throw new Error('[De Minimis Official] source produced 0 rows.');
+  }
+
   const res = await importDeMinimis(rows, {
     importId: opts?.importId,
     makeSourceRef: (row) =>

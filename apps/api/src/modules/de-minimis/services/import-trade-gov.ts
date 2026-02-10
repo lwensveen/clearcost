@@ -98,7 +98,11 @@ export async function importDeMinimisFromTradeGov(
     if (items.length < size) break;
   }
 
-  if (rows.length === 0) return { ok: true as const, inserted: 0, updated: 0, count: 0 };
+  if (rows.length === 0) {
+    throw new Error(
+      '[De Minimis Trade.gov] source produced 0 rows. Check API availability and response schema.'
+    );
+  }
 
   const res = await importDeMinimis(rows, {
     importId: opts.importId,

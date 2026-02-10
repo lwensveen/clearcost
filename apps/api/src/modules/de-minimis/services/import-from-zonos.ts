@@ -187,6 +187,12 @@ export async function importDeMinimisFromZonos(
     }
   });
 
+  if (inserted + updated === 0) {
+    throw new Error(
+      '[De Minimis Zonos] source produced 0 rows. Check page structure and parsing selectors.'
+    );
+  }
+
   return {
     ok: true as const,
     source: URL,

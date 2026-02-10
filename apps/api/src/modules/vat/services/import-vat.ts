@@ -17,7 +17,9 @@ type ImportOpts = {
  * - On conflict: updates rate_pct, vat_base, effective_to, notes, updated_at.
  */
 export async function importVatRules(rows: VatRuleInsert[] | Array<any>, opts: ImportOpts = {}) {
-  if (!Array.isArray(rows) || rows.length === 0) return { ok: true as const, count: 0 };
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error('[VAT import] source produced 0 rows.');
+  }
 
   // Normalize inputs to DB column names
   const mapped = rows.map((r: any) => {
