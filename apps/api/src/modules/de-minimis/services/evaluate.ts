@@ -71,9 +71,7 @@ export async function evaluateDeMinimis(opts: {
     const rowCurrency = String(row.currency).toUpperCase();
     const rawVal = Number(row.value); // DB numeric -> string; coerce to number
     if (!Number.isFinite(rawVal)) {
-      throw new Error(
-        `Invalid de minimis threshold value for ${destCountryIso2} (${rowCurrency})`
-      );
+      throw new Error(`Invalid de minimis threshold value for ${destCountryIso2} (${rowCurrency})`);
     }
 
     let thr = rawVal;

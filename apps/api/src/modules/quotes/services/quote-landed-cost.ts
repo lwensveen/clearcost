@@ -180,7 +180,12 @@ function rowSurchargeAmount(
 function totalSurcharges(
   rows: SurchargeRow[],
   input: { CIF: number; duty: number }
-): { amount: number; perUnitExcludedCount: number; perUnitExcludedCodes: string[]; unitCodes: string[] } {
+): {
+  amount: number;
+  perUnitExcludedCount: number;
+  perUnitExcludedCodes: string[];
+  unitCodes: string[];
+} {
   let amount = 0;
   let perUnitExcludedCount = 0;
   const perUnitCodes = new Set<string>();
