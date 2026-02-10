@@ -7,9 +7,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../duty-rates/services/uk/base.js', async () => {
-  const actual = await vi.importActual<
-    typeof import('../../../duty-rates/services/uk/base.js')
-  >('../../../duty-rates/services/uk/base.js');
+  const actual = await vi.importActual<typeof import('../../../duty-rates/services/uk/base.js')>(
+    '../../../duty-rates/services/uk/base.js'
+  );
   return {
     ...actual,
     getLatestVersionId: mocks.getLatestVersionIdMock,

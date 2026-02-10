@@ -13,9 +13,9 @@ vi.mock('../import-surcharges.js', () => ({
 }));
 
 vi.mock('../../../duty-rates/services/eu/base.js', async () => {
-  const actual = await vi.importActual<
-    typeof import('../../../duty-rates/services/eu/base.js')
-  >('../../../duty-rates/services/eu/base.js');
+  const actual = await vi.importActual<typeof import('../../../duty-rates/services/eu/base.js')>(
+    '../../../duty-rates/services/eu/base.js'
+  );
   return {
     ...actual,
     parseGeoAreaDescriptions: mocks.parseGeoAreaDescriptionsMock,
