@@ -159,6 +159,7 @@ export async function getActiveDutyRateWithMeta(
             status: 'ok',
             dataset: exact.source ?? null,
             effectiveFrom: exact.effectiveFrom ?? null,
+            note: 'partner_exact',
           },
         };
       }
@@ -192,6 +193,7 @@ export async function getActiveDutyRateWithMeta(
             status: 'ok',
             dataset: viaNotes.source ?? null,
             effectiveFrom: viaNotes.effectiveFrom ?? null,
+            note: 'partner_notes_fallback',
           },
         };
       }

@@ -395,6 +395,31 @@ describe('quoteLandedCost', () => {
     );
   });
 
+  it('downgrades duty confidence when partner matching falls back to notes', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.getActiveDutyRateWithMetaMock.mockResolvedValue({
+      value: {
+        ratePct: 5,
+        dutyRule: 'fta',
+        partner: null,
+        source: 'official',
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+      },
+      meta: {
+        status: 'ok',
+        dataset: 'official',
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+        note: 'partner_notes_fallback',
+      },
+    });
+
+    const out = await quoteLandedCost(baseInput);
+
+    expect(out.quote.componentConfidence.duty).toBe('estimated');
+    expect(out.quote.overallConfidence).toBe('estimated');
+    expect(out.quote.explainability?.duty.matchMode).toBe('notes_fallback');
+  });
+
   it('passes normalized transport mode into surcharge lookup', async () => {
     mockMerchantContext(undefined, []);
     await quoteLandedCost(baseInput);

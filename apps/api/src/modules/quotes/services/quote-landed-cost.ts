@@ -80,6 +80,14 @@ function toSurchargeTransportMode(mode: QuoteInput['mode']): 'AIR' | 'OCEAN' {
   return mode === 'air' ? 'AIR' : 'OCEAN';
 }
 
+function dutyMatchModeFromLookup(
+  note: string | null | undefined
+): 'exact_partner' | 'notes_fallback' | null {
+  if (note === 'partner_exact') return 'exact_partner';
+  if (note === 'partner_notes_fallback') return 'notes_fallback';
+  return null;
+}
+
 function normalizeSurchargePct(pct: number | null | undefined): number {
   if (pct == null || !Number.isFinite(pct)) return 0;
   // Prefer the canonical DB contract (0..1 fraction), but tolerate legacy whole-% data.
@@ -416,6 +424,7 @@ export async function quoteLandedCost(
   const dutyLookup = await getActiveDutyRateWithMeta(destCountry, hs6, now, {
     partner: toDutyPartnerIso2(originCountry),
   });
+  const dutyMatchMode = dutyMatchModeFromLookup(dutyLookup.meta.note);
   const dutyRow = dutyLookup.value;
   const vatLookup = await getVatForHs6WithMeta(destCountry, hs6, now);
   const vatInfo = vatLookup.value; // { ratePct, base, source, effectiveFrom }
@@ -539,6 +548,21 @@ export async function quoteLandedCost(
     };
   }
 
+  if (
+    dutyMatchMode === 'notes_fallback' &&
+    confidence.componentConfidence.duty === 'authoritative'
+  ) {
+    const componentConfidence = {
+      ...confidence.componentConfidence,
+      duty: 'estimated' as const,
+    };
+    confidence = {
+      ...confidence,
+      componentConfidence,
+      overallConfidence: overallConfidenceFrom(componentConfidence),
+    };
+  }
+
   let strictFreshnessNote: string | null = null;
   const strictFreshnessEnabled = opts?.strictFreshness ?? isStrictFreshnessEnabled();
   if (strictFreshnessEnabled) {
@@ -620,6 +644,7 @@ export async function quoteLandedCost(
           dutyRule: dutyRow?.dutyRule ?? null,
           partner: dutyRow?.partner ?? null,
           source: dutyRow?.source ?? null,
+          ...(dutyMatchMode ? { matchMode: dutyMatchMode } : {}),
           effectiveFrom: dutyEffectiveFrom ? dutyEffectiveFrom.toISOString() : null,
           suppressedByDeMinimis: dem.suppressDuty,
         },

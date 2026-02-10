@@ -47,6 +47,7 @@ export const QuoteExplainabilitySchema = z.object({
     dutyRule: z.string().nullable(),
     partner: z.string().nullable(),
     source: z.string().nullable(),
+    matchMode: z.enum(['exact_partner', 'notes_fallback']).optional(),
     effectiveFrom: z.string().nullable(),
     suppressedByDeMinimis: z.boolean(),
   }),
