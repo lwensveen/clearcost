@@ -25,6 +25,24 @@ export type GetActiveDutyRateOpts = {
 
 export type DutyRateLookupResult = LookupResult<DutyRateRow | null>;
 
+/**
+ * Build a partner-token regex pattern for SQL/JS matching.
+ * Uses non-letter boundaries to avoid false positives like partner "IN" matching "china".
+ */
+export function partnerTokenPattern(partnerIso2: string): string {
+  const token = partnerIso2.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(token)) return '';
+  return `(^|[^A-Z])${token}([^A-Z]|$)`;
+}
+
+/** Pure helper to validate token-boundary matching behavior in unit tests. */
+export function noteHasPartnerToken(note: string | null | undefined, partnerIso2: string): boolean {
+  const pattern = partnerTokenPattern(partnerIso2);
+  if (!pattern) return false;
+  const re = new RegExp(pattern, 'i');
+  return re.test(note ?? '');
+}
+
 /** Internal helper to normalize the final row into a plain object. */
 function asDutyRateRow(
   row:
@@ -172,10 +190,10 @@ export async function getActiveDutyRateWithMeta(
       // 1b) Fallback: datasets without `partner` set (e.g., US “Special”),
       //     try notes-based match. Keep source preference first.
       // ----------------------------------------------------------------------
-      const needle = `%${opts.partner!.trim().toLowerCase()}%`;
-      const notesMatch: SQL<boolean> = sql`
-      lower(coalesce(${dutyRatesTable.notes}, '')) LIKE ${needle}
-    `;
+      const pattern = partnerTokenPattern(partnerIso2);
+      const notesMatch: SQL<boolean> = pattern
+        ? sql`upper(coalesce(${dutyRatesTable.notes}, '')) ~ ${pattern}`
+        : sql`false`;
 
       const [notesRow] = await db
         .select(cols)
