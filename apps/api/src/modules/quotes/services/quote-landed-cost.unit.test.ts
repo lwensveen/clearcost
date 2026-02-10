@@ -126,6 +126,8 @@ beforeEach(() => {
     effectivePct: 0,
     usedComponents: false,
     fxMissingRate: false,
+    contextMissing: false,
+    missingInputs: [],
   });
   mocks.computeDutyForRateIdMock.mockImplementation(
     async (
@@ -143,6 +145,8 @@ beforeEach(() => {
         effectivePct: ctx.customsValueDest > 0 ? duty / ctx.customsValueDest : 0,
         usedComponents: false,
         fxMissingRate: false,
+        contextMissing: false,
+        missingInputs: [],
       };
     }
   );
@@ -437,6 +441,8 @@ describe('quoteLandedCost', () => {
       effectivePct: 0.075,
       usedComponents: true,
       fxMissingRate: false,
+      contextMissing: false,
+      missingInputs: [],
     });
 
     const out = await quoteLandedCost(baseInput);
@@ -453,7 +459,31 @@ describe('quoteLandedCost', () => {
       })
     );
     expect(out.quote.components.duty).toBe(9);
-    expect(out.quote.explainability?.duty.calculation).toBe('components');
+    expect(out.quote.explainability?.duty).toMatchObject({ calculation: 'components' });
+  });
+
+  it('marks duty estimated when component context is missing and fallback rate is used', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.computeDutyForRateIdMock.mockResolvedValue({
+      duty: 6,
+      effectivePct: 0.05,
+      usedComponents: false,
+      fxMissingRate: false,
+      contextMissing: true,
+      missingInputs: ['quantity'],
+    });
+
+    const out = await quoteLandedCost(baseInput);
+
+    expect(out.quote.components.duty).toBe(6);
+    expect(out.quote.componentConfidence.duty).toBe('estimated');
+    expect(out.quote.overallConfidence).toBe('estimated');
+    expect(out.quote.explainability?.duty).toMatchObject({
+      calculation: 'fallback_rate',
+      missingContextInputs: ['quantity'],
+    });
+    expect(out.quote.policy).toContain('Duty components require additional shipment inputs');
+    expect(out.quote.policy).toContain('fallback ad-valorem rate was used');
   });
 
   it('downgrades duty confidence when partner matching falls back to notes', async () => {

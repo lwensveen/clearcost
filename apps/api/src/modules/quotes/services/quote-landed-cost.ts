@@ -435,6 +435,8 @@ export async function quoteLandedCost(
   // -----------------
   let duty = 0;
   let dutyComputedFromComponents = false;
+  let dutyFallbackRateDueToMissingContext = false;
+  let dutyMissingContextInputs: Array<'quantity' | 'netKg' | 'liters' | 'uom'> = [];
   if (!dem.suppressDuty) {
     if (dutyRow?.id) {
       const dutyComputed = await computeDutyForRateId(
@@ -450,6 +452,10 @@ export async function quoteLandedCost(
       duty = dutyComputed.duty;
       dutyComputedFromComponents = dutyComputed.usedComponents;
       fxMissingRate ||= dutyComputed.fxMissingRate;
+      if (dutyComputed.contextMissing) {
+        dutyMissingContextInputs = dutyComputed.missingInputs;
+        dutyFallbackRateDueToMissingContext = !dutyComputed.usedComponents;
+      }
     } else {
       const rate = dutyRow ? Number(dutyRow.ratePct) : 0;
       duty = (rate / 100) * CIF;
@@ -539,6 +545,15 @@ export async function quoteLandedCost(
       surchargeTotals.perUnitExcludedCount === 1 ? '' : 's'
     } not included in total.`;
   }
+  if (dutyMissingContextInputs.length > 0) {
+    policy += ` Duty components require additional shipment inputs (${dutyMissingContextInputs.join(
+      ', '
+    )}); ${
+      dutyFallbackRateDueToMissingContext
+        ? 'fallback ad-valorem rate was used.'
+        : 'partial component calculation was used.'
+    }`;
+  }
 
   let confidence = deriveQuoteConfidenceParts({
     statuses: {
@@ -568,6 +583,20 @@ export async function quoteLandedCost(
 
   if (
     dutyMatchMode === 'notes_fallback' &&
+    confidence.componentConfidence.duty === 'authoritative'
+  ) {
+    const componentConfidence = {
+      ...confidence.componentConfidence,
+      duty: 'estimated' as const,
+    };
+    confidence = {
+      ...confidence,
+      componentConfidence,
+      overallConfidence: overallConfidenceFrom(componentConfidence),
+    };
+  }
+  if (
+    dutyMissingContextInputs.length > 0 &&
     confidence.componentConfidence.duty === 'authoritative'
   ) {
     const componentConfidence = {
@@ -663,7 +692,14 @@ export async function quoteLandedCost(
           partner: dutyRow?.partner ?? null,
           source: dutyRow?.source ?? null,
           ...(dutyMatchMode ? { matchMode: dutyMatchMode } : {}),
-          ...(dutyComputedFromComponents ? { calculation: 'components' as const } : {}),
+          ...(dutyComputedFromComponents
+            ? { calculation: 'components' as const }
+            : dutyFallbackRateDueToMissingContext
+              ? { calculation: 'fallback_rate' as const }
+              : {}),
+          ...(dutyMissingContextInputs.length > 0
+            ? { missingContextInputs: dutyMissingContextInputs }
+            : {}),
           effectiveFrom: dutyEffectiveFrom ? dutyEffectiveFrom.toISOString() : null,
           suppressedByDeMinimis: dem.suppressDuty,
         },

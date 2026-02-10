@@ -25,20 +25,46 @@ export type DutyComponent = {
 };
 
 /** Compute duty from components. Returns total duty and effective ad-valorem ratio. */
+export type DutyMissingContextInput = 'quantity' | 'netKg' | 'liters' | 'uom';
+
 export function computeDutyFromComponents(
   ctx: DutyComputeContext,
   comps: DutyComponent[]
-): { duty: number; effectivePct: number } {
-  const { customsValueDest, quantity = 1, netKg = 0, liters = 0 } = ctx;
+): { duty: number; effectivePct: number; missingInputs: DutyMissingContextInput[] } {
+  const customsValueDest = Number(ctx.customsValueDest);
+  const quantity = ctx.quantity;
+  const netKg = ctx.netKg;
+  const liters = ctx.liters;
 
-  const uomFactor = (c: DutyComponent) => {
-    const u = (c.uom || '').toLowerCase();
-    if (u === 'kg') return netKg;
-    if (u === '100kg') return netKg / 100;
-    if (u === 'l' || u === 'liter' || u === 'litre') return liters;
-    if (u === 'item' || u === 'unit' || u === 'pair') return quantity;
-    // safe default: treat as per item
-    return quantity;
+  const missing = new Set<DutyMissingContextInput>();
+
+  const uomFactor = (
+    component: DutyComponent
+  ): { factor: number; missingInput: DutyMissingContextInput | null } => {
+    const u = String(component.uom ?? '')
+      .trim()
+      .toLowerCase();
+    if (u === 'kg') {
+      return Number.isFinite(netKg)
+        ? { factor: Number(netKg), missingInput: null }
+        : { factor: 0, missingInput: 'netKg' };
+    }
+    if (u === '100kg') {
+      return Number.isFinite(netKg)
+        ? { factor: Number(netKg) / 100, missingInput: null }
+        : { factor: 0, missingInput: 'netKg' };
+    }
+    if (u === 'l' || u === 'liter' || u === 'litre') {
+      return Number.isFinite(liters)
+        ? { factor: Number(liters), missingInput: null }
+        : { factor: 0, missingInput: 'liters' };
+    }
+    if (u === 'item' || u === 'unit' || u === 'pair') {
+      return Number.isFinite(quantity)
+        ? { factor: Number(quantity), missingInput: null }
+        : { factor: 0, missingInput: 'quantity' };
+    }
+    return { factor: 0, missingInput: 'uom' };
   };
 
   let adval = 0;
@@ -50,11 +76,26 @@ export function computeDutyFromComponents(
     if (c.componentType === 'advalorem' && c.ratePct != null) {
       adval += (c.ratePct / 100) * customsValueDest;
     } else if (c.componentType === 'specific' && c.amount != null) {
-      specific += c.amount * uomFactor(c);
+      const factor = uomFactor(c);
+      if (factor.missingInput) {
+        missing.add(factor.missingInput);
+        continue;
+      }
+      specific += c.amount * factor.factor;
     } else if (c.componentType === 'minimum' && c.amount != null) {
-      minFloor = Math.max(minFloor, c.amount * uomFactor(c));
+      const factor = uomFactor(c);
+      if (factor.missingInput) {
+        missing.add(factor.missingInput);
+        continue;
+      }
+      minFloor = Math.max(minFloor, c.amount * factor.factor);
     } else if (c.componentType === 'maximum' && c.amount != null) {
-      maxCeil = Math.min(maxCeil, c.amount * uomFactor(c));
+      const factor = uomFactor(c);
+      if (factor.missingInput) {
+        missing.add(factor.missingInput);
+        continue;
+      }
+      maxCeil = Math.min(maxCeil, c.amount * factor.factor);
     }
   }
 
@@ -63,7 +104,7 @@ export function computeDutyFromComponents(
   if (maxCeil < Infinity) duty = Math.min(duty, maxCeil);
 
   const effectivePct = customsValueDest > 0 ? duty / customsValueDest : 0;
-  return { duty, effectivePct };
+  return { duty, effectivePct, missingInputs: [...missing] };
 }
 
 function normalizeCurrency(code: string | null | undefined): string | null {
@@ -96,6 +137,8 @@ export async function computeDutyForRateId(
   effectivePct: number;
   usedComponents: boolean;
   fxMissingRate: boolean;
+  contextMissing: boolean;
+  missingInputs: DutyMissingContextInput[];
 }> {
   const on = opts?.on ?? new Date();
   const rows = await db
@@ -172,7 +215,24 @@ export async function computeDutyForRateId(
 
   if (convertedComps.length > 0) {
     const res = computeDutyFromComponents(ctx, convertedComps);
-    return { ...res, usedComponents: true, fxMissingRate };
+    if (res.missingInputs.length === 0) {
+      return { ...res, usedComponents: true, fxMissingRate, contextMissing: false };
+    }
+
+    const pct = opts?.fallbackRatePct != null ? Number(opts.fallbackRatePct) : null;
+    if (pct != null && isFinite(pct)) {
+      const duty = (pct / 100) * ctx.customsValueDest;
+      return {
+        duty,
+        effectivePct: ctx.customsValueDest > 0 ? duty / ctx.customsValueDest : 0,
+        usedComponents: false,
+        fxMissingRate,
+        contextMissing: true,
+        missingInputs: res.missingInputs,
+      };
+    }
+
+    return { ...res, usedComponents: true, fxMissingRate, contextMissing: true };
   }
 
   const pct = opts?.fallbackRatePct != null ? Number(opts.fallbackRatePct) : null;
@@ -183,9 +243,18 @@ export async function computeDutyForRateId(
       effectivePct: ctx.customsValueDest > 0 ? duty / ctx.customsValueDest : 0,
       usedComponents: false,
       fxMissingRate,
+      contextMissing: false,
+      missingInputs: [],
     };
   }
 
   // Nothing to compute
-  return { duty: 0, effectivePct: 0, usedComponents: false, fxMissingRate };
+  return {
+    duty: 0,
+    effectivePct: 0,
+    usedComponents: false,
+    fxMissingRate,
+    contextMissing: false,
+    missingInputs: [],
+  };
 }

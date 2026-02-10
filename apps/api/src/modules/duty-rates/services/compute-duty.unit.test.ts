@@ -56,6 +56,19 @@ describe('computeDutyFromComponents', () => {
 
     expect(out.duty).toBe(160);
     expect(out.effectivePct).toBeCloseTo(0.16, 6);
+    expect(out.missingInputs).toEqual([]);
+  });
+
+  it('reports missing quantity/liters/netKg/uom context instead of assuming defaults', () => {
+    const out = computeDutyFromComponents({ customsValueDest: 1000 }, [
+      { componentType: 'specific', amount: 1, uom: 'item' },
+      { componentType: 'specific', amount: 1, uom: 'kg' },
+      { componentType: 'specific', amount: 1, uom: 'liter' },
+      { componentType: 'specific', amount: 1, uom: 'crate' },
+    ]);
+
+    expect(out.duty).toBe(0);
+    expect(out.missingInputs.sort()).toEqual(['liters', 'netKg', 'quantity', 'uom']);
   });
 });
 
@@ -108,6 +121,8 @@ describe('computeDutyForRateId', () => {
       effectivePct: 0.23,
       usedComponents: true,
       fxMissingRate: false,
+      contextMissing: false,
+      missingInputs: [],
     });
   });
 
@@ -124,6 +139,35 @@ describe('computeDutyForRateId', () => {
     expect(out.effectivePct).toBeCloseTo(0.07, 6);
     expect(out.usedComponents).toBe(false);
     expect(out.fxMissingRate).toBe(false);
+    expect(out.contextMissing).toBe(false);
+    expect(out.missingInputs).toEqual([]);
+  });
+
+  it('falls back to parent rate and reports context missing when component uom inputs are absent', async () => {
+    mockComponentRows([
+      {
+        componentType: 'specific',
+        ratePct: null,
+        amount: '2.000',
+        currency: 'EUR',
+        uom: 'item',
+        qualifier: null,
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+        effectiveTo: null,
+      },
+    ]);
+
+    const out = await computeDutyForRateId(
+      'rate_1',
+      { customsValueDest: 200 },
+      { fallbackRatePct: 7, on: new Date('2025-01-15T00:00:00.000Z'), destCurrency: 'EUR' }
+    );
+
+    expect(out.duty).toBeCloseTo(14, 6);
+    expect(out.effectivePct).toBeCloseTo(0.07, 6);
+    expect(out.usedComponents).toBe(false);
+    expect(out.contextMissing).toBe(true);
+    expect(out.missingInputs).toEqual(['quantity']);
   });
 
   it('fails clearly when component currency code is invalid', async () => {
