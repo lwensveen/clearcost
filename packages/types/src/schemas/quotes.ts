@@ -67,6 +67,13 @@ export const QuoteExplainabilitySchema = z.object({
     appliedCodes: z.array(z.string()),
     appliedCount: z.number().int().nonnegative(),
     sourceRefs: z.array(z.string()),
+    nonModeledPerUnit: z
+      .object({
+        count: z.number().int().nonnegative(),
+        codes: z.array(z.string()),
+        unitCodes: z.array(z.string()),
+      })
+      .optional(),
   }),
   freight: z.object({
     model: z.enum(['card', 'override']),

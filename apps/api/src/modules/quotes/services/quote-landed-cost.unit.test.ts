@@ -418,6 +418,42 @@ describe('quoteLandedCost', () => {
     expect(out.quote.missingComponents).not.toContain('surcharges');
   });
 
+  it('reports non-modeled per-unit surcharges and marks surcharge confidence estimated', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.getSurchargesScopedWithMetaMock.mockResolvedValue({
+      value: [
+        {
+          surchargeCode: 'FDA_FSMA_REINSPECTION_HOURLY_DOM',
+          rateType: 'per_unit',
+          unitAmt: 338.0,
+          unitCode: 'HOUR',
+        },
+        {
+          surchargeCode: 'AQI_VESSEL',
+          rateType: 'fixed',
+          fixedAmt: null,
+          unitAmt: 237.68,
+          unitCode: 'ARRIVAL',
+        },
+      ],
+      meta: { status: 'ok', dataset: null, effectiveFrom: null },
+    });
+
+    const out = await quoteLandedCost(baseInput);
+
+    expect(out.quote.components.fees).toBe(0);
+    expect(out.quote.total).toBe(151.2);
+    expect(out.quote.componentConfidence.surcharges).toBe('estimated');
+    expect(out.quote.overallConfidence).toBe('estimated');
+    expect(out.quote.missingComponents).not.toContain('surcharges');
+    expect(out.quote.policy).toContain('per-unit surcharge rows not included in total');
+    expect(out.quote.explainability?.surcharges.nonModeledPerUnit).toEqual({
+      count: 2,
+      codes: ['FDA_FSMA_REINSPECTION_HOURLY_DOM', 'AQI_VESSEL'],
+      unitCodes: ['HOUR', 'ARRIVAL'],
+    });
+  });
+
   it('applies ad-valorem surcharge fractions with min/max clamps', async () => {
     mockMerchantContext(undefined, []);
     mocks.getSurchargesScopedWithMetaMock.mockResolvedValue({

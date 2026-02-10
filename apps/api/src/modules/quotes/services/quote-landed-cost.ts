@@ -99,31 +99,60 @@ function surchargeBaseAmount(
   return input.CIF;
 }
 
+type SurchargeRow = {
+  surchargeCode?: string | null;
+  rateType?: string | null;
+  valueBasis?: string | null;
+  fixedAmt?: number | null;
+  pctAmt?: number | null;
+  minAmt?: number | null;
+  maxAmt?: number | null;
+  unitAmt?: number | null;
+  unitCode?: string | null;
+};
+
+type PerUnitExclusion = {
+  code: string;
+  unitCode: string;
+};
+
+type SurchargeAmountResult = {
+  amount: number;
+  perUnitExclusion?: PerUnitExclusion;
+};
+
+function toPerUnitExclusion(row: SurchargeRow): PerUnitExclusion {
+  return {
+    code: typeof row.surchargeCode === 'string' ? row.surchargeCode : '',
+    unitCode: typeof row.unitCode === 'string' ? row.unitCode : '',
+  };
+}
+
 function rowSurchargeAmount(
-  row: {
-    rateType?: string | null;
-    valueBasis?: string | null;
-    fixedAmt?: number | null;
-    pctAmt?: number | null;
-    minAmt?: number | null;
-    maxAmt?: number | null;
-  },
+  row: SurchargeRow,
   input: { CIF: number; duty: number }
-): number {
+): SurchargeAmountResult {
   const rateType = String(row.rateType ?? '').toLowerCase();
+  const hasUnitAmt = row.unitAmt != null && Number.isFinite(row.unitAmt);
   if (rateType === 'fixed') {
-    return clampAmount(row.fixedAmt ?? 0, row.minAmt, row.maxAmt);
+    if (row.fixedAmt != null && Number.isFinite(row.fixedAmt)) {
+      return { amount: clampAmount(row.fixedAmt, row.minAmt, row.maxAmt) };
+    }
+    if (hasUnitAmt) {
+      return { amount: 0, perUnitExclusion: toPerUnitExclusion(row) };
+    }
+    return { amount: 0 };
   }
 
   if (rateType === 'ad_valorem') {
     const pctFraction = normalizeSurchargePct(row.pctAmt);
     const basis = surchargeBaseAmount(row.valueBasis, input);
     const amount = pctFraction * basis;
-    return clampAmount(amount, row.minAmt, row.maxAmt);
+    return { amount: clampAmount(amount, row.minAmt, row.maxAmt) };
   }
 
   if (rateType === 'per_unit') {
-    return 0;
+    return { amount: 0, perUnitExclusion: toPerUnitExclusion(row) };
   }
 
   // Legacy/import-fallback behavior where rateType is missing or invalid:
@@ -137,25 +166,42 @@ function rowSurchargeAmount(
       const basis = surchargeBaseAmount(row.valueBasis, input);
       amount += clampAmount(pctFraction * basis, row.minAmt, row.maxAmt);
     }
-    return amount;
+    return { amount };
+  }
+
+  if (hasUnitAmt) {
+    return { amount: 0, perUnitExclusion: toPerUnitExclusion(row) };
   }
 
   // per-unit/unknown rows require extra quantity context not modeled here yet.
-  return 0;
+  return { amount: 0 };
 }
 
 function totalSurcharges(
-  rows: Array<{
-    rateType?: string | null;
-    valueBasis?: string | null;
-    fixedAmt?: number | null;
-    pctAmt?: number | null;
-    minAmt?: number | null;
-    maxAmt?: number | null;
-  }>,
+  rows: SurchargeRow[],
   input: { CIF: number; duty: number }
-): number {
-  return rows.reduce((sum, row) => sum + rowSurchargeAmount(row, input), 0);
+): { amount: number; perUnitExcludedCount: number; perUnitExcludedCodes: string[]; unitCodes: string[] } {
+  let amount = 0;
+  let perUnitExcludedCount = 0;
+  const perUnitCodes = new Set<string>();
+  const unitCodes = new Set<string>();
+
+  for (const row of rows) {
+    const out = rowSurchargeAmount(row, input);
+    amount += out.amount;
+    if (out.perUnitExclusion) {
+      perUnitExcludedCount += 1;
+      if (out.perUnitExclusion.code) perUnitCodes.add(out.perUnitExclusion.code);
+      if (out.perUnitExclusion.unitCode) unitCodes.add(out.perUnitExclusion.unitCode);
+    }
+  }
+
+  return {
+    amount,
+    perUnitExcludedCount,
+    perUnitExcludedCodes: [...perUnitCodes],
+    unitCodes: [...unitCodes],
+  };
 }
 
 function strictStaleComponentsFromSnapshot(
@@ -330,7 +376,8 @@ export async function quoteLandedCost(
     transportMode: toSurchargeTransportMode(input.mode),
   });
   const sur = surchargeLookup.value;
-  const fees = totalSurcharges(sur, { CIF, duty });
+  const surchargeTotals = totalSurcharges(sur, { CIF, duty });
+  const fees = surchargeTotals.amount;
 
   // -----------------
   // Output assembly
@@ -356,7 +403,7 @@ export async function quoteLandedCost(
   );
 
   // Policy text prioritizes de minimis messaging, then IOSS, then standard
-  const policy =
+  let policy =
     dem.suppressDuty || dem.suppressVAT
       ? dem.suppressDuty && dem.suppressVAT
         ? 'De minimis: duty & VAT not charged at import.'
@@ -366,6 +413,12 @@ export async function quoteLandedCost(
       : iossEligible
         ? 'IOSS: VAT collected at checkout; no import VAT due.'
         : 'Standard import tax rules apply.';
+
+  if (surchargeTotals.perUnitExcludedCount > 0) {
+    policy += ` ${surchargeTotals.perUnitExcludedCount} per-unit surcharge row${
+      surchargeTotals.perUnitExcludedCount === 1 ? '' : 's'
+    } not included in total.`;
+  }
 
   let confidence = deriveQuoteConfidenceParts({
     statuses: {
@@ -377,6 +430,21 @@ export async function quoteLandedCost(
     fxMissingRate,
     freightOverridden: opts?.freightInDestOverride != null,
   });
+
+  if (
+    surchargeTotals.perUnitExcludedCount > 0 &&
+    confidence.componentConfidence.surcharges === 'authoritative'
+  ) {
+    const componentConfidence = {
+      ...confidence.componentConfidence,
+      surcharges: 'estimated' as const,
+    };
+    confidence = {
+      ...confidence,
+      componentConfidence,
+      overallConfidence: overallConfidenceFrom(componentConfidence),
+    };
+  }
 
   let strictFreshnessNote: string | null = null;
   const strictFreshnessEnabled = opts?.strictFreshness ?? isStrictFreshnessEnabled();
@@ -479,6 +547,15 @@ export async function quoteLandedCost(
           appliedCodes: surchargeCodes,
           appliedCount: sur.length,
           sourceRefs: surchargeSourceRefs,
+          ...(surchargeTotals.perUnitExcludedCount > 0
+            ? {
+                nonModeledPerUnit: {
+                  count: surchargeTotals.perUnitExcludedCount,
+                  codes: surchargeTotals.perUnitExcludedCodes,
+                  unitCodes: surchargeTotals.unitCodes,
+                },
+              }
+            : {}),
         },
         freight: {
           model: freightModel,
