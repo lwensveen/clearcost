@@ -12,7 +12,7 @@ export async function getLatestJpTariffBase(): Promise<string> {
   const a = root
     .querySelectorAll('a')
     .map((el) => el.getAttribute('href') || '')
-    .find((href) => /\/english\/tariff\/\d{4}_\d{2}_\d{2}\/index\.htm$/i.test(href));
+    .find((href) => /\/english\/tariff\/\d{4}_\d{1,2}(?:_\d{1,2})?\/index\.htm$/i.test(href));
   if (!a) throw new Error('No edition index found');
 
   const url = new URL(a, JP_TARIFF_INDEX).href;

@@ -5,16 +5,42 @@ import { parsePercentAdValorem, toHs6 } from '../../utils/parse.js';
 import { httpFetch } from '../../../../lib/http.js';
 
 type FetchOpts = {
-  /** Override the dated base (e.g., https://www.customs.go.jp/english/tariff/2025_1/index.htm) */
+  /** Override the dated base (e.g., https://www.customs.go.jp/english/tariff/2025_04_01/index.htm) */
   editionBase?: string;
   /** Optional HS6 filter to limit scope */
   hs6List?: string[];
   /** Optional custom User-Agent */
   userAgent?: string;
+  /** Optional override for row effective date */
+  effectiveFrom?: Date;
 };
+
+export function parseJpEditionEffectiveFrom(editionBaseUrl: string): Date | null {
+  const match = editionBaseUrl.match(/\/(\d{4})_(\d{1,2})(?:_(\d{1,2}))?(?:\/|$)/);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3] ?? '1');
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  if (dt.getUTCFullYear() !== year || dt.getUTCMonth() + 1 !== month || dt.getUTCDate() !== day) {
+    return null;
+  }
+
+  return dt;
+}
 
 export async function fetchJpMfnDutyRates(options: FetchOpts = {}): Promise<DutyRateInsert[]> {
   const editionBaseUrl = options.editionBase ?? (await getLatestJpTariffBase());
+  const effectiveFrom = options.effectiveFrom ?? parseJpEditionEffectiveFrom(editionBaseUrl);
+  if (!effectiveFrom) {
+    throw new Error(
+      `[JP Duties] Could not derive effectiveFrom from edition base URL: ${editionBaseUrl}`
+    );
+  }
   const chapterPageUrls = await listJpTariffChapterPages(editionBaseUrl);
 
   const results: DutyRateInsert[] = [];
@@ -60,7 +86,7 @@ export async function fetchJpMfnDutyRates(options: FetchOpts = {}): Promise<Duty
         hs6,
         dutyRule: 'mfn',
         ratePct: ratePctString,
-        effectiveFrom: undefined, // edition governs; lines usually lack explicit dates
+        effectiveFrom, // edition governs; lines usually lack explicit dates
         effectiveTo: undefined,
         notes: undefined,
         source: 'official',

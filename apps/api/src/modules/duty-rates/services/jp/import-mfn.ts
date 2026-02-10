@@ -1,5 +1,6 @@
 import type { DutyRateInsert } from '@clearcost/types';
 import { batchUpsertDutyRatesFromStream } from '../../utils/batch-upsert.js';
+import { fetchJpMfnDutyRates } from './fetch-mfn.js';
 import { fetchWitsMfnDutyRates } from '../wits/mfn.js';
 
 type Params = {
@@ -10,11 +11,6 @@ type Params = {
   useWitsFallback?: boolean;
 };
 
-async function fetchJpMfnOfficial(_hs6List?: string[]): Promise<DutyRateInsert[]> {
-  // Placeholder: return [] until we have a METI/Customs bulk feed
-  return [];
-}
-
 export async function importJpMfn({
   hs6List,
   batchSize = 5_000,
@@ -22,7 +18,7 @@ export async function importJpMfn({
   dryRun,
   useWitsFallback = true,
 }: Params) {
-  const officialRows = await fetchJpMfnOfficial(hs6List);
+  const officialRows = await fetchJpMfnDutyRates({ hs6List });
 
   let witsRows: DutyRateInsert[] = [];
   if (useWitsFallback) {
