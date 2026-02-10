@@ -31,6 +31,7 @@ type SurchargeRowOut = z.infer<typeof SelectRowSchema>;
 type TransportMode = SurchargeRowOut['transportMode']; // e.g. 'ALL' | 'OCEAN' | 'AIR' | 'TRUCK' | 'RAIL' | 'BARGE'
 type ApplyLevel = SurchargeRowOut['applyLevel']; // 'entry' | 'line' | 'shipment' | 'program'
 type RankedSurchargeRow = { row: SurchargeRowOut; score: number; tiebreak: number };
+const TRADE_REMEDY_CODES = new Set(['TRADE_REMEDY_301', 'TRADE_REMEDY_232']);
 
 export type GetSurchargesScopedInput = {
   dest: string;
@@ -161,6 +162,25 @@ export function selectScopedSurchargeRows(
   return [...byScopeKey.values()];
 }
 
+function isTradeRemedyCode(code: string | null | undefined): boolean {
+  return typeof code === 'string' && TRADE_REMEDY_CODES.has(code);
+}
+
+export function filterUnscopedTradeRemedyRows(
+  rows: SurchargeRowOut[],
+  input: { hs6Key: string | null }
+): { value: SurchargeRowOut[]; filteredCount: number } {
+  let filteredCount = 0;
+  const value = rows.filter((row) => {
+    if (!isTradeRemedyCode(row.surchargeCode)) return true;
+    const isScopedByHs6 = !!input.hs6Key && row.hs6 === input.hs6Key;
+    if (isScopedByHs6) return true;
+    filteredCount += 1;
+    return false;
+  });
+  return { value, filteredCount };
+}
+
 // ---- main ------------------------------------------------------------------
 /**
  * Return active surcharges for a given destination as of `on`, optionally scoped
@@ -229,19 +249,41 @@ export async function getSurchargesScopedWithMeta(
 
     const coerced = rows.map((r) => SelectRowSchema.parse(r));
 
-    const value = selectScopedSurchargeRows(coerced, {
+    const rankedRows = selectScopedSurchargeRows(coerced, {
       originUp,
       hs6Key,
       mode,
       level,
     });
-    if (value.length > 0) {
+    const filtered = filterUnscopedTradeRemedyRows(rankedRows, { hs6Key });
+    if (filtered.value.length > 0) {
       return {
-        value,
+        value: filtered.value,
         meta: {
-          status: 'ok',
-          dataset: value.find((row) => row.sourceRef)?.sourceRef ?? null,
-          effectiveFrom: latestSurchargeEffectiveFrom(value),
+          status: filtered.filteredCount > 0 ? 'out_of_scope' : 'ok',
+          dataset: filtered.value.find((row) => row.sourceRef)?.sourceRef ?? null,
+          effectiveFrom: latestSurchargeEffectiveFrom(filtered.value),
+          ...(filtered.filteredCount > 0
+            ? {
+                note: `${filtered.filteredCount} trade-remedy row${
+                  filtered.filteredCount === 1 ? '' : 's'
+                } skipped: no HS6-level scope correlation.`,
+              }
+            : {}),
+        },
+      };
+    }
+
+    if (filtered.filteredCount > 0) {
+      return {
+        value: [],
+        meta: {
+          status: 'out_of_scope',
+          dataset: rankedRows.find((row) => row.sourceRef)?.sourceRef ?? null,
+          effectiveFrom: latestSurchargeEffectiveFrom(rankedRows),
+          note: `${filtered.filteredCount} trade-remedy row${
+            filtered.filteredCount === 1 ? '' : 's'
+          } skipped: no HS6-level scope correlation.`,
         },
       };
     }

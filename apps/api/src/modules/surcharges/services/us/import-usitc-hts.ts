@@ -60,7 +60,7 @@ function makeNotes(
       ? `HTS ${hts10} – Section 301 (additional duty)`
       : `HTS ${hts10} – Section 232 (additional duty)`;
   const comp = generalCell && hasCompound(generalCell) ? '; contains specific/compound text' : '';
-  return `${base}${comp}.`;
+  return `${base}${comp}. Scope is chapter-99 program aggregate; quote-time requires HS6 correlation to apply.`;
 }
 
 /**
@@ -123,7 +123,7 @@ export async function importUsTradeRemediesFromHTS(
     origin: null,
     hs6: null,
     rateType: 'ad_valorem',
-    applyLevel: 'entry',
+    applyLevel: 'program',
     valueBasis: 'customs',
     transportMode: 'ALL',
     currency: 'USD',
@@ -174,11 +174,12 @@ export async function importUsTradeRemediesFromHTS(
       const program = r.surchargeCode === 'TRADE_REMEDY_301' ? '301' : '232';
       const origin = r.origin ?? 'ALL';
       const hs = r.hs6 ?? 'ALL';
+      const scope = r.hs6 ? 'hs6' : 'aggregate';
       const ef =
         r.effectiveFrom instanceof Date
           ? r.effectiveFrom.toISOString().slice(0, 10)
           : String(r.effectiveFrom).slice(0, 10);
-      return `usitc:hts:program=${program}:origin=${origin}:hs6=${hs}:ef=${ef}`;
+      return `usitc:hts:program=${program}:origin=${origin}:hs6=${hs}:scope=${scope}:ef=${ef}`;
     },
   });
 

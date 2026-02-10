@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { latestSurchargeEffectiveFrom, selectScopedSurchargeRows } from './get-surcharges.js';
+import {
+  filterUnscopedTradeRemedyRows,
+  latestSurchargeEffectiveFrom,
+  selectScopedSurchargeRows,
+} from './get-surcharges.js';
 
 type ScopedSurchargeRow = Parameters<typeof selectScopedSurchargeRows>[0][number];
 
@@ -119,5 +123,41 @@ describe('selectScopedSurchargeRows', () => {
     });
 
     expect(out.map((row) => row.id).sort()).toEqual(['hmf-generic', 'mpf-specific']);
+  });
+});
+
+describe('filterUnscopedTradeRemedyRows', () => {
+  it('drops aggregate trade-remedy rows without hs6 correlation', () => {
+    const rows = [
+      makeRow({
+        id: 'tr301-aggregate',
+        surchargeCode: 'TRADE_REMEDY_301',
+        origin: 'CN',
+        hs6: null,
+      }),
+      makeRow({ id: 'mpf', surchargeCode: 'MPF', origin: null, hs6: null }),
+    ];
+
+    const out = filterUnscopedTradeRemedyRows(rows, { hs6Key: '850110' });
+
+    expect(out.filteredCount).toBe(1);
+    expect(out.value.map((row) => row.id)).toEqual(['mpf']);
+  });
+
+  it('keeps trade-remedy rows when hs6-scoped rows exist', () => {
+    const rows = [
+      makeRow({
+        id: 'tr301-scoped',
+        surchargeCode: 'TRADE_REMEDY_301',
+        origin: 'CN',
+        hs6: '850110',
+      }),
+      makeRow({ id: 'hmf', surchargeCode: 'HMF', origin: null, hs6: null }),
+    ];
+
+    const out = filterUnscopedTradeRemedyRows(rows, { hs6Key: '850110' });
+
+    expect(out.filteredCount).toBe(0);
+    expect(out.value.map((row) => row.id).sort()).toEqual(['hmf', 'tr301-scoped']);
   });
 });

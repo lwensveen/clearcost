@@ -620,6 +620,9 @@ export async function quoteLandedCost(
       surchargeTotals.perUnitExcludedCount === 1 ? '' : 's'
     } not included in total.`;
   }
+  if (surchargeLookup.meta.note) {
+    policy += ` ${surchargeLookup.meta.note}`;
+  }
   if (dutyMissingContextInputs.length > 0) {
     policy += ` Duty components require additional shipment inputs (${dutyMissingContextInputs.join(
       ', '
