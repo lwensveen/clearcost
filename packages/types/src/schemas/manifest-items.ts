@@ -14,6 +14,8 @@ export const ManifestItemSelectCoercedSchema = ManifestItemSelectSchema.extend({
     .optional()
     .transform((v) => v ?? { l: 0, w: 0, h: 0 }),
   weightKg: z.coerce.number(),
+  quantity: z.coerce.number().nullable().optional(),
+  liters: z.coerce.number().nullable().optional(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 });

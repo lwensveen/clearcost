@@ -19,6 +19,8 @@ export const ManifestItemInputSchema = z.object({
   itemValue: MoneyInputSchema,
   dimsCm: DimsCmInputSchema,
   weightKg: z.number().nonnegative(),
+  quantity: z.number().nonnegative().optional(),
+  liters: z.number().nonnegative().optional(),
   categoryKey: z.string().min(1),
   hs6: z
     .string()

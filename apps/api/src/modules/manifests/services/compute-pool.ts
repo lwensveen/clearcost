@@ -77,13 +77,24 @@ export async function computePool(manifestId: string, opts: ComputePoolOpts = {}
   const enriched = items.map((it) => {
     const dims = it.dimsCm ?? { l: 0, w: 0, h: 0 };
     const wKg = Number(it.weightKg ?? 0);
+    const quantityRaw = Number(it.quantity ?? NaN);
+    const litersRaw = Number(it.liters ?? NaN);
     const volKg = volumetricKg(dims);
     const chgKg = shippingMode === 'air' ? Math.max(wKg, volKg) : wKg;
     const m3 = volumeM3(dims);
 
     const basis = allocation === 'chargeable' ? chgKg : allocation === 'volumetric' ? m3 : wKg;
 
-    return { ...it, dims, weightKgNum: wKg, chargeableKg: chgKg, m3, basis };
+    return {
+      ...it,
+      dims,
+      weightKgNum: wKg,
+      quantityNum: Number.isFinite(quantityRaw) && quantityRaw >= 0 ? quantityRaw : undefined,
+      litersNum: Number.isFinite(litersRaw) && litersRaw >= 0 ? litersRaw : undefined,
+      chargeableKg: chgKg,
+      m3,
+      basis,
+    };
   });
 
   const totalBasis = enriched.reduce((s, r) => s + (Number.isFinite(r.basis) ? r.basis : 0), 0);
@@ -130,6 +141,8 @@ export async function computePool(manifestId: string, opts: ComputePoolOpts = {}
         },
         dimsCm: { l: Number(it.dims.l ?? 0), w: Number(it.dims.w ?? 0), h: Number(it.dims.h ?? 0) },
         weightKg: Number(it.weightKgNum ?? 0),
+        quantity: it.quantityNum,
+        liters: it.litersNum,
         categoryKey: String(it.categoryKey ?? ''),
         hs6: it.hs6 ? String(it.hs6) : undefined,
       },

@@ -47,7 +47,7 @@ export function parseCsv(text: string): Record<string, string>[] {
 export function mapRecordToItem(rec: Record<string, string>, manifestId: string): RowShape {
   // Supported columns (match your exporter): id is ignored; manifestId is derived
   // reference, notes, hs6, categoryKey, itemValueAmount, itemValueCurrency,
-  // weightKg, dimsL, dimsW, dimsH, createdAt, updatedAt
+  // weightKg, quantity, liters, dimsL, dimsW, dimsH, createdAt, updatedAt
   const n = (v?: string) => (v == null || v === '' ? undefined : Number(v));
   const s = (v?: string) => (v == null || v === '' ? undefined : v);
 
@@ -66,6 +66,8 @@ export function mapRecordToItem(rec: Record<string, string>, manifestId: string)
     itemValueAmount: s(rec['itemvalueamount']) ?? '0',
     itemValueCurrency: s(rec['itemvaluecurrency']) ?? 'USD',
     weightKg: s(rec['weightkg']) ?? '0',
+    quantity: s(rec['quantity'] ?? rec['qty']),
+    liters: s(rec['liters'] ?? rec['litres']),
     dimsCm: dims,
   };
   return row;

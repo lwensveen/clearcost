@@ -187,6 +187,8 @@ export type ManifestItemInput = {
   itemValueAmount: string | number; // DB numeric → send as string or number
   itemValueCurrency: string; // e.g. 'USD'
   weightKg?: string | number; // DB numeric → send as string or number
+  quantity?: string | number | null; // optional shipment quantity context
+  liters?: string | number | null; // optional liters context
   dimsCm?: { l?: number; w?: number; h?: number } | null;
 };
 
@@ -215,6 +217,8 @@ export async function replaceItemsAction(
       const itemValueAmount = it.itemValueAmount;
       const itemValueCurrency = it.itemValueCurrency;
       const weightKg = it.weightKg;
+      const quantity = it.quantity;
+      const liters = it.liters;
 
       return {
         reference: ref == null ? null : String(ref),
@@ -227,6 +231,8 @@ export async function replaceItemsAction(
             : '0',
         itemValueCurrency: typeof itemValueCurrency === 'string' ? itemValueCurrency : 'USD',
         weightKg: typeof weightKg === 'number' || typeof weightKg === 'string' ? weightKg : '0',
+        quantity: typeof quantity === 'number' || typeof quantity === 'string' ? quantity : null,
+        liters: typeof liters === 'number' || typeof liters === 'string' ? liters : null,
         dimsCm: {
           l: Number(dims.l ?? 0) || 0,
           w: Number(dims.w ?? 0) || 0,
@@ -332,6 +338,8 @@ export async function updateItemAction(
     itemValueAmount: string | number;
     itemValueCurrency: string;
     weightKg: string | number;
+    quantity: string | number | null;
+    liters: string | number | null;
     dimsCm: { l?: number; w?: number; h?: number } | null;
   }>
 ) {

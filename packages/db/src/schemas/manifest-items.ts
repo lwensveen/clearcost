@@ -15,6 +15,9 @@ export const manifestItemsTable = pgTable(
     // Physicals
     dimsCm: jsonb('dims_cm').$type<{ l: number; w: number; h: number }>().notNull(),
     weightKg: numeric('weight_kg', { precision: 12, scale: 3 }).notNull(),
+    // Optional shipment context used by duty-component/per-unit surcharge calculations.
+    quantity: numeric('quantity', { precision: 12, scale: 3 }),
+    liters: numeric('liters', { precision: 12, scale: 3 }),
     // Classification hints
     hs6: char('user_hs6', { length: 6 }), // optional user-provided HS6
     categoryKey: varchar('category_key', { length: 256 }), // fallback classifier key
