@@ -12,6 +12,7 @@ import { getFreightWithMeta } from '../../freight/services/get-freight.js';
 import { getVatForHs6WithMeta } from '../../vat/services/get-vat-for-hs6.js';
 import { getCanonicalFxAsOf } from '../../fx/services/get-canonical-fx-asof.js';
 import { evaluateDeMinimis } from '../../de-minimis/services/evaluate.js';
+import { computeDutyForRateId } from '../../duty-rates/services/compute-duty.js';
 import {
   deriveQuoteConfidenceParts,
   overallConfidenceFrom,
@@ -433,9 +434,26 @@ export async function quoteLandedCost(
   // Duty (MFN first)
   // -----------------
   let duty = 0;
+  let dutyComputedFromComponents = false;
   if (!dem.suppressDuty) {
-    const rate = dutyRow ? Number(dutyRow.ratePct) : 0;
-    duty = (rate / 100) * CIF;
+    if (dutyRow?.id) {
+      const dutyComputed = await computeDutyForRateId(
+        dutyRow.id,
+        { customsValueDest: CIF, netKg: input.weightKg },
+        {
+          fallbackRatePct: Number(dutyRow.ratePct),
+          on: now,
+          fxAsOf,
+          destCurrency,
+        }
+      );
+      duty = dutyComputed.duty;
+      dutyComputedFromComponents = dutyComputed.usedComponents;
+      fxMissingRate ||= dutyComputed.fxMissingRate;
+    } else {
+      const rate = dutyRow ? Number(dutyRow.ratePct) : 0;
+      duty = (rate / 100) * CIF;
+    }
   }
 
   // -----------------
@@ -645,6 +663,7 @@ export async function quoteLandedCost(
           partner: dutyRow?.partner ?? null,
           source: dutyRow?.source ?? null,
           ...(dutyMatchMode ? { matchMode: dutyMatchMode } : {}),
+          ...(dutyComputedFromComponents ? { calculation: 'components' as const } : {}),
           effectiveFrom: dutyEffectiveFrom ? dutyEffectiveFrom.toISOString() : null,
           suppressedByDeMinimis: dem.suppressDuty,
         },

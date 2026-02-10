@@ -3,6 +3,7 @@ import { and, asc, desc, eq, gt, isNull, lte, or, sql, SQL } from 'drizzle-orm';
 import type { LookupResult } from '../../../lib/lookup-meta.js';
 
 export type DutyRateRow = {
+  id: string;
   ratePct: number;
   dutyRule: 'mfn' | 'fta' | 'anti_dumping' | 'safeguard' | 'other' | null;
   partner: string | null;
@@ -28,6 +29,7 @@ export type DutyRateLookupResult = LookupResult<DutyRateRow | null>;
 function asDutyRateRow(
   row:
     | {
+        id: string;
         ratePct: unknown;
         dutyRule: unknown;
         partner: string | null;
@@ -39,6 +41,7 @@ function asDutyRateRow(
 ): DutyRateRow | null {
   if (!row) return null;
   return {
+    id: row.id,
     ratePct: row.ratePct != null ? Number(row.ratePct as number) : 0,
     dutyRule: (row.dutyRule as DutyRateRow['dutyRule']) ?? null,
     partner: row.partner ?? null,
@@ -124,6 +127,7 @@ export async function getActiveDutyRateWithMeta(
     );
 
     const cols = {
+      id: dutyRatesTable.id,
       ratePct: dutyRatesTable.ratePct,
       dutyRule: dutyRatesTable.dutyRule,
       partner: dutyRatesTable.partner,

@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   resolveHs6Mock: vi.fn(),
   convertCurrencyWithMetaMock: vi.fn(),
   getActiveDutyRateWithMetaMock: vi.fn(),
+  computeDutyForRateIdMock: vi.fn(),
   getSurchargesScopedWithMetaMock: vi.fn(),
   getFreightWithMetaMock: vi.fn(),
   getVatForHs6WithMetaMock: vi.fn(),
@@ -34,6 +35,10 @@ vi.mock('../../fx/services/convert-currency.js', () => ({
 
 vi.mock('../../duty-rates/services/get-active-duty-rate.js', () => ({
   getActiveDutyRateWithMeta: mocks.getActiveDutyRateWithMetaMock,
+}));
+
+vi.mock('../../duty-rates/services/compute-duty.js', () => ({
+  computeDutyForRateId: mocks.computeDutyForRateIdMock,
 }));
 
 vi.mock('../../surcharges/services/get-surcharges.js', () => ({
@@ -104,13 +109,43 @@ beforeEach(() => {
     meta: { status: 'ok' },
   });
   mocks.getActiveDutyRateWithMetaMock.mockResolvedValue({
-    value: { ratePct: 5, source: 'official', effectiveFrom: new Date('2025-01-01T00:00:00.000Z') },
+    value: {
+      id: 'duty-rate-1',
+      ratePct: 5,
+      source: 'official',
+      effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+    },
     meta: {
       status: 'ok',
       dataset: 'official',
       effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
     },
   });
+  mocks.computeDutyForRateIdMock.mockResolvedValue({
+    duty: 0,
+    effectivePct: 0,
+    usedComponents: false,
+    fxMissingRate: false,
+  });
+  mocks.computeDutyForRateIdMock.mockImplementation(
+    async (
+      _dutyRateId: string,
+      ctx: { customsValueDest: number },
+      opts?: { fallbackRatePct?: number }
+    ) => {
+      const fallbackRatePct =
+        opts?.fallbackRatePct != null && Number.isFinite(opts.fallbackRatePct)
+          ? Number(opts.fallbackRatePct)
+          : 0;
+      const duty = (fallbackRatePct / 100) * Number(ctx.customsValueDest);
+      return {
+        duty,
+        effectivePct: ctx.customsValueDest > 0 ? duty / ctx.customsValueDest : 0,
+        usedComponents: false,
+        fxMissingRate: false,
+      };
+    }
+  );
   mocks.getVatForHs6WithMetaMock.mockResolvedValue({
     value: {
       ratePct: 20,
@@ -393,6 +428,32 @@ describe('quoteLandedCost', () => {
       expect.any(Date),
       { partner: 'CN' }
     );
+  });
+
+  it('uses duty component compute path when duty row id is present', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.computeDutyForRateIdMock.mockResolvedValue({
+      duty: 9,
+      effectivePct: 0.075,
+      usedComponents: true,
+      fxMissingRate: false,
+    });
+
+    const out = await quoteLandedCost(baseInput);
+
+    expect(mocks.computeDutyForRateIdMock).toHaveBeenCalledWith(
+      'duty-rate-1',
+      expect.objectContaining({
+        customsValueDest: 120,
+        netKg: 2,
+      }),
+      expect.objectContaining({
+        fallbackRatePct: 5,
+        destCurrency: 'EUR',
+      })
+    );
+    expect(out.quote.components.duty).toBe(9);
+    expect(out.quote.explainability?.duty.calculation).toBe('components');
   });
 
   it('downgrades duty confidence when partner matching falls back to notes', async () => {

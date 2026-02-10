@@ -1,5 +1,6 @@
 import { db, dutyRateComponentsTable } from '@clearcost/db';
-import { eq } from 'drizzle-orm';
+import { and, eq, gt, isNull, lte, or } from 'drizzle-orm';
+import { convertCurrencyWithMeta } from '../../fx/services/convert-currency.js';
 
 /** Shipment context you’ll know at quote time */
 export type DutyComputeContext = {
@@ -65,6 +66,18 @@ export function computeDutyFromComponents(
   return { duty, effectivePct };
 }
 
+function normalizeCurrency(code: string | null | undefined): string | null {
+  const normalized = String(code ?? '')
+    .trim()
+    .toUpperCase();
+  if (!normalized) return null;
+  if (/^[A-Z]{3}$/.test(normalized)) return normalized;
+  throw Object.assign(new Error(`Invalid duty component currency code "${normalized}"`), {
+    statusCode: 500,
+    code: 'DUTY_COMPONENT_CURRENCY_INVALID',
+  });
+}
+
 /**
  * Convenience: load components for a duty rate and compute. If there are no components,
  * fall back to the parent ad-valorem percentage (if provided).
@@ -72,8 +85,19 @@ export function computeDutyFromComponents(
 export async function computeDutyForRateId(
   dutyRateId: string,
   ctx: DutyComputeContext,
-  opts?: { fallbackRatePct?: number } // e.g. Number(parentRow.ratePct)
-): Promise<{ duty: number; effectivePct: number; usedComponents: boolean }> {
+  opts?: {
+    fallbackRatePct?: number; // e.g. Number(parentRow.ratePct)
+    on?: Date;
+    fxAsOf?: Date;
+    destCurrency?: string;
+  }
+): Promise<{
+  duty: number;
+  effectivePct: number;
+  usedComponents: boolean;
+  fxMissingRate: boolean;
+}> {
+  const on = opts?.on ?? new Date();
   const rows = await db
     .select({
       componentType: dutyRateComponentsTable.componentType,
@@ -82,19 +106,37 @@ export async function computeDutyForRateId(
       currency: dutyRateComponentsTable.currency,
       uom: dutyRateComponentsTable.uom,
       qualifier: dutyRateComponentsTable.qualifier,
+      effectiveFrom: dutyRateComponentsTable.effectiveFrom,
+      effectiveTo: dutyRateComponentsTable.effectiveTo,
     })
     .from(dutyRateComponentsTable)
-    .where(eq(dutyRateComponentsTable.dutyRateId, dutyRateId));
+    .where(
+      and(
+        eq(dutyRateComponentsTable.dutyRateId, dutyRateId),
+        lte(dutyRateComponentsTable.effectiveFrom, on),
+        or(isNull(dutyRateComponentsTable.effectiveTo), gt(dutyRateComponentsTable.effectiveTo, on))
+      )
+    );
+
+  const destCurrency = normalizeCurrency(opts?.destCurrency ?? null);
+  let fxMissingRate = false;
 
   const comps: DutyComponent[] = rows
-    .map((r) => ({
-      componentType: r.componentType as DutyComponent['componentType'],
-      ratePct: r.ratePct != null ? Number(r.ratePct) : null,
-      amount: r.amount != null ? Number(r.amount) : null,
-      currency: r.currency ?? null,
-      uom: r.uom ?? null,
-      qualifier: r.qualifier ?? null,
-    }))
+    .map((r) => {
+      const componentType = r.componentType as DutyComponent['componentType'];
+      const parsedRatePct = r.ratePct != null ? Number(r.ratePct) : null;
+      const parsedAmount = r.amount != null ? Number(r.amount) : null;
+      const componentCurrency = normalizeCurrency(r.currency ?? null);
+
+      return {
+        componentType,
+        ratePct: parsedRatePct,
+        amount: parsedAmount,
+        currency: componentCurrency,
+        uom: r.uom ?? null,
+        qualifier: r.qualifier ?? null,
+      };
+    })
     .filter((c) =>
       c.componentType === 'advalorem'
         ? c.ratePct != null
@@ -103,9 +145,34 @@ export async function computeDutyForRateId(
           : c.amount != null
     );
 
-  if (comps.length > 0) {
-    const res = computeDutyFromComponents(ctx, comps);
-    return { ...res, usedComponents: true };
+  const convertedComps: DutyComponent[] = [];
+  for (const component of comps) {
+    if (component.amount == null) {
+      convertedComps.push(component);
+      continue;
+    }
+
+    const sourceCurrency = normalizeCurrency(component.currency);
+    if (!sourceCurrency || sourceCurrency === destCurrency || !destCurrency) {
+      convertedComps.push(component);
+      continue;
+    }
+
+    const fxOut = await convertCurrencyWithMeta(component.amount, sourceCurrency, destCurrency, {
+      on: opts?.fxAsOf ?? on,
+      strict: true,
+    });
+    fxMissingRate ||= fxOut.meta.missingRate;
+    convertedComps.push({
+      ...component,
+      amount: fxOut.amount,
+      currency: destCurrency,
+    });
+  }
+
+  if (convertedComps.length > 0) {
+    const res = computeDutyFromComponents(ctx, convertedComps);
+    return { ...res, usedComponents: true, fxMissingRate };
   }
 
   const pct = opts?.fallbackRatePct != null ? Number(opts.fallbackRatePct) : null;
@@ -115,9 +182,10 @@ export async function computeDutyForRateId(
       duty,
       effectivePct: ctx.customsValueDest > 0 ? duty / ctx.customsValueDest : 0,
       usedComponents: false,
+      fxMissingRate,
     };
   }
 
   // Nothing to compute
-  return { duty: 0, effectivePct: 0, usedComponents: false };
+  return { duty: 0, effectivePct: 0, usedComponents: false, fxMissingRate };
 }
