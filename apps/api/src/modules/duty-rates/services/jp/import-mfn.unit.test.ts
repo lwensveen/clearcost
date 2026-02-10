@@ -51,7 +51,15 @@ describe('importJpMfn', () => {
   });
 
   it('throws when official and fallback sources both produce zero rows', async () => {
-    await expect(importJpMfn({})).rejects.toThrow(/produced 0 rows/i);
+    await expect(importJpMfn({ useWitsFallback: true })).rejects.toThrow(
+      /official and WITS fallback sources/i
+    );
+    expect(mocks.batchUpsertDutyRatesFromStreamMock).not.toHaveBeenCalled();
+  });
+
+  it('throws when official source produces zero rows and fallback is disabled', async () => {
+    await expect(importJpMfn({})).rejects.toThrow(/produced 0 official rows/i);
+    expect(mocks.fetchWitsMfnDutyRatesMock).not.toHaveBeenCalled();
     expect(mocks.batchUpsertDutyRatesFromStreamMock).not.toHaveBeenCalled();
   });
 
@@ -67,7 +75,7 @@ describe('importJpMfn', () => {
       dryRun: false,
     });
 
-    const out = await importJpMfn({ hs6List: ['010121', '010129'] });
+    const out = await importJpMfn({ hs6List: ['010121', '010129'], useWitsFallback: true });
 
     expect(out).toMatchObject({ ok: true, inserted: 2, updated: 0, count: 2 });
     expect(mocks.fetchJpMfnDutyRatesMock).toHaveBeenCalledWith({ hs6List: ['010121', '010129'] });
@@ -80,10 +88,10 @@ describe('importJpMfn', () => {
 
     const [rows, options] = mocks.batchUpsertDutyRatesFromStreamMock.mock.calls[0] ?? [];
     expect(rows).toEqual([official, wits]);
-    expect(options).toMatchObject({ source: 'wits' });
+    expect(options).not.toHaveProperty('source');
   });
 
-  it('does not call WITS when fallback is disabled', async () => {
+  it('does not call WITS when fallback is disabled by default', async () => {
     const official = makeRow({ hs6: '020110', source: 'official' });
     mocks.fetchJpMfnDutyRatesMock.mockResolvedValue([official]);
     mocks.batchUpsertDutyRatesFromStreamMock.mockResolvedValue({
@@ -93,13 +101,41 @@ describe('importJpMfn', () => {
       dryRun: false,
     });
 
-    const out = await importJpMfn({ useWitsFallback: false });
+    const out = await importJpMfn({});
 
     expect(out).toMatchObject({ ok: true, inserted: 1, updated: 0, count: 1 });
     expect(mocks.fetchWitsMfnDutyRatesMock).not.toHaveBeenCalled();
     expect(mocks.batchUpsertDutyRatesFromStreamMock).toHaveBeenCalledWith(
       [official],
-      expect.objectContaining({ source: 'wits' })
+      expect.objectContaining({
+        makeSourceRef: expect.any(Function),
+      })
     );
+  });
+
+  it('builds source refs that preserve official vs fallback provenance', async () => {
+    const official = makeRow({ source: 'official', hs6: '010121' });
+    const wits = makeRow({
+      source: 'wits',
+      hs6: '020110',
+      partner: 'AU',
+      dutyRule: 'fta',
+    });
+    mocks.fetchJpMfnDutyRatesMock.mockResolvedValue([official]);
+    mocks.fetchWitsMfnDutyRatesMock.mockResolvedValue([wits]);
+    mocks.batchUpsertDutyRatesFromStreamMock.mockResolvedValue({
+      inserted: 2,
+      updated: 0,
+      count: 2,
+      dryRun: false,
+    });
+
+    await importJpMfn({ useWitsFallback: true });
+
+    const [, options] = mocks.batchUpsertDutyRatesFromStreamMock.mock.calls[0] ?? [];
+    const makeSourceRef = options?.makeSourceRef as ((row: DutyRateInsert) => string) | undefined;
+    expect(makeSourceRef).toBeTypeOf('function');
+    expect(makeSourceRef?.(official)).toBe('jp-customs:JP:ERGA:mfn:010121');
+    expect(makeSourceRef?.(wits)).toBe('wits:JP:AU:fta:020110');
   });
 });

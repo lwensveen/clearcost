@@ -8,7 +8,7 @@ type Params = {
   batchSize?: number;
   importId?: string;
   dryRun?: boolean;
-  useWitsFallback?: boolean;
+  useWitsFallback?: boolean; // default false (official-first)
 };
 
 export async function importJpMfn({
@@ -16,7 +16,7 @@ export async function importJpMfn({
   batchSize = 5_000,
   importId,
   dryRun,
-  useWitsFallback = true,
+  useWitsFallback = false,
 }: Params) {
   const officialRows = await fetchJpMfnDutyRates({ hs6List });
 
@@ -28,18 +28,24 @@ export async function importJpMfn({
   const merged = [...officialRows, ...witsRows];
 
   if (merged.length === 0) {
-    throw new Error(
-      '[JP Duties] MFN produced 0 rows. Check WITS fallback availability and parser compatibility.'
-    );
+    if (useWitsFallback) {
+      throw new Error('[JP Duties] MFN produced 0 rows from official and WITS fallback sources.');
+    }
+    throw new Error('[JP Duties] MFN produced 0 official rows.');
   }
 
   const res = await batchUpsertDutyRatesFromStream(merged, {
     batchSize,
     importId,
     dryRun,
-    source: 'wits',
     makeSourceRef: (r) =>
-      r.partner && r.partner !== '' ? `jp:${r.partner}:fta:${r.hs6}` : `jp:erga:mfn:${r.hs6}`,
+      [
+        r.source === 'wits' ? 'wits' : 'jp-customs',
+        'JP',
+        r.partner && r.partner !== '' ? r.partner : 'ERGA',
+        r.dutyRule ?? 'mfn',
+        r.hs6,
+      ].join(':'),
   });
 
   return {
