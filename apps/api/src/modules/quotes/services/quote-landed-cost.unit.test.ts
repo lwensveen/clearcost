@@ -345,6 +345,30 @@ describe('quoteLandedCost', () => {
     expect(out.quote.freight).toBe(25);
   });
 
+  it('converts surcharge fixed amounts using surcharge row currency', async () => {
+    mockMerchantContext(undefined, []);
+    const fxAsOf = new Date('2025-01-01T00:00:00.000Z');
+
+    mocks.getSurchargesScopedWithMetaMock.mockResolvedValue({
+      value: [{ surchargeCode: 'MPF', rateType: 'fixed', fixedAmt: 10, currency: 'USD' }],
+      meta: { status: 'ok', dataset: null, effectiveFrom: null },
+    });
+    mocks.convertCurrencyWithMetaMock
+      .mockResolvedValueOnce({ amount: 20, meta: { missingRate: false, error: null } }) // freight: USD->EUR
+      .mockResolvedValueOnce({ amount: 100, meta: { missingRate: false, error: null } }) // goods: USD->EUR
+      .mockResolvedValueOnce({ amount: 100, meta: { missingRate: false, error: null } }) // EUR->EUR
+      .mockResolvedValueOnce({ amount: 8, meta: { missingRate: false, error: null } }); // surcharge: USD->EUR
+
+    const out = await quoteLandedCost(baseInput);
+
+    expect(mocks.convertCurrencyWithMetaMock).toHaveBeenNthCalledWith(4, 10, 'USD', 'EUR', {
+      on: fxAsOf,
+      strict: true,
+    });
+    expect(out.quote.components.fees).toBe(8);
+    expect(out.quote.total).toBe(159.2);
+  });
+
   it('normalizes ISO2 lanes to ISO3 for freight lookup matching', async () => {
     mockMerchantContext(undefined, []);
 
@@ -679,6 +703,19 @@ describe('quoteLandedCost', () => {
 
     await expect(quoteLandedCost(baseInput)).rejects.toThrow('FX rate unavailable');
     expect(mocks.evaluateDeMinimisMock).not.toHaveBeenCalled();
+  });
+
+  it('fails clearly when surcharge row currency code is invalid', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.getSurchargesScopedWithMetaMock.mockResolvedValue({
+      value: [{ surchargeCode: 'MPF', rateType: 'fixed', fixedAmt: 5, currency: 'US' }],
+      meta: { status: 'ok', dataset: null, effectiveFrom: null },
+    });
+
+    await expect(quoteLandedCost(baseInput)).rejects.toMatchObject({
+      statusCode: 500,
+      code: 'SURCHARGE_CURRENCY_INVALID',
+    });
   });
 
   it('supports merchant-less flow and sea mode chargeable calculation', async () => {

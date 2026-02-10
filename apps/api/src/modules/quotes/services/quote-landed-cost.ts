@@ -111,6 +111,7 @@ type SurchargeRow = {
   surchargeCode?: string | null;
   rateType?: string | null;
   valueBasis?: string | null;
+  currency?: string | null;
   fixedAmt?: number | null;
   pctAmt?: number | null;
   minAmt?: number | null;
@@ -126,6 +127,7 @@ type PerUnitExclusion = {
 
 type SurchargeAmountResult = {
   amount: number;
+  fxMissingRate: boolean;
   perUnitExclusion?: PerUnitExclusion;
 };
 
@@ -136,31 +138,84 @@ function toPerUnitExclusion(row: SurchargeRow): PerUnitExclusion {
   };
 }
 
-function rowSurchargeAmount(
+function resolveSurchargeSourceCurrency(row: SurchargeRow, destCurrency: string): string {
+  const raw = String(row.currency ?? '')
+    .trim()
+    .toUpperCase();
+  if (raw.length === 0) return destCurrency;
+  if (/^[A-Z]{3}$/.test(raw)) return raw;
+  throw Object.assign(
+    new Error(
+      `Invalid surcharge currency code "${raw}" for surcharge ${String(row.surchargeCode ?? '')}`
+    ),
+    {
+      statusCode: 500,
+      code: 'SURCHARGE_CURRENCY_INVALID',
+    }
+  );
+}
+
+async function convertSurchargeAmount(
+  value: number | null | undefined,
+  sourceCurrency: string,
+  destCurrency: string,
+  fxAsOf: Date
+) {
+  if (value == null || !Number.isFinite(value)) {
+    return { amount: null as number | null, fxMissingRate: false };
+  }
+  if (sourceCurrency === destCurrency) {
+    return { amount: value, fxMissingRate: false };
+  }
+  const out = await convertCurrencyWithMeta(value, sourceCurrency, destCurrency, {
+    on: fxAsOf,
+    strict: true,
+  });
+  return { amount: out.amount, fxMissingRate: out.meta.missingRate };
+}
+
+async function rowSurchargeAmount(
   row: SurchargeRow,
-  input: { CIF: number; duty: number }
-): SurchargeAmountResult {
+  input: { CIF: number; duty: number },
+  ctx: { destCurrency: string; fxAsOf: Date }
+): Promise<SurchargeAmountResult> {
+  const sourceCurrency = resolveSurchargeSourceCurrency(row, ctx.destCurrency);
   const rateType = String(row.rateType ?? '').toLowerCase();
   const hasUnitAmt = row.unitAmt != null && Number.isFinite(row.unitAmt);
   if (rateType === 'fixed') {
     if (row.fixedAmt != null && Number.isFinite(row.fixedAmt)) {
-      return { amount: clampAmount(row.fixedAmt, row.minAmt, row.maxAmt) };
+      const [fixedOut, minOut, maxOut] = await Promise.all([
+        convertSurchargeAmount(row.fixedAmt, sourceCurrency, ctx.destCurrency, ctx.fxAsOf),
+        convertSurchargeAmount(row.minAmt, sourceCurrency, ctx.destCurrency, ctx.fxAsOf),
+        convertSurchargeAmount(row.maxAmt, sourceCurrency, ctx.destCurrency, ctx.fxAsOf),
+      ]);
+      return {
+        amount: clampAmount(fixedOut.amount ?? 0, minOut.amount, maxOut.amount),
+        fxMissingRate: fixedOut.fxMissingRate || minOut.fxMissingRate || maxOut.fxMissingRate,
+      };
     }
     if (hasUnitAmt) {
-      return { amount: 0, perUnitExclusion: toPerUnitExclusion(row) };
+      return { amount: 0, fxMissingRate: false, perUnitExclusion: toPerUnitExclusion(row) };
     }
-    return { amount: 0 };
+    return { amount: 0, fxMissingRate: false };
   }
 
   if (rateType === 'ad_valorem') {
+    const [minOut, maxOut] = await Promise.all([
+      convertSurchargeAmount(row.minAmt, sourceCurrency, ctx.destCurrency, ctx.fxAsOf),
+      convertSurchargeAmount(row.maxAmt, sourceCurrency, ctx.destCurrency, ctx.fxAsOf),
+    ]);
     const pctFraction = normalizeSurchargePct(row.pctAmt);
     const basis = surchargeBaseAmount(row.valueBasis, input);
     const amount = pctFraction * basis;
-    return { amount: clampAmount(amount, row.minAmt, row.maxAmt) };
+    return {
+      amount: clampAmount(amount, minOut.amount, maxOut.amount),
+      fxMissingRate: minOut.fxMissingRate || maxOut.fxMissingRate,
+    };
   }
 
   if (rateType === 'per_unit') {
-    return { amount: 0, perUnitExclusion: toPerUnitExclusion(row) };
+    return { amount: 0, fxMissingRate: false, perUnitExclusion: toPerUnitExclusion(row) };
   }
 
   // Legacy/import-fallback behavior where rateType is missing or invalid:
@@ -168,40 +223,60 @@ function rowSurchargeAmount(
   const hasFixed = row.fixedAmt != null && Number.isFinite(row.fixedAmt);
   const hasPct = row.pctAmt != null && Number.isFinite(row.pctAmt);
   if (hasFixed || hasPct) {
-    let amount = hasFixed ? (row.fixedAmt ?? 0) : 0;
+    let amount = 0;
+    let fxMissingRate = false;
+    if (hasFixed) {
+      const fixedOut = await convertSurchargeAmount(
+        row.fixedAmt,
+        sourceCurrency,
+        ctx.destCurrency,
+        ctx.fxAsOf
+      );
+      amount += fixedOut.amount ?? 0;
+      fxMissingRate ||= fixedOut.fxMissingRate;
+    }
     if (hasPct) {
+      const [minOut, maxOut] = await Promise.all([
+        convertSurchargeAmount(row.minAmt, sourceCurrency, ctx.destCurrency, ctx.fxAsOf),
+        convertSurchargeAmount(row.maxAmt, sourceCurrency, ctx.destCurrency, ctx.fxAsOf),
+      ]);
       const pctFraction = normalizeSurchargePct(row.pctAmt);
       const basis = surchargeBaseAmount(row.valueBasis, input);
-      amount += clampAmount(pctFraction * basis, row.minAmt, row.maxAmt);
+      amount += clampAmount(pctFraction * basis, minOut.amount, maxOut.amount);
+      fxMissingRate ||= minOut.fxMissingRate || maxOut.fxMissingRate;
     }
-    return { amount };
+    return { amount, fxMissingRate };
   }
 
   if (hasUnitAmt) {
-    return { amount: 0, perUnitExclusion: toPerUnitExclusion(row) };
+    return { amount: 0, fxMissingRate: false, perUnitExclusion: toPerUnitExclusion(row) };
   }
 
   // per-unit/unknown rows require extra quantity context not modeled here yet.
-  return { amount: 0 };
+  return { amount: 0, fxMissingRate: false };
 }
 
-function totalSurcharges(
+async function totalSurcharges(
   rows: SurchargeRow[],
-  input: { CIF: number; duty: number }
-): {
+  input: { CIF: number; duty: number },
+  ctx: { destCurrency: string; fxAsOf: Date }
+): Promise<{
   amount: number;
+  fxMissingRate: boolean;
   perUnitExcludedCount: number;
   perUnitExcludedCodes: string[];
   unitCodes: string[];
-} {
+}> {
   let amount = 0;
+  let fxMissingRate = false;
   let perUnitExcludedCount = 0;
   const perUnitCodes = new Set<string>();
   const unitCodes = new Set<string>();
 
   for (const row of rows) {
-    const out = rowSurchargeAmount(row, input);
+    const out = await rowSurchargeAmount(row, input, ctx);
     amount += out.amount;
+    fxMissingRate ||= out.fxMissingRate;
     if (out.perUnitExclusion) {
       perUnitExcludedCount += 1;
       if (out.perUnitExclusion.code) perUnitCodes.add(out.perUnitExclusion.code);
@@ -211,6 +286,7 @@ function totalSurcharges(
 
   return {
     amount,
+    fxMissingRate,
     perUnitExcludedCount,
     perUnitExcludedCodes: [...perUnitCodes],
     unitCodes: [...unitCodes],
@@ -392,7 +468,8 @@ export async function quoteLandedCost(
     transportMode: toSurchargeTransportMode(input.mode),
   });
   const sur = surchargeLookup.value;
-  const surchargeTotals = totalSurcharges(sur, { CIF, duty });
+  const surchargeTotals = await totalSurcharges(sur, { CIF, duty }, { destCurrency, fxAsOf });
+  fxMissingRate ||= surchargeTotals.fxMissingRate;
   const fees = surchargeTotals.amount;
 
   // -----------------
