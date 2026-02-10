@@ -1,6 +1,7 @@
 import { db, freightRateCardsTable, freightRateStepsTable } from '@clearcost/db';
-import { and, desc, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import type { LookupResult } from '../../../lib/lookup-meta.js';
+import { freightLaneLookupCandidates } from './lane-country-code.js';
 
 export type FreightLookupInput = {
   origin: string;
@@ -22,6 +23,19 @@ export type FreightLookupResult = LookupResult<FreightLookupValue | null>;
 
 export async function getFreightWithMeta(opts: FreightLookupInput): Promise<FreightLookupResult> {
   try {
+    const originCandidates = freightLaneLookupCandidates(opts.origin);
+    const destCandidates = freightLaneLookupCandidates(opts.dest);
+
+    if (originCandidates.length <= 0 || destCandidates.length <= 0) {
+      return {
+        value: null,
+        meta: {
+          status: 'error',
+          note: `invalid freight lane input origin=${opts.origin} dest=${opts.dest}`,
+        },
+      };
+    }
+
     const cardRows = await db
       .select({
         id: freightRateCardsTable.id,
@@ -33,8 +47,8 @@ export async function getFreightWithMeta(opts: FreightLookupInput): Promise<Frei
       .from(freightRateCardsTable)
       .where(
         and(
-          eq(freightRateCardsTable.origin, opts.origin),
-          eq(freightRateCardsTable.dest, opts.dest),
+          inArray(freightRateCardsTable.origin, originCandidates),
+          inArray(freightRateCardsTable.dest, destCandidates),
           eq(freightRateCardsTable.freightMode, opts.freightMode),
           eq(freightRateCardsTable.freightUnit, opts.freightUnit),
           lte(freightRateCardsTable.effectiveFrom, opts.on),
@@ -54,7 +68,7 @@ export async function getFreightWithMeta(opts: FreightLookupInput): Promise<Frei
         .from(freightRateCardsTable)
         .where(
           and(
-            eq(freightRateCardsTable.dest, opts.dest),
+            inArray(freightRateCardsTable.dest, destCandidates),
             eq(freightRateCardsTable.freightMode, opts.freightMode),
             eq(freightRateCardsTable.freightUnit, opts.freightUnit)
           )

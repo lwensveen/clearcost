@@ -1,28 +1,122 @@
 import { db, freightRateCardsTable, freightRateStepsTable, provenanceTable } from '@clearcost/db';
 import { eq, sql } from 'drizzle-orm';
 import { sha256Hex } from '../../../lib/provenance.js';
-import {
-  FreightCardImportSchema,
-  FreightCardsImportSchema,
-  type FreightCardImport,
-} from '@clearcost/types';
+import { FreightCardsImportSchema, type FreightCardImport } from '@clearcost/types';
+import { requireFreightIso3 } from './lane-country-code.js';
 
 type ImportOpts = {
   batchSize?: number;
   importId?: string;
   makeSourceRef?: (card: FreightCardImport) => string | undefined;
+  enforceCoverageGuardrails?: boolean;
+  minCoverageRetention?: number;
 };
 
 const ymd = (d?: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+const DEFAULT_MIN_COVERAGE_RETENTION = 0.5;
+
+type CoverageSnapshot = {
+  laneCount: number;
+  destinationCount: number;
+};
+
+function laneKey(card: Pick<FreightCardImport, 'origin' | 'dest' | 'freightMode' | 'freightUnit'>) {
+  return `${card.origin}|${card.dest}|${card.freightMode}|${card.freightUnit}`;
+}
+
+function summarizeCoverage(cards: FreightCardImport[]): CoverageSnapshot {
+  const lanes = new Set<string>();
+  const dests = new Set<string>();
+  for (const card of cards) {
+    lanes.add(laneKey(card));
+    dests.add(card.dest);
+  }
+  return {
+    laneCount: lanes.size,
+    destinationCount: dests.size,
+  };
+}
+
+async function currentCoverageSnapshot(): Promise<CoverageSnapshot> {
+  const laneRows = await db
+    .selectDistinct({
+      origin: freightRateCardsTable.origin,
+      dest: freightRateCardsTable.dest,
+      freightMode: freightRateCardsTable.freightMode,
+      freightUnit: freightRateCardsTable.freightUnit,
+    })
+    .from(freightRateCardsTable);
+
+  const destRows = await db
+    .selectDistinct({
+      dest: freightRateCardsTable.dest,
+    })
+    .from(freightRateCardsTable);
+
+  return {
+    laneCount: laneRows.length,
+    destinationCount: destRows.length,
+  };
+}
+
+function assertCoverageRetention(
+  incoming: CoverageSnapshot,
+  existing: CoverageSnapshot,
+  minRetention: number
+) {
+  if (existing.laneCount <= 0) return;
+  const laneRetention = incoming.laneCount / existing.laneCount;
+  if (laneRetention < minRetention) {
+    throw new Error(
+      [
+        'Freight import guardrail triggered: incoming lane coverage dropped too far.',
+        `incoming_lanes=${incoming.laneCount}`,
+        `existing_lanes=${existing.laneCount}`,
+        `retention=${laneRetention.toFixed(3)}`,
+        `min_retention=${minRetention.toFixed(3)}`,
+      ].join(' ')
+    );
+  }
+
+  if (existing.destinationCount <= 0) return;
+  const destinationRetention = incoming.destinationCount / existing.destinationCount;
+  if (destinationRetention < minRetention) {
+    throw new Error(
+      [
+        'Freight import guardrail triggered: incoming destination coverage dropped too far.',
+        `incoming_destinations=${incoming.destinationCount}`,
+        `existing_destinations=${existing.destinationCount}`,
+        `retention=${destinationRetention.toFixed(3)}`,
+        `min_retention=${minRetention.toFixed(3)}`,
+      ].join(' ')
+    );
+  }
+}
 
 export async function importFreightCards(cards: FreightCardImport[], opts: ImportOpts = {}) {
   const parsed = FreightCardsImportSchema.parse(cards);
   const items = parsed.map((card) => ({
     ...card,
-    origin: card.origin.toUpperCase(),
-    dest: card.dest.toUpperCase(),
+    // Canonicalize lane codes to ISO3 so quote lookups are deterministic.
+    origin: requireFreightIso3(card.origin, 'origin'),
+    dest: requireFreightIso3(card.dest, 'dest'),
     currency: (card.currency ?? 'USD').toUpperCase(),
   }));
+  const incomingCoverage = summarizeCoverage(items);
+  if (incomingCoverage.laneCount <= 0) {
+    throw new Error('Freight import guardrail triggered: source produced 0 unique lanes');
+  }
+
+  if (opts.enforceCoverageGuardrails) {
+    const minRetention = opts.minCoverageRetention ?? DEFAULT_MIN_COVERAGE_RETENTION;
+    if (!Number.isFinite(minRetention) || minRetention <= 0 || minRetention > 1) {
+      throw new Error(
+        `Invalid freight import minCoverageRetention (${String(minRetention)}); expected (0, 1]`
+      );
+    }
+    const existingCoverage = await currentCoverageSnapshot();
+    assertCoverageRetention(incomingCoverage, existingCoverage, minRetention);
+  }
 
   await db.transaction(async (tx) => {
     for (const card of items) {

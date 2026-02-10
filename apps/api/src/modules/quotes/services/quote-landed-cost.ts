@@ -9,6 +9,7 @@ import { convertCurrencyWithMeta } from '../../fx/services/convert-currency.js';
 import { getActiveDutyRateWithMeta } from '../../duty-rates/services/get-active-duty-rate.js';
 import { getSurchargesScopedWithMeta } from '../../surcharges/services/get-surcharges.js';
 import { getFreightWithMeta } from '../../freight/services/get-freight.js';
+import { toFreightIso3 } from '../../freight/services/lane-country-code.js';
 import { getVatForHs6WithMeta } from '../../vat/services/get-vat-for-hs6.js';
 import { getCanonicalFxAsOf } from '../../fx/services/get-canonical-fx-asof.js';
 import { evaluateDeMinimis } from '../../de-minimis/services/evaluate.js';
@@ -55,16 +56,6 @@ function resolveFreightSourceCurrency(rawCurrency: string | null | undefined): s
     .toUpperCase();
   if (/^[A-Z]{3}$/.test(normalized)) return normalized;
   return BASE_CCY;
-}
-
-function toFreightIso3(countryCode: string): string {
-  const normalized = String(countryCode ?? '')
-    .trim()
-    .toUpperCase();
-  if (/^[A-Z]{3}$/.test(normalized)) return normalized;
-  if (!/^[A-Z]{2}$/.test(normalized)) return normalized;
-  const iso2 = normalized === 'UK' ? 'GB' : normalized;
-  return countries.alpha2ToAlpha3(iso2) ?? normalized;
 }
 
 function toDutyPartnerIso2(countryCode: string): string {
@@ -437,9 +428,9 @@ export async function quoteLandedCost(
   const unit: Unit = input.mode === 'air' ? 'kg' : 'm3';
 
   const freightLookup = await getFreightWithMeta({
-    // Quote API uses ISO2 lanes while freight cards are keyed by ISO3.
-    origin: toFreightIso3(originCountry),
-    dest: toFreightIso3(destCountry),
+    // Freight service handles ISO2/ISO3 lane reconciliation for both lookup and legacy data.
+    origin: toFreightIso3(originCountry) ?? originCountry,
+    dest: toFreightIso3(destCountry) ?? destCountry,
     freightMode: input.mode,
     freightUnit: unit,
     qty,

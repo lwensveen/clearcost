@@ -11,7 +11,7 @@ export const freightJson: Command = async (args) => {
     { importSource: 'FILE', job: 'freight:json', params: { url } },
     async () => {
       const rows: any = await fetchJSON(url);
-      const res = await importFreightCards(rows);
+      const res = await importFreightCards(rows, { enforceCoverageGuardrails: true });
       const inserted = Number(res?.count ?? 0);
 
       return { inserted, payload: res };

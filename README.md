@@ -167,6 +167,9 @@ These are the **minimum** env vars to boot each app locally. Feature‑specific 
   Destination countries are resolved via `packages/types/src/schemas/country-currency.ts`; extend mapping there when
   onboarding new destination countries. Normalize aliases (e.g. `UK` -> `GB`) with
   `normalizeCountryIso2(...)` before dataset lookups.
+- **Freight lane country code semantics**: freight lane codes are canonicalized to ISO-3166 alpha-3 for storage.
+  Importers/lookup accept ISO2 or ISO3 and normalize through
+  `apps/api/src/modules/freight/services/lane-country-code.ts`.
 - **Client parsing**: use `extractErrorMessage(...)` (see `apps/web/lib/errors.ts`) instead of reading `json.error`
   directly so both string and object errors are handled safely.
 - **Env helpers (apps/web)**: `requireEnv` is build‑safe in non‑prod; `requireEnvStrict` always throws.
