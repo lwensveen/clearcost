@@ -940,6 +940,7 @@ describe('quoteLandedCost', () => {
 
     expect(out.quote.freight).toBe(0);
     expect(out.quote.components.fees).toBe(0);
+    expect(out.quote.componentConfidence.freight).toBe('estimated');
   });
 
   it('IOSS path tolerates missing VAT info and omits checkoutVAT when zero', async () => {
@@ -970,14 +971,14 @@ describe('quoteLandedCost', () => {
       expectedMissing: [] as string[],
     },
     {
-      name: 'CN->DE no_match duty still authoritative',
+      name: 'CN->DE no_match duty is estimated',
       input: { origin: 'CN', dest: 'DE' },
       duty: 'no_match',
       vat: 'ok',
       surcharges: 'ok',
       freight: 'ok',
       fxMissingRate: false,
-      expectedOverall: 'authoritative',
+      expectedOverall: 'estimated',
       expectedMissing: [] as string[],
     },
     {
@@ -1023,6 +1024,17 @@ describe('quoteLandedCost', () => {
       fxMissingRate: false,
       expectedOverall: 'missing',
       expectedMissing: ['freight'],
+    },
+    {
+      name: 'JP->GB no_match freight marks estimated freight',
+      input: { origin: 'JP', dest: 'GB' },
+      duty: 'ok',
+      vat: 'ok',
+      surcharges: 'ok',
+      freight: 'no_match',
+      fxMissingRate: false,
+      expectedOverall: 'estimated',
+      expectedMissing: [] as string[],
     },
     {
       name: 'ID->DE surcharge dataset missing marks missing',

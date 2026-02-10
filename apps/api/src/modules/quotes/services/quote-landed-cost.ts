@@ -678,6 +678,36 @@ export async function quoteLandedCost(
       overallConfidence: overallConfidenceFrom(componentConfidence),
     };
   }
+  if (
+    dutyLookup.meta.status === 'no_match' &&
+    !dem.suppressDuty &&
+    confidence.componentConfidence.duty === 'authoritative'
+  ) {
+    const componentConfidence = {
+      ...confidence.componentConfidence,
+      duty: 'estimated' as const,
+    };
+    confidence = {
+      ...confidence,
+      componentConfidence,
+      overallConfidence: overallConfidenceFrom(componentConfidence),
+    };
+  }
+  if (
+    freightLookup.meta.status === 'no_match' &&
+    opts?.freightInDestOverride == null &&
+    confidence.componentConfidence.freight === 'authoritative'
+  ) {
+    const componentConfidence = {
+      ...confidence.componentConfidence,
+      freight: 'estimated' as const,
+    };
+    confidence = {
+      ...confidence,
+      componentConfidence,
+      overallConfidence: overallConfidenceFrom(componentConfidence),
+    };
+  }
 
   let strictFreshnessNote: string | null = null;
   const strictFreshnessEnabled = opts?.strictFreshness ?? isStrictFreshnessEnabled();
