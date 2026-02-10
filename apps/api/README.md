@@ -95,9 +95,13 @@ INTERNAL_SIGNING_SECRET=change-me
 # FX + data
 CURRENCY_BASE=USD
 
-# EU TARIC (when running EU importers)
-EU_TARIC_GOODS_URL=...
-EU_TARIC_GOODS_DESC_URL=...
+# EU TARIC (required for EU duty importers)
+EU_TARIC_MEASURE_URL=...
+EU_TARIC_COMPONENT_URL=...
+EU_TARIC_DUTY_EXPR_URL=...                # optional but recommended
+EU_TARIC_GEO_DESC_URL=...                 # optional (preferential labels)
+EU_TARIC_GOODS_URL=...                    # optional (legacy goods endpoints)
+EU_TARIC_GOODS_DESC_URL=...               # optional (legacy goods endpoints)
 EU_TARIC_LANGUAGE=EN
 
 # HS aliases (AHTN etc.)
