@@ -1,4 +1,4 @@
-import type { QuoteInput } from '@clearcost/types';
+import { getCurrencyForCountry, type QuoteInput } from '@clearcost/types';
 import { db, merchantProfilesTable, taxRegistrationsTable } from '@clearcost/db';
 import { and, eq } from 'drizzle-orm';
 import { EU_ISO2, volumeM3, volumetricKg } from '../utils.js';
@@ -29,6 +29,19 @@ const roundMoney = (n: number, ccy: string) => {
 
 function isStrictFreshnessEnabled() {
   return process.env.QUOTE_STRICT_FRESHNESS === '1';
+}
+
+function resolveDestinationCurrency(destCountryIso2: string): string {
+  const iso2 = destCountryIso2.toUpperCase();
+  const currency = getCurrencyForCountry(iso2);
+  if (currency) return currency;
+  throw Object.assign(
+    new Error(`No ISO-4217 currency mapping configured for destination country ${iso2}`),
+    {
+      statusCode: 400,
+      code: 'DEST_CURRENCY_UNMAPPED',
+    }
+  );
 }
 
 function strictStaleComponentsFromSnapshot(
@@ -68,6 +81,7 @@ export async function quoteLandedCost(
 ) {
   const now = new Date();
   const fxAsOf = opts?.fxAsOf ?? (await getCanonicalFxAsOf());
+  const destCurrency = resolveDestinationCurrency(input.dest);
   let fxMissingRate = false;
 
   const [profile, regs] = await Promise.all([
@@ -116,9 +130,12 @@ export async function quoteLandedCost(
 
   let freightInDest = opts?.freightInDestOverride ?? 0;
   if (opts?.freightInDestOverride == null) {
-    const freightFx = await convertCurrencyWithMeta(freightRow?.price ?? 0, BASE_CCY, input.dest, {
-      on: fxAsOf,
-    });
+    const freightFx = await convertCurrencyWithMeta(
+      freightRow?.price ?? 0,
+      BASE_CCY,
+      destCurrency,
+      { on: fxAsOf, strict: true }
+    );
     freightInDest = freightFx.amount;
     fxMissingRate ||= freightFx.meta.missingRate;
   }
@@ -126,8 +143,8 @@ export async function quoteLandedCost(
   const itemDestFx = await convertCurrencyWithMeta(
     input.itemValue.amount,
     input.itemValue.currency,
-    input.dest,
-    { on: fxAsOf }
+    destCurrency,
+    { on: fxAsOf, strict: true }
   );
   const itemValDest = itemDestFx.amount;
   fxMissingRate ||= itemDestFx.meta.missingRate;
@@ -137,6 +154,7 @@ export async function quoteLandedCost(
   // De minimis decision (FX-pinned and CIF-based)
   const dem = await evaluateDeMinimis({
     dest: input.dest,
+    destCurrency,
     goodsDest: itemValDest,
     freightDest: freightInDest,
     fxAsOf,
@@ -159,7 +177,10 @@ export async function quoteLandedCost(
   // -----------------
   // VAT / IOSS logic
   // -----------------
-  const itemEurFx = await convertCurrencyWithMeta(itemValDest, input.dest, 'EUR', { on: fxAsOf });
+  const itemEurFx = await convertCurrencyWithMeta(itemValDest, destCurrency, 'EUR', {
+    on: fxAsOf,
+    strict: true,
+  });
   const itemValEUR = itemEurFx.amount;
   fxMissingRate ||= itemEurFx.meta.missingRate;
   const iossEligible = wantsCheckoutVAT && itemValEUR <= 150;
@@ -199,7 +220,7 @@ export async function quoteLandedCost(
   // Output assembly
   // -----------------
   const incoterm = (profile?.defaultIncoterm ?? 'DAP').toUpperCase() as 'DDP' | 'DAP';
-  const currency = input.dest;
+  const currency = destCurrency;
 
   const components = {
     CIF: roundMoney(CIF, currency),

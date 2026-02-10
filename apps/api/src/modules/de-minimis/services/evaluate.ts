@@ -1,4 +1,5 @@
 import { db, deMinimisTable } from '@clearcost/db';
+import { getCurrencyForCountry } from '@clearcost/types';
 import { and, desc, eq, gte, isNull, lte, or } from 'drizzle-orm';
 import { convertCurrency } from '../../fx/services/convert-currency.js';
 
@@ -11,6 +12,31 @@ export type DeMinimisDecision = {
 
 const toMidnightUTC = (d: Date) => new Date(d.toISOString().slice(0, 10));
 
+function resolveDestinationCurrency(destCountryIso2: string, explicitCurrency?: string): string {
+  const explicit = explicitCurrency?.trim().toUpperCase();
+  if (explicit) {
+    if (!/^[A-Z]{3}$/.test(explicit)) {
+      throw Object.assign(new Error(`Invalid destination currency code: ${explicit}`), {
+        statusCode: 400,
+        code: 'DEST_CURRENCY_INVALID',
+      });
+    }
+    return explicit;
+  }
+
+  const countryIso2 = destCountryIso2.toUpperCase();
+  const mapped = getCurrencyForCountry(countryIso2);
+  if (mapped) return mapped;
+
+  throw Object.assign(
+    new Error(`No ISO-4217 currency mapping configured for destination country ${countryIso2}`),
+    {
+      statusCode: 400,
+      code: 'DEST_CURRENCY_UNMAPPED',
+    }
+  );
+}
+
 export async function evaluateDeMinimis(opts: {
   dest: string; // ISO country (for table filter)
   destCurrency?: string; // ISO-4217 for destination currency (NEW, optional)
@@ -19,7 +45,7 @@ export async function evaluateDeMinimis(opts: {
   fxAsOf: Date; // FX date for converting thresholds -> destCurrency
 }): Promise<DeMinimisDecision> {
   const day = toMidnightUTC(opts.fxAsOf);
-  const destCurrency = (opts.destCurrency ?? opts.dest).toUpperCase(); // fallback to old behavior
+  const destCurrency = resolveDestinationCurrency(opts.dest, opts.destCurrency);
 
   const rows = await db
     .select()
@@ -43,15 +69,25 @@ export async function evaluateDeMinimis(opts: {
 
     const rowCurrency = String(row.currency).toUpperCase();
     const rawVal = Number(row.value); // DB numeric -> string; coerce to number
-    if (!Number.isFinite(rawVal)) return null;
+    if (!Number.isFinite(rawVal)) {
+      throw new Error(`Invalid de minimis threshold value for ${opts.dest.toUpperCase()} (${rowCurrency})`);
+    }
 
     let thr = rawVal;
     if (rowCurrency !== destCurrency) {
       try {
-        thr = await convertCurrency(rawVal, rowCurrency, destCurrency, { on: day });
-      } catch {
-        // If FX fails, treat as no threshold (can't reliably compare)
-        return null;
+        thr = await convertCurrency(rawVal, rowCurrency, destCurrency, { on: day, strict: true });
+      } catch (error) {
+        throw Object.assign(
+          new Error(
+            `Unable to convert de minimis threshold ${rowCurrency}->${destCurrency} for ${opts.dest.toUpperCase()}`
+          ),
+          {
+            statusCode: 500,
+            code: 'DE_MINIMIS_FX_UNAVAILABLE',
+            cause: error,
+          }
+        );
       }
     }
 

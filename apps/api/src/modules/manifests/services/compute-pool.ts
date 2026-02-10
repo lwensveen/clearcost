@@ -6,6 +6,7 @@ import {
   manifestsTable,
   merchantProfilesTable,
 } from '@clearcost/db';
+import { getCurrencyForCountry } from '@clearcost/types';
 import { eq } from 'drizzle-orm';
 import { quoteLandedCost } from '../../quotes/services/quote-landed-cost.js';
 
@@ -51,7 +52,10 @@ export async function computePool(manifestId: string, opts: ComputePoolOpts = {}
     .then((r) => r[0]);
 
   const { origin, dest, shippingMode } = manifest;
-  const currency = dest; // MVP convention
+  const currency = getCurrencyForCountry(dest);
+  if (!currency) {
+    throw new Error(`No ISO-4217 currency mapping configured for destination country ${dest}`);
+  }
   const fixedFreightTotal = Number(manifest.fixedFreightTotal ?? 0);
   if (!Number.isFinite(fixedFreightTotal) || fixedFreightTotal < 0) {
     throw new Error('Manifest.fixedFreightTotal required for pooled compute');

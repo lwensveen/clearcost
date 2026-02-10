@@ -6,6 +6,7 @@ const HUBS = ['EUR', 'USD'] as const;
 
 export type ConvertCurrencyMeta = {
   missingRate: boolean;
+  error: string | null;
 };
 
 type ConvertCurrencyResult = {
@@ -31,23 +32,23 @@ async function convertCurrencyInternal(
   to: string,
   opts: ConvertOpts = {}
 ): Promise<ConvertCurrencyResult> {
-  if (!Number.isFinite(amount)) return { amount: 0, meta: { missingRate: false } };
+  if (!Number.isFinite(amount)) return { amount: 0, meta: { missingRate: false, error: null } };
 
   const src = from.toUpperCase();
   const dst = to.toUpperCase();
 
-  if (src === dst) return { amount, meta: { missingRate: false } };
+  if (src === dst) return { amount, meta: { missingRate: false, error: null } };
 
   const cacheKey = buildFxCacheKey(opts.on, src, dst);
   const cached = fxCacheGet(cacheKey);
-  if (cached != null) return { amount: amount * cached, meta: { missingRate: false } };
+  if (cached != null) return { amount: amount * cached, meta: { missingRate: false, error: null } };
 
   // 1) direct
   const direct = await fetchRate(src, dst, opts.on);
   if (direct != null) {
     fxCacheSet(cacheKey, direct, opts.ttlMs);
     fxCacheSet(buildFxCacheKey(opts.on, dst, src), 1 / direct, opts.ttlMs);
-    return { amount: amount * direct, meta: { missingRate: false } };
+    return { amount: amount * direct, meta: { missingRate: false, error: null } };
   }
 
   // 2) reverse
@@ -56,7 +57,7 @@ async function convertCurrencyInternal(
     const rate = 1 / reverse;
     fxCacheSet(cacheKey, rate, opts.ttlMs);
     fxCacheSet(buildFxCacheKey(opts.on, dst, src), reverse, opts.ttlMs);
-    return { amount: amount * rate, meta: { missingRate: false } };
+    return { amount: amount * rate, meta: { missingRate: false, error: null } };
   }
 
   // 3) triangulate via hubs
@@ -70,17 +71,16 @@ async function convertCurrencyInternal(
       const rate = legA * legB;
       fxCacheSet(cacheKey, rate, opts.ttlMs);
       fxCacheSet(buildFxCacheKey(opts.on, dst, src), 1 / rate, opts.ttlMs);
-      return { amount: amount * rate, meta: { missingRate: false } };
+      return { amount: amount * rate, meta: { missingRate: false, error: null } };
     }
   }
 
-  if (opts.strict) {
-    const day = opts.on ? opts.on.toISOString().slice(0, 10) : 'latest';
-    throw new Error(`FX rate unavailable for ${src}->${dst} on ${day}`);
-  }
+  const day = opts.on ? opts.on.toISOString().slice(0, 10) : 'latest';
+  const error = `FX rate unavailable for ${src}->${dst} on ${day}`;
+  if (opts.strict) throw new Error(error);
 
-  // fallback: return unconverted amount
-  return { amount, meta: { missingRate: true } };
+  // fallback: return unconverted amount + explicit missing metadata for callers
+  return { amount, meta: { missingRate: true, error } };
 }
 
 export async function convertCurrency(

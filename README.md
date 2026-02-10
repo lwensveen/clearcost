@@ -163,6 +163,9 @@ These are the **minimum** env vars to boot each app locally. Feature‑specific 
 
 - **API error envelope**: all error responses should be shaped as
   `{ error: { code: string; message: string; details?: unknown } }`.
+- **Quote currency semantics**: quote/de-minimis math uses ISO-4217 currency codes only (never ISO country codes).
+  Destination countries are resolved via `packages/types/src/schemas/country-currency.ts`; extend mapping there when
+  onboarding new destination countries.
 - **Client parsing**: use `extractErrorMessage(...)` (see `apps/web/lib/errors.ts`) instead of reading `json.error`
   directly so both string and object errors are handled safely.
 - **Env helpers (apps/web)**: `requireEnv` is build‑safe in non‑prod; `requireEnvStrict` always throws.

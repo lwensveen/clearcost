@@ -293,6 +293,42 @@ describe('quoteLandedCost', () => {
     });
   });
 
+  it('uses mapped destination currency codes for FX conversion and quote totals', async () => {
+    mockMerchantContext(undefined, []);
+    const fxAsOf = new Date('2025-01-01T00:00:00.000Z');
+    const baseCurrency = (process.env.CURRENCY_BASE ?? 'USD').toUpperCase();
+
+    mocks.convertCurrencyWithMetaMock
+      .mockResolvedValueOnce({ amount: 18, meta: { missingRate: false, error: null } }) // freight: USD->EUR
+      .mockResolvedValueOnce({ amount: 90, meta: { missingRate: false, error: null } }) // goods: USD->EUR
+      .mockResolvedValueOnce({ amount: 90, meta: { missingRate: false, error: null } }); // EUR->EUR
+
+    const out = await quoteLandedCost({ ...baseInput, dest: 'NL' });
+
+    expect(out.quote.currency).toBe('EUR');
+    expect(out.quote.total).toBe(143.24);
+    expect(mocks.convertCurrencyWithMetaMock).toHaveBeenNthCalledWith(
+      1,
+      20,
+      baseCurrency,
+      'EUR',
+      { on: fxAsOf, strict: true }
+    );
+    expect(mocks.convertCurrencyWithMetaMock).toHaveBeenNthCalledWith(
+      2,
+      100,
+      'USD',
+      'EUR',
+      { on: fxAsOf, strict: true }
+    );
+    expect(mocks.evaluateDeMinimisMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dest: 'NL',
+        destCurrency: 'EUR',
+      })
+    );
+  });
+
   it('treats no_match surcharges as authoritative with empty fee result', async () => {
     mockMerchantContext(undefined, []);
     mocks.getSurchargesScopedWithMetaMock.mockResolvedValue({
@@ -411,10 +447,30 @@ describe('quoteLandedCost', () => {
 
   it('uses JPY rounding rules (0 decimals)', async () => {
     mockMerchantContext(undefined, []);
-    const out = await quoteLandedCost({ ...baseInput, dest: 'JPY' });
+    const out = await quoteLandedCost({ ...baseInput, dest: 'JP' });
 
     expect(Number.isInteger(out.quote.total)).toBe(true);
     expect(Number.isInteger(out.quote.components.CIF)).toBe(true);
+  });
+
+  it('fails clearly when destination country has no currency mapping', async () => {
+    mockMerchantContext(undefined, []);
+
+    await expect(quoteLandedCost({ ...baseInput, dest: 'ZZ' })).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'DEST_CURRENCY_UNMAPPED',
+    });
+    expect(mocks.convertCurrencyWithMetaMock).not.toHaveBeenCalled();
+  });
+
+  it('fails clearly when strict FX conversion has no available rate', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.convertCurrencyWithMetaMock.mockRejectedValueOnce(
+      new Error('FX rate unavailable for USD->EUR on 2025-01-01')
+    );
+
+    await expect(quoteLandedCost(baseInput)).rejects.toThrow('FX rate unavailable');
+    expect(mocks.evaluateDeMinimisMock).not.toHaveBeenCalled();
   });
 
   it('supports merchant-less flow and sea mode chargeable calculation', async () => {
@@ -544,8 +600,8 @@ describe('quoteLandedCost', () => {
       expectedMissing: [] as string[],
     },
     {
-      name: 'JP->UK freight dataset missing marks missing freight',
-      input: { origin: 'JP', dest: 'UK' },
+      name: 'JP->GB freight dataset missing marks missing freight',
+      input: { origin: 'JP', dest: 'GB' },
       duty: 'ok',
       vat: 'ok',
       surcharges: 'ok',
