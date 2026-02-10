@@ -68,6 +68,96 @@ function toDutyPartnerIso2(countryCode: string): string {
   return normalized;
 }
 
+function toSurchargeTransportMode(mode: QuoteInput['mode']): 'AIR' | 'OCEAN' {
+  return mode === 'air' ? 'AIR' : 'OCEAN';
+}
+
+function normalizeSurchargePct(pct: number | null | undefined): number {
+  if (pct == null || !Number.isFinite(pct)) return 0;
+  // Prefer the canonical DB contract (0..1 fraction), but tolerate legacy whole-% data.
+  return pct > 1 ? pct / 100 : pct;
+}
+
+function clampAmount(
+  amount: number,
+  minAmount: number | null | undefined,
+  maxAmount: number | null | undefined
+): number {
+  let out = amount;
+  if (minAmount != null && Number.isFinite(minAmount)) out = Math.max(out, minAmount);
+  if (maxAmount != null && Number.isFinite(maxAmount)) out = Math.min(out, maxAmount);
+  return out;
+}
+
+function surchargeBaseAmount(
+  valueBasis: string | null | undefined,
+  input: { CIF: number; duty: number }
+): number {
+  const basis = String(valueBasis ?? '').toLowerCase();
+  if (basis === 'duty') return input.duty;
+  // We only have CIF/customs-like value in this quote pipeline today.
+  return input.CIF;
+}
+
+function rowSurchargeAmount(
+  row: {
+    rateType?: string | null;
+    valueBasis?: string | null;
+    fixedAmt?: number | null;
+    pctAmt?: number | null;
+    minAmt?: number | null;
+    maxAmt?: number | null;
+  },
+  input: { CIF: number; duty: number }
+): number {
+  const rateType = String(row.rateType ?? '').toLowerCase();
+  if (rateType === 'fixed') {
+    return clampAmount(row.fixedAmt ?? 0, row.minAmt, row.maxAmt);
+  }
+
+  if (rateType === 'ad_valorem') {
+    const pctFraction = normalizeSurchargePct(row.pctAmt);
+    const basis = surchargeBaseAmount(row.valueBasis, input);
+    const amount = pctFraction * basis;
+    return clampAmount(amount, row.minAmt, row.maxAmt);
+  }
+
+  if (rateType === 'per_unit') {
+    return 0;
+  }
+
+  // Legacy/import-fallback behavior where rateType is missing or invalid:
+  // apply whatever numeric fields are present.
+  const hasFixed = row.fixedAmt != null && Number.isFinite(row.fixedAmt);
+  const hasPct = row.pctAmt != null && Number.isFinite(row.pctAmt);
+  if (hasFixed || hasPct) {
+    let amount = hasFixed ? (row.fixedAmt ?? 0) : 0;
+    if (hasPct) {
+      const pctFraction = normalizeSurchargePct(row.pctAmt);
+      const basis = surchargeBaseAmount(row.valueBasis, input);
+      amount += clampAmount(pctFraction * basis, row.minAmt, row.maxAmt);
+    }
+    return amount;
+  }
+
+  // per-unit/unknown rows require extra quantity context not modeled here yet.
+  return 0;
+}
+
+function totalSurcharges(
+  rows: Array<{
+    rateType?: string | null;
+    valueBasis?: string | null;
+    fixedAmt?: number | null;
+    pctAmt?: number | null;
+    minAmt?: number | null;
+    maxAmt?: number | null;
+  }>,
+  input: { CIF: number; duty: number }
+): number {
+  return rows.reduce((sum, row) => sum + rowSurchargeAmount(row, input), 0);
+}
+
 function strictStaleComponentsFromSnapshot(
   snapshot: Awaited<ReturnType<typeof getDatasetFreshnessSnapshot>>
 ) {
@@ -237,11 +327,10 @@ export async function quoteLandedCost(
     origin: input.origin,
     hs6,
     on: now,
+    transportMode: toSurchargeTransportMode(input.mode),
   });
   const sur = surchargeLookup.value;
-  const feesFixed = sur.reduce((s, r) => s + (r.fixedAmt ?? 0), 0);
-  const feesPct = sur.reduce((s, r) => s + (r.pctAmt ?? 0), 0) * (CIF / 100);
-  const fees = feesFixed + feesPct;
+  const fees = totalSurcharges(sur, { CIF, duty });
 
   // -----------------
   // Output assembly

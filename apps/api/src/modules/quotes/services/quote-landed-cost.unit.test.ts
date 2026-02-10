@@ -349,6 +349,29 @@ describe('quoteLandedCost', () => {
     );
   });
 
+  it('passes normalized transport mode into surcharge lookup', async () => {
+    mockMerchantContext(undefined, []);
+    await quoteLandedCost(baseInput);
+
+    expect(mocks.getSurchargesScopedWithMetaMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dest: 'DE',
+        origin: 'CN',
+        hs6: '123456',
+        transportMode: 'AIR',
+      })
+    );
+
+    mockMerchantContext(undefined, []);
+    await quoteLandedCost({ ...baseInput, mode: 'sea' });
+
+    expect(mocks.getSurchargesScopedWithMetaMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        transportMode: 'OCEAN',
+      })
+    );
+  });
+
   it('falls back to uppercased origin when ISO3 conversion is unavailable', async () => {
     mockMerchantContext(undefined, []);
 
@@ -393,6 +416,40 @@ describe('quoteLandedCost', () => {
     expect(out.quote.components.fees).toBe(0);
     expect(out.quote.componentConfidence.surcharges).toBe('authoritative');
     expect(out.quote.missingComponents).not.toContain('surcharges');
+  });
+
+  it('applies ad-valorem surcharge fractions with min/max clamps', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.getSurchargesScopedWithMetaMock.mockResolvedValue({
+      value: [
+        {
+          rateType: 'ad_valorem',
+          valueBasis: 'customs',
+          pctAmt: 0.003464,
+          minAmt: 31.67,
+          maxAmt: 614.35,
+        },
+      ],
+      meta: { status: 'ok', dataset: null, effectiveFrom: null },
+    });
+
+    const out = await quoteLandedCost(baseInput);
+
+    expect(out.quote.components.fees).toBe(31.67);
+    expect(out.quote.total).toBe(182.87);
+  });
+
+  it('normalizes legacy whole-percent surcharge values', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.getSurchargesScopedWithMetaMock.mockResolvedValue({
+      value: [{ rateType: 'ad_valorem', valueBasis: 'customs', pctAmt: 2 }],
+      meta: { status: 'ok', dataset: null, effectiveFrom: null },
+    });
+
+    const out = await quoteLandedCost(baseInput);
+
+    expect(out.quote.components.fees).toBe(2.4);
+    expect(out.quote.total).toBe(153.6);
   });
 
   it('marks out_of_scope vat as estimated', async () => {
