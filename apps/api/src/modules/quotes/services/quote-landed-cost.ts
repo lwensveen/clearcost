@@ -58,6 +58,16 @@ function toFreightIso3(countryCode: string): string {
   return countries.alpha2ToAlpha3(iso2) ?? normalized;
 }
 
+function toDutyPartnerIso2(countryCode: string): string {
+  const normalized = String(countryCode ?? '')
+    .trim()
+    .toUpperCase();
+  if (normalized === 'UK') return 'GB';
+  if (/^[A-Z]{2}$/.test(normalized)) return normalized;
+  if (/^[A-Z]{3}$/.test(normalized)) return countries.alpha3ToAlpha2(normalized) ?? normalized;
+  return normalized;
+}
+
 function strictStaleComponentsFromSnapshot(
   snapshot: Awaited<ReturnType<typeof getDatasetFreshnessSnapshot>>
 ) {
@@ -175,7 +185,9 @@ export async function quoteLandedCost(
     fxAsOf,
   });
 
-  const dutyLookup = await getActiveDutyRateWithMeta(input.dest, hs6, now);
+  const dutyLookup = await getActiveDutyRateWithMeta(input.dest, hs6, now, {
+    partner: toDutyPartnerIso2(input.origin),
+  });
   const dutyRow = dutyLookup.value;
   const vatLookup = await getVatForHs6WithMeta(input.dest, hs6, now);
   const vatInfo = vatLookup.value; // { ratePct, base, source, effectiveFrom }

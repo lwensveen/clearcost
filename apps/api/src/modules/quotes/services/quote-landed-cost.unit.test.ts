@@ -336,6 +336,19 @@ describe('quoteLandedCost', () => {
     );
   });
 
+  it('passes normalized origin as duty partner for duty-rate matching', async () => {
+    mockMerchantContext(undefined, []);
+
+    await quoteLandedCost(baseInput);
+
+    expect(mocks.getActiveDutyRateWithMetaMock).toHaveBeenCalledWith(
+      'DE',
+      '123456',
+      expect.any(Date),
+      { partner: 'CN' }
+    );
+  });
+
   it('falls back to uppercased origin when ISO3 conversion is unavailable', async () => {
     mockMerchantContext(undefined, []);
 
@@ -359,6 +372,12 @@ describe('quoteLandedCost', () => {
         origin: 'GBR',
         dest: 'DEU',
       })
+    );
+    expect(mocks.getActiveDutyRateWithMetaMock).toHaveBeenCalledWith(
+      'DE',
+      '123456',
+      expect.any(Date),
+      { partner: 'GB' }
     );
   });
 
