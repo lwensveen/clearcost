@@ -17,6 +17,9 @@ export const QuoteInputSchema = z.object({
   itemValue: MoneySchema,
   dimsCm: DimsCmSchema,
   weightKg: z.number().finite(),
+  // Optional shipment context used by component-based duty calculations.
+  quantity: z.number().finite().nonnegative().optional(),
+  liters: z.number().finite().nonnegative().optional(),
   categoryKey: z.string().min(1),
   hs6: z
     .string()

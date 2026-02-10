@@ -445,13 +445,15 @@ describe('quoteLandedCost', () => {
       missingInputs: [],
     });
 
-    const out = await quoteLandedCost(baseInput);
+    const out = await quoteLandedCost({ ...baseInput, quantity: 3, liters: 12 });
 
     expect(mocks.computeDutyForRateIdMock).toHaveBeenCalledWith(
       'duty-rate-1',
       expect.objectContaining({
         customsValueDest: 120,
         netKg: 2,
+        quantity: 3,
+        liters: 12,
       }),
       expect.objectContaining({
         fallbackRatePct: 5,

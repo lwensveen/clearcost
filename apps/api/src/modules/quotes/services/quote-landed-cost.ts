@@ -441,7 +441,12 @@ export async function quoteLandedCost(
     if (dutyRow?.id) {
       const dutyComputed = await computeDutyForRateId(
         dutyRow.id,
-        { customsValueDest: CIF, netKg: input.weightKg },
+        {
+          customsValueDest: CIF,
+          netKg: input.weightKg,
+          quantity: input.quantity,
+          liters: input.liters,
+        },
         {
           fallbackRatePct: Number(dutyRow.ratePct),
           on: now,
