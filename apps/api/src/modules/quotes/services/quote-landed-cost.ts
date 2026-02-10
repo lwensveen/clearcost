@@ -140,6 +140,12 @@ type SurchargeAmountResult = {
   perUnitExclusion?: PerUnitExclusion;
 };
 
+type SurchargeUnitContext = {
+  quantity?: number | null;
+  weightKg?: number | null;
+  liters?: number | null;
+};
+
 function toPerUnitExclusion(row: SurchargeRow): PerUnitExclusion {
   return {
     code: typeof row.surchargeCode === 'string' ? row.surchargeCode : '',
@@ -183,10 +189,62 @@ async function convertSurchargeAmount(
   return { amount: out.amount, fxMissingRate: out.meta.missingRate };
 }
 
+function resolvePerUnitMultiplier(
+  unitCode: string | null | undefined,
+  ctx: SurchargeUnitContext
+): number | null {
+  const normalized = String(unitCode ?? '')
+    .trim()
+    .toUpperCase();
+  const quantity = Number(ctx.quantity ?? NaN);
+  const weightKg = Number(ctx.weightKg ?? NaN);
+  const liters = Number(ctx.liters ?? NaN);
+
+  if (
+    ['UNIT', 'UNITS', 'ITEM', 'ITEMS', 'EA', 'EACH', 'PCS', 'PC', 'PAIR', 'PAIRS'].includes(
+      normalized
+    )
+  ) {
+    return Number.isFinite(quantity) && quantity >= 0 ? quantity : null;
+  }
+  if (['KG', 'KGS', 'KILOGRAM', 'KILOGRAMS'].includes(normalized)) {
+    return Number.isFinite(weightKg) && weightKg >= 0 ? weightKg : null;
+  }
+  if (['100KG', '100_KG'].includes(normalized)) {
+    return Number.isFinite(weightKg) && weightKg >= 0 ? weightKg / 100 : null;
+  }
+  if (['L', 'LITER', 'LITERS', 'LITRE', 'LITRES'].includes(normalized)) {
+    return Number.isFinite(liters) && liters >= 0 ? liters : null;
+  }
+  return null;
+}
+
+async function perUnitSurchargeAmount(
+  row: SurchargeRow,
+  sourceCurrency: string,
+  ctx: { destCurrency: string; fxAsOf: Date; unitContext: SurchargeUnitContext }
+): Promise<SurchargeAmountResult> {
+  const multiplier = resolvePerUnitMultiplier(row.unitCode, ctx.unitContext);
+  if (multiplier == null) {
+    return { amount: 0, fxMissingRate: false, perUnitExclusion: toPerUnitExclusion(row) };
+  }
+
+  const [unitOut, minOut, maxOut] = await Promise.all([
+    convertSurchargeAmount(row.unitAmt, sourceCurrency, ctx.destCurrency, ctx.fxAsOf),
+    convertSurchargeAmount(row.minAmt, sourceCurrency, ctx.destCurrency, ctx.fxAsOf),
+    convertSurchargeAmount(row.maxAmt, sourceCurrency, ctx.destCurrency, ctx.fxAsOf),
+  ]);
+  const amount = clampAmount((unitOut.amount ?? 0) * multiplier, minOut.amount, maxOut.amount);
+  return {
+    amount,
+    fxMissingRate: unitOut.fxMissingRate || minOut.fxMissingRate || maxOut.fxMissingRate,
+  };
+}
+
 async function rowSurchargeAmount(
   row: SurchargeRow,
   input: { CIF: number; duty: number },
-  ctx: { destCurrency: string; fxAsOf: Date }
+  ctx: { destCurrency: string; fxAsOf: Date; unitContext: SurchargeUnitContext }
 ): Promise<SurchargeAmountResult> {
   const sourceCurrency = resolveSurchargeSourceCurrency(row, ctx.destCurrency);
   const rateType = String(row.rateType ?? '').toLowerCase();
@@ -204,7 +262,7 @@ async function rowSurchargeAmount(
       };
     }
     if (hasUnitAmt) {
-      return { amount: 0, fxMissingRate: false, perUnitExclusion: toPerUnitExclusion(row) };
+      return perUnitSurchargeAmount(row, sourceCurrency, ctx);
     }
     return { amount: 0, fxMissingRate: false };
   }
@@ -224,7 +282,7 @@ async function rowSurchargeAmount(
   }
 
   if (rateType === 'per_unit') {
-    return { amount: 0, fxMissingRate: false, perUnitExclusion: toPerUnitExclusion(row) };
+    return perUnitSurchargeAmount(row, sourceCurrency, ctx);
   }
 
   // Legacy/import-fallback behavior where rateType is missing or invalid:
@@ -258,17 +316,17 @@ async function rowSurchargeAmount(
   }
 
   if (hasUnitAmt) {
-    return { amount: 0, fxMissingRate: false, perUnitExclusion: toPerUnitExclusion(row) };
+    return perUnitSurchargeAmount(row, sourceCurrency, ctx);
   }
 
-  // per-unit/unknown rows require extra quantity context not modeled here yet.
+  // Unknown per-unit units still require additional context and remain excluded.
   return { amount: 0, fxMissingRate: false };
 }
 
 async function totalSurcharges(
   rows: SurchargeRow[],
   input: { CIF: number; duty: number },
-  ctx: { destCurrency: string; fxAsOf: Date }
+  ctx: { destCurrency: string; fxAsOf: Date; unitContext: SurchargeUnitContext }
 ): Promise<{
   amount: number;
   fxMissingRate: boolean;
@@ -506,7 +564,19 @@ export async function quoteLandedCost(
     transportMode: toSurchargeTransportMode(input.mode),
   });
   const sur = surchargeLookup.value;
-  const surchargeTotals = await totalSurcharges(sur, { CIF, duty }, { destCurrency, fxAsOf });
+  const surchargeTotals = await totalSurcharges(
+    sur,
+    { CIF, duty },
+    {
+      destCurrency,
+      fxAsOf,
+      unitContext: {
+        quantity: input.quantity,
+        weightKg: input.weightKg,
+        liters: input.liters,
+      },
+    }
+  );
   fxMissingRate ||= surchargeTotals.fxMissingRate;
   const fees = surchargeTotals.amount;
 

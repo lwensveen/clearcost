@@ -623,6 +623,57 @@ describe('quoteLandedCost', () => {
     expect(out.quote.missingComponents).not.toContain('surcharges');
   });
 
+  it('applies supported per-unit surcharges using quantity and weight context', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.getSurchargesScopedWithMetaMock.mockResolvedValue({
+      value: [
+        {
+          surchargeCode: 'MPF',
+          rateType: 'per_unit',
+          unitAmt: 3,
+          unitCode: 'UNIT',
+        },
+        {
+          surchargeCode: 'HMF',
+          rateType: 'per_unit',
+          unitAmt: 2,
+          unitCode: 'KG',
+        },
+      ],
+      meta: { status: 'ok', dataset: null, effectiveFrom: null },
+    });
+
+    const out = await quoteLandedCost({ ...baseInput, quantity: 4 });
+
+    expect(out.quote.components.fees).toBe(16);
+    expect(out.quote.total).toBe(167.2);
+    expect(out.quote.componentConfidence.surcharges).toBe('authoritative');
+    expect(out.quote.policy).not.toContain('per-unit surcharge rows not included in total');
+    expect(out.quote.explainability?.surcharges.nonModeledPerUnit).toBeUndefined();
+  });
+
+  it('applies supported per-unit surcharges using liters context', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.getSurchargesScopedWithMetaMock.mockResolvedValue({
+      value: [
+        {
+          surchargeCode: 'SUGAR_LEVY',
+          rateType: 'per_unit',
+          unitAmt: 1.5,
+          unitCode: 'L',
+        },
+      ],
+      meta: { status: 'ok', dataset: null, effectiveFrom: null },
+    });
+
+    const out = await quoteLandedCost({ ...baseInput, liters: 10 });
+
+    expect(out.quote.components.fees).toBe(15);
+    expect(out.quote.total).toBe(166.2);
+    expect(out.quote.componentConfidence.surcharges).toBe('authoritative');
+    expect(out.quote.explainability?.surcharges.nonModeledPerUnit).toBeUndefined();
+  });
+
   it('reports non-modeled per-unit surcharges and marks surcharge confidence estimated', async () => {
     mockMerchantContext(undefined, []);
     mocks.getSurchargesScopedWithMetaMock.mockResolvedValue({
