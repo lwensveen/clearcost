@@ -3,7 +3,9 @@ import { sql } from 'drizzle-orm';
 import type { DutyRateInsert } from '@clearcost/types';
 
 export async function importDutyRates(rows: DutyRateInsert[]) {
-  if (!rows.length) return { ok: true as const, count: 0 };
+  if (!rows.length) {
+    throw new Error('[Duty import] source produced 0 rows.');
+  }
 
   const values = rows.map((r) => ({
     id: r.id,

@@ -20,7 +20,9 @@ export async function importVatFromLLM(
   rows: LlmVat[],
   opts: { importId?: string } = {}
 ): Promise<{ ok: true; count: number }> {
-  if (!rows?.length) return { ok: true as const, count: 0 };
+  if (!rows?.length) {
+    throw new Error('[VAT LLM import] source produced 0 rows.');
+  }
 
   const mapped: VatRuleInsert[] = rows.map((r) => ({
     dest: (up2(r.country_code) ?? '') as string,

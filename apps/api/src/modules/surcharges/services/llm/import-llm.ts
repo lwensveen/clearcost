@@ -79,7 +79,9 @@ export async function importSurchargesFromLLM(
     getSourceRef?: (row: LlmSurcharge) => string | undefined;
   } = {}
 ): Promise<{ ok: true; inserted: number; updated: number; count: number }> {
-  if (!rows?.length) return { ok: true, inserted: 0, updated: 0, count: 0 };
+  if (!rows?.length) {
+    throw new Error('[Surcharge LLM import] source produced 0 rows.');
+  }
 
   const values: SurchargeInsert[] = [];
   const srcByKey = new Map<string, string | undefined>();

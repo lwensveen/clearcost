@@ -52,7 +52,9 @@ export async function importDutyRatesFromLLM(
     }) => string | undefined;
   } = {}
 ): Promise<{ ok: true; inserted: number; updated: number; count: number }> {
-  if (!rows?.length) return { ok: true as const, inserted: 0, updated: 0, count: 0 };
+  if (!rows?.length) {
+    throw new Error('[Duty LLM import] source produced 0 rows.');
+  }
 
   const headline: DutyInsert[] = rows.map((r) => ({
     dest: up2(r.country_code), // ISO2

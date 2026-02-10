@@ -55,7 +55,9 @@ export async function importSurcharges(rows: SurchargeInsert[]) {
     })
     .filter(Boolean) as Array<(typeof surchargesTable)['$inferInsert']>;
 
-  if (normalized.length === 0) return { ok: true as const, count: 0 };
+  if (normalized.length === 0) {
+    throw new Error('[Surcharge import] source produced 0 valid rows after normalization.');
+  }
 
   await db.transaction(async (trx) => {
     for (const v of normalized) {
