@@ -1,4 +1,5 @@
 import type { SurchargeInsert } from '@clearcost/types';
+import { adValoremPercentToFractionString } from '../pct.js';
 import {
   ERGA_OMNES_ID,
   getLatestVersionId,
@@ -154,7 +155,7 @@ export async function importUkTradeRemediesAsSurcharges(
       origin,
       hs6: code6,
       surchargeCode: surchargeCode,
-      pctAmt: pct.toFixed(3),
+      pctAmt: adValoremPercentToFractionString(pct),
       fixedAmt: null,
       effectiveFrom: start,
       effectiveTo: end ?? null,

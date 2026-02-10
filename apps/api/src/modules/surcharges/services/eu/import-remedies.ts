@@ -6,6 +6,7 @@
 
 import type { SurchargeInsert } from '@clearcost/types';
 import { importSurcharges } from '../import-surcharges.js';
+import { adValoremPercentToFractionString } from '../pct.js';
 import {
   ERGA_OMNES_ID,
   hs6 as toHs6,
@@ -13,7 +14,6 @@ import {
   parseDutyExpressions,
   parseGeoAreaDescriptions,
   parseMeasures,
-  toNumeric3String,
 } from '../../../duty-rates/services/eu/base.js';
 
 type ImportOpts = {
@@ -114,7 +114,7 @@ export async function importEuTradeRemediesAsSurcharges(
       origin,
       hs6: toHs6(m.code10),
       surchargeCode: surchargeCode,
-      pctAmt: toNumeric3String(c.pct),
+      pctAmt: adValoremPercentToFractionString(c.pct),
       fixedAmt: null,
       effectiveFrom: start,
       effectiveTo: end,
