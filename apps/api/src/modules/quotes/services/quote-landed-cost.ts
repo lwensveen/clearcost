@@ -1,6 +1,8 @@
 import { getCurrencyForCountry, type QuoteInput } from '@clearcost/types';
 import { db, merchantProfilesTable, taxRegistrationsTable } from '@clearcost/db';
 import { and, eq } from 'drizzle-orm';
+import countries from 'i18n-iso-countries';
+import en from 'i18n-iso-countries/langs/en.json' with { type: 'json' };
 import { EU_ISO2, volumeM3, volumetricKg } from '../utils.js';
 import { resolveHs6 } from '../../hs-codes/services/resolve-hs6.js';
 import { convertCurrencyWithMeta } from '../../fx/services/convert-currency.js';
@@ -20,6 +22,8 @@ import { getDatasetFreshnessSnapshot } from '../../health/services.js';
 
 type Unit = 'kg' | 'm3';
 const BASE_CCY = process.env.CURRENCY_BASE ?? 'USD';
+
+countries.registerLocale(en);
 
 const roundMoney = (n: number, ccy: string) => {
   const dp = ccy === 'JPY' ? 0 : 2;
@@ -42,6 +46,16 @@ function resolveDestinationCurrency(destCountryIso2: string): string {
       code: 'DEST_CURRENCY_UNMAPPED',
     }
   );
+}
+
+function toFreightIso3(countryCode: string): string {
+  const normalized = String(countryCode ?? '')
+    .trim()
+    .toUpperCase();
+  if (/^[A-Z]{3}$/.test(normalized)) return normalized;
+  if (!/^[A-Z]{2}$/.test(normalized)) return normalized;
+  const iso2 = normalized === 'UK' ? 'GB' : normalized;
+  return countries.alpha2ToAlpha3(iso2) ?? normalized;
 }
 
 function strictStaleComponentsFromSnapshot(
@@ -119,8 +133,9 @@ export async function quoteLandedCost(
   const unit: Unit = input.mode === 'air' ? 'kg' : 'm3';
 
   const freightLookup = await getFreightWithMeta({
-    origin: input.origin,
-    dest: input.dest,
+    // Quote API uses ISO2 lanes while freight cards are keyed by ISO3.
+    origin: toFreightIso3(input.origin),
+    dest: toFreightIso3(input.dest),
     freightMode: input.mode,
     freightUnit: unit,
     qty,

@@ -323,6 +323,45 @@ describe('quoteLandedCost', () => {
     );
   });
 
+  it('normalizes ISO2 lanes to ISO3 for freight lookup matching', async () => {
+    mockMerchantContext(undefined, []);
+
+    await quoteLandedCost(baseInput);
+
+    expect(mocks.getFreightWithMetaMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        origin: 'CHN',
+        dest: 'DEU',
+      })
+    );
+  });
+
+  it('falls back to uppercased origin when ISO3 conversion is unavailable', async () => {
+    mockMerchantContext(undefined, []);
+
+    await quoteLandedCost({ ...baseInput, origin: 'zz' });
+
+    expect(mocks.getFreightWithMetaMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        origin: 'ZZ',
+        dest: 'DEU',
+      })
+    );
+  });
+
+  it('normalizes UK alias to GBR for freight lookup', async () => {
+    mockMerchantContext(undefined, []);
+
+    await quoteLandedCost({ ...baseInput, origin: 'UK' });
+
+    expect(mocks.getFreightWithMetaMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        origin: 'GBR',
+        dest: 'DEU',
+      })
+    );
+  });
+
   it('treats no_match surcharges as authoritative with empty fee result', async () => {
     mockMerchantContext(undefined, []);
     mocks.getSurchargesScopedWithMetaMock.mockResolvedValue({
