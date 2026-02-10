@@ -11,6 +11,41 @@ type Params = {
   useWitsFallback?: boolean; // default true
 };
 
+export const JP_FTA_DEFAULT_PARTNER_GEOIDS = [
+  'CN',
+  'KR',
+  'AU',
+  'NZ',
+  'TH',
+  'MY',
+  'ID',
+  'PH',
+  'VN',
+  'LA',
+  'KH',
+  'BN',
+  'SG',
+  'CA',
+  'MX',
+  'EU',
+  'GB',
+  'US',
+] as const;
+
+function normalizePartnerGeoIds(partnerGeoIds?: string[]): string[] {
+  const raw =
+    partnerGeoIds && partnerGeoIds.length > 0 ? partnerGeoIds : [...JP_FTA_DEFAULT_PARTNER_GEOIDS];
+  const out = new Set<string>();
+  for (const partner of raw) {
+    const normalized = String(partner ?? '')
+      .trim()
+      .toUpperCase();
+    if (!/^[A-Z]{2}$/.test(normalized)) continue;
+    out.add(normalized);
+  }
+  return [...out];
+}
+
 async function fetchJpPreferentialOfficial(
   _partners?: string[],
   _hs6List?: string[]
@@ -27,11 +62,11 @@ export async function importJpPreferential({
   dryRun,
   useWitsFallback = true,
 }: Params) {
-  const officialRows = await fetchJpPreferentialOfficial(partnerGeoIds, hs6List);
+  const partners = normalizePartnerGeoIds(partnerGeoIds);
+  const officialRows = await fetchJpPreferentialOfficial(partners, hs6List);
 
   const witsRows: DutyRateInsert[] = [];
   if (useWitsFallback) {
-    const partners = partnerGeoIds ?? [];
     for (const partner of partners) {
       const rows = await fetchWitsPreferentialDutyRates({
         dest: 'JP',
@@ -46,18 +81,26 @@ export async function importJpPreferential({
   const merged = [...officialRows, ...witsRows];
 
   if (merged.length === 0) {
-    throw new Error(
-      '[JP Duties] Preferential produced 0 rows. Check WITS fallback availability and partner coverage.'
-    );
+    if (useWitsFallback) {
+      throw new Error(
+        '[JP Duties] Preferential produced 0 rows from official and WITS fallback sources.'
+      );
+    }
+    throw new Error('[JP Duties] Preferential produced 0 official rows.');
   }
 
   const res = await batchUpsertDutyRatesFromStream(merged, {
     batchSize,
     importId,
     dryRun,
-    source: 'wits',
     makeSourceRef: (r) =>
-      r.partner && r.partner !== '' ? `jp:${r.partner}:fta:${r.hs6}` : `jp:erga:mfn:${r.hs6}`,
+      [
+        r.source === 'wits' ? 'wits' : 'jp-customs',
+        'JP',
+        r.partner && r.partner !== '' ? r.partner : 'ERGA',
+        r.dutyRule ?? 'fta',
+        r.hs6,
+      ].join(':'),
   });
 
   return {
