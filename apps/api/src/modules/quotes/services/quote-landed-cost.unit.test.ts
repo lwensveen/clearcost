@@ -307,20 +307,14 @@ describe('quoteLandedCost', () => {
 
     expect(out.quote.currency).toBe('EUR');
     expect(out.quote.total).toBe(143.24);
-    expect(mocks.convertCurrencyWithMetaMock).toHaveBeenNthCalledWith(
-      1,
-      20,
-      baseCurrency,
-      'EUR',
-      { on: fxAsOf, strict: true }
-    );
-    expect(mocks.convertCurrencyWithMetaMock).toHaveBeenNthCalledWith(
-      2,
-      100,
-      'USD',
-      'EUR',
-      { on: fxAsOf, strict: true }
-    );
+    expect(mocks.convertCurrencyWithMetaMock).toHaveBeenNthCalledWith(1, 20, baseCurrency, 'EUR', {
+      on: fxAsOf,
+      strict: true,
+    });
+    expect(mocks.convertCurrencyWithMetaMock).toHaveBeenNthCalledWith(2, 100, 'USD', 'EUR', {
+      on: fxAsOf,
+      strict: true,
+    });
     expect(mocks.evaluateDeMinimisMock).toHaveBeenCalledWith(
       expect.objectContaining({
         dest: 'NL',
