@@ -28,8 +28,9 @@ const SelectRowSchema = SurchargeSelectCoercedSchema.pick({
   notes: true,
 });
 type SurchargeRowOut = z.infer<typeof SelectRowSchema>;
-type TransportMode = SurchargeRowOut['transportMode']; // 'ALL' | 'OCEAN' | 'AIR' | 'TRUCK' | 'RAIL'
+type TransportMode = SurchargeRowOut['transportMode']; // e.g. 'ALL' | 'OCEAN' | 'AIR' | 'TRUCK' | 'RAIL' | 'BARGE'
 type ApplyLevel = SurchargeRowOut['applyLevel']; // 'entry' | 'line' | 'shipment' | 'program'
+type RankedSurchargeRow = { row: SurchargeRowOut; score: number; tiebreak: number };
 
 export type GetSurchargesScopedInput = {
   dest: string;
@@ -56,7 +57,7 @@ export function latestSurchargeEffectiveFrom(
 }
 
 // ---- helpers ---------------------------------------------------------------
-const MODES = ['ALL', 'OCEAN', 'AIR', 'TRUCK', 'RAIL'] as const;
+const MODES = ['ALL', 'OCEAN', 'AIR', 'TRUCK', 'RAIL', 'BARGE'] as const;
 const LEVELS = ['entry', 'line', 'shipment', 'program'] as const;
 
 function normMode(v?: string | null): TransportMode | null {
@@ -73,6 +74,91 @@ function normHs6(v?: string | null): string | null {
   if (!v) return null;
   const s = String(v).replace(/\D+/g, '').slice(0, 6);
   return s.length === 6 ? s : null;
+}
+
+function scoreSurchargeRow(
+  row: SurchargeRowOut,
+  input: {
+    originUp: string | null;
+    hs6Key: string | null;
+    mode: TransportMode | null;
+    level: ApplyLevel | null;
+  }
+): RankedSurchargeRow {
+  const { originUp, hs6Key, mode, level } = input;
+  let score = 0;
+
+  if (mode) {
+    if (row.transportMode === mode)
+      score += 8; // exact mode
+    else if (row.transportMode === 'ALL') score += 2; // generic fallback
+  } else {
+    score += row.transportMode === 'ALL' ? 0 : 1;
+  }
+
+  if (level && row.applyLevel === level) score += 4;
+
+  const matchOrigin =
+    !!originUp && typeof row.origin === 'string' && row.origin.toUpperCase() === originUp;
+  const matchHs6 = !!hs6Key && row.hs6 === hs6Key;
+  if (matchOrigin) score += 2;
+  if (matchHs6) score += 1;
+
+  const tiebreak =
+    (row.transportMode === 'ALL' ? 0 : 1) +
+    (row.origin ? 1 : 0) +
+    (row.hs6 ? 1 : 0) +
+    (row.effectiveFrom?.getTime() ?? 0) / 1_000_000_000_000;
+
+  return { row, score, tiebreak };
+}
+
+function rowMatchesFallbackScope(
+  row: SurchargeRowOut,
+  input: { originUp: string | null; hs6Key: string | null }
+) {
+  const { originUp, hs6Key } = input;
+  if (!originUp && !hs6Key) return true;
+  if (originUp && row.origin && row.origin.toUpperCase() === originUp) return true;
+  if (hs6Key && row.hs6 === hs6Key) return true;
+  return !row.origin && !row.hs6;
+}
+
+function scopedSurchargeKey(
+  row: SurchargeRowOut,
+  input: { mode: TransportMode | null; originUp: string | null; hs6Key: string | null }
+) {
+  const parts: string[] = [row.surchargeCode, row.applyLevel];
+  // For scoped quote lookups, treat ALL + exact mode as a single fallback set.
+  if (!input.mode) parts.push(row.transportMode);
+  // For origin/HS-scoped lookups, treat specific + generic rows as one fallback set.
+  if (!input.originUp) parts.push(row.origin ?? '');
+  if (!input.hs6Key) parts.push(row.hs6 ?? '');
+  return parts.join('::');
+}
+
+export function selectScopedSurchargeRows(
+  rows: SurchargeRowOut[],
+  input: {
+    originUp: string | null;
+    hs6Key: string | null;
+    mode: TransportMode | null;
+    level: ApplyLevel | null;
+  }
+): SurchargeRowOut[] {
+  const ranked = rows
+    .map((row) => scoreSurchargeRow(row, input))
+    .filter(({ row }) => rowMatchesFallbackScope(row, input))
+    .sort((a, b) => b.score - a.score || b.tiebreak - a.tiebreak);
+
+  // Prevent double-charging when both specific and generic fallback rows match.
+  const byScopeKey = new Map<string, SurchargeRowOut>();
+  for (const rankedRow of ranked) {
+    const key = scopedSurchargeKey(rankedRow.row, input);
+    if (!byScopeKey.has(key)) byScopeKey.set(key, rankedRow.row);
+  }
+
+  return [...byScopeKey.values()];
 }
 
 // ---- main ------------------------------------------------------------------
@@ -143,46 +229,12 @@ export async function getSurchargesScopedWithMeta(
 
     const coerced = rows.map((r) => SelectRowSchema.parse(r));
 
-    const ranked = coerced
-      .map((r) => {
-        let score = 0;
-
-        // transportMode specificity
-        if (mode) {
-          if (r.transportMode === mode)
-            score += 8; // exact mode
-          else if (r.transportMode === 'ALL') score += 2; // generic ok
-        } else {
-          // no mode requested: slight preference to non-ALL (more specific)
-          score += r.transportMode === 'ALL' ? 0 : 1;
-        }
-
-        // applyLevel specificity (only matters if requested)
-        if (level && r.applyLevel === level) score += 4;
-
-        // origin & hs6 specificity
-        const matchOrigin =
-          !!originUp && typeof r.origin === 'string' && r.origin.toUpperCase() === originUp;
-        const matchHs6 = !!hs6Key && r.hs6 === hs6Key;
-        if (matchOrigin) score += 2;
-        if (matchHs6) score += 1;
-
-        // Tie-breaker: more constrained rows win
-        const tiebreak = (r.transportMode === 'ALL' ? 0 : 1) + (r.origin ? 1 : 0) + (r.hs6 ? 1 : 0);
-
-        return { r, score, tiebreak };
-      })
-      .filter(({ r }) => {
-        // If origin/hs6 requested, allow exact matches or fall back to generic rows.
-        if (!originUp && !hs6Key) return true;
-        if (originUp && r.origin && r.origin.toUpperCase() === originUp) return true;
-        if (hs6Key && r.hs6 === hs6Key) return true;
-        // generic fallback (no origin & no hs6)
-        return !r.origin && !r.hs6;
-      })
-      .sort((a, b) => b.score - a.score || b.tiebreak - a.tiebreak);
-
-    const value = ranked.map(({ r }) => r);
+    const value = selectScopedSurchargeRows(coerced, {
+      originUp,
+      hs6Key,
+      mode,
+      level,
+    });
     if (value.length > 0) {
       return {
         value,
