@@ -165,7 +165,11 @@ export async function importUkTradeRemediesAsSurcharges(
     });
   }
 
-  if (!out.length) return { ok: true as const, count: 0 };
+  if (!out.length) {
+    throw new Error(
+      '[UK surcharges] remedy import produced 0 rows. Check UK tariff source availability and parsing filters.'
+    );
+  }
 
   // Provenance-enabled upsert
   const res = await batchUpsertSurchargesFromStream(out, {

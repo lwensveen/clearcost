@@ -27,6 +27,7 @@ export async function importPreferentialFromWits(params: {
   let inserted = 0;
   let updated = 0;
   let count = 0;
+  let fetchedRows = 0;
 
   for (const partner of partners) {
     const rows = await fetchWitsPreferentialDutyRates({
@@ -34,7 +35,9 @@ export async function importPreferentialFromWits(params: {
       partner,
       backfillYears,
       hs6List: params.hs6List,
-    }).catch(() => [] as DutyRateInsert[]);
+    });
+
+    fetchedRows += rows.length;
 
     if (!rows.length) continue;
 
@@ -49,6 +52,12 @@ export async function importPreferentialFromWits(params: {
     inserted += res.inserted;
     updated += res.updated;
     count += res.count;
+  }
+
+  if (fetchedRows === 0) {
+    throw new Error(
+      `[WITS FTA] ${dest} produced 0 rows across ${partners.length} partner jobs. Check WITS source availability and partner coverage.`
+    );
   }
 
   return {

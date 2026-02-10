@@ -33,7 +33,9 @@ export async function importEuPreferential(
   });
 
   if (!rows?.length) {
-    return { ok: true, inserted: 0, updated: 0, count: 0, dryRun: Boolean(params.dryRun) };
+    throw new Error(
+      '[EU Duties] Preferential produced 0 rows. Check TARIC source availability and parsing filters.'
+    );
   }
 
   const res = await batchUpsertDutyRatesFromStream(rows, {

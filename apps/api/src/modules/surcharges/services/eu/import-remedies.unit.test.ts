@@ -79,4 +79,28 @@ describe('importEuTradeRemediesAsSurcharges', () => {
       }),
     ]);
   });
+
+  it('fails fast when remedy measure types are not configured', async () => {
+    await expect(
+      importEuTradeRemediesAsSurcharges({
+        measureTypeIds: [],
+        xmlMeasureUrl: 'https://example.com/measure.xml',
+        xmlComponentUrl: 'https://example.com/component.xml',
+      })
+    ).rejects.toThrow(/requires at least one measure type id/i);
+  });
+
+  it('fails fast when TARIC filter yields zero remedy measures', async () => {
+    mocks.parseMeasuresMock.mockResolvedValueOnce(new Map());
+
+    await expect(
+      importEuTradeRemediesAsSurcharges({
+        measureTypeIds: ['551'],
+        xmlMeasureUrl: 'https://example.com/measure.xml',
+        xmlComponentUrl: 'https://example.com/component.xml',
+        xmlGeoDescUrl: 'https://example.com/geo.xml',
+        xmlDutyExprUrl: 'https://example.com/duty.xml',
+      })
+    ).rejects.toThrow(/produced 0 measures/i);
+  });
 });

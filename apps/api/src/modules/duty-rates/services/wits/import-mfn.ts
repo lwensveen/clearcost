@@ -27,10 +27,12 @@ export async function importMfnFromWits(params: {
     dest,
     backfillYears,
     hs6List: params.hs6List,
-  }).catch(() => [] as DutyRateInsert[]);
+  });
 
   if (!rows.length) {
-    return { ok: true as const, inserted: 0, updated: 0, count: 0, dryRun: !!params.dryRun };
+    throw new Error(
+      `[WITS MFN] ${dest} produced 0 rows. Check WITS source availability and extraction filters.`
+    );
   }
 
   // Upsert with provenance tags

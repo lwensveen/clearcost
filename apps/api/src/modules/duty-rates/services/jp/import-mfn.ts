@@ -32,7 +32,9 @@ export async function importJpMfn({
   const merged = [...officialRows, ...witsRows];
 
   if (merged.length === 0) {
-    return { ok: true as const, inserted: 0, updated: 0, count: 0, dryRun: Boolean(dryRun) };
+    throw new Error(
+      '[JP Duties] MFN produced 0 rows. Check WITS fallback availability and parser compatibility.'
+    );
   }
 
   const res = await batchUpsertDutyRatesFromStream(merged, {

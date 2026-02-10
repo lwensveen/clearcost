@@ -38,7 +38,7 @@ export async function importJpPreferential({
         partner,
         backfillYears: 1,
         hs6List,
-      }).catch(() => [] as DutyRateInsert[]);
+      });
       witsRows.push(...rows);
     }
   }
@@ -46,7 +46,9 @@ export async function importJpPreferential({
   const merged = [...officialRows, ...witsRows];
 
   if (merged.length === 0) {
-    return { ok: true as const, inserted: 0, updated: 0, count: 0, dryRun: Boolean(dryRun) };
+    throw new Error(
+      '[JP Duties] Preferential produced 0 rows. Check WITS fallback availability and partner coverage.'
+    );
   }
 
   const res = await batchUpsertDutyRatesFromStream(merged, {

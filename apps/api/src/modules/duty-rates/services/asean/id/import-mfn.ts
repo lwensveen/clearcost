@@ -8,8 +8,11 @@ export async function importIdMfn(params: {
   dryRun?: boolean;
 }) {
   const rows = await fetchIdMfnDutyRates();
-  if (!rows.length)
-    return { ok: true as const, inserted: 0, updated: 0, count: 0, dryRun: !!params.dryRun };
+  if (!rows.length) {
+    throw new Error(
+      '[ID Duties] MFN produced 0 rows. Check official source availability and parser compatibility.'
+    );
+  }
 
   const res = await batchUpsertDutyRatesFromStream(rows, {
     batchSize: params.batchSize ?? 5000,

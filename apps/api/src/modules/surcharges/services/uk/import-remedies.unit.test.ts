@@ -67,4 +67,14 @@ describe('importUkTradeRemediesAsSurcharges', () => {
       })
     );
   });
+
+  it('fails fast when source parsing yields zero remedy rows', async () => {
+    mocks.s3SelectMock.mockResolvedValueOnce([]);
+
+    await expect(
+      importUkTradeRemediesAsSurcharges({
+        measureTypeIds: ['552'],
+      })
+    ).rejects.toThrow(/produced 0 rows/i);
+  });
 });

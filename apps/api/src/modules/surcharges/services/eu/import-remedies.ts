@@ -46,7 +46,11 @@ export async function importEuTradeRemediesAsSurcharges(
   const hs6Allow = new Set((opts.hs6List ?? []).map(toHs6).filter(Boolean));
   const measureTypes = new Set((opts.measureTypeIds ?? []).filter(Boolean));
 
-  if (measureTypes.size === 0) return { ok: true, count: 0 };
+  if (measureTypes.size === 0) {
+    throw new Error(
+      '[EU surcharges] remedy import requires at least one measure type id to be configured.'
+    );
+  }
 
   const measureUrl = opts.xmlMeasureUrl ?? process.env.EU_TARIC_MEASURE_URL ?? '';
   const componentUrl = opts.xmlComponentUrl ?? process.env.EU_TARIC_COMPONENT_URL ?? '';
@@ -54,7 +58,11 @@ export async function importEuTradeRemediesAsSurcharges(
   const dutyExprUrl = opts.xmlDutyExprUrl ?? process.env.EU_TARIC_DUTY_EXPR_URL ?? '';
   const lang = (opts.language ?? process.env.EU_TARIC_LANGUAGE ?? 'EN').toUpperCase();
 
-  if (!measureUrl || !componentUrl) return { ok: true, count: 0 };
+  if (!measureUrl || !componentUrl) {
+    throw new Error(
+      '[EU surcharges] remedy import missing TARIC measure/component URLs. Check task env configuration.'
+    );
+  }
 
   // Optional geo names for nicer notes
   let geoNames = new Map<string, string>();
@@ -83,7 +91,11 @@ export async function importEuTradeRemediesAsSurcharges(
     const code6 = toHs6(m.code10);
     return !hs6Allow.size || hs6Allow.has(code6);
   });
-  if (measures.size === 0) return { ok: true, count: 0 };
+  if (measures.size === 0) {
+    throw new Error(
+      '[EU surcharges] remedy import produced 0 measures. Check TARIC source availability and filters.'
+    );
+  }
 
   // Parse components; keep only ad-valorem
   const comps = await parseComponents(componentUrl, new Set(measures.keys()), adValoremExprIds);
@@ -124,7 +136,11 @@ export async function importEuTradeRemediesAsSurcharges(
     });
   }
 
-  if (!out.length) return { ok: true, count: 0 };
+  if (!out.length) {
+    throw new Error(
+      '[EU surcharges] remedy import produced 0 ad-valorem rows. Check component parsing and duty expressions.'
+    );
+  }
 
   const res = await importSurcharges(out);
   return { ok: true, count: res.count ?? out.length };
