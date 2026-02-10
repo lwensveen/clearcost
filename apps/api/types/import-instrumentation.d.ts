@@ -1,13 +1,27 @@
 import 'fastify';
 import type { ImportSource } from '../src/lib/provenance.js';
 
-export type ImportMeta = { importSource: ImportSource; job: string; source?: string };
+export type ImportMeta = {
+  importSource: ImportSource;
+  job: string;
+  source?: string;
+  sourceUrl?: string;
+  version?: string;
+};
+
+export type ImportRunPatch = {
+  sourceUrl?: string;
+  version?: string;
+  fileHash?: string | null;
+  fileBytes?: number | null;
+};
 
 export type ImportCtx = {
   meta: ImportMeta;
   runId: string;
   endTimer: () => void;
   lockKey?: string;
+  runPatch?: ImportRunPatch;
 };
 
 type UsageBag = { start: number; bytesIn: number; bytesOut: number };

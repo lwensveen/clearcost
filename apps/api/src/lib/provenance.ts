@@ -82,6 +82,8 @@ export async function finishImportRun(
     importStatus: 'succeeded' | 'failed';
     inserted?: number;
     updated?: number;
+    version?: string | null;
+    sourceUrl?: string | null;
     fileHash?: string | null;
     fileBytes?: number | null;
     error?: string | null;
@@ -93,6 +95,8 @@ export async function finishImportRun(
       importStatus: patch.importStatus,
       inserted: patch.inserted ?? undefined,
       updated: patch.updated ?? undefined,
+      version: patch.version ?? undefined,
+      sourceUrl: patch.sourceUrl ?? undefined,
       fileHash: patch.fileHash ?? undefined,
       fileBytes: patch.fileBytes ?? undefined,
       error: patch.error ?? undefined,

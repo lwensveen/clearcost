@@ -455,6 +455,36 @@ describe('import-instrumentation plugin (unit)', () => {
     await app.close();
   });
 
+  it('includes runPatch artifact fields when finishing a successful import', async () => {
+    const plugin = await loadPlugin();
+    const app = Fastify();
+    await app.register(plugin);
+    app.get(
+      '/artifact',
+      { config: { importMeta: { importSource: 'WITS', job: 'seed' } } },
+      async (req, reply) => {
+        req.importCtx!.runPatch = {
+          ...req.importCtx!.runPatch,
+          sourceUrl: 'https://example.test/data.json',
+          fileHash: 'abc123',
+          fileBytes: 42,
+        };
+        return reply.type('application/json').send({ inserted: 1 });
+      }
+    );
+
+    const r = await app.inject({ method: 'GET', url: '/artifact' });
+    expect(r.statusCode).toBe(200);
+    expect(finishImportRun).toHaveBeenCalledWith('run-1', {
+      importStatus: 'succeeded',
+      inserted: 1,
+      sourceUrl: 'https://example.test/data.json',
+      fileHash: 'abc123',
+      fileBytes: 42,
+    });
+    await app.close();
+  });
+
   it('ignores invalid JSON body safely (inserted defaults to 0)', async () => {
     const plugin = await loadPlugin();
     const app = Fastify();

@@ -23,6 +23,13 @@ type ImportMetaConfig = {
   version?: string;
 };
 
+type ImportRunPatch = {
+  sourceUrl?: string;
+  version?: string;
+  fileHash?: string | null;
+  fileBytes?: number | null;
+};
+
 function firstNonEmptyString(...values: unknown[]): string | undefined {
   for (const value of values) {
     if (typeof value !== 'string') continue;
@@ -56,6 +63,19 @@ function resolveVersion(meta: ImportMetaConfig, req: any): string | undefined {
   return firstNonEmptyString(meta.version, q?.version, b?.version);
 }
 
+function mergeRunPatch<T extends Record<string, unknown>>(
+  base: T,
+  patch: ImportRunPatch | undefined
+): T & ImportRunPatch {
+  if (!patch) return base as T & ImportRunPatch;
+  const out = { ...base } as T & ImportRunPatch;
+  if (patch.sourceUrl !== undefined) out.sourceUrl = patch.sourceUrl;
+  if (patch.version !== undefined) out.version = patch.version;
+  if (patch.fileHash !== undefined) out.fileHash = patch.fileHash;
+  if (patch.fileBytes !== undefined) out.fileBytes = patch.fileBytes;
+  return out;
+}
+
 const plugin: FastifyPluginAsync = async (app) => {
   app.decorateRequest('importCtx', undefined);
 
@@ -78,13 +98,15 @@ const plugin: FastifyPluginAsync = async (app) => {
 
     // 3) start metrics + provenance
     const end = startImportTimer(meta);
+    const sourceUrl = resolveSourceUrl(meta, req);
+    const version = resolveVersion(meta, req);
     let run: { id: string };
     try {
       run = await startImportRun({
         importSource: meta.importSource,
         job: meta.job,
-        version: resolveVersion(meta, req),
-        sourceUrl: resolveSourceUrl(meta, req),
+        version,
+        sourceUrl,
         params: {
           query: req.query ?? null,
           body: req.body ?? null,
@@ -104,7 +126,16 @@ const plugin: FastifyPluginAsync = async (app) => {
     hb.unref?.();
 
     req._importHeartbeat = hb;
-    req.importCtx = { meta, runId: run.id, endTimer: end, lockKey };
+    req.importCtx = {
+      meta,
+      runId: run.id,
+      endTimer: end,
+      lockKey,
+      runPatch: {
+        sourceUrl,
+        version,
+      },
+    };
   });
 
   function stopHeartbeat(req: any) {
@@ -138,13 +169,29 @@ const plugin: FastifyPluginAsync = async (app) => {
       if (ok) {
         importRowsInserted.inc(ctx.meta, inserted);
         setLastRunNow(ctx.meta);
-        await finishImportRun(ctx.runId, { importStatus: 'succeeded', inserted, updated });
+        await finishImportRun(
+          ctx.runId,
+          mergeRunPatch(
+            {
+              importStatus: 'succeeded',
+              inserted,
+              updated,
+            },
+            ctx.runPatch
+          )
+        );
       } else {
         importErrors.inc({ ...ctx.meta, stage: 'response' });
-        await finishImportRun(ctx.runId, {
-          importStatus: 'failed',
-          error: `HTTP ${reply.statusCode}`,
-        });
+        await finishImportRun(
+          ctx.runId,
+          mergeRunPatch(
+            {
+              importStatus: 'failed',
+              error: `HTTP ${reply.statusCode}`,
+            },
+            ctx.runPatch
+          )
+        );
       }
     } finally {
       ctx.endTimer();
@@ -158,10 +205,16 @@ const plugin: FastifyPluginAsync = async (app) => {
     const ctx = req.importCtx;
     if (!ctx) return;
     importErrors.inc({ ...ctx.meta, stage: 'error' });
-    await finishImportRun(ctx.runId, {
-      importStatus: 'failed',
-      error: String(err?.message ?? err),
-    });
+    await finishImportRun(
+      ctx.runId,
+      mergeRunPatch(
+        {
+          importStatus: 'failed',
+          error: String(err?.message ?? err),
+        },
+        ctx.runPatch
+      )
+    );
     ctx.endTimer();
     stopHeartbeat(req);
     if (ctx.lockKey) await releaseRunLock(ctx.lockKey);

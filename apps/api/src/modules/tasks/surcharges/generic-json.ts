@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { fetchJSON } from '../common.js';
+import { fetchJSONWithArtifact } from '../common.js';
 import { SurchargeInsert, TasksSurchargeGenericJsonBodySchema } from '@clearcost/types';
 import { batchUpsertSurchargesFromStream } from '../../surcharges/utils/batch-upsert.js';
 
@@ -15,7 +15,16 @@ export default function surchargeJsonRoute(app: FastifyInstance) {
     },
     async (req, reply) => {
       const { path = 'surcharges/surcharges.json' } = Body.parse(req.body ?? {});
-      const rows = await fetchJSON<SurchargeInsert[]>(path);
+      const artifact = await fetchJSONWithArtifact<SurchargeInsert[]>(path);
+      if (req.importCtx) {
+        req.importCtx.runPatch = {
+          ...req.importCtx.runPatch,
+          sourceUrl: artifact.sourceUrl,
+          fileHash: artifact.fileHash,
+          fileBytes: artifact.fileBytes,
+        };
+      }
+      const rows = artifact.data;
 
       const res = await batchUpsertSurchargesFromStream(rows, {
         importId: req.importCtx?.runId,

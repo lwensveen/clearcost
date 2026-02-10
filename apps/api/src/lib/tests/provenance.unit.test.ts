@@ -144,6 +144,8 @@ describe('provenance helpers', () => {
       importStatus: 'succeeded',
       inserted: 3,
       updated: 0,
+      version: 'v1',
+      sourceUrl: 'https://example.test/source.json',
       fileHash: 'abc123',
       fileBytes: 456,
       error: null,
@@ -155,6 +157,8 @@ describe('provenance helpers', () => {
       importStatus: 'succeeded',
       inserted: 3,
       updated: 0,
+      version: 'v1',
+      sourceUrl: 'https://example.test/source.json',
       fileHash: 'abc123',
       fileBytes: 456,
       error: null,
@@ -169,6 +173,8 @@ describe('provenance helpers', () => {
     expect(set.importStatus).toBe('succeeded');
     expect(set.inserted).toBe(3);
     expect(set.updated).toBe(0);
+    expect(set.version).toBe('v1');
+    expect(set.sourceUrl).toBe('https://example.test/source.json');
     expect(set.fileHash).toBe('abc123');
     expect(set.fileBytes).toBe(456);
 
@@ -192,6 +198,8 @@ describe('provenance helpers', () => {
     const set = state.lastUpdate!.set;
     expect(set.inserted).toBeUndefined();
     expect(set.updated).toBeUndefined();
+    expect(set.version).toBeUndefined();
+    expect(set.sourceUrl).toBeUndefined();
     expect(set.fileHash).toBeUndefined();
     expect(set.fileBytes).toBeUndefined();
     expect(set.error).toBeUndefined();
