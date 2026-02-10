@@ -9,6 +9,16 @@ export type JsonArtifact<T> = {
   fileBytes: number;
 };
 
+export function assertNonEmptyImportRows(
+  rows: { length: number },
+  opts: { job: string; sourceUrl?: string; detail?: string }
+): void {
+  if (rows.length > 0) return;
+  const src = opts.sourceUrl ? ` from ${opts.sourceUrl}` : '';
+  const detail = opts.detail ? ` (${opts.detail})` : '';
+  throw new Error(`[${opts.job}] source produced 0 rows${src}${detail}`);
+}
+
 function resolveRemoteUrl(path: string): string {
   const base = (process.env.DATA_REMOTE_BASE ?? '').replace(/\/+$/, '');
   return path.startsWith('http') ? path : `${base}/${path.replace(/^\/+/, '')}`;

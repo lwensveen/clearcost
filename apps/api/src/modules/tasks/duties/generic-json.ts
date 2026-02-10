@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { DutyRateInsert, TasksDutyJsonImportResponseSchema } from '@clearcost/types';
-import { fetchJSONWithArtifact } from '../common.js';
+import { assertNonEmptyImportRows, fetchJSONWithArtifact } from '../common.js';
 import { importDutyRates } from '../../duty-rates/services/import-duty-rates.js';
 
 export default function dutyJsonRoute(app: FastifyInstance) {
@@ -27,6 +27,10 @@ export default function dutyJsonRoute(app: FastifyInstance) {
         };
       }
       const rows = artifact.data;
+      assertNonEmptyImportRows(rows, {
+        job: 'duties:json',
+        sourceUrl: artifact.sourceUrl,
+      });
 
       const mapped: DutyRateInsert[] = rows
         .map((r) => ({

@@ -45,6 +45,11 @@ export async function importUsPreferential({
       );
     }
   }
+  if (rows.length === 0) {
+    throw new Error(
+      '[US Duties] FTA produced 0 rows. Check HTS source, special-rate parse, and SPI membership mapping.'
+    );
+  }
 
   const res = await batchUpsertDutyRatesFromStream(rows, {
     batchSize: 5000,

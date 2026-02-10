@@ -168,8 +168,9 @@ export async function importAphisAqiSurcharges(
   push('AQI_BARGE', fees.barge, 'OCEAN', 'BARGE', 'APHIS AQI Barge user fee (per barge)');
 
   if (!rows.length) {
-    if (DEBUG) console.warn('[APHIS] No rows parsed – skipping upsert');
-    return { ok: true as const, count: 0 };
+    throw new Error(
+      '[APHIS AQI] produced 0 rows. Check APHIS source availability and scraping patterns.'
+    );
   }
 
   const ret = await batchUpsertSurchargesFromStream(rows, {

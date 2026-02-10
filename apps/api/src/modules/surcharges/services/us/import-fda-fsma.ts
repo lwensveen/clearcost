@@ -187,8 +187,9 @@ export async function importFdaFsmaSurcharges(
   }
 
   if (!rows.length) {
-    if (DEBUG) console.warn('[FDA] No rows parsed – skipping upsert');
-    return { ok: true as const, count: 0 };
+    throw new Error(
+      '[FDA FSMA] produced 0 rows. Check FDA/Federal Register source availability and scraping patterns.'
+    );
   }
 
   const ret = await batchUpsertSurchargesFromStream(rows, {

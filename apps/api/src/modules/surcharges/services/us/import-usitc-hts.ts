@@ -161,7 +161,11 @@ export async function importUsTradeRemediesFromHTS(
     });
   }
 
-  if (!out.length) return { ok: true as const, inserted: 0, updated: 0, count: 0 };
+  if (!out.length) {
+    throw new Error(
+      '[USITC surcharges] produced 0 rows. Check HTS source availability and parser compatibility.'
+    );
+  }
 
   const res = await batchUpsertSurchargesFromStream(out, {
     batchSize: opts.batchSize ?? 5000,

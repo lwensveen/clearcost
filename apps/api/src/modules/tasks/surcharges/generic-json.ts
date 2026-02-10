@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { fetchJSONWithArtifact } from '../common.js';
+import { assertNonEmptyImportRows, fetchJSONWithArtifact } from '../common.js';
 import { SurchargeInsert, TasksSurchargeGenericJsonBodySchema } from '@clearcost/types';
 import { batchUpsertSurchargesFromStream } from '../../surcharges/utils/batch-upsert.js';
 
@@ -25,6 +25,10 @@ export default function surchargeJsonRoute(app: FastifyInstance) {
         };
       }
       const rows = artifact.data;
+      assertNonEmptyImportRows(rows, {
+        job: 'surcharges:json',
+        sourceUrl: artifact.sourceUrl,
+      });
 
       const res = await batchUpsertSurchargesFromStream(rows, {
         importId: req.importCtx?.runId,

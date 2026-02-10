@@ -81,7 +81,7 @@ export async function importDutyRatesFromWITS(params: ImportFromWitsParams) {
           year: targetYear,
           backfillYears: p.backfillYears,
           hs6List: p.hs6List,
-        }).catch(() => [] as DutyRateInsert[]),
+        }),
     });
 
     // Preferential (if partners provided)
@@ -96,7 +96,7 @@ export async function importDutyRatesFromWITS(params: ImportFromWitsParams) {
             year: targetYear,
             backfillYears: p.backfillYears,
             hs6List: p.hs6List,
-          }).catch(() => [] as DutyRateInsert[]),
+          }),
       });
     }
   }
@@ -104,6 +104,8 @@ export async function importDutyRatesFromWITS(params: ImportFromWitsParams) {
   if (jobs.length === 0) return { ok: true as const, inserted: 0 };
 
   let nextIndex = 0;
+  let fetchedRows = 0;
+  const failedJobs: { tag: string; error: string }[] = [];
 
   async function worker(): Promise<number> {
     let localInserted = 0;
@@ -111,19 +113,23 @@ export async function importDutyRatesFromWITS(params: ImportFromWitsParams) {
       const i = nextIndex++;
       const job = jobs[i];
       if (!job) break;
+      const tag = job.ctx.partner ? `${job.ctx.dest}-${job.ctx.partner}` : job.ctx.dest;
 
       let rows: DutyRateInsert[] = [];
       try {
         rows = await job.run();
-      } catch {
-        rows = [];
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        failedJobs.push({ tag, error: message });
+        if (DEBUG) console.warn(`[wits] job ${tag} ${job.ctx.year} failed: ${message}`);
+        continue;
       }
 
       if (DEBUG) {
-        const tag = job.ctx.partner ? `${job.ctx.dest}-${job.ctx.partner}` : job.ctx.dest;
         console.log(`[wits] job ${tag} ${job.ctx.year} -> rows=${rows.length}`);
       }
 
+      fetchedRows += rows.length;
       if (rows.length) {
         const res = await batchUpsertDutyRatesFromStream(rows, {
           batchSize: p.batchSize,
@@ -139,5 +145,24 @@ export async function importDutyRatesFromWITS(params: ImportFromWitsParams) {
 
   const workers = Array.from({ length: p.concurrency }, () => worker());
   const counts = await Promise.all(workers);
-  return { ok: true as const, inserted: counts.reduce((a, b) => a + b, 0) };
+  if (fetchedRows === 0) {
+    const failedSummary =
+      failedJobs.length > 0
+        ? ` Failed jobs: ${failedJobs
+            .slice(0, 3)
+            .map((f) => `${f.tag} (${f.error})`)
+            .join('; ')}`
+        : '';
+    throw new Error(
+      `[wits] source produced 0 rows across ${jobs.length} jobs for ${targetYear}.${failedSummary}`
+    );
+  }
+
+  return {
+    ok: true as const,
+    inserted: counts.reduce((a, b) => a + b, 0),
+    fetchedRows,
+    failedJobs: failedJobs.length,
+    totalJobs: jobs.length,
+  };
 }

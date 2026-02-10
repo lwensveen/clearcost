@@ -23,6 +23,11 @@ export async function importUsMfn({
       sample: rows.slice(0, 3),
     });
   }
+  if (rows.length === 0) {
+    throw new Error(
+      '[US Duties] MFN produced 0 rows. Check HTS source availability and parser compatibility.'
+    );
+  }
 
   const res = await batchUpsertDutyRatesFromStream(rows, {
     batchSize: 5000,
