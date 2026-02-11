@@ -105,7 +105,7 @@ beforeEach(() => {
     meta: { missingRate: false },
   }));
   mocks.getFreightWithMetaMock.mockResolvedValue({
-    value: { price: 20 },
+    value: { price: 20, currency: 'USD' },
     meta: { status: 'ok' },
   });
   mocks.getActiveDutyRateWithMetaMock.mockResolvedValue({
@@ -335,7 +335,6 @@ describe('quoteLandedCost', () => {
   it('uses mapped destination currency codes for FX conversion and quote totals', async () => {
     mockMerchantContext(undefined, []);
     const fxAsOf = new Date('2025-01-01T00:00:00.000Z');
-    const baseCurrency = (process.env.CURRENCY_BASE ?? 'USD').toUpperCase();
 
     mocks.convertCurrencyWithMetaMock
       .mockResolvedValueOnce({ amount: 18, meta: { missingRate: false, error: null } }) // freight: USD->EUR
@@ -346,7 +345,7 @@ describe('quoteLandedCost', () => {
 
     expect(out.quote.currency).toBe('EUR');
     expect(out.quote.total).toBe(143.24);
-    expect(mocks.convertCurrencyWithMetaMock).toHaveBeenNthCalledWith(1, 20, baseCurrency, 'EUR', {
+    expect(mocks.convertCurrencyWithMetaMock).toHaveBeenNthCalledWith(1, 20, 'USD', 'EUR', {
       on: fxAsOf,
       strict: true,
     });
@@ -887,9 +886,37 @@ describe('quoteLandedCost', () => {
     });
   });
 
+  it('fails clearly when matched freight row is missing currency code', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.getFreightWithMetaMock.mockResolvedValue({
+      value: { price: 20 },
+      meta: { status: 'ok' },
+    });
+
+    await expect(quoteLandedCost(baseInput)).rejects.toMatchObject({
+      statusCode: 500,
+      code: 'FREIGHT_CURRENCY_MISSING',
+    });
+    expect(mocks.convertCurrencyWithMetaMock).not.toHaveBeenCalled();
+  });
+
+  it('fails clearly when matched freight row currency code is invalid', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.getFreightWithMetaMock.mockResolvedValue({
+      value: { price: 20, currency: 'US' },
+      meta: { status: 'ok' },
+    });
+
+    await expect(quoteLandedCost(baseInput)).rejects.toMatchObject({
+      statusCode: 500,
+      code: 'FREIGHT_CURRENCY_INVALID',
+    });
+    expect(mocks.convertCurrencyWithMetaMock).not.toHaveBeenCalled();
+  });
+
   it('supports merchant-less flow and sea mode chargeable calculation', async () => {
     mocks.getFreightWithMetaMock.mockResolvedValue({
-      value: { price: 15 },
+      value: { price: 15, currency: 'USD' },
       meta: { status: 'ok' },
     });
     const out = await quoteLandedCost({
@@ -1124,7 +1151,7 @@ describe('quoteLandedCost', () => {
         meta: { status: surcharges, dataset: null, effectiveFrom: null },
       });
       mocks.getFreightWithMetaMock.mockResolvedValue({
-        value: freight === 'ok' ? { price: 20 } : null,
+        value: freight === 'ok' ? { price: 20, currency: 'USD' } : null,
         meta: { status: freight },
       });
       mocks.convertCurrencyWithMetaMock.mockImplementation(

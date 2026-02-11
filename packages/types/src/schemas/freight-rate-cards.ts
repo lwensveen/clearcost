@@ -26,6 +26,11 @@ export const FreightRateCardsListQuerySchema = z.object({
 
 export const FreightModeSchema = z.enum(['air', 'sea']);
 export const FreightUnitSchema = z.enum(['kg', 'm3']);
+const FreightCurrencySchema = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(/^[A-Z]{3}$/, 'Expected ISO-4217 currency code');
 const FreightLaneCountryCodeSchema = z
   .string()
   .trim()
@@ -37,6 +42,7 @@ const FreightCardAdminBaseSchema = z.object({
   dest: z.string().length(3),
   freightMode: FreightModeSchema,
   freightUnit: FreightUnitSchema,
+  currency: FreightCurrencySchema,
   carrier: z.string().min(1).optional().nullable(),
   service: z.string().min(1).optional().nullable(),
   notes: z.string().optional().nullable(),
@@ -110,7 +116,7 @@ export const FreightCardImportSchema = z.object({
   dest: FreightLaneCountryCodeSchema,
   freightMode: FreightModeSchema,
   freightUnit: FreightUnitSchema,
-  currency: z.string().length(3).default('USD'),
+  currency: FreightCurrencySchema,
   effectiveFrom: z.coerce.date(),
   effectiveTo: z.coerce.date().optional().nullable(),
   minCharge: z.coerce.number().optional(),

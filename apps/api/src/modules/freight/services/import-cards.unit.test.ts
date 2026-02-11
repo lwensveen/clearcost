@@ -57,6 +57,34 @@ describe('importFreightCards', () => {
     expect(mocks.transactionMock).not.toHaveBeenCalled();
   });
 
+  it('fails clearly when a freight card currency code is invalid', async () => {
+    await expect(
+      importFreightCards([
+        {
+          ...baseCard,
+          currency: 'US1',
+        },
+      ])
+    ).rejects.toThrow(/ISO-4217 currency code/i);
+
+    expect(mocks.selectDistinctMock).not.toHaveBeenCalled();
+    expect(mocks.transactionMock).not.toHaveBeenCalled();
+  });
+
+  it('fails clearly when a freight card currency is missing', async () => {
+    await expect(
+      importFreightCards([
+        {
+          ...baseCard,
+          currency: undefined,
+        } as unknown as typeof baseCard,
+      ])
+    ).rejects.toThrow(/currency/i);
+
+    expect(mocks.selectDistinctMock).not.toHaveBeenCalled();
+    expect(mocks.transactionMock).not.toHaveBeenCalled();
+  });
+
   it('fails when strict coverage guardrails detect a major lane coverage drop', async () => {
     mockDistinctRows([
       { origin: 'CHN', dest: 'DEU', freightMode: 'air', freightUnit: 'kg' },

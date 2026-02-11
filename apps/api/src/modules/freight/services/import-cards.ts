@@ -15,6 +15,20 @@ type ImportOpts = {
 const ymd = (d?: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 const DEFAULT_MIN_COVERAGE_RETENTION = 0.5;
 
+function requireFreightCurrencyCode(code: string, lane: string): string {
+  const normalized = String(code ?? '')
+    .trim()
+    .toUpperCase();
+  if (/^[A-Z]{3}$/.test(normalized)) return normalized;
+  throw Object.assign(
+    new Error(`Invalid freight currency code "${String(code ?? '')}" for lane ${lane}`),
+    {
+      statusCode: 400,
+      code: 'FREIGHT_CURRENCY_INVALID',
+    }
+  );
+}
+
 type CoverageSnapshot = {
   laneCount: number;
   destinationCount: number;
@@ -100,7 +114,10 @@ export async function importFreightCards(cards: FreightCardImport[], opts: Impor
     // Canonicalize lane codes to ISO3 so quote lookups are deterministic.
     origin: requireFreightIso3(card.origin, 'origin'),
     dest: requireFreightIso3(card.dest, 'dest'),
-    currency: (card.currency ?? 'USD').toUpperCase(),
+    currency: requireFreightCurrencyCode(
+      card.currency,
+      `${card.origin}->${card.dest}:${card.freightMode}/${card.freightUnit}`
+    ),
   }));
   const incomingCoverage = summarizeCoverage(items);
   if (incomingCoverage.laneCount <= 0) {

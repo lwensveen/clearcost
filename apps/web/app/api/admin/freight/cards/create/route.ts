@@ -15,6 +15,7 @@ export async function POST(req: Request) {
       dest: String(fd.get('dest') ?? ''),
       freightMode: String(fd.get('mode') ?? 'air') as 'air' | 'sea',
       freightUnit: String(fd.get('unit') ?? 'kg') as 'kg' | 'm3',
+      currency: String(fd.get('currency') ?? '').toUpperCase(),
       carrier: fd.get('carrier') ? String(fd.get('carrier')) : null,
       service: fd.get('service') ? String(fd.get('service')) : null,
       notes: fd.get('notes') ? String(fd.get('notes')) : null,

@@ -36,6 +36,10 @@ export default function NewCard() {
               </select>
             </div>
             <div className="space-y-2">
+              <Label>Currency (ISO-4217)</Label>
+              <Input name="currency" required defaultValue="USD" placeholder="USD" />
+            </div>
+            <div className="space-y-2">
               <Label>Carrier</Label>
               <Input name="carrier" />
             </div>

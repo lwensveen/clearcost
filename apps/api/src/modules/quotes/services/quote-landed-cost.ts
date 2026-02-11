@@ -23,7 +23,6 @@ import { toQuoteSourceMetadata } from './source-metadata.js';
 import { getDatasetFreshnessSnapshot } from '../../health/services.js';
 
 type Unit = 'kg' | 'm3';
-const BASE_CCY = process.env.CURRENCY_BASE ?? 'USD';
 
 countries.registerLocale(en);
 
@@ -54,8 +53,17 @@ function resolveFreightSourceCurrency(rawCurrency: string | null | undefined): s
   const normalized = String(rawCurrency ?? '')
     .trim()
     .toUpperCase();
+  if (!normalized) {
+    throw Object.assign(new Error('Missing freight currency code on matched freight card'), {
+      statusCode: 500,
+      code: 'FREIGHT_CURRENCY_MISSING',
+    });
+  }
   if (/^[A-Z]{3}$/.test(normalized)) return normalized;
-  return BASE_CCY;
+  throw Object.assign(new Error(`Invalid freight currency code "${normalized}"`), {
+    statusCode: 500,
+    code: 'FREIGHT_CURRENCY_INVALID',
+  });
 }
 
 function toDutyPartnerIso2(countryCode: string): string {
@@ -440,15 +448,19 @@ export async function quoteLandedCost(
 
   let freightInDest = opts?.freightInDestOverride ?? 0;
   if (opts?.freightInDestOverride == null) {
-    const freightSourceCurrency = resolveFreightSourceCurrency(freightRow?.currency);
-    const freightFx = await convertCurrencyWithMeta(
-      freightRow?.price ?? 0,
-      freightSourceCurrency,
-      destCurrency,
-      { on: fxAsOf, strict: true }
-    );
-    freightInDest = freightFx.amount;
-    fxMissingRate ||= freightFx.meta.missingRate;
+    if (freightRow) {
+      const freightSourceCurrency = resolveFreightSourceCurrency(freightRow.currency);
+      const freightFx = await convertCurrencyWithMeta(
+        freightRow.price ?? 0,
+        freightSourceCurrency,
+        destCurrency,
+        { on: fxAsOf, strict: true }
+      );
+      freightInDest = freightFx.amount;
+      fxMissingRate ||= freightFx.meta.missingRate;
+    } else {
+      freightInDest = 0;
+    }
   }
 
   const itemDestFx = await convertCurrencyWithMeta(
