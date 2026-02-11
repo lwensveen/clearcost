@@ -17,6 +17,26 @@ const numStr = (v: unknown) => {
   const n = typeof v === 'number' ? v : Number(v);
   return Number.isFinite(n) ? String(n) : null;
 };
+const hasNumeric = (v: unknown) => {
+  if (v == null || v === '') return false;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n);
+};
+function parseCurrency(raw: string | null | undefined, rowLabel: string, required: boolean) {
+  const ccy = up2(raw);
+  if (!ccy) {
+    if (required) {
+      throw new Error(
+        `[Surcharge LLM import] Currency is required for monetary surcharge row ${rowLabel}.`
+      );
+    }
+    return undefined;
+  }
+  if (!/^[A-Z]{3}$/.test(ccy)) {
+    throw new Error(`[Surcharge LLM import] Invalid currency code "${ccy}" at ${rowLabel}.`);
+  }
+  return ccy;
+}
 
 function coerceTransportMode(v?: string | null): SurchargeInsert['transportMode'] {
   const t = String(v || 'ALL').toUpperCase();
@@ -32,7 +52,10 @@ function coerceApplyLevel(v?: string | null): SurchargeInsert['applyLevel'] {
 }
 function coerceRateType(v?: string | null): SurchargeInsert['rateType'] {
   const t = String(v || 'ad_valorem').toLowerCase();
-  if (t === 'ad_valorem' || t === 'fixed' || t === 'unit') return t as SurchargeInsert['rateType'];
+  if (t === 'ad_valorem' || t === 'fixed' || t === 'per_unit') {
+    return t as SurchargeInsert['rateType'];
+  }
+  if (t === 'unit') return 'per_unit';
   return 'ad_valorem';
 }
 function coerceValueBasis(v?: string | null): SurchargeInsert['valueBasis'] {
@@ -87,18 +110,28 @@ export async function importSurchargesFromLLM(
   const srcByKey = new Map<string, string | undefined>();
 
   for (const r of rows) {
+    const rateType = coerceRateType(r.rate_type);
+    const rowLabel = `dest=${up2(r.country_code) ?? String(r.country_code)}:code=${String(r.surcharge_code)}:rateType=${String(rateType)}`;
+    const requiresCurrency =
+      rateType === 'fixed' ||
+      rateType === 'per_unit' ||
+      hasNumeric(r.fixed_amount) ||
+      hasNumeric(r.min_amount) ||
+      hasNumeric(r.max_amount) ||
+      hasNumeric(r.unit_amount);
+    const currency = parseCurrency(r.currency ?? null, rowLabel, requiresCurrency);
     const v: SurchargeInsert = {
       dest: up2(r.country_code)!,
       origin: up2(r.origin_code ?? null) ?? null,
       hs6: onlyHs6(r.hs6 ?? null),
 
       surchargeCode: coerceSurchargeCode(r.surcharge_code),
-      rateType: coerceRateType(r.rate_type),
+      rateType,
       applyLevel: coerceApplyLevel(r.apply_level),
       valueBasis: coerceValueBasis(r.value_basis),
       transportMode: coerceTransportMode(r.transport_mode),
 
-      currency: up2(r.currency ?? null) ?? 'USD',
+      currency,
       // map correct LLM field names → DB numeric strings
       fixedAmt: numStr(r.fixed_amount) ?? null,
       pctAmt: numStr(r.pct_decimal) ?? null, // 0..1 decimal

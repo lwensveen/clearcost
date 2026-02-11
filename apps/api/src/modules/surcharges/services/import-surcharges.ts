@@ -10,6 +10,30 @@ function normHs6(v?: string | null) {
   const s = String(v).replace(/\D+/g, '').slice(0, 6);
   return s.length === 6 ? s : null;
 }
+function hasNumeric(v?: string | number | null) {
+  if (v == null || v === '') return false;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n);
+}
+function parseCurrency(
+  raw: string | null | undefined,
+  rowLabel: string,
+  required: boolean
+): string | undefined {
+  const ccy = raw?.trim().toUpperCase();
+  if (!ccy) {
+    if (required) {
+      throw new Error(
+        `[Surcharge import] Currency is required for monetary surcharge row ${rowLabel}.`
+      );
+    }
+    return undefined;
+  }
+  if (!/^[A-Z]{3}$/.test(ccy)) {
+    throw new Error(`[Surcharge import] Invalid currency code "${ccy}" at ${rowLabel}.`);
+  }
+  return ccy;
+}
 function toDbNumeric(n?: string | number | null) {
   if (n == null || n === '') return undefined; // omit ⇒ DB default/NULL
   const num = typeof n === 'number' ? n : Number(n);
@@ -29,17 +53,27 @@ export async function importSurcharges(rows: SurchargeInsert[]) {
       const parsed = SurchargeInsertSchema.safeParse(raw);
       if (!parsed.success) return null;
       const r = parsed.data;
+      const rateType = r.rateType ?? 'ad_valorem';
+      const rowLabel = `dest=${normIso2(r.dest) ?? String(r.dest)}:code=${String(r.surchargeCode)}:rateType=${rateType}`;
+      const requiresCurrency =
+        rateType === 'fixed' ||
+        rateType === 'per_unit' ||
+        hasNumeric(r.fixedAmt) ||
+        hasNumeric(r.minAmt) ||
+        hasNumeric(r.maxAmt) ||
+        hasNumeric(r.unitAmt);
+      const currency = parseCurrency(r.currency ?? null, rowLabel, requiresCurrency);
 
       return {
         dest: normIso2(r.dest)!,
         origin: normIso2(r.origin ?? null),
         hs6: normHs6(r.hs6 ?? null),
         surchargeCode: r.surchargeCode, // enum
-        rateType: r.rateType ?? 'ad_valorem',
+        rateType,
         applyLevel: r.applyLevel ?? 'entry',
         valueBasis: r.valueBasis ?? 'customs',
         transportMode: r.transportMode ?? 'ALL',
-        currency: r.currency ?? 'USD',
+        currency,
         fixedAmt: toDbNumeric(r.fixedAmt),
         pctAmt: toDbNumeric(r.pctAmt),
         minAmt: toDbNumeric(r.minAmt),

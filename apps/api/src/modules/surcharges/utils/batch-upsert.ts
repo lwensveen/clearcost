@@ -29,6 +29,26 @@ const toDbText = (s?: string | null) => (s && s.trim() ? s.trim() : sql`NULL`);
 const toDbFrom = (d?: Date | null) => (d instanceof Date ? d : undefined);
 /** Always open-ended unless you explicitly pass a Date */
 const toDbTo = (d?: Date | null) => (d instanceof Date ? d : sql`NULL`);
+const hasNumeric = (v?: string | number | null) => {
+  if (v == null || v === '') return false;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n);
+};
+function parseCurrency(s: string | null | undefined, rowLabel: string, required: boolean) {
+  const raw = String(s ?? '')
+    .trim()
+    .toUpperCase();
+  if (raw.length === 0) {
+    if (required) {
+      throw new Error(`[Surcharges] Currency is required for monetary surcharge row ${rowLabel}.`);
+    }
+    return undefined;
+  }
+  if (!/^[A-Z]{3}$/.test(raw)) {
+    throw new Error(`[Surcharges] Invalid currency code "${raw}" at ${rowLabel}.`);
+  }
+  return raw;
+}
 
 function isoOrNull(d: Date | string | null | undefined): string | null {
   if (!d) return null;
@@ -46,7 +66,6 @@ const dfltValueBasis = (s?: string | null) =>
   (low(s) ?? 'customs') as SurchargeInsertRow['valueBasis'];
 const dfltTransport = (s?: string | null) =>
   (up(s) ?? 'ALL') as SurchargeInsertRow['transportMode'];
-const dfltCurrency = (s?: string | null) => (up(s) ?? 'USD') as SurchargeInsertRow['currency'];
 
 // -------------------------------------------------
 /**
@@ -72,31 +91,43 @@ export async function batchUpsertSurchargesFromStream(
     if (buf.length === 0) return;
 
     // Normalize rows → DB insert shape (no empty strings for numerics/dates).
-    const values = buf.map((r) => ({
-      dest: up(r.dest)!, // required ISO2 -> UPPER
-      origin: up(r.origin ?? null), // optional ISO2 -> UPPER
-      hs6: hs6(r.hs6 ?? null),
-      surchargeCode: r.surchargeCode, // enum already
-      // enums with lowercase labels in DB
-      rateType: dfltRateType(r.rateType),
-      applyLevel: dfltApplyLevel(r.applyLevel),
-      valueBasis: dfltValueBasis(r.valueBasis),
-      // enum with uppercase labels in DB
-      transportMode: dfltTransport(r.transportMode),
-      // 3-letter currency -> UPPER
-      currency: dfltCurrency(r.currency),
-      fixedAmt: toDbNumeric(r.fixedAmt),
-      pctAmt: toDbNumeric(r.pctAmt),
-      minAmt: toDbNumeric(r.minAmt),
-      maxAmt: toDbNumeric(r.maxAmt),
-      unitAmt: toDbNumeric(r.unitAmt),
-      unitCode: up(r.unitCode ?? null),
-      sourceUrl: toDbText(r.sourceUrl ?? null),
-      sourceRef: toDbText(r.sourceRef ?? null),
-      notes: toDbNotes(r.notes),
-      effectiveFrom: toDbFrom(r.effectiveFrom),
-      effectiveTo: toDbTo(r.effectiveTo),
-    })) as Array<(typeof surchargesTable)['$inferInsert']>;
+    const values = buf.map((r) => {
+      const rateType = dfltRateType(r.rateType);
+      const rowLabel = `dest=${up(r.dest) ?? String(r.dest)}:code=${String(r.surchargeCode)}:rateType=${String(rateType)}`;
+      const requiresCurrency =
+        rateType === 'fixed' ||
+        rateType === 'per_unit' ||
+        hasNumeric(r.fixedAmt) ||
+        hasNumeric(r.minAmt) ||
+        hasNumeric(r.maxAmt) ||
+        hasNumeric(r.unitAmt);
+      const currency = parseCurrency(r.currency ?? null, rowLabel, requiresCurrency);
+
+      return {
+        dest: up(r.dest)!, // required ISO2 -> UPPER
+        origin: up(r.origin ?? null), // optional ISO2 -> UPPER
+        hs6: hs6(r.hs6 ?? null),
+        surchargeCode: r.surchargeCode, // enum already
+        // enums with lowercase labels in DB
+        rateType,
+        applyLevel: dfltApplyLevel(r.applyLevel),
+        valueBasis: dfltValueBasis(r.valueBasis),
+        // enum with uppercase labels in DB
+        transportMode: dfltTransport(r.transportMode),
+        currency,
+        fixedAmt: toDbNumeric(r.fixedAmt),
+        pctAmt: toDbNumeric(r.pctAmt),
+        minAmt: toDbNumeric(r.minAmt),
+        maxAmt: toDbNumeric(r.maxAmt),
+        unitAmt: toDbNumeric(r.unitAmt),
+        unitCode: up(r.unitCode ?? null),
+        sourceUrl: toDbText(r.sourceUrl ?? null),
+        sourceRef: toDbText(r.sourceRef ?? null),
+        notes: toDbNotes(r.notes),
+        effectiveFrom: toDbFrom(r.effectiveFrom),
+        effectiveTo: toDbTo(r.effectiveTo),
+      };
+    }) as Array<(typeof surchargesTable)['$inferInsert']>;
 
     const ret = await db
       .insert(surchargesTable)
