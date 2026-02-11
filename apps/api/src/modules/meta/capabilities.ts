@@ -1,4 +1,4 @@
-import { commands } from '../../lib/cron/registry.js';
+import { COMMAND_KEYS } from '../../lib/cron/command-keys.js';
 
 type DatasetKey =
   | 'duties'
@@ -103,7 +103,7 @@ function pickCommandKeys(dataset: DatasetKey, allCommandKeys: string[]): string[
 }
 
 export function getMetaCapabilitiesDocument() {
-  const commandKeys = Object.keys(commands);
+  const commandKeys = [...COMMAND_KEYS];
 
   const datasets: Record<
     DatasetKey,
