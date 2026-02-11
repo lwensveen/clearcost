@@ -56,6 +56,22 @@ NEXT_PUBLIC_API_BASE="http://localhost:4000"
 - `NEXT_PUBLIC_*` variables are exposed to the browser. Keep secrets (API keys) **without** that prefix and use them
   only in server files (route handlers / server actions).
 
+### Playground Proxy Setup
+
+To enable the MVP playground:
+
+```bash
+CLEARCOST_API_BASE_URL=http://localhost:3001
+CLEARCOST_DEMO_API_KEY=your-demo-api-key
+```
+
+The playground calls `/api/quote-proxy`, which forwards to `/v1/quotes` using the server-side API
+key.
+
+Use a dedicated demo key for `CLEARCOST_DEMO_API_KEY`, created with limited permissions in the API
+and marked as demo (for example `is_demo=true`). Do not reuse production integration keys for the
+public playground.
+
 ---
 
 ## Scripts

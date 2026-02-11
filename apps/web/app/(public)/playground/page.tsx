@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { QuoteResponse } from '@clearcost/types';
+import Link from 'next/link';
 
 const ORIGINS = ['US', 'NL'] as const;
 const DESTINATIONS = ['NL', 'DE'] as const;
@@ -32,9 +33,7 @@ const MVP_SCOPE_ERROR =
 const DATA_NOT_READY_ERROR = 'Required FX/VAT/duty data not available. Please try again later.';
 const ABOVE_DE_MINIMIS_ERROR = 'Declared value exceeds €150 de-minimis limit for this MVP.';
 const GENERIC_SERVER_ERROR = 'Something went wrong while generating the quote. Please try again.';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') ?? '';
-const QUOTE_URL = `${API_BASE}/v1/quotes`;
+const QUOTE_PROXY_URL = '/api/quote-proxy';
 
 function mapError(code: string | null, status: number, fallbackMessage: string): string {
   if (code === 'unsupported_lane_or_scope') return MVP_SCOPE_ERROR;
@@ -85,7 +84,7 @@ export default function PlaygroundPage() {
 
     setLoading(true);
     try {
-      const response = await fetch(QUOTE_URL, {
+      const response = await fetch(QUOTE_PROXY_URL, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -127,12 +126,12 @@ export default function PlaygroundPage() {
       }
 
       if (!body || typeof body !== 'object') {
-        setServerError('Unexpected response from /v1/quotes.');
+        setServerError('Unexpected response from quote proxy.');
         return;
       }
       setQuote(body as QuoteResponse);
     } catch {
-      setServerError('Network error while calling /v1/quotes.');
+      setServerError('Network error while calling quote proxy.');
     } finally {
       setLoading(false);
     }
@@ -225,6 +224,11 @@ export default function PlaygroundPage() {
         ClearCost MVP supports limited lanes and product types. This tool provides a cost estimate
         based on available duty/VAT data. It is not a filing service and does not guarantee final
         customs assessment.
+      </p>
+      <p className="mt-2 text-sm">
+        <Link className="underline" href="/docs/mvp">
+          See current MVP support & limitations
+        </Link>
       </p>
     </main>
   );
