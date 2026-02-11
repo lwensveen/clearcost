@@ -29,6 +29,7 @@ export const apiKeysTable = pgTable(
       .notNull()
       .default(sql`'{}'::text[]`),
     isActive: boolean('is_active').notNull().default(true),
+    isDemo: boolean('is_demo').notNull().default(false),
     expiresAt: timestamp('expires_at'),
     revokedAt: timestamp('revoked_at'),
     allowedCidrs: text('allowed_cidrs')

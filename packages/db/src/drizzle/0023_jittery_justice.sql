@@ -1,0 +1,1 @@
+ALTER TABLE "api_keys" ADD COLUMN "is_demo" boolean DEFAULT false NOT NULL;

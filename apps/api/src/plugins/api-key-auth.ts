@@ -23,6 +23,7 @@ import {
   internalBodyHash,
   timingSafeHexEqual,
 } from '../lib/internal-signing.js';
+import { isDemoKey } from '../modules/api-keys/services/is-demo-key.js';
 
 function scryptAsync(
   password: BinaryLike,
@@ -144,7 +145,14 @@ function parsePresentedToken(hdr?: string | string[] | null): ParsedToken | null
 
 declare module 'fastify' {
   interface FastifyRequest {
-    apiKey?: { id: string; ownerId: string; scopes: string[]; keyId: string; prefix: string };
+    apiKey?: {
+      id: string;
+      ownerId: string;
+      scopes: string[];
+      keyId: string;
+      prefix: string;
+      isDemo?: boolean;
+    };
   }
   interface FastifyInstance {
     requireApiKey: (
@@ -292,6 +300,7 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
             scopes,
             keyId: row.keyId,
             prefix: row.prefix,
+            isDemo: isDemoKey(row),
           };
 
           void db

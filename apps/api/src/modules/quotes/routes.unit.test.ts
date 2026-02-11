@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { registry } from '../../lib/metrics.js';
 
 const mocks = vi.hoisted(() => ({
   withIdempotencyMock: vi.fn(),
@@ -84,6 +85,19 @@ const quoteInput = {
   mode: 'air',
 };
 
+async function getMetricValue(
+  metricName: string,
+  labels: Record<string, string>
+): Promise<number | undefined> {
+  const all = await registry.getMetricsAsJSON();
+  const metric = all.find((item) => item.name === metricName);
+  if (!metric) return undefined;
+  const series = metric.values.find((item) =>
+    Object.entries(labels).every(([key, value]) => item.labels?.[key] === value)
+  );
+  return series?.value;
+}
+
 function mockInsertSuccess() {
   const catchable = { catch: vi.fn() };
   const values = vi.fn(() => catchable);
@@ -150,6 +164,7 @@ async function buildApp() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  registry.resetMetrics();
   mockInsertSuccess();
 
   mocks.quoteLandedCostMock.mockResolvedValue({
@@ -175,6 +190,9 @@ describe('quotes routes', () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers['idempotency-key']).toBe('idem_1');
     expect(res.json()).toMatchObject(sampleQuote);
+    expect(
+      await getMetricValue('clearcost_quotes_mvp_total', { lane: 'CN->DE', currency: 'USD' })
+    ).toBe(1);
     await app.close();
   });
 
@@ -355,6 +373,12 @@ describe('quotes routes', () => {
         code: 'unsupported_lane_or_scope',
       },
     });
+    expect(
+      await getMetricValue('clearcost_quotes_mvp_unsupported_total', {
+        lane: 'CN->DE',
+        currency: 'USD',
+      })
+    ).toBe(1);
     await app.close();
   });
 
@@ -379,6 +403,12 @@ describe('quotes routes', () => {
         code: 'data_not_ready',
       },
     });
+    expect(
+      await getMetricValue('clearcost_quotes_mvp_data_not_ready_total', {
+        lane: 'CN->DE',
+        currency: 'USD',
+      })
+    ).toBe(1);
     await app.close();
   });
 

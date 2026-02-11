@@ -17,12 +17,34 @@ import { withIdempotency } from '../../lib/idempotency.js';
 import { quoteLandedCost } from './services/quote-landed-cost.js';
 import { and, desc, eq, gt, sql } from 'drizzle-orm';
 import { errorResponse, errorResponseForStatus } from '../../lib/errors.js';
+import {
+  quotesMvpDataNotReadyTotal,
+  quotesMvpTotal,
+  quotesMvpUnsupportedTotal,
+} from '../../lib/metrics.js';
 
 type QuoteResponse = z.infer<typeof QuoteResponseSchema>;
 
 function getIdemKey(h: unknown) {
   const hdrs = IdempotencyHeaderSchema.parse(h ?? {});
   return hdrs['idempotency-key'] ?? hdrs['x-idempotency-key']!;
+}
+
+function quoteLaneLabel(origin: string | undefined, dest: string | undefined): string {
+  const from = String(origin ?? '')
+    .trim()
+    .toUpperCase();
+  const to = String(dest ?? '')
+    .trim()
+    .toUpperCase();
+  return `${from || 'UNK'}->${to || 'UNK'}`;
+}
+
+function quoteCurrencyLabel(currency: string | undefined): string {
+  const normalized = String(currency ?? '')
+    .trim()
+    .toUpperCase();
+  return normalized || 'UNK';
 }
 
 export default function quoteRoutes(app: FastifyInstance) {
@@ -54,6 +76,8 @@ export default function quoteRoutes(app: FastifyInstance) {
 
       const ownerId = req.apiKey!.ownerId; // route requires auth; non-null
       const idemScope = `quotes:${ownerId}`;
+      const laneLabel = quoteLaneLabel(req.body.origin, req.body.dest);
+      const currencyLabel = quoteCurrencyLabel(req.body.itemValue?.currency);
 
       try {
         let replayed = false;
@@ -134,6 +158,7 @@ export default function quoteRoutes(app: FastifyInstance) {
 
         if (replayed) reply.header('Idempotent-Replayed', 'true');
 
+        quotesMvpTotal.labels(laneLabel, currencyLabel).inc();
         return reply.send(result);
       } catch (err: any) {
         const status = Number(err?.statusCode) || 500;
@@ -144,6 +169,12 @@ export default function quoteRoutes(app: FastifyInstance) {
           return reply.code(409).send(errorResponseForStatus(409, err?.message ?? 'Processing'));
         }
         if (status === 400 || status === 422 || status === 503) {
+          if (code === 'data_not_ready') {
+            quotesMvpDataNotReadyTotal.labels(laneLabel, currencyLabel).inc();
+          }
+          if (code === 'unsupported_lane_or_scope') {
+            quotesMvpUnsupportedTotal.labels(laneLabel, currencyLabel).inc();
+          }
           req.log.warn({ err, idemKey, msg: 'quote rejected' });
           return reply
             .code(status)

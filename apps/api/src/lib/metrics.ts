@@ -48,6 +48,27 @@ export const importLastRun = new Gauge({
   registers: [registry],
 });
 
+export const quotesMvpTotal = new Counter({
+  name: 'clearcost_quotes_mvp_total',
+  help: 'Successful MVP quote computations.',
+  labelNames: ['lane', 'currency'] as const,
+  registers: [registry],
+});
+
+export const quotesMvpDataNotReadyTotal = new Counter({
+  name: 'clearcost_quotes_mvp_data_not_ready_total',
+  help: 'MVP quote requests rejected due to stale/missing official data.',
+  labelNames: ['lane', 'currency'] as const,
+  registers: [registry],
+});
+
+export const quotesMvpUnsupportedTotal = new Counter({
+  name: 'clearcost_quotes_mvp_unsupported_total',
+  help: 'MVP quote requests rejected for lane/scope limits.',
+  labelNames: ['lane', 'currency'] as const,
+  registers: [registry],
+});
+
 export function startImportTimer(labels: Labels) {
   const end = importDuration.startTimer(labels);
   return () => end();
