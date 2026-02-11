@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
-    "drizzle-kit": "^0.31.8",
+    "drizzle-kit": "^0.31.9",
     "drizzle-orm": "^0.45.1",
     "drizzle-zod": "^0.8.3",
     "pg": "^8.18.0",
@@ -15,15 +15,11 @@
   "devDependencies": {
     "@clearcost/eslint-config": "workspace:*",
     "@clearcost/typescript-config": "workspace:*",
-    "@types/node": "^25.1.0",
+    "@types/node": "^25.2.3",
     "@types/pg": "^8.16.0",
     "@types/ws": "^8.18.1",
-    "eslint": "^9.39.2"
+    "eslint": "^10.0.0"
   },
-  "files": [
-    "dist"
-  ],
-  "main": "dist/index.js",
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -31,6 +27,10 @@
       "default": "./dist/index.js"
     }
   },
+  "files": [
+    "dist"
+  ],
+  "main": "dist/index.js",
   "private": true,
   "scripts": {
     "build": "tsc -p tsconfig.json",
