@@ -107,11 +107,13 @@ function clampAmount(
 
 function surchargeBaseAmount(
   valueBasis: string | null | undefined,
-  input: { CIF: number; duty: number }
+  input: { CIF: number; duty: number; goods: number }
 ): number {
   const basis = String(valueBasis ?? '').toLowerCase();
   if (basis === 'duty') return input.duty;
-  // We only have CIF/customs-like value in this quote pipeline today.
+  if (basis === 'fob') return input.goods;
+  if (basis === 'customs' || basis === 'cif' || basis === 'entered' || basis === 'other')
+    return input.CIF;
   return input.CIF;
 }
 
@@ -242,7 +244,7 @@ async function perUnitSurchargeAmount(
 
 async function rowSurchargeAmount(
   row: SurchargeRow,
-  input: { CIF: number; duty: number },
+  input: { CIF: number; duty: number; goods: number },
   ctx: { destCurrency: string; fxAsOf: Date; unitContext: SurchargeUnitContext }
 ): Promise<SurchargeAmountResult> {
   const sourceCurrency = resolveSurchargeSourceCurrency(row, ctx.destCurrency);
@@ -324,7 +326,7 @@ async function rowSurchargeAmount(
 
 async function totalSurcharges(
   rows: SurchargeRow[],
-  input: { CIF: number; duty: number },
+  input: { CIF: number; duty: number; goods: number },
   ctx: { destCurrency: string; fxAsOf: Date; unitContext: SurchargeUnitContext }
 ): Promise<{
   amount: number;
@@ -569,7 +571,7 @@ export async function quoteLandedCost(
   const sur = surchargeLookup.value;
   const surchargeTotals = await totalSurcharges(
     sur,
-    { CIF, duty },
+    { CIF, duty, goods: itemValDest },
     {
       destCurrency,
       fxAsOf,

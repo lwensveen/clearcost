@@ -743,6 +743,34 @@ describe('quoteLandedCost', () => {
     expect(out.quote.total).toBe(153.6);
   });
 
+  it('uses FOB basis for ad-valorem surcharges when specified', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.getSurchargesScopedWithMetaMock.mockResolvedValue({
+      value: [{ rateType: 'ad_valorem', valueBasis: 'fob', pctAmt: 0.1 }],
+      meta: { status: 'ok', dataset: null, effectiveFrom: null },
+    });
+
+    const out = await quoteLandedCost(baseInput);
+
+    expect(out.quote.components.CIF).toBe(120);
+    expect(out.quote.components.fees).toBe(10);
+    expect(out.quote.total).toBe(161.2);
+  });
+
+  it('uses DUTY basis for ad-valorem surcharges when specified', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.getSurchargesScopedWithMetaMock.mockResolvedValue({
+      value: [{ rateType: 'ad_valorem', valueBasis: 'duty', pctAmt: 0.5 }],
+      meta: { status: 'ok', dataset: null, effectiveFrom: null },
+    });
+
+    const out = await quoteLandedCost(baseInput);
+
+    expect(out.quote.components.duty).toBe(6);
+    expect(out.quote.components.fees).toBe(3);
+    expect(out.quote.total).toBe(154.2);
+  });
+
   it('marks out_of_scope vat as estimated', async () => {
     mockMerchantContext(undefined, []);
     mocks.getVatForHs6WithMetaMock.mockResolvedValue({
