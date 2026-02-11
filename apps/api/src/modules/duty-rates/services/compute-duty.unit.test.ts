@@ -70,6 +70,53 @@ describe('computeDutyFromComponents', () => {
     expect(out.duty).toBe(0);
     expect(out.missingInputs.sort()).toEqual(['liters', 'netKg', 'quantity', 'uom']);
   });
+
+  it('applies max_of/min_of formula components for ad-valorem versus specific duties', () => {
+    const maxOut = computeDutyFromComponents(
+      {
+        customsValueDest: 1000,
+        netKg: 50,
+      },
+      [
+        { componentType: 'advalorem', ratePct: 10 },
+        { componentType: 'specific', amount: 5, uom: 'kg' },
+        { componentType: 'other', formula: { op: 'max_of', refs: ['advalorem', 'specific'] } },
+      ]
+    );
+    expect(maxOut.duty).toBe(250);
+
+    const minOut = computeDutyFromComponents(
+      {
+        customsValueDest: 1000,
+        netKg: 50,
+      },
+      [
+        { componentType: 'advalorem', ratePct: 10 },
+        { componentType: 'specific', amount: 5, uom: 'kg' },
+        { componentType: 'other', formula: { op: 'min_of', refs: ['advalorem', 'specific'] } },
+      ]
+    );
+    expect(minOut.duty).toBe(100);
+  });
+
+  it('fails clearly on unsupported duty component formulas', () => {
+    expect(() =>
+      computeDutyFromComponents(
+        {
+          customsValueDest: 1000,
+          netKg: 50,
+        },
+        [
+          { componentType: 'advalorem', ratePct: 10 },
+          { componentType: 'specific', amount: 5, uom: 'kg' },
+          {
+            componentType: 'other',
+            formula: { op: 'average_of', refs: ['advalorem', 'specific'] },
+          },
+        ]
+      )
+    ).toThrow(/DUTY_COMPONENT_FORMULA_INVALID|Invalid duty component formula/);
+  });
 });
 
 describe('computeDutyForRateId', () => {
@@ -143,6 +190,63 @@ describe('computeDutyForRateId', () => {
     expect(out.missingInputs).toEqual([]);
   });
 
+  it('uses persisted formula component rows when computing duty for a rate', async () => {
+    mockComponentRows([
+      {
+        componentType: 'advalorem',
+        ratePct: '10.000',
+        amount: null,
+        currency: null,
+        uom: null,
+        qualifier: null,
+        formula: null,
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+        effectiveTo: null,
+      },
+      {
+        componentType: 'specific',
+        ratePct: null,
+        amount: '5.000',
+        currency: 'EUR',
+        uom: 'kg',
+        qualifier: null,
+        formula: null,
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+        effectiveTo: null,
+      },
+      {
+        componentType: 'other',
+        ratePct: null,
+        amount: null,
+        currency: null,
+        uom: null,
+        qualifier: null,
+        formula: { op: 'max_of', refs: ['advalorem', 'specific'] },
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+        effectiveTo: null,
+      },
+    ]);
+
+    const out = await computeDutyForRateId(
+      'rate_1',
+      { customsValueDest: 1000, netKg: 50 },
+      {
+        fallbackRatePct: 7,
+        on: new Date('2025-01-15T00:00:00.000Z'),
+        destCurrency: 'EUR',
+      }
+    );
+
+    expect(out).toEqual({
+      duty: 250,
+      effectivePct: 0.25,
+      usedComponents: true,
+      fxMissingRate: false,
+      contextMissing: false,
+      missingInputs: [],
+    });
+  });
+
   it('falls back to parent rate and reports context missing when component uom inputs are absent', async () => {
     mockComponentRows([
       {
@@ -193,6 +297,55 @@ describe('computeDutyForRateId', () => {
     ).rejects.toMatchObject({
       statusCode: 500,
       code: 'DUTY_COMPONENT_CURRENCY_INVALID',
+    });
+  });
+
+  it('fails clearly when persisted component formula is invalid', async () => {
+    mockComponentRows([
+      {
+        componentType: 'advalorem',
+        ratePct: '10.000',
+        amount: null,
+        currency: null,
+        uom: null,
+        qualifier: null,
+        formula: null,
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+        effectiveTo: null,
+      },
+      {
+        componentType: 'specific',
+        ratePct: null,
+        amount: '1.000',
+        currency: 'EUR',
+        uom: 'kg',
+        qualifier: null,
+        formula: null,
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+        effectiveTo: null,
+      },
+      {
+        componentType: 'other',
+        ratePct: null,
+        amount: null,
+        currency: null,
+        uom: null,
+        qualifier: null,
+        formula: { op: 'max_of', refs: ['advalorem'] },
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+        effectiveTo: null,
+      },
+    ]);
+
+    await expect(
+      computeDutyForRateId(
+        'rate_1',
+        { customsValueDest: 100, netKg: 10 },
+        { on: new Date('2025-01-15T00:00:00.000Z'), destCurrency: 'EUR' }
+      )
+    ).rejects.toMatchObject({
+      statusCode: 500,
+      code: 'DUTY_COMPONENT_FORMULA_INVALID',
     });
   });
 });

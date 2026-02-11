@@ -22,10 +22,61 @@ export type DutyComponent = {
   currency?: string | null; // optional; assume already in dest currency unless you add FX
   uom?: string | null; // 'kg' | '100kg' | 'item' | 'pair' | 'l' | ...
   qualifier?: string | null; // optional text like 'net'
+  formula?: unknown;
 };
 
 /** Compute duty from components. Returns total duty and effective ad-valorem ratio. */
 export type DutyMissingContextInput = 'quantity' | 'netKg' | 'liters' | 'uom';
+
+type DutyFormulaOp = 'max_of' | 'min_of';
+type DutyFormulaRef = 'advalorem' | 'specific';
+type DutyFormula = {
+  op: DutyFormulaOp;
+  refs: DutyFormulaRef[];
+};
+
+function invalidDutyFormula(reason: string): Error & {
+  statusCode: 500;
+  code: 'DUTY_COMPONENT_FORMULA_INVALID';
+} {
+  return Object.assign(new Error(`Invalid duty component formula: ${reason}`), {
+    statusCode: 500 as const,
+    code: 'DUTY_COMPONENT_FORMULA_INVALID' as const,
+  });
+}
+
+function parseDutyFormula(raw: unknown): DutyFormula | null {
+  if (raw == null) return null;
+  if (typeof raw !== 'object' || Array.isArray(raw)) {
+    throw invalidDutyFormula('expected object payload');
+  }
+  const candidate = raw as { op?: unknown; refs?: unknown };
+  const op = String(candidate.op ?? '')
+    .trim()
+    .toLowerCase();
+  if (op !== 'max_of' && op !== 'min_of') {
+    throw invalidDutyFormula(`unsupported op "${String(candidate.op ?? '')}"`);
+  }
+  if (!Array.isArray(candidate.refs)) {
+    throw invalidDutyFormula('refs must be an array');
+  }
+  const refs = [
+    ...new Set(
+      candidate.refs.map((ref) =>
+        String(ref ?? '')
+          .trim()
+          .toLowerCase()
+      )
+    ),
+  ];
+  const normalizedRefs = refs.filter((ref): ref is DutyFormulaRef => {
+    return ref === 'advalorem' || ref === 'specific';
+  });
+  if (normalizedRefs.length < 2) {
+    throw invalidDutyFormula('requires both advalorem and specific refs');
+  }
+  return { op, refs: normalizedRefs };
+}
 
 export function computeDutyFromComponents(
   ctx: DutyComputeContext,
@@ -71,6 +122,7 @@ export function computeDutyFromComponents(
   let specific = 0;
   let minFloor = 0;
   let maxCeil = Infinity;
+  const formulas: DutyFormula[] = [];
 
   for (const c of comps) {
     if (c.componentType === 'advalorem' && c.ratePct != null) {
@@ -96,10 +148,18 @@ export function computeDutyFromComponents(
         continue;
       }
       maxCeil = Math.min(maxCeil, c.amount * factor.factor);
+    } else if (c.componentType === 'other') {
+      const parsedFormula = parseDutyFormula(c.formula ?? null);
+      if (parsedFormula) formulas.push(parsedFormula);
     }
   }
 
   let duty = adval + specific;
+  for (const formula of formulas) {
+    const referencedAmounts = formula.refs.map((ref) => (ref === 'advalorem' ? adval : specific));
+    duty =
+      formula.op === 'max_of' ? Math.max(...referencedAmounts) : Math.min(...referencedAmounts);
+  }
   if (minFloor > 0) duty = Math.max(duty, minFloor);
   if (maxCeil < Infinity) duty = Math.min(duty, maxCeil);
 
@@ -149,6 +209,7 @@ export async function computeDutyForRateId(
       currency: dutyRateComponentsTable.currency,
       uom: dutyRateComponentsTable.uom,
       qualifier: dutyRateComponentsTable.qualifier,
+      formula: dutyRateComponentsTable.formula,
       effectiveFrom: dutyRateComponentsTable.effectiveFrom,
       effectiveTo: dutyRateComponentsTable.effectiveTo,
     })
@@ -178,13 +239,14 @@ export async function computeDutyForRateId(
         currency: componentCurrency,
         uom: r.uom ?? null,
         qualifier: r.qualifier ?? null,
+        formula: r.formula ?? null,
       };
     })
     .filter((c) =>
       c.componentType === 'advalorem'
         ? c.ratePct != null
         : c.componentType === 'other'
-          ? false
+          ? c.formula != null
           : c.amount != null
     );
 
