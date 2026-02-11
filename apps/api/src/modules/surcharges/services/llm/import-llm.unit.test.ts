@@ -42,4 +42,23 @@ describe('importSurchargesFromLLM', () => {
       ])
     ).rejects.toThrow(/invalid currency code/i);
   });
+
+  it('fails fast when rate_type is invalid', async () => {
+    await expect(
+      importSurchargesFromLLM([
+        {
+          country_code: 'US',
+          surcharge_code: 'OTHER',
+          rate_type: 'tiered',
+          pct_decimal: 0.1,
+          currency: 'USD',
+          apply_level: 'entry',
+          value_basis: 'customs',
+          transport_mode: 'ALL',
+          effective_from: '2025-01-01',
+          source_url: 'https://example.com',
+        } as any,
+      ])
+    ).rejects.toThrow(/invalid surcharge ratetype/i);
+  });
 });

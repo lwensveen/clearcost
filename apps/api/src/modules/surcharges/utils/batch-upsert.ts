@@ -1,6 +1,7 @@
 import { db, provenanceTable, surchargesTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
 import { sha256Hex } from '../../../lib/provenance.js';
+import { resolveSurchargeRateType } from './rate-type.js';
 
 type SurchargeInsertRow = typeof surchargesTable.$inferInsert;
 type SurchargeSelectRow = typeof surchargesTable.$inferSelect;
@@ -58,8 +59,6 @@ function isoOrNull(d: Date | string | null | undefined): string | null {
 }
 
 // Defaults that match DB enum labels
-const dfltRateType = (s?: string | null) =>
-  (low(s) ?? 'ad_valorem') as SurchargeInsertRow['rateType'];
 const dfltApplyLevel = (s?: string | null) =>
   (low(s) ?? 'entry') as SurchargeInsertRow['applyLevel'];
 const dfltValueBasis = (s?: string | null) =>
@@ -92,8 +91,14 @@ export async function batchUpsertSurchargesFromStream(
 
     // Normalize rows → DB insert shape (no empty strings for numerics/dates).
     const values = buf.map((r) => {
-      const rateType = dfltRateType(r.rateType);
-      const rowLabel = `dest=${up(r.dest) ?? String(r.dest)}:code=${String(r.surchargeCode)}:rateType=${String(rateType)}`;
+      const rowLabel = `dest=${up(r.dest) ?? String(r.dest)}:code=${String(r.surchargeCode)}`;
+      const rateType = resolveSurchargeRateType({
+        rawRateType: r.rateType,
+        fixedAmt: r.fixedAmt,
+        pctAmt: r.pctAmt,
+        unitAmt: r.unitAmt,
+        rowLabel,
+      }) as SurchargeInsertRow['rateType'];
       const requiresCurrency =
         rateType === 'fixed' ||
         rateType === 'per_unit' ||

@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import { sha256Hex } from '../../../../lib/provenance.js';
 import type { SurchargeInsert } from '@clearcost/types';
 import type { LlmSurcharge } from './schema.js';
+import { resolveSurchargeRateType } from '../../utils/rate-type.js';
 
 const up2 = (s?: string | null) => (s ? s.trim().toUpperCase() : null);
 const onlyHs6 = (v?: string | null) => {
@@ -49,14 +50,6 @@ function coerceApplyLevel(v?: string | null): SurchargeInsert['applyLevel'] {
   if (t === 'entry' || t === 'line' || t === 'shipment' || t === 'program')
     return t as SurchargeInsert['applyLevel'];
   return 'entry';
-}
-function coerceRateType(v?: string | null): SurchargeInsert['rateType'] {
-  const t = String(v || 'ad_valorem').toLowerCase();
-  if (t === 'ad_valorem' || t === 'fixed' || t === 'per_unit') {
-    return t as SurchargeInsert['rateType'];
-  }
-  if (t === 'unit') return 'per_unit';
-  return 'ad_valorem';
 }
 function coerceValueBasis(v?: string | null): SurchargeInsert['valueBasis'] {
   const t = String(v || 'customs').toLowerCase();
@@ -110,8 +103,14 @@ export async function importSurchargesFromLLM(
   const srcByKey = new Map<string, string | undefined>();
 
   for (const r of rows) {
-    const rateType = coerceRateType(r.rate_type);
-    const rowLabel = `dest=${up2(r.country_code) ?? String(r.country_code)}:code=${String(r.surcharge_code)}:rateType=${String(rateType)}`;
+    const rowLabel = `dest=${up2(r.country_code) ?? String(r.country_code)}:code=${String(r.surcharge_code)}`;
+    const rateType = resolveSurchargeRateType({
+      rawRateType: r.rate_type,
+      fixedAmt: r.fixed_amount,
+      pctAmt: r.pct_decimal,
+      unitAmt: r.unit_amount,
+      rowLabel,
+    });
     const requiresCurrency =
       rateType === 'fixed' ||
       rateType === 'per_unit' ||

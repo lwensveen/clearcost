@@ -32,4 +32,18 @@ describe('importSurcharges', () => {
       ])
     ).rejects.toThrow(/invalid currency code/i);
   });
+
+  it('fails fast when rateType is ambiguous and cannot be inferred', async () => {
+    await expect(
+      importSurcharges([
+        {
+          dest: 'US',
+          surchargeCode: 'OTHER',
+          fixedAmt: '5',
+          pctAmt: '0.05',
+          currency: 'USD',
+        } as any,
+      ])
+    ).rejects.toThrow(/ambiguous surcharge ratetype/i);
+  });
 });

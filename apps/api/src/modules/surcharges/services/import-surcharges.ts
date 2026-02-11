@@ -1,6 +1,7 @@
 import { db, surchargesTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
 import { type SurchargeInsert, SurchargeInsertSchema } from '@clearcost/types';
+import { resolveSurchargeRateType } from '../utils/rate-type.js';
 
 function normIso2(v?: string | null) {
   return v ? v.trim().toUpperCase() : null;
@@ -53,8 +54,14 @@ export async function importSurcharges(rows: SurchargeInsert[]) {
       const parsed = SurchargeInsertSchema.safeParse(raw);
       if (!parsed.success) return null;
       const r = parsed.data;
-      const rateType = r.rateType ?? 'ad_valorem';
-      const rowLabel = `dest=${normIso2(r.dest) ?? String(r.dest)}:code=${String(r.surchargeCode)}:rateType=${rateType}`;
+      const rowLabel = `dest=${normIso2(r.dest) ?? String(r.dest)}:code=${String(r.surchargeCode)}`;
+      const rateType = resolveSurchargeRateType({
+        rawRateType: r.rateType,
+        fixedAmt: r.fixedAmt,
+        pctAmt: r.pctAmt,
+        unitAmt: r.unitAmt,
+        rowLabel,
+      });
       const requiresCurrency =
         rateType === 'fixed' ||
         rateType === 'per_unit' ||
