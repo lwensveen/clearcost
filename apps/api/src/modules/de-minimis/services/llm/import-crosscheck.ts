@@ -70,12 +70,12 @@ export async function importDeMinimisCrossChecked(
   // 1) call both
   const [oa, gx] = await Promise.all([
     importDeMinimisFromOpenAI(ef, {
-      importId: opts.importId,
       prompt: 'Return maximum coverage with official sources only. JSON only.',
+      ingest: false,
     }),
     importDeMinimisFromGrok(ef, {
-      importId: undefined,
       prompt: 'Return maximum coverage with official sources only. JSON only.',
+      ingest: false,
     }),
   ]);
 
@@ -83,8 +83,8 @@ export async function importDeMinimisCrossChecked(
   const mapOA = new Map<string, RowLLM>();
   const mapGX = new Map<string, RowLLM>();
 
-  const rowsOA: RowLLM[] = (oa as any).rows ?? [];
-  const rowsGX: RowLLM[] = (gx as any).rows ?? [];
+  const rowsOA: RowLLM[] = oa.rows;
+  const rowsGX: RowLLM[] = gx.rows;
 
   for (const r of rowsOA) mapOA.set(keyOf(r), r);
   for (const r of rowsGX) mapGX.set(keyOf(r), r);

@@ -1,11 +1,11 @@
-import { z } from 'zod';
 import type { DeMinimisInsert } from '@clearcost/types';
 import { importDeMinimis } from '../import-de-minimis.js';
 import {
   deMinimisLlmDefaultUserPrompt,
   deMinimisLlmSystemPrompt,
 } from './prompts/de-minimis-llm.js';
-import { PayloadSchema, RowSchema } from './schema.js';
+import type { LlmDeMinimisRow } from './schema.js';
+import { PayloadSchema } from './schema.js';
 import { httpFetch } from '../../../../lib/http.js';
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -13,14 +13,14 @@ const toDate = (s: string) => new Date(`${s}T00:00:00Z`);
 
 export async function importDeMinimisFromGrok(
   effectiveOn?: Date,
-  opts: { importId?: string; prompt?: string; model?: string } = {}
+  opts: { importId?: string; prompt?: string; model?: string; ingest?: boolean } = {}
 ): Promise<{
   ok: true;
   inserted: number;
   updated: number;
   count: number;
   usedModel: string;
-  rows: z.infer<typeof RowSchema>[];
+  rows: LlmDeMinimisRow[];
 }> {
   const ef = effectiveOn ?? new Date();
   const efStr = iso(ef);
@@ -85,6 +85,17 @@ export async function importDeMinimisFromGrok(
       effectiveFrom,
       effectiveTo,
     });
+  }
+
+  if (opts.ingest === false) {
+    return {
+      ok: true as const,
+      inserted: 0,
+      updated: 0,
+      count: parsed.rows.length,
+      usedModel,
+      rows: parsed.rows,
+    };
   }
 
   const res = await importDeMinimis(rows, {

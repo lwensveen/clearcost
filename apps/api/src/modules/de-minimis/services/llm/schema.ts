@@ -17,3 +17,5 @@ export const RowSchema = z.object({
   confidence: z.number().min(0).max(1).optional(),
 });
 export const PayloadSchema = z.object({ rows: z.array(RowSchema).max(2000) });
+
+export type LlmDeMinimisRow = z.infer<typeof RowSchema>;

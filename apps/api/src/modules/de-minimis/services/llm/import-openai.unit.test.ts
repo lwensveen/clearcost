@@ -90,4 +90,38 @@ describe('importDeMinimisFromOpenAI', () => {
     );
     expect(mocks.importDeMinimisMock).not.toHaveBeenCalled();
   });
+
+  it('parses rows without ingest side effects when ingest is disabled', async () => {
+    mocks.createMock.mockResolvedValue({
+      model: 'gpt-test',
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              rows: [
+                {
+                  country_code: 'JP',
+                  kind: 'DUTY',
+                  basis: 'INTRINSIC',
+                  currency: 'JPY',
+                  value: 10000,
+                  effective_from: '2025-01-01',
+                  effective_to: null,
+                  source_url: 'https://www.customs.go.jp',
+                },
+              ],
+            }),
+          },
+        },
+      ],
+    });
+
+    const out = await importDeMinimisFromOpenAI(new Date('2025-01-01T00:00:00.000Z'), {
+      ingest: false,
+    });
+
+    expect(out).toMatchObject({ inserted: 0, updated: 0, count: 1, usedModel: 'gpt-test' });
+    expect(out.rows).toHaveLength(1);
+    expect(mocks.importDeMinimisMock).not.toHaveBeenCalled();
+  });
 });
