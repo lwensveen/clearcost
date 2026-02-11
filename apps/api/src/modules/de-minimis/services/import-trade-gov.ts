@@ -33,6 +33,56 @@ const numStr = (v: unknown) => {
   const n = typeof v === 'number' ? v : Number(v);
   return Number.isFinite(n) ? String(n) : null;
 };
+const EU_DUTY_INTRINSIC = new Set([
+  'AT',
+  'BE',
+  'BG',
+  'HR',
+  'CY',
+  'CZ',
+  'DE',
+  'DK',
+  'EE',
+  'ES',
+  'FI',
+  'FR',
+  'GR',
+  'HU',
+  'IE',
+  'IT',
+  'LT',
+  'LU',
+  'LV',
+  'MT',
+  'NL',
+  'PL',
+  'PT',
+  'RO',
+  'SE',
+  'SI',
+  'SK',
+]);
+const BASIS_OVERRIDES: Partial<
+  Record<
+    string,
+    Partial<Record<DeMinimisInsert['deMinimisKind'], DeMinimisInsert['deMinimisBasis']>>
+  >
+> = {
+  US: { DUTY: 'INTRINSIC' },
+  GB: { VAT: 'INTRINSIC' },
+  CA: { DUTY: 'INTRINSIC', VAT: 'INTRINSIC' },
+};
+
+function resolveTradeGovBasis(
+  dest: string,
+  kind: DeMinimisInsert['deMinimisKind']
+): DeMinimisInsert['deMinimisBasis'] {
+  const override = BASIS_OVERRIDES[dest]?.[kind];
+  if (override) return override;
+  if (kind === 'DUTY' && EU_DUTY_INTRINSIC.has(dest)) return 'INTRINSIC';
+  // Conservative default: use CIF unless we have explicit jurisdiction evidence.
+  return 'CIF';
+}
 
 /**
  * Imports De Minimis (DUTY) and VAT thresholds from Trade.gov (ITA).
@@ -40,7 +90,7 @@ const numStr = (v: unknown) => {
  *
  * Notes:
  *  - This dataset focuses on foreign markets; anomalies are possible (e.g., US row).
- *  - We default deMinimisBasis to INTRINSIC; curate CIF overrides later if needed.
+ *  - Basis is explicit for known jurisdictions and conservatively defaults to CIF.
  */
 export async function importDeMinimisFromTradeGov(
   effectiveOn?: Date,
@@ -82,7 +132,7 @@ export async function importDeMinimisFromTradeGov(
         rows.push({
           dest,
           deMinimisKind: kind,
-          deMinimisBasis: 'INTRINSIC', // placeholder; override per country later if needed
+          deMinimisBasis: resolveTradeGovBasis(dest, kind),
           currency: cur,
           value: v,
           effectiveFrom,

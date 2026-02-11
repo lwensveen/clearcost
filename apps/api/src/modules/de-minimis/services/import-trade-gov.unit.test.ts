@@ -47,6 +47,11 @@ describe('importDeMinimisFromTradeGov', () => {
               vat_amount: 40,
               vat_currency: 'CAD',
             },
+            {
+              country: 'BR',
+              de_minimis_value: 50,
+              de_minimis_currency: 'USD',
+            },
           ],
         }),
         { status: 200 }
@@ -57,5 +62,25 @@ describe('importDeMinimisFromTradeGov', () => {
 
     expect(out).toMatchObject({ ok: true, inserted: 1, updated: 0, count: 1 });
     expect(mocks.importDeMinimisMock).toHaveBeenCalledTimes(1);
+    const [rows] = mocks.importDeMinimisMock.mock.calls[0] ?? [];
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          dest: 'CA',
+          deMinimisKind: 'DUTY',
+          deMinimisBasis: 'INTRINSIC',
+        }),
+        expect.objectContaining({
+          dest: 'CA',
+          deMinimisKind: 'VAT',
+          deMinimisBasis: 'INTRINSIC',
+        }),
+        expect.objectContaining({
+          dest: 'BR',
+          deMinimisKind: 'DUTY',
+          deMinimisBasis: 'CIF',
+        }),
+      ])
+    );
   });
 });
