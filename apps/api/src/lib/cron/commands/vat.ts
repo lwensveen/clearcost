@@ -40,7 +40,7 @@ export const vatAuto: Command = async (argv = []) => {
       throw new Error(`VAT importer parsed ${rows.length} rows, below threshold ${minRows}.`);
     }
 
-    const res = await importVatRules(rows);
+    const res = await importVatRules(rows, { source: 'official' });
     const inserted = res?.count ?? rows.length ?? 0;
     return { inserted, payload: res };
   });

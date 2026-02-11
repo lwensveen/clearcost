@@ -155,6 +155,20 @@
       "when": 1770748267253,
       "tag": "0021_manifest_item_context",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1770844026825,
+      "tag": "0022_crazy_molecule_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1770845511342,
+      "tag": "0023_jittery_justice",
+      "breakpoints": true
     }
   ]
 }

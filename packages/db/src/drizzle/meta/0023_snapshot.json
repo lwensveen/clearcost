@@ -1,6 +1,6 @@
 {
-  "id": "c18293ea-30df-45c5-85dc-b51adc579a1d",
-  "prevId": "860825e7-733f-4c13-aa7d-0d7a5035141a",
+  "id": "7d59790b-9b12-4f2d-a0aa-b77bbce7145a",
+  "prevId": "42b32fb4-8ac4-4772-8ca2-658b55c044d3",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -584,6 +584,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "is_demo": {
+          "name": "is_demo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "expires_at": {
           "name": "expires_at",
@@ -4702,6 +4709,329 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.trade_notice_docs": {
+      "name": "trade_notice_docs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "notice_id": {
+          "name": "notice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mime": {
+          "name": "mime",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bytes": {
+          "name": "bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sha256": {
+          "name": "sha256",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "storage_ref": {
+          "name": "storage_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "trade_notice_docs_notice_url_uq": {
+          "name": "trade_notice_docs_notice_url_uq",
+          "columns": [
+            {
+              "expression": "notice_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "url",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trade_notice_docs_notice_idx": {
+          "name": "trade_notice_docs_notice_idx",
+          "columns": [
+            {
+              "expression": "notice_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "trade_notice_docs_notice_id_trade_notices_id_fk": {
+          "name": "trade_notice_docs_notice_id_trade_notices_id_fk",
+          "tableFrom": "trade_notice_docs",
+          "tableTo": "trade_notices",
+          "columnsFrom": [
+            "notice_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.trade_notices": {
+      "name": "trade_notices",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "dest": {
+          "name": "dest",
+          "type": "varchar(2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "authority": {
+          "name": "authority",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "notice_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'general'"
+        },
+        "lang": {
+          "name": "lang",
+          "type": "varchar(8)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'zh'"
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "effective_from": {
+          "name": "effective_from",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "effective_to": {
+          "name": "effective_to",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "notice_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'new'"
+        },
+        "sha256": {
+          "name": "sha256",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fetched_at": {
+          "name": "fetched_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parsed_at": {
+          "name": "parsed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "summary": {
+          "name": "summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tags": {
+          "name": "tags",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "trade_notices_url_uq": {
+          "name": "trade_notices_url_uq",
+          "columns": [
+            {
+              "expression": "url",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trade_notices_dest_status_idx": {
+          "name": "trade_notices_dest_status_idx",
+          "columns": [
+            {
+              "expression": "dest",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trade_notices_published_idx": {
+          "name": "trade_notices_published_idx",
+          "columns": [
+            {
+              "expression": "published_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trade_notices_type_idx": {
+          "name": "trade_notices_type_idx",
+          "columns": [
+            {
+              "expression": "type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.trade_program_members": {
       "name": "trade_program_members",
       "schema": "",
@@ -5121,6 +5451,14 @@
           "notNull": true,
           "default": "'STANDARD'"
         },
+        "source": {
+          "name": "source",
+          "type": "vat_source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'official'"
+        },
         "hs6": {
           "name": "hs6",
           "type": "varchar(6)",
@@ -5216,6 +5554,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "idx_vat_overrides_source": {
+          "name": "idx_vat_overrides_source",
+          "columns": [
+            {
+              "expression": "source",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -5249,6 +5602,14 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'STANDARD'"
+        },
+        "source": {
+          "name": "source",
+          "type": "vat_source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'official'"
         },
         "rate_pct": {
           "name": "rate_pct",
@@ -5338,6 +5699,21 @@
             },
             {
               "expression": "vat_rate_kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "vat_rules_source_idx": {
+          "name": "vat_rules_source_idx",
+          "columns": [
+            {
+              "expression": "source",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -5673,6 +6049,7 @@
         "APHIS",
         "API",
         "BASELINE",
+        "CN_NOTICES",
         "CN_TAXBOOK",
         "CSV",
         "ECB",
@@ -5686,6 +6063,7 @@
         "MANIFEST",
         "MANUAL",
         "MY_GAZETTE",
+        "NOTICES",
         "OECD",
         "OECD/IMF",
         "OFFICIAL",
@@ -5717,6 +6095,30 @@
       "values": [
         "DAP",
         "DDP"
+      ]
+    },
+    "public.notice_status": {
+      "name": "notice_status",
+      "schema": "public",
+      "values": [
+        "new",
+        "fetched",
+        "parsed",
+        "ignored",
+        "error"
+      ]
+    },
+    "public.notice_type": {
+      "name": "notice_type",
+      "schema": "public",
+      "values": [
+        "provisional_rate",
+        "trq",
+        "retaliatory",
+        "suspension",
+        "fta_schedule",
+        "general",
+        "other"
       ]
     },
     "public.org_role": {
@@ -5849,6 +6251,15 @@
         "STANDARD",
         "SUPER_REDUCED",
         "ZERO"
+      ]
+    },
+    "public.vat_source": {
+      "name": "vat_source",
+      "schema": "public",
+      "values": [
+        "official",
+        "llm",
+        "manual"
       ]
     },
     "public.hs_alias_system": {

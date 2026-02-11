@@ -25,7 +25,7 @@ import {
   type QuoteConfidenceComponent,
 } from './confidence.js';
 import { toQuoteSourceMetadata } from './source-metadata.js';
-import { getDatasetFreshnessSnapshot } from '../../health/services.js';
+import { getDatasetFreshnessSnapshot, getMvpFreshnessSnapshot } from '../../health/services.js';
 
 type Unit = 'kg' | 'm3';
 
@@ -465,9 +465,10 @@ async function quoteLandedCostMvp(
   const [dutyLookup, vatLookup, freshness] = await Promise.all([
     getActiveDutyRateWithMeta(destCountry, hs6, now, {
       partner: toDutyPartnerIso2(originCountry),
+      mvpOfficialOnly: true,
     }),
-    getVatForHs6WithMeta(destCountry, hs6, now),
-    getDatasetFreshnessSnapshot(),
+    getVatForHs6WithMeta(destCountry, hs6, now, { mvpOfficialOnly: true }),
+    getMvpFreshnessSnapshot(),
   ]);
 
   const staleDatasets: string[] = [];

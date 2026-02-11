@@ -124,3 +124,59 @@ describe('getDatasetFreshnessSnapshot', () => {
     expect(out.datasets.notices.stale).toBe(false);
   });
 });
+
+describe('getMvpFreshnessSnapshot', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-02-04T12:00:00.000Z'));
+    state.queue = [];
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('tracks official MVP import jobs for fx/vat/eu duties freshness', async () => {
+    state.queue = [
+      {
+        rows: [
+          {
+            last_success_at: '2026-02-04T11:30:00.000Z',
+            last_attempt_at: '2026-02-04T11:30:00.000Z',
+            source: 'ECB',
+          },
+        ],
+      }, // fx:daily
+      {
+        rows: [
+          {
+            last_success_at: '2026-02-04T10:00:00.000Z',
+            last_attempt_at: '2026-02-04T10:00:00.000Z',
+            source: 'OECD/IMF',
+          },
+        ],
+      }, // vat:auto
+      {
+        rows: [
+          {
+            last_success_at: '2026-02-04T09:00:00.000Z',
+            last_attempt_at: '2026-02-04T09:10:00.000Z',
+            source: 'TARIC',
+          },
+        ],
+      }, // duties:eu-mfn|duties:eu-daily
+    ];
+
+    const { getMvpFreshnessSnapshot } = await import('./services.js');
+    const out = await getMvpFreshnessSnapshot();
+
+    expect(out.now.toISOString()).toBe('2026-02-04T12:00:00.000Z');
+    expect(Object.keys(out.datasets)).toEqual(['fx', 'vat', 'duties']);
+    expect(out.datasets.fx.stale).toBe(false);
+    expect(out.datasets.fx.source).toBe('ECB');
+    expect(out.datasets.vat.stale).toBe(false);
+    expect(out.datasets.vat.source).toBe('OECD/IMF');
+    expect(out.datasets.duties.stale).toBe(false);
+    expect(out.datasets.duties.source).toBe('TARIC');
+  });
+});

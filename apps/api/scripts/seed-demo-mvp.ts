@@ -12,9 +12,10 @@ async function seedFx() {
   await db
     .insert(fxRatesTable)
     .values({
-      base: 'EUR',
-      quote: 'USD',
-      rate: '1.10000000',
+      // 1 USD -> 0.92 EUR demo FX rate used by MVP golden tests.
+      base: 'USD',
+      quote: 'EUR',
+      rate: '0.92000000',
       fxAsOf: FX_AS_OF,
       provider: 'ecb',
       sourceRef: 'demo-mvp-seed',
@@ -36,6 +37,8 @@ async function seedVat() {
     {
       dest: 'NL',
       vatRateKind: 'STANDARD' as const,
+      source: 'official' as const,
+      // 21% NL standard VAT rate for most goods (demo).
       ratePct: '21.000',
       vatBase: 'CIF_PLUS_DUTY' as const,
       effectiveFrom: EFFECTIVE_FROM,
@@ -45,6 +48,8 @@ async function seedVat() {
     {
       dest: 'DE',
       vatRateKind: 'STANDARD' as const,
+      source: 'official' as const,
+      // 19% DE standard VAT rate for most goods (demo).
       ratePct: '19.000',
       vatBase: 'CIF_PLUS_DUTY' as const,
       effectiveFrom: EFFECTIVE_FROM,
@@ -60,6 +65,7 @@ async function seedVat() {
       .onConflictDoUpdate({
         target: [vatRulesTable.dest, vatRulesTable.vatRateKind, vatRulesTable.effectiveFrom],
         set: {
+          source: sql`excluded.source`,
           ratePct: sql`excluded.rate_pct`,
           vatBase: sql`excluded.vat_base`,
           effectiveTo: sql`excluded.effective_to`,
@@ -77,7 +83,8 @@ async function seedDuty() {
       partner: 'US',
       hs6,
       source: 'official' as const,
-      ratePct: '2.500',
+      // 3.7% demo MFN duty for HS6 850440 (electronics accessory), representative of EU MFN range for 8504.x.
+      ratePct: hs6 === '850440' ? '3.700' : '2.500',
       dutyRule: 'mfn' as const,
       currency: 'EUR',
       effectiveFrom: EFFECTIVE_FROM,
@@ -89,7 +96,8 @@ async function seedDuty() {
       partner: 'US',
       hs6,
       source: 'official' as const,
-      ratePct: '2.500',
+      // 3.7% demo MFN duty for HS6 850440 (electronics accessory), representative of EU MFN range for 8504.x.
+      ratePct: hs6 === '850440' ? '3.700' : '2.500',
       dutyRule: 'mfn' as const,
       currency: 'EUR',
       effectiveFrom: EFFECTIVE_FROM,
@@ -101,6 +109,7 @@ async function seedDuty() {
       partner: 'NL',
       hs6,
       source: 'official' as const,
+      // Intra-EU demo lane (including HS6 851830): import duty is zero.
       ratePct: '0.000',
       dutyRule: 'mfn' as const,
       currency: 'EUR',

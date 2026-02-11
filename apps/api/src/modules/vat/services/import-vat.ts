@@ -8,6 +8,13 @@ import { sha256Hex } from '../../../lib/provenance.js';
 type ImportOpts = {
   importId?: string;
   makeSourceRef?: (row: VatRuleInsert) => string | undefined;
+  /**
+   * Provenance classification for imported VAT rows.
+   * - official: authoritative source imports
+   * - llm: model-generated/cross-check rows
+   * - manual: operator-provided/admin imports
+   */
+  source?: 'official' | 'llm' | 'manual';
 };
 
 /**
@@ -21,6 +28,8 @@ export async function importVatRules(rows: VatRuleInsert[] | Array<any>, opts: I
     throw new Error('[VAT import] source produced 0 rows.');
   }
 
+  const importSource = opts.source ?? 'official';
+
   // Normalize inputs to DB column names
   const mapped = rows.map((r: any) => {
     const dest = String(r.dest ?? '').toUpperCase();
@@ -30,8 +39,12 @@ export async function importVatRules(rows: VatRuleInsert[] | Array<any>, opts: I
     const effectiveFrom = toDateIfDefined(r.effectiveFrom);
     const effectiveTo = toDateOrNull(r.effectiveTo ?? null);
     const notes = r.notes ?? null;
+    const source =
+      String(r.source ?? importSource)
+        .trim()
+        .toLowerCase() || importSource;
 
-    return { dest, vatRateKind, ratePct, vatBase, effectiveFrom, effectiveTo, notes };
+    return { dest, vatRateKind, source, ratePct, vatBase, effectiveFrom, effectiveTo, notes };
   });
 
   // Validate after mapping
@@ -44,17 +57,21 @@ export async function importVatRules(rows: VatRuleInsert[] | Array<any>, opts: I
     .onConflictDoUpdate({
       target: [vatRulesTable.dest, vatRulesTable.vatRateKind, vatRulesTable.effectiveFrom],
       set: {
+        source: sql`excluded.source`,
         ratePct: sql`excluded.rate_pct`,
         vatBase: sql`excluded.vat_base`,
         effectiveTo: sql`excluded.effective_to`,
         notes: sql`excluded.notes`,
         updatedAt: sql`now()`,
       },
+      // Never let LLM upserts overwrite an existing official row.
+      ...(importSource === 'llm' ? { setWhere: sql`${vatRulesTable.source} <> 'official'` } : {}),
     })
     .returning({
       id: vatRulesTable.id,
       dest: vatRulesTable.dest,
       vatRateKind: vatRulesTable.vatRateKind,
+      source: vatRulesTable.source,
       ratePct: vatRulesTable.ratePct,
       vatBase: vatRulesTable.vatBase,
       effectiveFrom: vatRulesTable.effectiveFrom,
@@ -71,6 +88,7 @@ export async function importVatRules(rows: VatRuleInsert[] | Array<any>, opts: I
       sourceRef: opts.makeSourceRef?.({
         dest: r.dest,
         vatRateKind: r.vatRateKind,
+        source: r.source as VatRuleInsert['source'],
         ratePct: r.ratePct,
         vatBase: r.vatBase,
         effectiveFrom: r.effectiveFrom!,

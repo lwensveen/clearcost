@@ -8,6 +8,10 @@ import { CountryVatRow, VatRateKind } from './utils.js';
  * we normalize to 'CIF_PLUS_DUTY' below to avoid surprising downstream math.
  */
 export type VatBase = 'CIF' | 'CIF_PLUS_DUTY';
+export type VatSource = 'official' | 'llm' | 'manual';
+export type GetVatOpts = {
+  source?: VatSource;
+};
 
 /** Normalize any DB base value into a safe calculator base. */
 function normalizeBase(base: unknown): VatBase {
@@ -23,25 +27,29 @@ function normalizeBase(base: unknown): VatBase {
 export async function getVat(
   dest: string,
   on: Date,
-  kind: VatRateKind = 'STANDARD'
+  kind: VatRateKind = 'STANDARD',
+  opts: GetVatOpts = {}
 ): Promise<CountryVatRow | null> {
   const destISO2 = dest.toUpperCase();
+  const whereParts = [
+    eq(vatRulesTable.dest, destISO2),
+    eq(vatRulesTable.vatRateKind, kind),
+    lte(vatRulesTable.effectiveFrom, on),
+  ];
+  if (opts.source) {
+    whereParts.push(eq(vatRulesTable.source, opts.source));
+  }
 
   const [row] = await db
     .select({
       ratePct: vatRulesTable.ratePct,
       vatBase: vatRulesTable.vatBase,
       vatRateKind: vatRulesTable.vatRateKind,
+      source: vatRulesTable.source,
       effectiveFrom: vatRulesTable.effectiveFrom,
     })
     .from(vatRulesTable)
-    .where(
-      and(
-        eq(vatRulesTable.dest, destISO2),
-        eq(vatRulesTable.vatRateKind, kind),
-        lte(vatRulesTable.effectiveFrom, on)
-      )
-    )
+    .where(and(...whereParts))
     .orderBy(desc(vatRulesTable.effectiveFrom))
     .limit(1);
 
@@ -51,6 +59,7 @@ export async function getVat(
     ratePct: Number(row.ratePct),
     vatBase: normalizeBase(row.vatBase),
     vatRateKind: row.vatRateKind as VatRateKind,
+    source: row.source ?? null,
     effectiveFrom: row.effectiveFrom ?? null,
   };
 }

@@ -25,6 +25,12 @@ export type VatForHs6 = {
 };
 
 export type VatForHs6LookupResult = LookupResult<VatForHs6 | null>;
+export type VatForHs6LookupOpts = {
+  /**
+   * MVP-only guardrail: restrict VAT lookup to official imported rows.
+   */
+  mvpOfficialOnly?: boolean;
+};
 
 const VAT_OUT_OF_SCOPE_DESTS = new Set(['US']);
 const VAT_INTERNAL_SOURCE_LABELS = new Set(['default', 'override-rate', 'override-kind']);
@@ -58,19 +64,35 @@ export function resolveVatDatasetProvenance(
   return null;
 }
 
-async function getVatCoverageForDestination(dest: string, hs6: string) {
+async function getVatCoverageForDestination(
+  dest: string,
+  hs6: string,
+  opts: VatForHs6LookupOpts = {}
+) {
+  const sourceFilter = opts.mvpOfficialOnly ? 'official' : null;
   const [ruleRow, overrideRow] = await Promise.all([
     db
       .select({ effectiveFrom: vatRulesTable.effectiveFrom })
       .from(vatRulesTable)
-      .where(eq(vatRulesTable.dest, dest))
+      .where(
+        and(
+          eq(vatRulesTable.dest, dest),
+          sourceFilter ? eq(vatRulesTable.source, sourceFilter) : undefined
+        )
+      )
       .orderBy(desc(vatRulesTable.effectiveFrom))
       .limit(1)
       .then((rows) => rows[0] ?? null),
     db
       .select({ effectiveFrom: vatOverridesTable.effectiveFrom })
       .from(vatOverridesTable)
-      .where(and(eq(vatOverridesTable.dest, dest), eq(vatOverridesTable.hs6, hs6)))
+      .where(
+        and(
+          eq(vatOverridesTable.dest, dest),
+          eq(vatOverridesTable.hs6, hs6),
+          sourceFilter ? eq(vatOverridesTable.source, sourceFilter) : undefined
+        )
+      )
       .orderBy(desc(vatOverridesTable.effectiveFrom))
       .limit(1)
       .then((rows) => rows[0] ?? null),
@@ -82,11 +104,17 @@ async function getVatCoverageForDestination(dest: string, hs6: string) {
   return { effectiveFrom };
 }
 
-async function getLatestVatRuleEffectiveFrom(dest: string) {
+async function getLatestVatRuleEffectiveFrom(dest: string, opts: VatForHs6LookupOpts = {}) {
+  const sourceFilter = opts.mvpOfficialOnly ? 'official' : null;
   const [row] = await db
     .select({ effectiveFrom: vatRulesTable.effectiveFrom })
     .from(vatRulesTable)
-    .where(eq(vatRulesTable.dest, dest))
+    .where(
+      and(
+        eq(vatRulesTable.dest, dest),
+        sourceFilter ? eq(vatRulesTable.source, sourceFilter) : undefined
+      )
+    )
     .orderBy(desc(vatRulesTable.effectiveFrom))
     .limit(1);
   return row?.effectiveFrom ?? null;
@@ -106,10 +134,12 @@ async function getLatestVatRuleEffectiveFrom(dest: string) {
 export async function getVatForHs6WithMeta(
   dest: string,
   hs6: string,
-  on: Date
+  on: Date,
+  opts: VatForHs6LookupOpts = {}
 ): Promise<VatForHs6LookupResult> {
   try {
     const destA2 = dest.toUpperCase();
+    const sourceFilter = opts.mvpOfficialOnly ? 'official' : undefined;
     if (VAT_OUT_OF_SCOPE_DESTS.has(destA2)) {
       return {
         value: null,
@@ -123,13 +153,13 @@ export async function getVatForHs6WithMeta(
     // Fetch the HS6 override (if any) and the country's STANDARD VAT duty_rule in parallel.
     // STANDARD is our "anchor" for VAT base, regardless of which percentage we end up using.
     const [overrideRow, standardRow] = (await Promise.all([
-      getVatOverride(destA2, hs6, on), // -> Hs6OverrideRow | null
-      getVat(destA2, on, 'STANDARD'), // -> CountryVatRow | null
+      getVatOverride(destA2, hs6, on, { source: sourceFilter }), // -> Hs6OverrideRow | null
+      getVat(destA2, on, 'STANDARD', { source: sourceFilter }), // -> CountryVatRow | null
     ])) as [Hs6OverrideRow | null, CountryVatRow | null];
 
     // If we have neither override nor a country STANDARD duty_rule, we can't compute VAT.
     if (!overrideRow && !standardRow) {
-      const coverage = await getVatCoverageForDestination(destA2, hs6);
+      const coverage = await getVatCoverageForDestination(destA2, hs6, opts);
       return {
         value: null,
         meta: coverage
@@ -169,7 +199,7 @@ export async function getVatForHs6WithMeta(
     // 2) HS6 override provides a kind -> fetch country VAT for that kind.
     if (overrideRow?.vatRateKind) {
       const vatRateKind = overrideRow.vatRateKind as VatRateKind;
-      const kindRow = await getVat(destA2, on, vatRateKind); // -> CountryVatRow | null
+      const kindRow = await getVat(destA2, on, vatRateKind, { source: sourceFilter }); // -> CountryVatRow | null
 
       if (kindRow) {
         const value = {
@@ -209,7 +239,7 @@ export async function getVatForHs6WithMeta(
     }
 
     // Last-resort null: no usable data.
-    const latestEffectiveFrom = await getLatestVatRuleEffectiveFrom(destA2);
+    const latestEffectiveFrom = await getLatestVatRuleEffectiveFrom(destA2, opts);
     return {
       value: null,
       meta: latestEffectiveFrom

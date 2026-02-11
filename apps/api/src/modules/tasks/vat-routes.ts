@@ -16,6 +16,7 @@ export default function vatRoutes(app: FastifyInstance) {
 
       const res = await importVatRules(rows, {
         importId,
+        source: 'official',
         makeSourceRef: (r) => {
           const note = (r.notes ?? '').toLowerCase();
           const src = note.includes('oecd') ? 'oecd' : note.includes('imf') ? 'imf' : 'oecd_imf';

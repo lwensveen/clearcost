@@ -2,6 +2,7 @@ import { db } from '@clearcost/db';
 import { and, desc, eq, lte } from 'drizzle-orm';
 import { vatOverridesTable } from '@clearcost/db';
 import { VatRateKind } from './utils.js';
+import type { VatSource } from './get-vat.js';
 
 /**
  * An HS6 override can:
@@ -15,7 +16,12 @@ import { VatRateKind } from './utils.js';
 export type VatOverrideRow = {
   ratePct?: number | null;
   vatRateKind?: VatRateKind | null;
+  source?: string | null;
   effectiveFrom: Date | null;
+};
+
+export type GetVatOverrideOpts = {
+  source?: VatSource;
 };
 
 /**
@@ -26,25 +32,29 @@ export type VatOverrideRow = {
 export async function getVatOverride(
   dest: string,
   hs6: string,
-  on: Date
+  on: Date,
+  opts: GetVatOverrideOpts = {}
 ): Promise<VatOverrideRow | null> {
   const destISO2 = dest.toUpperCase();
   const hs6Code = String(hs6).trim(); // keep exact; caller should ensure /^\d{6}$/ upstream
+  const whereParts = [
+    eq(vatOverridesTable.dest, destISO2),
+    eq(vatOverridesTable.hs6, hs6Code),
+    lte(vatOverridesTable.effectiveFrom, on),
+  ];
+  if (opts.source) {
+    whereParts.push(eq(vatOverridesTable.source, opts.source));
+  }
 
   const [row] = await db
     .select({
       ratePct: vatOverridesTable.ratePct,
       vatRateKind: vatOverridesTable.vatRateKind,
+      source: vatOverridesTable.source,
       effectiveFrom: vatOverridesTable.effectiveFrom,
     })
     .from(vatOverridesTable)
-    .where(
-      and(
-        eq(vatOverridesTable.dest, destISO2),
-        eq(vatOverridesTable.hs6, hs6Code),
-        lte(vatOverridesTable.effectiveFrom, on)
-      )
-    )
+    .where(and(...whereParts))
     .orderBy(desc(vatOverridesTable.effectiveFrom))
     .limit(1);
 
@@ -53,6 +63,7 @@ export async function getVatOverride(
   return {
     ratePct: row.ratePct == null ? null : Number(row.ratePct),
     vatRateKind: (row.vatRateKind ?? null) as VatRateKind | null,
+    source: row.source ?? null,
     effectiveFrom: row.effectiveFrom ?? null,
   };
 }

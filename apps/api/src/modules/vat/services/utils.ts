@@ -13,6 +13,8 @@ export type CountryVatRow = {
   ratePct: number; // VAT % (coerced from NUMERIC)
   vatBase: VatBase; // VAT base used for import VAT math
   vatRateKind: VatRateKind; // which rate kind this row represents
+  source?: string | null;
+  dataset?: string | null;
   effectiveFrom: Date | null;
 };
 

@@ -16,6 +16,8 @@ export const vatRateKindEnum = pgEnum('vat_rate_kind', [
   'ZERO',
 ]);
 
+export const vatSourceEnum = pgEnum('vat_source', ['official', 'llm', 'manual']);
+
 /** Freight */
 export const freightModeEnum = pgEnum('freight_mode', ['air', 'sea', 'express']);
 export const freightUnitEnum = pgEnum('freight_unit', ['kg', 'm3']);

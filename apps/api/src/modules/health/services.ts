@@ -90,6 +90,48 @@ async function getImportFreshnessStats(jobPrefixes: string[]): Promise<ImportFre
   };
 }
 
+async function getImportFreshnessStatsForExactJobs(jobs: string[]): Promise<ImportFreshnessStats> {
+  if (jobs.length === 0) {
+    return { lastSuccessAt: null, lastAttemptAt: null, source: null };
+  }
+
+  const exactClauses = jobs.map((job) => sql`job = ${job}`);
+  const whereJobs = sql.join(exactClauses, sql` OR `);
+  const attemptAtExpr = sql`COALESCE(finished_at, started_at)`;
+
+  const res = await db.execute(sql`
+    SELECT
+      MAX(
+        CASE
+          WHEN import_status = 'succeeded' THEN ${attemptAtExpr}
+          ELSE NULL
+        END
+      ) AS last_success_at,
+      MAX(${attemptAtExpr}) AS last_attempt_at,
+      (
+        SELECT i2.import_source::text
+        FROM imports i2
+        WHERE (${whereJobs})
+          AND i2.import_status = 'succeeded'
+        ORDER BY COALESCE(i2.finished_at, i2.started_at) DESC NULLS LAST
+        LIMIT 1
+      ) AS source
+    FROM imports
+    WHERE (${whereJobs})
+  `);
+
+  const row =
+    (res as any)?.rows?.[0] ??
+    (Array.isArray(res) ? (res as Array<Record<string, unknown>>)[0] : null) ??
+    null;
+
+  return {
+    lastSuccessAt: toDateOrNull(row?.last_success_at ?? null),
+    lastAttemptAt: toDateOrNull(row?.last_attempt_at ?? null),
+    source: typeof row?.source === 'string' ? row.source : null,
+  };
+}
+
 export async function getDatasetFreshnessSnapshot() {
   const now = new Date();
   const datasets: Record<
@@ -211,6 +253,105 @@ export async function getDatasetFreshnessSnapshot() {
         : latestRunAt == null
           ? true
           : ageHours! > rule.freshnessThresholdHours;
+
+    datasets[dataset] = {
+      scheduled: rule.scheduled,
+      thresholdHours: rule.freshnessThresholdHours,
+      freshnessThresholdHours: rule.freshnessThresholdHours,
+      lastSuccessAt,
+      lastAttemptAt,
+      source,
+      latestRunAt,
+      ageHours,
+      stale,
+    };
+  }
+
+  return { now, datasets };
+}
+
+type MvpDatasetFreshnessKey = 'fx' | 'vat' | 'duties';
+
+type MvpDatasetFreshnessRule = {
+  scheduled: boolean;
+  freshnessThresholdHours: number;
+  jobs: string[];
+};
+
+const MVP_DATASET_FRESHNESS_RULES: Record<MvpDatasetFreshnessKey, MvpDatasetFreshnessRule> = {
+  // MVP relies on ECB-based daily FX in the quote path.
+  fx: { scheduled: true, freshnessThresholdHours: 30, jobs: ['fx:daily'] },
+  // MVP VAT data should come from the official auto VAT import.
+  vat: { scheduled: true, freshnessThresholdHours: 48, jobs: ['vat:auto'] },
+  // MVP EU lane uses EU MFN duties; eu-daily is accepted as equivalent official coverage.
+  duties: {
+    scheduled: true,
+    freshnessThresholdHours: 192,
+    jobs: ['duties:eu-mfn', 'duties:eu-daily'],
+  },
+};
+
+export async function getMvpFreshnessSnapshot() {
+  const now = new Date();
+  const datasets: Record<
+    MvpDatasetFreshnessKey,
+    {
+      scheduled: boolean;
+      thresholdHours: number;
+      freshnessThresholdHours: number;
+      lastSuccessAt: Date | null;
+      lastAttemptAt: Date | null;
+      source: string | null;
+      latestRunAt: Date | null;
+      ageHours: number | null;
+      stale: boolean;
+    }
+  > = {
+    fx: {
+      scheduled: true,
+      thresholdHours: 30,
+      freshnessThresholdHours: 30,
+      lastSuccessAt: null,
+      lastAttemptAt: null,
+      source: null,
+      latestRunAt: null,
+      ageHours: null,
+      stale: true,
+    },
+    vat: {
+      scheduled: true,
+      thresholdHours: 48,
+      freshnessThresholdHours: 48,
+      lastSuccessAt: null,
+      lastAttemptAt: null,
+      source: null,
+      latestRunAt: null,
+      ageHours: null,
+      stale: true,
+    },
+    duties: {
+      scheduled: true,
+      thresholdHours: 192,
+      freshnessThresholdHours: 192,
+      lastSuccessAt: null,
+      lastAttemptAt: null,
+      source: null,
+      latestRunAt: null,
+      ageHours: null,
+      stale: true,
+    },
+  };
+
+  for (const [dataset, rule] of Object.entries(MVP_DATASET_FRESHNESS_RULES) as Array<
+    [MvpDatasetFreshnessKey, MvpDatasetFreshnessRule]
+  >) {
+    const { lastSuccessAt, lastAttemptAt, source } = await getImportFreshnessStatsForExactJobs(
+      rule.jobs
+    );
+    const latestRunAt = lastSuccessAt;
+    const ageHours =
+      latestRunAt == null ? null : Math.max(0, (now.getTime() - latestRunAt.getTime()) / 36e5);
+    const stale = latestRunAt == null ? true : ageHours! > rule.freshnessThresholdHours;
 
     datasets[dataset] = {
       scheduled: rule.scheduled,

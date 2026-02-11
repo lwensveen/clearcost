@@ -1,6 +1,6 @@
 import { index, numeric, pgTable, text, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { createTimestampColumn } from '../utils.js';
-import { vatBaseEnum, vatRateKindEnum } from '../enums.js';
+import { vatBaseEnum, vatRateKindEnum, vatSourceEnum } from '../enums.js';
 
 export const vatRulesTable = pgTable(
   'vat_rules',
@@ -8,6 +8,7 @@ export const vatRulesTable = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     dest: varchar('dest', { length: 2 }).notNull(),
     vatRateKind: vatRateKindEnum('vat_rate_kind').notNull().default('STANDARD'),
+    source: vatSourceEnum('source').notNull().default('official'),
     ratePct: numeric('rate_pct', { precision: 6, scale: 3 }).notNull(),
     vatBase: vatBaseEnum('vat_base').notNull().default('CIF_PLUS_DUTY'),
     effectiveFrom: createTimestampColumn('effective_from', { defaultNow: true }),
@@ -19,5 +20,6 @@ export const vatRulesTable = pgTable(
   (t) => [
     uniqueIndex('vat_rules_dest_kind_from_uq').on(t.dest, t.vatRateKind, t.effectiveFrom),
     index('vat_rules_dest_kind_idx').on(t.dest, t.vatRateKind),
+    index('vat_rules_source_idx').on(t.source),
   ]
 );

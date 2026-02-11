@@ -51,6 +51,7 @@ export async function importVatFromLLM(
 
   const res = await importVatRules(mapped, {
     importId: opts.importId,
+    source: 'llm',
     makeSourceRef: (row) => srcByKey.get(keyOf(row)),
   });
 

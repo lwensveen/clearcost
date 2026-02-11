@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   getCanonicalFxAsOfMock: vi.fn(),
   evaluateDeMinimisMock: vi.fn(),
   getDatasetFreshnessSnapshotMock: vi.fn(),
+  getMvpFreshnessSnapshotMock: vi.fn(),
 }));
 
 vi.mock('@clearcost/db', async () => {
@@ -63,6 +64,7 @@ vi.mock('../../de-minimis/services/evaluate.js', () => ({
 
 vi.mock('../../health/services.js', () => ({
   getDatasetFreshnessSnapshot: mocks.getDatasetFreshnessSnapshotMock,
+  getMvpFreshnessSnapshot: mocks.getMvpFreshnessSnapshotMock,
 }));
 
 import { quoteLandedCost } from './quote-landed-cost.js';
@@ -252,6 +254,41 @@ beforeEach(() => {
         lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
         lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
         source: null,
+        latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+        ageHours: 0,
+        stale: false,
+      },
+    },
+  });
+  mocks.getMvpFreshnessSnapshotMock.mockResolvedValue({
+    now: new Date('2025-01-01T00:00:00.000Z'),
+    datasets: {
+      duties: {
+        scheduled: true,
+        freshnessThresholdHours: 192,
+        lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+        lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+        source: 'TARIC',
+        latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+        ageHours: 0,
+        stale: false,
+      },
+      vat: {
+        scheduled: true,
+        freshnessThresholdHours: 48,
+        lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+        lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+        source: 'OECD/IMF',
+        latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
+        ageHours: 0,
+        stale: false,
+      },
+      fx: {
+        scheduled: true,
+        freshnessThresholdHours: 30,
+        lastSuccessAt: new Date('2025-01-01T00:00:00.000Z'),
+        lastAttemptAt: new Date('2025-01-01T00:00:00.000Z'),
+        source: 'ECB',
         latestRunAt: new Date('2025-01-01T00:00:00.000Z'),
         ageHours: 0,
         stale: false,
@@ -1409,7 +1446,8 @@ describe('quoteLandedCost MVP mode', () => {
     mocks.getActiveDutyRateWithMetaMock.mockResolvedValue({
       value: {
         id: 'duty-mvp-1',
-        ratePct: 2.5,
+        // 3.7% demo MFN duty for HS6 850440 in US -> EU MVP flow.
+        ratePct: 3.7,
         dutyRule: 'mfn',
         partner: 'US',
         source: 'official',
@@ -1423,6 +1461,7 @@ describe('quoteLandedCost MVP mode', () => {
     });
     mocks.getVatForHs6WithMetaMock.mockResolvedValue({
       value: {
+        // 21% NL standard VAT rate (demo).
         ratePct: 21,
         vatBase: 'CIF_PLUS_DUTY',
         source: 'default',
@@ -1437,6 +1476,7 @@ describe('quoteLandedCost MVP mode', () => {
     mocks.convertCurrencyWithMetaMock.mockImplementation(
       async (amount: number, from: string, to: string) => {
         if (from === 'USD' && to === 'EUR') {
+          // 1 USD -> 0.92 EUR demo FX rate.
           return { amount: Number(amount) * 0.92, meta: { missingRate: false, error: null } };
         }
         if (from === to)
@@ -1447,6 +1487,17 @@ describe('quoteLandedCost MVP mode', () => {
 
     const out = await quoteLandedCost(mvpBaseInput, { mvpMode: true });
 
+    expect(mocks.getActiveDutyRateWithMetaMock).toHaveBeenCalledWith(
+      'NL',
+      '850440',
+      expect.any(Date),
+      { partner: 'US', mvpOfficialOnly: true }
+    );
+    expect(mocks.getVatForHs6WithMetaMock).toHaveBeenCalledWith('NL', '850440', expect.any(Date), {
+      mvpOfficialOnly: true,
+    });
+    expect(mocks.getMvpFreshnessSnapshotMock).toHaveBeenCalledTimes(1);
+
     expect(out.quote.currency).toBe('EUR');
     expect(out.quote.items).toEqual([{ hs6: '850440', declaredValue: 100, currency: 'USD' }]);
     expect(out.quote.fxRate).toMatchObject({
@@ -1454,10 +1505,11 @@ describe('quoteLandedCost MVP mode', () => {
       to: 'EUR',
       rate: 0.92,
     });
-    expect(out.quote.dutyAmount).toBe(2.3);
-    expect(out.quote.vatAmount).toBe(19.8);
-    expect(out.quote.totalLandedCost).toBe(114.1);
-    expect(out.quote.total).toBe(114.1);
+    // 92.00 + 3.40 duty + 20.03 VAT = 115.43 total (see demo seed math).
+    expect(out.quote.dutyAmount).toBe(3.4);
+    expect(out.quote.vatAmount).toBe(20.03);
+    expect(out.quote.totalLandedCost).toBe(115.43);
+    expect(out.quote.total).toBe(115.43);
     expect(out.quote.metadata).toMatchObject({
       confidence: 'high',
       originCountry: 'US',
@@ -1487,6 +1539,7 @@ describe('quoteLandedCost MVP mode', () => {
     });
     mocks.getVatForHs6WithMetaMock.mockResolvedValue({
       value: {
+        // 19% DE standard VAT rate (demo).
         ratePct: 19,
         vatBase: 'CIF_PLUS_DUTY',
         source: 'default',
@@ -1515,6 +1568,7 @@ describe('quoteLandedCost MVP mode', () => {
     );
 
     expect(out.quote.currency).toBe('EUR');
+    // 100.00 + 0.00 duty + 19.00 VAT = 119.00 total (see demo seed math).
     expect(out.quote.dutyAmount).toBe(0);
     expect(out.quote.vatAmount).toBe(19);
     expect(out.quote.totalLandedCost).toBe(119);
@@ -1566,6 +1620,7 @@ describe('quoteLandedCost MVP mode', () => {
     mocks.convertCurrencyWithMetaMock.mockImplementation(
       async (amount: number, from: string, to: string) => {
         if (from === 'USD' && to === 'EUR') {
+          // 1 USD -> 0.92 EUR demo FX rate.
           return { amount: Number(amount) * 0.92, meta: { missingRate: false, error: null } };
         }
         throw new Error(`Unexpected FX conversion ${from}->${to}`);
@@ -1574,7 +1629,8 @@ describe('quoteLandedCost MVP mode', () => {
     mocks.getActiveDutyRateWithMetaMock.mockResolvedValue({
       value: {
         id: 'duty-mvp-3',
-        ratePct: 2.5,
+        // 3.7% demo MFN duty for HS6 850440 in US -> EU MVP flow.
+        ratePct: 3.7,
         dutyRule: 'mfn',
         partner: 'US',
         source: 'official',

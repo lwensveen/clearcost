@@ -43,8 +43,10 @@
         "CC_LIMIT_STARTER_MAX_MANIFESTS",
         "CLEARCOST_ADMIN_API_KEY",
         "CLEARCOST_API_KEY",
+        "CLEARCOST_API_BASE_URL",
         "CLEARCOST_API_URL",
         "CLEARCOST_BASE_URL",
+        "CLEARCOST_DEMO_API_KEY",
         "CLEARCOST_TASKS_API_KEY",
         "CLEARCOST_WEB_SERVER_KEY",
         "CLEARCOST_WEBHOOK_TIMEOUT_MS",
@@ -192,6 +194,8 @@
       ],
       "outputs": [],
       "env": [
+        "CLEARCOST_API_BASE_URL",
+        "CLEARCOST_DEMO_API_KEY",
         "CLEARCOST_WEB_SERVER_KEY",
         "NEXT_PHASE"
       ]

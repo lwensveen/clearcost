@@ -21,6 +21,11 @@ export type DutyRateRow = {
 export type GetActiveDutyRateOpts = {
   preferFTA?: boolean;
   partner?: string; // ISO2 origin (recommended).
+  /**
+   * MVP-only guardrail: restrict lookup to official rows and do not fall back to
+   * manual/vendor/wits/llm rows.
+   */
+  mvpOfficialOnly?: boolean;
 };
 
 export type DutyRateLookupResult = LookupResult<DutyRateRow | null>;
@@ -122,15 +127,17 @@ const sourcePriority = sql<number>`
 `;
 
 async function getDutyDatasetInfo(
-  destA2: string
+  destA2: string,
+  opts: Pick<GetActiveDutyRateOpts, 'mvpOfficialOnly'> = {}
 ): Promise<{ dataset: string | null; effectiveFrom: Date | null } | null> {
+  const officialOnlyWhere = opts.mvpOfficialOnly ? eq(dutyRatesTable.source, 'official') : null;
   const [row] = await db
     .select({
       dataset: dutyRatesTable.source,
       effectiveFrom: dutyRatesTable.effectiveFrom,
     })
     .from(dutyRatesTable)
-    .where(eq(dutyRatesTable.dest, destA2))
+    .where(and(eq(dutyRatesTable.dest, destA2), officialOnlyWhere ?? sql`TRUE`))
     .orderBy(desc(dutyRatesTable.effectiveFrom))
     .limit(1);
 
@@ -162,12 +169,15 @@ export async function getActiveDutyRateWithMeta(
     const hs6Key = String(hs6).slice(0, 6);
     const partnerIso2 = normalizePartnerIso2(opts.partner ?? null) || null;
 
+    const officialOnlyWhere = opts.mvpOfficialOnly ? eq(dutyRatesTable.source, 'official') : null;
+
     // Base validity & key filter
     const baseWhere = and(
       eq(dutyRatesTable.dest, destA2),
       eq(dutyRatesTable.hs6, hs6Key),
       lte(dutyRatesTable.effectiveFrom, on),
-      or(isNull(dutyRatesTable.effectiveTo), gt(dutyRatesTable.effectiveTo, on))
+      or(isNull(dutyRatesTable.effectiveTo), gt(dutyRatesTable.effectiveTo, on)),
+      officialOnlyWhere ?? sql`TRUE`
     );
 
     const cols = {
@@ -282,7 +292,7 @@ export async function getActiveDutyRateWithMeta(
       };
     }
 
-    const datasetInfo = await getDutyDatasetInfo(destA2);
+    const datasetInfo = await getDutyDatasetInfo(destA2, opts);
     return {
       value: null,
       meta: datasetInfo

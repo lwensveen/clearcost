@@ -71,6 +71,7 @@ export default function vatRoutes(app: FastifyInstance) {
         .insert(vatRulesTable)
         .values({
           dest: b.dest.toUpperCase(),
+          source: 'manual',
           ratePct: String(b.ratePct),
           vatBase: b.vatBase,
           effectiveFrom: b.effectiveFrom,
@@ -102,6 +103,7 @@ export default function vatRoutes(app: FastifyInstance) {
         .update(vatRulesTable)
         .set({
           ...(b.dest ? { dest: b.dest.toUpperCase() } : {}),
+          source: 'manual',
           ...(b.ratePct !== undefined ? { ratePct: String(b.ratePct) } : {}),
           ...(b.vatBase ? { vatBase: b.vatBase } : {}),
           ...(b.effectiveFrom ? { effectiveFrom: b.effectiveFrom } : {}),
@@ -157,6 +159,7 @@ export default function vatRoutes(app: FastifyInstance) {
           .insert(vatRulesTable)
           .values({
             dest: r0.dest.toUpperCase(),
+            source: 'manual',
             ratePct: String(r0.ratePct),
             vatBase: r0.vatBase,
             effectiveFrom: r0.effectiveFrom,
@@ -185,7 +188,7 @@ export default function vatRoutes(app: FastifyInstance) {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
     },
     async (req) => {
-      const res = await importVatRules(req.body);
+      const res = await importVatRules(req.body, { source: 'manual' });
       return VatAdminImportResponseSchema.parse({ ok: true as const, count: res.count });
     }
   );
