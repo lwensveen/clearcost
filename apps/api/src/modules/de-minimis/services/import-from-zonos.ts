@@ -3,45 +3,63 @@ import { sql } from 'drizzle-orm';
 import { load } from 'cheerio';
 import { sha256Hex } from '../../../lib/provenance.js';
 import { httpFetch } from '../../../lib/http.js';
+import type { DeMinimisInsert } from '@clearcost/types';
 
 type ParsedCell = { value: number; currency: string };
+type DeMinimisBasis = NonNullable<DeMinimisInsert['deMinimisBasis']>;
 const URL = 'https://zonos.com/docs/guides/de-minimis-values';
 
 const CURRENCY_FIX: Record<string, string> = { KM: 'BAM', RMB: 'CNY' };
 const toMidnightUTC = (d: Date) => new Date(d.toISOString().slice(0, 10));
 
-// Known basis overrides (authoritative sources):
-const BASIS: Record<string, { duty?: 'INTRINSIC' | 'CIF'; vat?: 'INTRINSIC' | 'CIF' }> = {
-  US: { duty: 'INTRINSIC' },
-  GB: { vat: 'INTRINSIC' },
-  AT: { duty: 'INTRINSIC' },
-  BE: { duty: 'INTRINSIC' },
-  BG: { duty: 'INTRINSIC' },
-  HR: { duty: 'INTRINSIC' },
-  CY: { duty: 'INTRINSIC' },
-  CZ: { duty: 'INTRINSIC' },
-  DE: { duty: 'INTRINSIC' },
-  DK: { duty: 'INTRINSIC' },
-  EE: { duty: 'INTRINSIC' },
-  ES: { duty: 'INTRINSIC' },
-  FI: { duty: 'INTRINSIC' },
-  FR: { duty: 'INTRINSIC' },
-  GR: { duty: 'INTRINSIC' },
-  HU: { duty: 'INTRINSIC' },
-  IE: { duty: 'INTRINSIC' },
-  IT: { duty: 'INTRINSIC' },
-  LT: { duty: 'INTRINSIC' },
-  LU: { duty: 'INTRINSIC' },
-  LV: { duty: 'INTRINSIC' },
-  MT: { duty: 'INTRINSIC' },
-  NL: { duty: 'INTRINSIC' },
-  PL: { duty: 'INTRINSIC' },
-  PT: { duty: 'INTRINSIC' },
-  RO: { duty: 'INTRINSIC' },
-  SE: { duty: 'INTRINSIC' },
-  SI: { duty: 'INTRINSIC' },
-  SK: { duty: 'INTRINSIC' },
+const EU_DUTY_INTRINSIC = new Set([
+  'AT',
+  'BE',
+  'BG',
+  'HR',
+  'CY',
+  'CZ',
+  'DE',
+  'DK',
+  'EE',
+  'ES',
+  'FI',
+  'FR',
+  'GR',
+  'HU',
+  'IE',
+  'IT',
+  'LT',
+  'LU',
+  'LV',
+  'MT',
+  'NL',
+  'PL',
+  'PT',
+  'RO',
+  'SE',
+  'SI',
+  'SK',
+]);
+const BASIS_OVERRIDES: Partial<
+  Record<string, Partial<Record<DeMinimisInsert['deMinimisKind'], DeMinimisBasis>>>
+> = {
+  US: { DUTY: 'INTRINSIC' },
+  GB: { VAT: 'INTRINSIC' },
+  CA: { DUTY: 'INTRINSIC', VAT: 'INTRINSIC' },
 };
+
+export function resolveZonosBasis(
+  dest: string,
+  kind: DeMinimisInsert['deMinimisKind']
+): DeMinimisBasis {
+  const country = String(dest).trim().toUpperCase();
+  const override = BASIS_OVERRIDES[country]?.[kind];
+  if (override) return override;
+  if (kind === 'DUTY' && EU_DUTY_INTRINSIC.has(country)) return 'INTRINSIC';
+  // Conservative default for scraped source when no explicit jurisdiction basis is configured.
+  return 'CIF';
+}
 
 function parseAmountCell(text: string): ParsedCell | null {
   // expects formats like "150 EUR", "€150 EUR", "150USD" (we only use trailing currency letters)
@@ -175,10 +193,10 @@ export async function importDeMinimisFromZonos(
       };
 
       if (duty && duty.value > 0) {
-        await upsertOne('DUTY', duty.value, duty.currency, BASIS[iso]?.duty ?? 'INTRINSIC');
+        await upsertOne('DUTY', duty.value, duty.currency, resolveZonosBasis(iso, 'DUTY'));
       }
       if (tax && tax.value > 0) {
-        await upsertOne('VAT', tax.value, tax.currency, BASIS[iso]?.vat ?? 'INTRINSIC');
+        await upsertOne('VAT', tax.value, tax.currency, resolveZonosBasis(iso, 'VAT'));
       }
     }
 
