@@ -43,6 +43,32 @@ export function noteHasPartnerToken(note: string | null | undefined, partnerIso2
   return re.test(note ?? '');
 }
 
+function normalizePartnerIso2(value: string | null | undefined): string {
+  const token = String(value ?? '')
+    .trim()
+    .toUpperCase();
+  return /^[A-Z]{2}$/.test(token) ? token : '';
+}
+
+/** Partner-empty rows are global (MFN/baseline) and are safe fallback candidates. */
+export function isGlobalPartnerRow(partnerIso2: string | null | undefined): boolean {
+  return normalizePartnerIso2(partnerIso2) === '';
+}
+
+/**
+ * For origin-aware fallback, never apply a duty row that is specific to another partner.
+ * Accept only exact-partner rows or global (partner-empty) rows.
+ */
+export function isPartnerCompatibleFallbackRow(
+  rowPartnerIso2: string | null | undefined,
+  requestedPartnerIso2: string | null | undefined
+): boolean {
+  const requested = normalizePartnerIso2(requestedPartnerIso2);
+  if (!requested) return true;
+  const rowPartner = normalizePartnerIso2(rowPartnerIso2);
+  return rowPartner === '' || rowPartner === requested;
+}
+
 /** Internal helper to normalize the final row into a plain object. */
 function asDutyRateRow(
   row:
@@ -134,7 +160,7 @@ export async function getActiveDutyRateWithMeta(
   try {
     const destA2 = dest.toUpperCase();
     const hs6Key = String(hs6).slice(0, 6);
-    const partnerIso2 = opts.partner?.trim().toUpperCase() || null;
+    const partnerIso2 = normalizePartnerIso2(opts.partner ?? null) || null;
 
     // Base validity & key filter
     const baseWhere = and(
@@ -195,7 +221,7 @@ export async function getActiveDutyRateWithMeta(
         ? sql`upper(coalesce(${dutyRatesTable.notes}, '')) ~ ${pattern}`
         : sql`false`;
 
-      const [notesRow] = await db
+      const notesRows = await db
         .select(cols)
         .from(dutyRatesTable)
         .where(and(baseWhere, notesMatch))
@@ -205,8 +231,9 @@ export async function getActiveDutyRateWithMeta(
           asc(dutyRatesTable.ratePct),
           desc(dutyRatesTable.effectiveFrom)
         )
-        .limit(1);
+        .limit(100);
 
+      const notesRow = notesRows.find((row) => isGlobalPartnerRow(row.partner));
       const viaNotes = asDutyRateRow(notesRow);
       if (viaNotes) {
         return {
@@ -226,26 +253,23 @@ export async function getActiveDutyRateWithMeta(
     // --------------------------------------------------------------------------
     const rulePriority = makeRulePriority(Boolean(opts.preferFTA));
 
-    // Soft bias: if a partner was requested, prefer rows that happen to match it.
-    const partnerBias = partnerIso2
-      ? asc(sql`CASE WHEN ${dutyRatesTable.partner} = ${partnerIso2} THEN 0 ELSE 1 END`)
-      : undefined;
-
     const orderBys = [
       sourcePriority, // OFFICIAL > … > WITS baseline
-      ...(partnerBias ? ([partnerBias] as const) : []),
       rulePriority,
       asc(dutyRatesTable.ratePct),
       desc(dutyRatesTable.effectiveFrom),
     ] as const;
 
-    const [row] = await db
+    const rows = await db
       .select(cols)
       .from(dutyRatesTable)
       .where(baseWhere)
       .orderBy(...orderBys)
-      .limit(1);
+      .limit(partnerIso2 ? 500 : 1);
 
+    const row = partnerIso2
+      ? rows.find((candidate) => isPartnerCompatibleFallbackRow(candidate.partner, partnerIso2))
+      : rows[0];
     const value = asDutyRateRow(row);
     if (value) {
       return {
