@@ -3,6 +3,8 @@ import { db, deMinimisTable, provenanceTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
 import { sha256Hex } from '../../../lib/provenance.js';
 
+type DeMinimisBasis = 'INTRINSIC' | 'CIF';
+
 type ProvOpts = {
   importId?: string;
   makeSourceRef?: (row: (typeof deMinimisTable)['$inferSelect']) => string | undefined;
@@ -16,12 +18,25 @@ const toDbNumeric = (n: unknown): string | null => {
   return Number.isFinite(num) ? String(num) : null; // pass as text -> numeric
 };
 
-const toDate = (d: unknown) =>
+const toDate = (d: unknown): Date =>
   d instanceof Date ? d : new Date(`${String(d ?? '').slice(0, 10)}T00:00:00Z`);
 
 // For inserts, provide real Date or null (not SQL NULL)
-const toDbFrom = (d: unknown): Date => toDate(d);
-const toDbTo = (d: unknown): Date | null => (d ? toDate(d) : null);
+const toDbFrom = (d: unknown, rowLabel: string): Date => {
+  const out = toDate(d);
+  if (Number.isNaN(out.getTime())) {
+    throw new Error(`[DeMinimis] Invalid effectiveFrom at ${rowLabel}.`);
+  }
+  return out;
+};
+const toDbTo = (d: unknown, rowLabel: string): Date | null => {
+  if (!d) return null;
+  const out = toDate(d);
+  if (Number.isNaN(out.getTime())) {
+    throw new Error(`[DeMinimis] Invalid effectiveTo at ${rowLabel}.`);
+  }
+  return out;
+};
 
 const isoOrNull = (d: Date | string | null | undefined) =>
   !d
@@ -29,6 +44,53 @@ const isoOrNull = (d: Date | string | null | undefined) =>
     : d instanceof Date
       ? d.toISOString()
       : new Date(`${String(d).slice(0, 10)}T00:00:00Z`).toISOString();
+
+function normalizeBasis(
+  basis: string | null | undefined,
+  rowLabel: string
+): (typeof deMinimisTable)['$inferInsert']['deMinimisBasis'] {
+  const normalized = up(basis);
+  if (normalized === 'INTRINSIC' || normalized === 'CIF') {
+    return normalized as DeMinimisBasis;
+  }
+  throw new Error(`[DeMinimis] Invalid deMinimisBasis at ${rowLabel}. Expected INTRINSIC or CIF.`);
+}
+
+function normalizeInsertRow(
+  row: DeMinimisInsert,
+  index: number
+): (typeof deMinimisTable)['$inferInsert'] {
+  const rowLabel = `row ${index + 1}`;
+  const dest = up(row.dest);
+  if (!dest || !/^[A-Z]{2}$/.test(dest)) {
+    throw new Error(`[DeMinimis] Invalid destination country code at ${rowLabel}.`);
+  }
+
+  const kind = row.deMinimisKind;
+  if (kind !== 'DUTY' && kind !== 'VAT') {
+    throw new Error(`[DeMinimis] Invalid deMinimisKind at ${rowLabel}.`);
+  }
+
+  const currency = up(row.currency);
+  if (!currency || !/^[A-Z]{3}$/.test(currency)) {
+    throw new Error(`[DeMinimis] Invalid currency code at ${rowLabel}.`);
+  }
+
+  const value = toDbNumeric(row.value);
+  if (value == null) {
+    throw new Error(`[DeMinimis] Invalid threshold value at ${rowLabel}.`);
+  }
+
+  return {
+    dest,
+    deMinimisKind: kind,
+    deMinimisBasis: normalizeBasis(row.deMinimisBasis, rowLabel),
+    currency,
+    value,
+    effectiveFrom: toDbFrom(row.effectiveFrom, rowLabel),
+    effectiveTo: toDbTo(row.effectiveTo ?? null, rowLabel),
+  };
+}
 
 /**
  * Upsert de-minimis thresholds using your canonical insert type.
@@ -41,6 +103,7 @@ export async function importDeMinimis(
   let buf: DeMinimisInsert[] = [];
   let inserted = 0;
   let updated = 0;
+  let sourceRows = 0;
 
   const isAsync = (s: any): s is AsyncIterable<DeMinimisInsert> =>
     s && typeof s[Symbol.asyncIterator] === 'function';
@@ -48,15 +111,7 @@ export async function importDeMinimis(
   async function flush() {
     if (!buf.length) return;
 
-    const values = buf.map((r) => ({
-      dest: up(r.dest)!,
-      deMinimisKind: r.deMinimisKind,
-      deMinimisBasis: (up(r.deMinimisBasis) as 'INTRINSIC' | 'CIF') ?? 'INTRINSIC',
-      currency: up(r.currency)!,
-      value: toDbNumeric(r.value), // string | null
-      effectiveFrom: toDbFrom(r.effectiveFrom), // Date (always)
-      effectiveTo: toDbTo(r.effectiveTo ?? null), // Date | null
-    })) as Array<(typeof deMinimisTable)['$inferInsert']>;
+    const values = buf.map(normalizeInsertRow);
 
     const ret = await db
       .insert(deMinimisTable)
@@ -128,13 +183,18 @@ export async function importDeMinimis(
   if (isAsync(source)) {
     for await (const row of source) {
       buf.push(row);
+      sourceRows++;
       if (buf.length >= 5000) await flush();
     }
   } else {
     for (const row of source) {
       buf.push(row);
+      sourceRows++;
       if (buf.length >= 5000) await flush();
     }
+  }
+  if (sourceRows === 0) {
+    throw new Error('[DeMinimis] source produced 0 rows.');
   }
   await flush();
 
