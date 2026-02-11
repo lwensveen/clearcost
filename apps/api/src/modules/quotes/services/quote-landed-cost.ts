@@ -1,4 +1,9 @@
-import { getCurrencyForCountry, normalizeCountryIso2, type QuoteInput } from '@clearcost/types';
+import {
+  getCurrencyForCountry,
+  normalizeCountryIso2,
+  type QuoteInput,
+  type QuoteResponse,
+} from '@clearcost/types';
 import { db, merchantProfilesTable, taxRegistrationsTable } from '@clearcost/db';
 import { and, eq } from 'drizzle-orm';
 import countries from 'i18n-iso-countries';
@@ -31,6 +36,42 @@ const roundMoney = (n: number, ccy: string) => {
   const f = Math.pow(10, dp);
   return Math.round(n * f) / f;
 };
+
+const MVP_SUPPORTED_ORIGINS = new Set(['US', 'NL']);
+const MVP_SUPPORTED_DESTINATIONS = new Set(['NL', 'DE']);
+const MVP_SUPPORTED_CURRENCIES = new Set(['USD', 'EUR']);
+const MVP_HS6_PREFIX = '85';
+const MVP_MAX_DECLARED_EUR = 150;
+const MVP_SCOPE_MESSAGE =
+  'ClearCost MVP only supports US/NL → NL/DE, electronics accessories <150 EUR';
+
+function quoteError(statusCode: number, code: string, message: string): Error {
+  return Object.assign(new Error(message), { statusCode, code });
+}
+
+function unsupportedScopeError(message = MVP_SCOPE_MESSAGE): Error {
+  return quoteError(422, 'unsupported_lane_or_scope', message);
+}
+
+function aboveDeMinimisError(): Error {
+  return quoteError(
+    422,
+    'above_de_minimis',
+    'ClearCost MVP only supports declared customs value below 150 EUR equivalent'
+  );
+}
+
+function dataNotReadyError(message: string): Error {
+  return quoteError(
+    503,
+    'data_not_ready',
+    `FX/VAT/duty data for this lane is missing or stale; cannot quote reliably. ${message}`
+  );
+}
+
+function isoTimestampOrNull(value: Date | null | undefined): string | null {
+  return value ? value.toISOString() : null;
+}
 
 function isStrictFreshnessEnabled() {
   return process.env.QUOTE_STRICT_FRESHNESS === '1';
@@ -361,6 +402,255 @@ async function totalSurcharges(
   };
 }
 
+async function quoteLandedCostMvp(
+  input: QuoteInput & { merchantId?: string },
+  opts?: QuoteCalcOpts
+): Promise<{ fxAsOf: Date; quote: QuoteResponse }> {
+  const now = new Date();
+  const originCountry = normalizeCountryIso2(input.origin) ?? input.origin.toUpperCase();
+  const destCountry = normalizeCountryIso2(input.dest) ?? input.dest.toUpperCase();
+  const inputCurrency = String(input.itemValue.currency ?? '')
+    .trim()
+    .toUpperCase();
+
+  if (!MVP_SUPPORTED_ORIGINS.has(originCountry)) throw unsupportedScopeError();
+  if (!MVP_SUPPORTED_DESTINATIONS.has(destCountry)) throw unsupportedScopeError();
+  if (!MVP_SUPPORTED_CURRENCIES.has(inputCurrency)) throw unsupportedScopeError();
+
+  const destCurrency = resolveDestinationCurrency(destCountry);
+  if (!MVP_SUPPORTED_CURRENCIES.has(destCurrency)) throw unsupportedScopeError();
+
+  // MVP is explicitly for postal/parcel-like B2C shipments; keep mode narrow.
+  if (input.mode !== 'air') {
+    throw unsupportedScopeError();
+  }
+
+  const hs6 = await resolveHs6(input.categoryKey, input.hs6);
+  if (!/^\d{6}$/.test(hs6) || !hs6.startsWith(MVP_HS6_PREFIX)) {
+    throw unsupportedScopeError();
+  }
+
+  const fxAsOf = opts?.fxAsOf ?? (await getCanonicalFxAsOf());
+
+  let goodsDestOut: Awaited<ReturnType<typeof convertCurrencyWithMeta>>;
+  try {
+    goodsDestOut = await convertCurrencyWithMeta(
+      input.itemValue.amount,
+      inputCurrency,
+      destCurrency,
+      { on: fxAsOf, strict: true }
+    );
+  } catch {
+    throw dataNotReadyError(
+      `Missing FX conversion ${inputCurrency}->${destCurrency} at ${fxAsOf.toISOString()}`
+    );
+  }
+
+  let goodsEurOut: Awaited<ReturnType<typeof convertCurrencyWithMeta>>;
+  try {
+    goodsEurOut = await convertCurrencyWithMeta(input.itemValue.amount, inputCurrency, 'EUR', {
+      on: fxAsOf,
+      strict: true,
+    });
+  } catch {
+    throw dataNotReadyError(
+      `Missing FX conversion ${inputCurrency}->EUR at ${fxAsOf.toISOString()}`
+    );
+  }
+
+  if (goodsEurOut.amount >= MVP_MAX_DECLARED_EUR) {
+    throw aboveDeMinimisError();
+  }
+
+  const [dutyLookup, vatLookup, freshness] = await Promise.all([
+    getActiveDutyRateWithMeta(destCountry, hs6, now, {
+      partner: toDutyPartnerIso2(originCountry),
+    }),
+    getVatForHs6WithMeta(destCountry, hs6, now),
+    getDatasetFreshnessSnapshot(),
+  ]);
+
+  const staleDatasets: string[] = [];
+  if (
+    freshness.datasets.fx.stale === true ||
+    (freshness.datasets.fx.scheduled && freshness.datasets.fx.lastSuccessAt == null)
+  ) {
+    staleDatasets.push('fx');
+  }
+  if (
+    freshness.datasets.vat.stale === true ||
+    (freshness.datasets.vat.scheduled && freshness.datasets.vat.lastSuccessAt == null)
+  ) {
+    staleDatasets.push('vat');
+  }
+  if (
+    freshness.datasets.duties.stale === true ||
+    (freshness.datasets.duties.scheduled && freshness.datasets.duties.lastSuccessAt == null)
+  ) {
+    staleDatasets.push('duty');
+  }
+  if (staleDatasets.length > 0) {
+    throw dataNotReadyError(`Stale or missing freshness runs: ${staleDatasets.join(', ')}`);
+  }
+
+  const dutyRow = dutyLookup.value;
+  if (!dutyRow || dutyLookup.meta.status !== 'ok') {
+    throw dataNotReadyError(
+      `Duty lookup status ${dutyLookup.meta.status} for ${originCountry}->${destCountry} ${hs6}`
+    );
+  }
+
+  const dutyRule = (dutyRow.dutyRule ?? 'mfn').toLowerCase();
+  if (dutyRule !== 'mfn' && dutyRule !== 'fta') {
+    throw unsupportedScopeError(
+      `${MVP_SCOPE_MESSAGE}. This request resolves to a non-MFN/non-FTA duty rule.`
+    );
+  }
+
+  const vatInfo = vatLookup.value;
+  if (!vatInfo || vatLookup.meta.status !== 'ok') {
+    throw dataNotReadyError(`VAT lookup status ${vatLookup.meta.status} for ${destCountry} ${hs6}`);
+  }
+
+  const goodsDest = roundMoney(goodsDestOut.amount, destCurrency);
+  const dutyAmount = roundMoney((goodsDest * Number(dutyRow.ratePct)) / 100, destCurrency);
+  const vatBase =
+    (vatInfo.vatBase as 'CIF' | 'CIF_PLUS_DUTY') === 'CIF_PLUS_DUTY'
+      ? goodsDest + dutyAmount
+      : goodsDest;
+  const vatAmount = roundMoney((vatBase * Number(vatInfo.ratePct)) / 100, destCurrency);
+  const totalLandedCost = roundMoney(goodsDest + dutyAmount + vatAmount, destCurrency);
+
+  const volKg = volumetricKg(input.dimsCm);
+  const chargeableKg = Math.max(input.weightKg, volKg);
+  const fxRate =
+    input.itemValue.amount === 0
+      ? 1
+      : Number((goodsDestOut.amount / input.itemValue.amount).toFixed(8));
+
+  return {
+    fxAsOf,
+    quote: {
+      hs6,
+      currency: destCurrency,
+      chargeableKg,
+      freight: 0,
+      deMinimis: {
+        duty: {
+          thresholdDest: MVP_MAX_DECLARED_EUR,
+          deMinimisBasis: 'INTRINSIC' as const,
+          under: true,
+        },
+        vat: {
+          thresholdDest: MVP_MAX_DECLARED_EUR,
+          deMinimisBasis: 'INTRINSIC' as const,
+          under: true,
+        },
+        suppressDuty: false,
+        suppressVAT: false,
+      },
+      components: {
+        CIF: goodsDest,
+        duty: dutyAmount,
+        vat: vatAmount,
+        fees: 0,
+      },
+      total: totalLandedCost,
+      guaranteedMax: roundMoney(totalLandedCost * 1.02, destCurrency),
+      policy:
+        'ClearCost MVP quote: US/NL → NL/DE, chapter 85 accessories, declared value under 150 EUR equivalent.',
+      incoterm: 'DAP' as const,
+      componentConfidence: {
+        duty: 'authoritative' as const,
+        vat: 'authoritative' as const,
+        surcharges: 'authoritative' as const,
+        freight: 'authoritative' as const,
+        fx: 'authoritative' as const,
+      },
+      overallConfidence: 'authoritative' as const,
+      missingComponents: [],
+      sources: {
+        duty: toQuoteSourceMetadata({
+          dataset: dutyLookup.meta.dataset,
+          effectiveFrom: dutyLookup.meta.effectiveFrom,
+        }),
+        vat: toQuoteSourceMetadata({
+          dataset: vatLookup.meta.dataset,
+          effectiveFrom: vatLookup.meta.effectiveFrom,
+        }),
+        surcharges: toQuoteSourceMetadata({
+          dataset: null,
+          effectiveFrom: null,
+        }),
+      },
+      explainability: {
+        duty: {
+          dutyRule: dutyRow.dutyRule ?? null,
+          partner: dutyRow.partner ?? null,
+          source: dutyRow.source ?? null,
+          effectiveFrom: dutyRow.effectiveFrom ? dutyRow.effectiveFrom.toISOString() : null,
+          suppressedByDeMinimis: false,
+        },
+        vat: {
+          source: vatInfo.source ?? null,
+          vatBase: vatInfo.vatBase ?? null,
+          effectiveFrom: vatInfo.effectiveFrom ? vatInfo.effectiveFrom.toISOString() : null,
+          checkoutCollected: false,
+          suppressedByDeMinimis: false,
+        },
+        deMinimis: {
+          suppressDuty: false,
+          suppressVAT: false,
+          dutyBasis: 'INTRINSIC' as const,
+          vatBasis: 'INTRINSIC' as const,
+        },
+        surcharges: {
+          appliedCodes: [],
+          appliedCount: 0,
+          sourceRefs: [],
+        },
+        freight: {
+          model: 'override' as const,
+          lookupStatus: 'no_dataset' as const,
+          unit: 'kg' as const,
+          qty: chargeableKg,
+        },
+      },
+      items: [
+        {
+          hs6,
+          declaredValue: roundMoney(input.itemValue.amount, inputCurrency),
+          currency: inputCurrency,
+        },
+      ],
+      fxRate: {
+        from: inputCurrency,
+        to: destCurrency,
+        rate: fxRate,
+        asOf: fxAsOf.toISOString(),
+        derivedFrom:
+          inputCurrency === destCurrency ? 'identity' : 'fx_rates latest <= fxAsOf conversion',
+      },
+      dutyAmount,
+      vatAmount,
+      totalLandedCost,
+      metadata: {
+        confidence: 'high' as const,
+        originCountry,
+        destinationCountry: destCountry,
+        inputCurrency,
+        outputCurrency: destCurrency,
+        dataFreshness: {
+          fxAsOf: fxAsOf.toISOString(),
+          fxImportAt: isoTimestampOrNull(freshness.datasets.fx.lastSuccessAt),
+          vatImportAt: isoTimestampOrNull(freshness.datasets.vat.lastSuccessAt),
+          dutyImportAt: isoTimestampOrNull(freshness.datasets.duties.lastSuccessAt),
+        },
+      },
+    },
+  };
+}
+
 function strictStaleComponentsFromSnapshot(
   snapshot: Awaited<ReturnType<typeof getDatasetFreshnessSnapshot>>
 ) {
@@ -390,12 +680,18 @@ export type QuoteCalcOpts = {
   fxAsOf?: Date;
   /** Test/runtime override for strict freshness behavior (defaults to env flag). */
   strictFreshness?: boolean;
+  /** Restrict quote computation to the productized MVP lane/scope only. */
+  mvpMode?: boolean;
 };
 
 export async function quoteLandedCost(
   input: QuoteInput & { merchantId?: string },
   opts?: QuoteCalcOpts
-) {
+): Promise<{ fxAsOf: Date; quote: QuoteResponse }> {
+  if (opts?.mvpMode) {
+    return quoteLandedCostMvp(input, opts);
+  }
+
   const destCountry = normalizeCountryIso2(input.dest) ?? input.dest.toUpperCase();
   const originCountry = normalizeCountryIso2(input.origin) ?? input.origin.toUpperCase();
   const now = new Date();

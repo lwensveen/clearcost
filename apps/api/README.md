@@ -151,6 +151,38 @@ The API starts two servers:
 - Public server: `HOST` + `PORT` (default `0.0.0.0:3001`)
 - Internal server: `INTERNAL_HOST` + `INTERNAL_PORT` (default `0.0.0.0:3002`)
 
+## MVP Demo Seed (US/NL -> NL/DE)
+
+Use this when you want a deterministic local dataset for the scoped MVP quote flow.
+All monetary values in quote computation are handled with ISO-4217 currency codes (never country codes).
+Country -> currency mapping lives in `packages/types/src/schemas/country-currency.ts`.
+
+```bash
+# from repo root
+docker compose up -d db
+
+# set DB URL for local compose Postgres
+export DATABASE_URL=postgres://clearcost:clearcost@localhost:5432/clearcost
+
+# run migrations + seed
+bun run --cwd packages/db migrate
+bun run --cwd apps/api seed:mvp
+
+# start API
+bun run --cwd apps/api dev
+```
+
+Working quote example (requires a valid `x-api-key` with `quotes:write`):
+
+```bash
+curl -s \\
+  -H "x-api-key: $API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -H "Idempotency-Key: mvp-demo-$(uuidgen | tr -d -)" \\
+  -d '{\"origin\":\"US\",\"dest\":\"NL\",\"itemValue\":{\"amount\":100,\"currency\":\"USD\"},\"dimsCm\":{\"l\":20,\"w\":15,\"h\":10},\"weightKg\":1.2,\"categoryKey\":\"electronics_accessories\",\"hs6\":\"850440\",\"mode\":\"air\"}' \\
+  http://localhost:3001/v1/quotes | jq .
+```
+
 ---
 
 ## OpenAPI & Docs

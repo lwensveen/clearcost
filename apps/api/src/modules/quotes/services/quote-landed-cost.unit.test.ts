@@ -1389,3 +1389,222 @@ describe('quoteLandedCost', () => {
     expect(out.quote.policy).toContain('Strict freshness mode');
   });
 });
+
+describe('quoteLandedCost MVP mode', () => {
+  const mvpBaseInput = {
+    merchantId: 'owner_1',
+    origin: 'US',
+    dest: 'NL',
+    itemValue: { amount: 100, currency: 'USD' },
+    dimsCm: { l: 20, w: 15, h: 10 },
+    weightKg: 1.2,
+    categoryKey: 'electronics_accessories',
+    hs6: '850440',
+    mode: 'air' as const,
+  };
+
+  it('computes US -> NL quote with FX, duty, and VAT from seeded-style inputs', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.resolveHs6Mock.mockResolvedValue('850440');
+    mocks.getActiveDutyRateWithMetaMock.mockResolvedValue({
+      value: {
+        id: 'duty-mvp-1',
+        ratePct: 2.5,
+        dutyRule: 'mfn',
+        partner: 'US',
+        source: 'official',
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+      },
+      meta: {
+        status: 'ok',
+        dataset: 'official',
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+      },
+    });
+    mocks.getVatForHs6WithMetaMock.mockResolvedValue({
+      value: {
+        ratePct: 21,
+        vatBase: 'CIF_PLUS_DUTY',
+        source: 'default',
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+      },
+      meta: {
+        status: 'ok',
+        dataset: 'official',
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+      },
+    });
+    mocks.convertCurrencyWithMetaMock.mockImplementation(
+      async (amount: number, from: string, to: string) => {
+        if (from === 'USD' && to === 'EUR') {
+          return { amount: Number(amount) * 0.92, meta: { missingRate: false, error: null } };
+        }
+        if (from === to)
+          return { amount: Number(amount), meta: { missingRate: false, error: null } };
+        throw new Error(`Unexpected FX conversion ${from}->${to}`);
+      }
+    );
+
+    const out = await quoteLandedCost(mvpBaseInput, { mvpMode: true });
+
+    expect(out.quote.currency).toBe('EUR');
+    expect(out.quote.items).toEqual([{ hs6: '850440', declaredValue: 100, currency: 'USD' }]);
+    expect(out.quote.fxRate).toMatchObject({
+      from: 'USD',
+      to: 'EUR',
+      rate: 0.92,
+    });
+    expect(out.quote.dutyAmount).toBe(2.3);
+    expect(out.quote.vatAmount).toBe(19.8);
+    expect(out.quote.totalLandedCost).toBe(114.1);
+    expect(out.quote.total).toBe(114.1);
+    expect(out.quote.metadata).toMatchObject({
+      confidence: 'high',
+      originCountry: 'US',
+      destinationCountry: 'NL',
+      inputCurrency: 'USD',
+      outputCurrency: 'EUR',
+    });
+  });
+
+  it('computes NL -> DE quote with EUR values and zero duty', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.resolveHs6Mock.mockResolvedValue('851830');
+    mocks.getActiveDutyRateWithMetaMock.mockResolvedValue({
+      value: {
+        id: 'duty-mvp-2',
+        ratePct: 0,
+        dutyRule: 'mfn',
+        partner: 'NL',
+        source: 'official',
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+      },
+      meta: {
+        status: 'ok',
+        dataset: 'official',
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+      },
+    });
+    mocks.getVatForHs6WithMetaMock.mockResolvedValue({
+      value: {
+        ratePct: 19,
+        vatBase: 'CIF_PLUS_DUTY',
+        source: 'default',
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+      },
+      meta: {
+        status: 'ok',
+        dataset: 'official',
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+      },
+    });
+    mocks.convertCurrencyWithMetaMock.mockImplementation(async (amount: number) => ({
+      amount: Number(amount),
+      meta: { missingRate: false, error: null },
+    }));
+
+    const out = await quoteLandedCost(
+      {
+        ...mvpBaseInput,
+        origin: 'NL',
+        dest: 'DE',
+        itemValue: { amount: 100, currency: 'EUR' },
+        hs6: '851830',
+      },
+      { mvpMode: true }
+    );
+
+    expect(out.quote.currency).toBe('EUR');
+    expect(out.quote.dutyAmount).toBe(0);
+    expect(out.quote.vatAmount).toBe(19);
+    expect(out.quote.totalLandedCost).toBe(119);
+  });
+
+  it('rejects values at or above 150 EUR equivalent', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.resolveHs6Mock.mockResolvedValue('850440');
+    mocks.convertCurrencyWithMetaMock.mockResolvedValue({
+      amount: 180,
+      meta: { missingRate: false, error: null },
+    });
+
+    await expect(
+      quoteLandedCost(
+        {
+          ...mvpBaseInput,
+          itemValue: { amount: 200, currency: 'USD' },
+        },
+        { mvpMode: true }
+      )
+    ).rejects.toMatchObject({
+      statusCode: 422,
+      code: 'above_de_minimis',
+    });
+  });
+
+  it('rejects unsupported origins or destinations', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.resolveHs6Mock.mockResolvedValue('850440');
+
+    await expect(
+      quoteLandedCost(
+        {
+          ...mvpBaseInput,
+          origin: 'CN',
+        },
+        { mvpMode: true }
+      )
+    ).rejects.toMatchObject({
+      statusCode: 422,
+      code: 'unsupported_lane_or_scope',
+    });
+  });
+
+  it('fails clearly when required VAT data is missing', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.resolveHs6Mock.mockResolvedValue('850440');
+    mocks.convertCurrencyWithMetaMock.mockImplementation(
+      async (amount: number, from: string, to: string) => {
+        if (from === 'USD' && to === 'EUR') {
+          return { amount: Number(amount) * 0.92, meta: { missingRate: false, error: null } };
+        }
+        throw new Error(`Unexpected FX conversion ${from}->${to}`);
+      }
+    );
+    mocks.getActiveDutyRateWithMetaMock.mockResolvedValue({
+      value: {
+        id: 'duty-mvp-3',
+        ratePct: 2.5,
+        dutyRule: 'mfn',
+        partner: 'US',
+        source: 'official',
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+      },
+      meta: {
+        status: 'ok',
+        dataset: 'official',
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+      },
+    });
+    mocks.getVatForHs6WithMetaMock.mockResolvedValue({
+      value: null,
+      meta: { status: 'no_dataset', dataset: null, effectiveFrom: null },
+    });
+
+    await expect(quoteLandedCost(mvpBaseInput, { mvpMode: true })).rejects.toMatchObject({
+      statusCode: 503,
+      code: 'data_not_ready',
+    });
+  });
+
+  it('fails clearly when FX data is missing', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.resolveHs6Mock.mockResolvedValue('850440');
+    mocks.convertCurrencyWithMetaMock.mockRejectedValue(new Error('FX rate unavailable'));
+
+    await expect(quoteLandedCost(mvpBaseInput, { mvpMode: true })).rejects.toMatchObject({
+      statusCode: 503,
+      code: 'data_not_ready',
+    });
+  });
+});

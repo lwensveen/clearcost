@@ -90,6 +90,7 @@
     "import:vat:llm-crosscheck": "bun run src/lib/cron/index.ts import:vat:llm-crosscheck",
     "import:vat:llm-grok": "bun run src/lib/cron/index.ts import:vat:llm-grok",
     "import:vat:llm-openai": "bun run src/lib/cron/index.ts import:vat:llm-openai",
+    "seed:mvp": "bun run scripts/seed-demo-mvp.ts",
     "seed:countries:basic": "bun run src/lib/cron/index.ts seed:countries:basic",
     "seed:trade-programs:us": "bun run src/lib/cron/index.ts seed:trade-programs:us",
     "start": "node dist/src/main.js",

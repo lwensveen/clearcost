@@ -314,6 +314,74 @@ describe('quotes routes', () => {
     await app.close();
   });
 
+  it('POST / invokes quote service in MVP mode', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/',
+      headers: { 'idempotency-key': 'idem_mvp' },
+      payload: quoteInput,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.quoteLandedCostMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ...quoteInput,
+        merchantId: 'owner_1',
+      }),
+      expect.objectContaining({ mvpMode: true })
+    );
+    await app.close();
+  });
+
+  it('POST / propagates unsupported MVP scope as 422', async () => {
+    mocks.withIdempotencyMock.mockRejectedValue({
+      statusCode: 422,
+      code: 'unsupported_lane_or_scope',
+      message: 'ClearCost MVP only supports US/NL → NL/DE, electronics accessories <150 EUR',
+    });
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/',
+      headers: { 'idempotency-key': 'idem_scope' },
+      payload: quoteInput,
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(res.json()).toMatchObject({
+      error: {
+        code: 'unsupported_lane_or_scope',
+      },
+    });
+    await app.close();
+  });
+
+  it('POST / propagates data-not-ready as 503', async () => {
+    mocks.withIdempotencyMock.mockRejectedValue({
+      statusCode: 503,
+      code: 'data_not_ready',
+      message: 'FX/VAT/duty data for this lane is missing or stale; cannot quote reliably',
+    });
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/',
+      headers: { 'idempotency-key': 'idem_data_not_ready' },
+      payload: quoteInput,
+    });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({
+      error: {
+        code: 'data_not_ready',
+      },
+    });
+    await app.close();
+  });
+
   it('GET /by-key/:key returns 404 when cached quote is missing', async () => {
     mocks.findFirstMock.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
 

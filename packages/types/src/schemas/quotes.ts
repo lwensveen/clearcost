@@ -135,6 +135,42 @@ export const QuoteResponseSchema = z.object({
     surcharges: QuoteSourceMetadataSchema,
   }),
   explainability: QuoteExplainabilitySchema.optional(),
+  items: z
+    .array(
+      z.object({
+        hs6: z.string().regex(/^\d{6}$/),
+        declaredValue: z.number(),
+        currency: z.string().length(3),
+      })
+    )
+    .optional(),
+  fxRate: z
+    .object({
+      from: z.string().length(3),
+      to: z.string().length(3),
+      rate: z.number(),
+      asOf: z.string(),
+      derivedFrom: z.string(),
+    })
+    .optional(),
+  dutyAmount: z.number().optional(),
+  vatAmount: z.number().optional(),
+  totalLandedCost: z.number().optional(),
+  metadata: z
+    .object({
+      confidence: z.enum(['high', 'low']),
+      originCountry: z.string().length(2),
+      destinationCountry: z.string().length(2),
+      inputCurrency: z.string().length(3),
+      outputCurrency: z.string().length(3),
+      dataFreshness: z.object({
+        fxAsOf: z.string().nullable(),
+        fxImportAt: z.string().nullable(),
+        vatImportAt: z.string().nullable(),
+        dutyImportAt: z.string().nullable(),
+      }),
+    })
+    .optional(),
 });
 
 export const QuoteRecentQuerySchema = z.object({

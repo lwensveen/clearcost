@@ -16,7 +16,7 @@ import {
 import { withIdempotency } from '../../lib/idempotency.js';
 import { quoteLandedCost } from './services/quote-landed-cost.js';
 import { and, desc, eq, gt, sql } from 'drizzle-orm';
-import { errorResponseForStatus } from '../../lib/errors.js';
+import { errorResponse, errorResponseForStatus } from '../../lib/errors.js';
 
 type QuoteResponse = z.infer<typeof QuoteResponseSchema>;
 
@@ -40,7 +40,9 @@ export default function quoteRoutes(app: FastifyInstance) {
         response: {
           200: QuoteResponseSchema,
           400: ErrorResponseSchema,
+          422: ErrorResponseSchema,
           409: ErrorResponseSchema,
+          503: ErrorResponseSchema,
           500: ErrorResponseSchema,
         },
       },
@@ -61,10 +63,13 @@ export default function quoteRoutes(app: FastifyInstance) {
           idemKey,
           req.body,
           async () => {
-            const { quote: out, fxAsOf } = await quoteLandedCost({
-              ...req.body,
-              merchantId: ownerId,
-            });
+            const { quote: out, fxAsOf } = await quoteLandedCost(
+              {
+                ...req.body,
+                merchantId: ownerId,
+              },
+              { mvpMode: true }
+            );
 
             // 1) Audit (best-effort)
             db.insert(auditQuotesTable)
@@ -132,12 +137,20 @@ export default function quoteRoutes(app: FastifyInstance) {
         return reply.send(result);
       } catch (err: any) {
         const status = Number(err?.statusCode) || 500;
+        const message = err?.message ?? (status === 500 ? 'quote failed' : 'Request failed');
+        const code = typeof err?.code === 'string' ? err.code : null;
         if (status === 409) {
           req.log.warn({ err, idemKey, msg: 'idempotency conflict' });
           return reply.code(409).send(errorResponseForStatus(409, err?.message ?? 'Processing'));
         }
+        if (status === 400 || status === 422 || status === 503) {
+          req.log.warn({ err, idemKey, msg: 'quote rejected' });
+          return reply
+            .code(status)
+            .send(code ? errorResponse(message, code) : errorResponseForStatus(status, message));
+        }
         req.log.error({ err, idemKey, msg: 'quote failed' });
-        return reply.code(500).send(errorResponseForStatus(500, err?.message ?? 'quote failed'));
+        return reply.code(500).send(errorResponseForStatus(500, message));
       }
     }
   );
