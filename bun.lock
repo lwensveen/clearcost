@@ -1,6 +1,5 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "clearcost",
@@ -70,6 +69,7 @@
       "name": "docs",
       "version": "0.1.0",
       "dependencies": {
+        "@clearcost/types": "workspace:*",
         "@clearcost/ui": "workspace:*",
         "next": "^16.1.6",
         "react": "^19.2.4",
