@@ -1,6 +1,7 @@
 import { db, dutyRatesTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
 import type { DutyRateInsert } from '@clearcost/types';
+import { resolveDutyRateCurrency } from '../utils/currency.js';
 
 export async function importDutyRates(rows: DutyRateInsert[]) {
   if (!rows.length) {
@@ -14,7 +15,7 @@ export async function importDutyRates(rows: DutyRateInsert[]) {
     hs6: r.hs6.slice(0, 6),
     ratePct: r.ratePct,
     dutyRule: r.dutyRule ?? 'mfn',
-    currency: r.currency ?? 'USD',
+    currency: resolveDutyRateCurrency(r.dest, r.currency ?? null),
     effectiveFrom: r.effectiveFrom ?? new Date(),
     effectiveTo: r.effectiveTo ?? null,
     notes: r.notes ?? null,

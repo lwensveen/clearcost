@@ -2,6 +2,7 @@ import { db, dutyRatesTable, provenanceTable } from '@clearcost/db';
 import { sha256Hex } from '../../../lib/provenance.js';
 import { sql } from 'drizzle-orm';
 import { DEBUG } from './utils.js';
+import { resolveDutyRateCurrency } from './currency.js';
 
 type DutyRateInsertRow = typeof dutyRatesTable.$inferInsert;
 type DutyRateSelectRow = typeof dutyRatesTable.$inferSelect;
@@ -50,8 +51,10 @@ export async function batchUpsertDutyRatesFromStream(
     // Normalize partner to '' (MFN sentinel) and apply source default
     const rows = buf.map((r) => ({
       ...r,
+      dest: String(r.dest).toUpperCase(),
       partner: r.partner ?? '',
       source: r.source ?? opts.source ?? 'official',
+      currency: resolveDutyRateCurrency(String(r.dest), r.currency ?? null),
     }));
 
     if (opts.dryRun) {

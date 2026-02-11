@@ -39,6 +39,8 @@ const COUNTRY_ISO2_ALIASES: Readonly<Record<string, string>> = Object.freeze({
  */
 export const COUNTRY_CURRENCY_BY_ISO2: Readonly<Record<string, string>> = Object.freeze({
   ...euroCurrencyMap,
+  // Dataset pseudo-destination used by EU tariff imports
+  EU: 'EUR',
   // EU destinations with local currency
   BG: 'BGN',
   CZ: 'CZK',
