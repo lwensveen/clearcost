@@ -47,7 +47,7 @@ export async function importDeMinimisFromOpenAI(
   for (const r of parsed.rows) {
     const dest = r.country_code.toUpperCase();
     const kind = r.kind;
-    const basis = r.basis ?? 'INTRINSIC';
+    const basis = r.basis;
     const currency = r.currency.toUpperCase();
     const value = String(r.value);
     const effectiveFrom = toDate(r.effective_from);

@@ -67,7 +67,7 @@ export async function importDeMinimisFromGrok(
   for (const row of parsed.rows) {
     const dest = row.country_code.toUpperCase();
     const kind = row.kind;
-    const basis = row.basis ?? 'INTRINSIC';
+    const basis = row.basis;
     const currency = row.currency.toUpperCase();
     const value = String(row.value);
     const effectiveFrom = toDate(row.effective_from);

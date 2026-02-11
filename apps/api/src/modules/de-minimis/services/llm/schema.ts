@@ -3,7 +3,7 @@ import { z } from 'zod/v4';
 export const RowSchema = z.object({
   country_code: z.string().length(2),
   kind: z.enum(['DUTY', 'VAT']),
-  basis: z.enum(['INTRINSIC', 'CIF']).default('INTRINSIC'),
+  basis: z.enum(['INTRINSIC', 'CIF']),
   currency: z.string().length(3),
   value: z.number().nonnegative(),
   effective_from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

@@ -30,7 +30,7 @@ Content rules:
 - "basis":
   - INTRINSIC = goods value only (no freight/insurance).
   - CIF = goods + freight + insurance.
-  - Default to INTRINSIC unless an official source explicitly prescribes CIF.
+  - Set explicitly in every row; use INTRINSIC unless an official source explicitly prescribes CIF.
 - "currency" must be the authority’s own currency for the threshold. Do NOT FX-convert.
 - "value" is the monetary threshold amount in that currency (not a percentage).
 - If a jurisdiction has no VAT de-minimis exemption, omit VAT rows entirely.
