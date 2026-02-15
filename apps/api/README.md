@@ -324,6 +324,72 @@ bun run internal-request -- --path /internal/cron/fx/daily --body '{}'
 - `GET /internal/notices` — internal notices browsing (tasks scope)
 - `GET /internal/notices/:id` — internal notices detail (tasks scope)
 
+## GitHub Actions cron runbook (env/secrets matrix)
+
+These workflows are the production schedulers:
+
+- `.github/workflows/cron-daily-http.yml`
+- `.github/workflows/cron-hourly-http.yml`
+- `.github/workflows/cron-weekly-cli.yml`
+- `.github/workflows/cron-daily-cli.yml`
+
+### Common HTTP cron requirements
+
+Both HTTP workflows (`cron-daily-http.yml` and `cron-hourly-http.yml`) require:
+
+| Name                         | Source | Required | Notes                                                            |
+| ---------------------------- | ------ | -------- | ---------------------------------------------------------------- |
+| `CLEARCOST_INTERNAL_API_URL` | secret | yes      | Base URL for internal server (`/internal/*`).                    |
+| `CLEARCOST_TASKS_API_KEY`    | secret | yes      | Must include required `tasks:*` scopes for triggered endpoints.  |
+| `INTERNAL_SIGNING_SECRET`    | secret | yes      | Used by `scripts/internal-request.ts` to sign internal requests. |
+
+### `cron-daily-http.yml`
+
+| Name                        | Source | Required | Used for                                             |
+| --------------------------- | ------ | -------- | ---------------------------------------------------- |
+| `MY_MFN_OFFICIAL_EXCEL_URL` | secret | no       | Enables MY MFN official Excel import step.           |
+| `PH_TARIFF_EXCEL_URL`       | secret | no       | Enables PH MFN official Excel import step.           |
+| `UK_REMEDY_MEASURE_TYPES`   | var    | no       | UK remedy measure types (defaults to `552,551,695`). |
+| `EU_TARIC_REMEDY_TYPES`     | var    | no       | Enables EU remedies surcharge import when non-empty. |
+| `IMPORTS_PRUNE_DAYS`        | var    | no       | Retention window for prune step (default `90`).      |
+| `SLACK_WEBHOOK_URL`         | secret | no       | Success/failure notifications.                       |
+| `DISCORD_WEBHOOK_URL`       | secret | no       | Success/failure notifications.                       |
+
+### `cron-hourly-http.yml`
+
+| Name                              | Source | Required | Used for                                                                     |
+| --------------------------------- | ------ | -------- | ---------------------------------------------------------------------------- |
+| `IMPORTS_SWEEP_THRESHOLD_MINUTES` | var    | no       | Stale run threshold for `/internal/cron/imports/sweep-stale` (default `30`). |
+| `SLACK_WEBHOOK_URL`               | secret | no       | Success/failure notifications.                                               |
+| `DISCORD_WEBHOOK_URL`             | secret | no       | Success/failure notifications.                                               |
+
+### `cron-weekly-cli.yml`
+
+| Name                  | Source | Required | Used for                                                  |
+| --------------------- | ------ | -------- | --------------------------------------------------------- |
+| `DATABASE_URL`        | secret | yes      | Direct DB import jobs via CLI runtime.                    |
+| `DATA_REMOTE_BASE`    | secret | no       | Enables freight cards JSON import step.                   |
+| `AHTN_SOURCE_URL`     | secret | no       | Enables AHTN alias import step.                           |
+| `CN_MFN_PDF_URL`      | secret | no       | Enables CN MFN PDF importer step.                         |
+| `TABULA_JAR_URL`      | var    | no       | Override Tabula jar URL for CN PDF parsing (has default). |
+| `SLACK_WEBHOOK_URL`   | secret | no       | Success/failure notifications.                            |
+| `DISCORD_WEBHOOK_URL` | secret | no       | Success/failure notifications.                            |
+
+### `cron-daily-cli.yml`
+
+| Name           | Source | Required | Used for                                              |
+| -------------- | ------ | -------- | ----------------------------------------------------- |
+| `DATABASE_URL` | secret | yes      | CN notices crawl + attachment jobs (MOF/GACC/MOFCOM). |
+
+### Failure behavior (intentional)
+
+Critical workflow steps are configured to fail fast when imports return no usable activity:
+
+- `cron-daily-http.yml`: FX must return `fxAsOf`; VAT, UK/EU remedy surcharges, and de-minimis imports must report rows (`count/inserted/updated > 0`).
+- `cron-weekly-cli.yml`: EU HS6, WITS duty imports (`fetchedRows > 0`), and freight JSON import (`count > 0`) fail the run if empty.
+
+This is deliberate so source/parser drift is visible in CI instead of silently succeeding with stale data.
+
 ---
 
 ## Cron/CLI usage
