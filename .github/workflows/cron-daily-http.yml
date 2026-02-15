@@ -57,6 +57,10 @@ jobs:
         run: |
           bun run internal-request -- --path /internal/cron/import/duties/uk-fta --body '{}' | jq .
 
+      - name: ID Duties — MFN (official)
+        run: |
+          bun run internal-request -- --path /internal/cron/import/duties/id-mfn --body '{}' | jq .
+
       - name: MY Duties — MFN official Excel (if configured)
         if: ${{ env.MY_MFN_OFFICIAL_EXCEL_URL != '' }}
         run: |
