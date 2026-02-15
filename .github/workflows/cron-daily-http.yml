@@ -17,6 +17,8 @@ jobs:
       CLEARCOST_INTERNAL_API_URL: ${{ secrets.CLEARCOST_INTERNAL_API_URL }}
       CLEARCOST_TASKS_API_KEY: ${{ secrets.CLEARCOST_TASKS_API_KEY }}
       INTERNAL_SIGNING_SECRET: ${{ secrets.INTERNAL_SIGNING_SECRET }}
+      MY_MFN_OFFICIAL_EXCEL_URL: ${{ secrets.MY_MFN_OFFICIAL_EXCEL_URL || '' }}
+      PH_TARIFF_EXCEL_URL: ${{ secrets.PH_TARIFF_EXCEL_URL || '' }}
       UK_REMEDY_MEASURE_TYPES: ${{ vars.UK_REMEDY_MEASURE_TYPES || '552,551,695' }}
       EU_TARIC_REMEDY_TYPES: ${{ vars.EU_TARIC_REMEDY_TYPES || '' }}
       PRUNE_DAYS: ${{ vars.IMPORTS_PRUNE_DAYS || 90 }}
@@ -54,6 +56,18 @@ jobs:
       - name: UK Duties — FTA
         run: |
           bun run internal-request -- --path /internal/cron/import/duties/uk-fta --body '{}' | jq .
+
+      - name: MY Duties — MFN official Excel (if configured)
+        if: ${{ env.MY_MFN_OFFICIAL_EXCEL_URL != '' }}
+        run: |
+          BODY=$(jq -n --arg url "$MY_MFN_OFFICIAL_EXCEL_URL" '{url: $url}')
+          bun run internal-request -- --path /internal/cron/import/duties/my-mfn/official/excel --body "$BODY" | jq .
+
+      - name: PH Duties — MFN official Excel (if configured)
+        if: ${{ env.PH_TARIFF_EXCEL_URL != '' }}
+        run: |
+          BODY=$(jq -n --arg url "$PH_TARIFF_EXCEL_URL" '{url: $url}')
+          bun run internal-request -- --path /internal/cron/import/duties/ph-mfn --body "$BODY" | jq .
 
       - name: UK Surcharges — remedies
         run: |
