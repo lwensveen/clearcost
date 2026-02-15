@@ -111,18 +111,8 @@ jobs:
           export TABULA_JAR="$PWD/tabula.jar"
           bun run src/lib/run-cron.ts import:duties:cn-mfn-pdf --url="$CN_MFN_PDF_URL" --mode=auto
 
-      - name: Duties — US (MFN + FTA)
-        working-directory: apps/api
-        run: bun run src/lib/run-cron.ts import:duties:us-all
-
-      # ----------- Surcharges -----------
-      - name: Surcharges — US trade remedies
-        working-directory: apps/api
-        run: bun run src/lib/run-cron.ts import:surcharges:us-trade-remedies
-
-      - name: Surcharges — US (all bundle)
-        working-directory: apps/api
-        run: bun run src/lib/run-cron.ts import:surcharges:us-all
+      # US duties + US surcharges run daily in cron-daily-http.yml (fail-fast).
+      # Keep weekly focused on heavier backfill/import jobs to avoid duplicate loads.
 
       - name: Freight — cards JSON (if remote base configured)
         if: ${{ env.DATA_REMOTE_BASE != '' }}

@@ -375,6 +375,8 @@ Both HTTP workflows (`cron-daily-http.yml` and `cron-hourly-http.yml`) require:
 | `SLACK_WEBHOOK_URL`   | secret | no       | Success/failure notifications.                            |
 | `DISCORD_WEBHOOK_URL` | secret | no       | Success/failure notifications.                            |
 
+US duties/surcharges are intentionally run in `cron-daily-http.yml` for fresher data and fail-fast checks.
+
 ### `cron-daily-cli.yml`
 
 | Name           | Source | Required | Used for                                                              |
