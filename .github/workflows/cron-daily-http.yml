@@ -73,6 +73,26 @@ jobs:
         run: |
           bun run internal-request -- --path /internal/cron/import/duties/id-mfn --body '{}' | jq .
 
+      - name: US Duties — MFN (HTS)
+        run: |
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/us-mfn --body '{}')
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[duties:us-mfn] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
+
+      - name: US Duties — FTA (HTS)
+        run: |
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/us-preferential --body '{}')
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[duties:us-fta] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
+
       - name: MY Duties — MFN official Excel (if configured)
         if: ${{ env.MY_MFN_OFFICIAL_EXCEL_URL != '' }}
         run: |
@@ -105,6 +125,16 @@ jobs:
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
             echo "[surcharges:eu-remedies] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
+
+      - name: US Surcharges — all
+        run: |
+          OUT=$(bun run internal-request -- --path /internal/cron/import/surcharges/us-all --body '{}')
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[surcharges:us-all] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
