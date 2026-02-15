@@ -35,11 +35,23 @@ jobs:
 
       - name: FX daily (ECB)
         run: |
-          bun run internal-request -- --path /internal/cron/fx/daily --body '{}' | jq .
+          OUT=$(bun run internal-request -- --path /internal/cron/fx/daily --body '{}')
+          echo "$OUT" | jq .
+          FX_AS_OF=$(echo "$OUT" | jq -r '.fxAsOf // empty')
+          if [ -z "$FX_AS_OF" ]; then
+            echo "[fx:daily] missing fxAsOf in response"
+            exit 1
+          fi
 
       - name: VAT (OECD/IMF auto)
         run: |
-          bun run internal-request -- --path /internal/cron/import/vat/auto --body '{}' | jq .
+          OUT=$(bun run internal-request -- --path /internal/cron/import/vat/auto --body '{}')
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[vat:auto] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
 
       - name: EU Duties (TARIC — daily)
         run: |
@@ -76,21 +88,45 @@ jobs:
       - name: UK Surcharges — remedies
         run: |
           BODY=$(jq -n --arg s "$UK_REMEDY_MEASURE_TYPES" '{measureTypeIds: ($s | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0)))}')
-          bun run internal-request -- --path /internal/cron/import/surcharges/uk-remedies --body "$BODY" | jq .
+          OUT=$(bun run internal-request -- --path /internal/cron/import/surcharges/uk-remedies --body "$BODY")
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[surcharges:uk-remedies] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
 
       - name: EU Surcharges — remedies (when configured)
         if: ${{ env.EU_TARIC_REMEDY_TYPES != '' }}
         run: |
           BODY=$(jq -n --arg s "$EU_TARIC_REMEDY_TYPES" '{measureTypeIds: ($s | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0)))}')
-          bun run internal-request -- --path /internal/cron/import/surcharges/eu-remedies --body "$BODY" | jq .
+          OUT=$(bun run internal-request -- --path /internal/cron/import/surcharges/eu-remedies --body "$BODY")
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[surcharges:eu-remedies] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
 
       - name: De Minimis — official
         run: |
-          bun run internal-request -- --path /internal/cron/de-minimis/import-official --body '{}' | jq .
+          OUT=$(bun run internal-request -- --path /internal/cron/de-minimis/import-official --body '{}')
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[de-minimis:import-official] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
 
       - name: De Minimis — Zonos
         run: |
-          bun run internal-request -- --path /internal/cron/de-minimis/import-zonos --body '{}' | jq .
+          OUT=$(bun run internal-request -- --path /internal/cron/de-minimis/import-zonos --body '{}')
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[de-minimis:import-zonos] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
 
       - name: Notices — CN (MOF)
         run: |

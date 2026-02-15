@@ -31,7 +31,14 @@ jobs:
       # ------------ HS ------------
       - name: HS — EU HS6 titles (TARIC)
         working-directory: apps/api
-        run: bun run src/lib/run-cron.ts import:hs:eu-hs6
+        run: |
+          OUT=$(bun run src/lib/run-cron.ts import:hs:eu-hs6 2>&1)
+          echo "$OUT"
+          COUNT=$(echo "$OUT" | sed -nE 's/.*count:\s*([0-9]+).*/\1/p' | tail -n1)
+          if [ -z "$COUNT" ] || [ "$COUNT" -lt 1 ]; then
+            echo "[hs:eu-hs6] expected >0 rows, got ${COUNT:-missing}"
+            exit 1
+          fi
 
       - name: HS — US HTS10 aliases
         working-directory: apps/api
@@ -50,29 +57,47 @@ jobs:
       - name: Duties — WITS (ASEAN)
         working-directory: apps/api
         run: |
-          bun run src/lib/run-cron.ts import:duties:wits \
+          OUT=$(bun run src/lib/run-cron.ts import:duties:wits \
             --dests SG,MY,TH,ID,PH,VN,BN,KH,LA,MM \
             --partners SG,MY,TH,ID,PH,VN,BN,KH,LA,MM \
             --backfillYears 1 \
-            --concurrency 4
+            --concurrency 4 2>&1)
+          echo "$OUT"
+          FETCHED=$(echo "$OUT" | sed -nE 's/.*fetchedRows:\s*([0-9]+).*/\1/p' | tail -n1)
+          if [ -z "$FETCHED" ] || [ "$FETCHED" -lt 1 ]; then
+            echo "[duties:wits:asean] expected >0 fetchedRows, got ${FETCHED:-missing}"
+            exit 1
+          fi
 
       - name: Duties — WITS (Japan + partners)
         working-directory: apps/api
         run: |
-          bun run src/lib/run-cron.ts import:duties:wits \
+          OUT=$(bun run src/lib/run-cron.ts import:duties:wits \
             --dests JP \
             --partners CN,KR,AU,NZ,TH,MY,ID,PH,VN,LA,KH,BN,SG,CA,MX,EU,GB,US \
             --backfillYears 1 \
-            --concurrency 3
+            --concurrency 3 2>&1)
+          echo "$OUT"
+          FETCHED=$(echo "$OUT" | sed -nE 's/.*fetchedRows:\s*([0-9]+).*/\1/p' | tail -n1)
+          if [ -z "$FETCHED" ] || [ "$FETCHED" -lt 1 ]; then
+            echo "[duties:wits:japan] expected >0 fetchedRows, got ${FETCHED:-missing}"
+            exit 1
+          fi
 
       - name: Duties — WITS (China + partners)
         working-directory: apps/api
         run: |
-          bun run src/lib/run-cron.ts import:duties:wits \
+          OUT=$(bun run src/lib/run-cron.ts import:duties:wits \
             --dests CN \
             --partners EU,US,GB,JP,KR,AU,NZ,CA,MX,CL,PE,PK,CH,NO,IS,LI,SG,MY,TH,ID,PH,VN,LA,KH,BN \
             --backfillYears 1 \
-            --concurrency 3
+            --concurrency 3 2>&1)
+          echo "$OUT"
+          FETCHED=$(echo "$OUT" | sed -nE 's/.*fetchedRows:\s*([0-9]+).*/\1/p' | tail -n1)
+          if [ -z "$FETCHED" ] || [ "$FETCHED" -lt 1 ]; then
+            echo "[duties:wits:china] expected >0 fetchedRows, got ${FETCHED:-missing}"
+            exit 1
+          fi
 
       - name: CN — MFN from official PDF (Tabula)
         if: ${{ env.CN_MFN_PDF_URL != '' }}
@@ -102,7 +127,14 @@ jobs:
       - name: Freight — cards JSON (if remote base configured)
         if: ${{ env.DATA_REMOTE_BASE != '' }}
         working-directory: apps/api
-        run: bun run src/lib/run-cron.ts import:freight "$DATA_REMOTE_BASE/freight/freight-cards.json"
+        run: |
+          OUT=$(bun run src/lib/run-cron.ts import:freight "$DATA_REMOTE_BASE/freight/freight-cards.json" 2>&1)
+          echo "$OUT"
+          COUNT=$(echo "$OUT" | sed -nE 's/.*count:\s*([0-9]+).*/\1/p' | tail -n1)
+          if [ -z "$COUNT" ] || [ "$COUNT" -lt 1 ]; then
+            echo "[freight:json] expected >0 rows, got ${COUNT:-missing}"
+            exit 1
+          fi
 
       - name: Slack (success)
         if: success()
