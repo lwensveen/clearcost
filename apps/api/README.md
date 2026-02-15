@@ -377,15 +377,16 @@ Both HTTP workflows (`cron-daily-http.yml` and `cron-hourly-http.yml`) require:
 
 ### `cron-daily-cli.yml`
 
-| Name           | Source | Required | Used for                                              |
-| -------------- | ------ | -------- | ----------------------------------------------------- |
-| `DATABASE_URL` | secret | yes      | CN notices crawl + attachment jobs (MOF/GACC/MOFCOM). |
+| Name           | Source | Required | Used for                                                              |
+| -------------- | ------ | -------- | --------------------------------------------------------------------- |
+| `DATABASE_URL` | secret | yes      | CN notices crawl + attachment jobs + `report:coverage` snapshot gate. |
 
 ### Failure behavior (intentional)
 
 Critical workflow steps are configured to fail fast when imports return no usable activity:
 
 - `cron-daily-http.yml`: FX must return `fxAsOf`; VAT, UK/EU remedy surcharges, and de-minimis imports must report rows (`count/inserted/updated > 0`).
+- `cron-daily-cli.yml`: `report:coverage` fails when MVP-required official freshness/coverage checks fail; successful runs upload `coverage-snapshot-<run_id>` artifact.
 - `cron-weekly-cli.yml`: EU HS6, WITS duty imports (`fetchedRows > 0`), and freight JSON import (`count > 0`) fail the run if empty.
 
 This is deliberate so source/parser drift is visible in CI instead of silently succeeding with stale data.
@@ -408,6 +409,7 @@ bun run src/lib/cron/index.ts import:duties:llm-openai --model gpt-4o-mini
 bun run src/lib/cron/index.ts import:surcharges:llm-crosscheck --mode strict
 bun run src/lib/cron/index.ts import:hs:eu-hs6
 bun run src/lib/cron/index.ts import:sweep-stale --threshold 30
+bun run src/lib/cron/index.ts report:coverage --out=artifacts/coverage-snapshot.json
 ```
 
 Command registry: `src/lib/cron/registry.ts` (implementations under `src/lib/cron/commands/*`).

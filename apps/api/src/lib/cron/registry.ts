@@ -41,6 +41,7 @@ import { dutiesCnMfnPdf } from './commands/duties/duties-cn.js';
 import { crawlNoticesCmd } from './commands/notices/notices.js';
 import { fetchNoticeDocsCmd } from './commands/notices/docs.js';
 import { crawlNoticesJsonCmd } from './commands/notices/json-feed.js';
+import { coverageSnapshot } from './commands/coverage.js';
 
 export const commands: Record<string, Command> = {
   'fx:refresh': fxRefresh,
@@ -101,4 +102,5 @@ export const commands: Record<string, Command> = {
 
   'seed:countries:basic': seedCountriesBasic,
   'seed:trade-programs:us': seedTradeProgramsUS,
+  'report:coverage': coverageSnapshot,
 };

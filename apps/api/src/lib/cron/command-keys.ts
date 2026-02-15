@@ -48,6 +48,7 @@ export const COMMAND_KEYS = [
   'import:vat:llm-crosscheck',
   'seed:countries:basic',
   'seed:trade-programs:us',
+  'report:coverage',
 ] as const;
 
 export type CommandKey = (typeof COMMAND_KEYS)[number];
