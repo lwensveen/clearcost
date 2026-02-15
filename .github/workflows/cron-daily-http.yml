@@ -17,6 +17,8 @@ jobs:
       CLEARCOST_INTERNAL_API_URL: ${{ secrets.CLEARCOST_INTERNAL_API_URL }}
       CLEARCOST_TASKS_API_KEY: ${{ secrets.CLEARCOST_TASKS_API_KEY }}
       INTERNAL_SIGNING_SECRET: ${{ secrets.INTERNAL_SIGNING_SECRET }}
+      UK_REMEDY_MEASURE_TYPES: ${{ vars.UK_REMEDY_MEASURE_TYPES || '552,551,695' }}
+      EU_TARIC_REMEDY_TYPES: ${{ vars.EU_TARIC_REMEDY_TYPES || '' }}
       PRUNE_DAYS: ${{ vars.IMPORTS_PRUNE_DAYS || 90 }}
     steps:
       - uses: actions/checkout@v5
@@ -52,6 +54,17 @@ jobs:
       - name: UK Duties — FTA
         run: |
           bun run internal-request -- --path /internal/cron/import/duties/uk-fta --body '{}' | jq .
+
+      - name: UK Surcharges — remedies
+        run: |
+          BODY=$(jq -n --arg s "$UK_REMEDY_MEASURE_TYPES" '{measureTypeIds: ($s | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0)))}')
+          bun run internal-request -- --path /internal/cron/import/surcharges/uk-remedies --body "$BODY" | jq .
+
+      - name: EU Surcharges — remedies (when configured)
+        if: ${{ env.EU_TARIC_REMEDY_TYPES != '' }}
+        run: |
+          BODY=$(jq -n --arg s "$EU_TARIC_REMEDY_TYPES" '{measureTypeIds: ($s | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0)))}')
+          bun run internal-request -- --path /internal/cron/import/surcharges/eu-remedies --body "$BODY" | jq .
 
       - name: De Minimis — official
         run: |

@@ -99,6 +99,11 @@ jobs:
         working-directory: apps/api
         run: bun run src/lib/run-cron.ts import:surcharges:us-all
 
+      - name: Freight — cards JSON (if remote base configured)
+        if: ${{ env.DATA_REMOTE_BASE != '' }}
+        working-directory: apps/api
+        run: bun run src/lib/run-cron.ts import:freight "$DATA_REMOTE_BASE/freight/freight-cards.json"
+
       - name: Slack (success)
         if: success()
         env:
