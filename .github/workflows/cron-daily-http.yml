@@ -113,6 +113,17 @@ jobs:
             exit 1
           fi
 
+      - name: ID Duties — FTA (WITS)
+        run: |
+          BODY='{"partnerGeoIds":["SG","MY","TH","PH","VN","BN","KH","LA","MM"]}'
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/id-fta --body "$BODY")
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[duties:id-fta] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
+
       - name: CN Duties — MFN (WITS)
         run: |
           OUT=$(bun run internal-request -- --path /internal/cron/import/duties/cn-mfn --body '{}')
@@ -143,6 +154,17 @@ jobs:
             exit 1
           fi
 
+      - name: TH Duties — FTA (WITS)
+        run: |
+          BODY='{"partnerGeoIds":["SG","MY","ID","PH","VN","BN","KH","LA","MM"]}'
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/th-fta --body "$BODY")
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[duties:th-fta] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
+
       - name: VN Duties — MFN (WITS)
         run: |
           OUT=$(bun run internal-request -- --path /internal/cron/import/duties/vn-mfn --body '{}')
@@ -153,6 +175,17 @@ jobs:
             exit 1
           fi
 
+      - name: VN Duties — FTA (WITS)
+        run: |
+          BODY='{"partnerGeoIds":["SG","MY","TH","ID","PH","BN","KH","LA","MM"]}'
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/vn-fta --body "$BODY")
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[duties:vn-fta] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
+
       - name: SG Duties — MFN (WITS)
         run: |
           OUT=$(bun run internal-request -- --path /internal/cron/import/duties/sg-mfn --body '{}')
@@ -160,6 +193,17 @@ jobs:
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
             echo "[duties:sg-mfn] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
+
+      - name: SG Duties — FTA (WITS)
+        run: |
+          BODY='{"partnerGeoIds":["MY","TH","ID","PH","VN","BN","KH","LA","MM"]}'
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/sg-fta --body "$BODY")
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[duties:sg-fta] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
