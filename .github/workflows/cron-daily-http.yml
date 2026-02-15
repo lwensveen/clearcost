@@ -73,6 +73,36 @@ jobs:
         run: |
           bun run internal-request -- --path /internal/cron/import/duties/id-mfn --body '{}' | jq .
 
+      - name: TH Duties — MFN (WITS)
+        run: |
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/th-mfn --body '{}')
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[duties:th-mfn] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
+
+      - name: VN Duties — MFN (WITS)
+        run: |
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/vn-mfn --body '{}')
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[duties:vn-mfn] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
+
+      - name: SG Duties — MFN (WITS)
+        run: |
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/sg-mfn --body '{}')
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[duties:sg-mfn] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
+
       - name: US Duties — MFN (HTS)
         run: |
           OUT=$(bun run internal-request -- --path /internal/cron/import/duties/us-mfn --body '{}')

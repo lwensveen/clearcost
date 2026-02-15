@@ -376,6 +376,7 @@ Both HTTP workflows (`cron-daily-http.yml` and `cron-hourly-http.yml`) require:
 | `DISCORD_WEBHOOK_URL` | secret | no       | Success/failure notifications.                            |
 
 US duties/surcharges are intentionally run in `cron-daily-http.yml` for fresher data and fail-fast checks.
+TH/VN/SG MFN duty imports are also run daily via internal HTTP routes (`duties:th-mfn`, `duties:vn-mfn`, `duties:sg-mfn`).
 
 ### `cron-daily-cli.yml`
 
@@ -387,7 +388,7 @@ US duties/surcharges are intentionally run in `cron-daily-http.yml` for fresher 
 
 Critical workflow steps are configured to fail fast when imports return no usable activity:
 
-- `cron-daily-http.yml`: FX must return `fxAsOf`; VAT, US duties (MFN/FTA), US/UK/EU remedy surcharges, and de-minimis imports must report rows (`count/inserted/updated > 0`).
+- `cron-daily-http.yml`: FX must return `fxAsOf`; VAT, TH/VN/SG/US duties (MFN), US duties (FTA), US/UK/EU remedy surcharges, and de-minimis imports must report rows (`count/inserted/updated > 0`).
 - `cron-daily-cli.yml`: `report:coverage` fails when MVP-required official freshness/coverage checks fail; successful runs upload `coverage-snapshot-<run_id>` artifact.
 - `cron-weekly-cli.yml`: EU HS6, WITS duty imports (`fetchedRows > 0`), and freight JSON import (`count > 0`) fail the run if empty.
 
