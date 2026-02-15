@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
 
   const { api, key } = getProxyConfig();
   if (!api || !key) return bad('Server not configured');
-  let body: Record<string, unknown> | null = null;
+  let body: Record<string, unknown> | null;
   try {
     const raw = await req.json();
     body = asRecord(raw);
