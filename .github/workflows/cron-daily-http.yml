@@ -73,6 +73,16 @@ jobs:
             exit 1
           fi
 
+      - name: JP Duties — FTA (WITS)
+        run: |
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/jp-fta --body '{}')
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[duties:jp-fta] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
+
       - name: UK Duties — MFN
         run: |
           OUT=$(bun run internal-request -- --path /internal/cron/import/duties/uk-mfn --body '{}')
