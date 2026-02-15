@@ -86,6 +86,10 @@ jobs:
           export TABULA_JAR="$PWD/tabula.jar"
           bun run src/lib/run-cron.ts import:duties:cn-mfn-pdf --url="$CN_MFN_PDF_URL" --mode=auto
 
+      - name: Duties — US (MFN + FTA)
+        working-directory: apps/api
+        run: bun run src/lib/run-cron.ts import:duties:us-all
+
       # ----------- Surcharges -----------
       - name: Surcharges — US trade remedies
         working-directory: apps/api

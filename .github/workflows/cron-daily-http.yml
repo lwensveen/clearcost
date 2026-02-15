@@ -45,6 +45,14 @@ jobs:
         run: |
           bun run internal-request -- --path /internal/cron/import/duties/jp-mfn --body '{}' | jq .
 
+      - name: UK Duties — MFN
+        run: |
+          bun run internal-request -- --path /internal/cron/import/duties/uk-mfn --body '{}' | jq .
+
+      - name: UK Duties — FTA
+        run: |
+          bun run internal-request -- --path /internal/cron/import/duties/uk-fta --body '{}' | jq .
+
       - name: De Minimis — official
         run: |
           bun run internal-request -- --path /internal/cron/de-minimis/import-official --body '{}' | jq .
