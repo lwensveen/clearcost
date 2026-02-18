@@ -135,6 +135,17 @@ jobs:
             exit 1
           fi
 
+      - name: PH Duties — FTA (WITS)
+        run: |
+          BODY='{"partnerGeoIds":["SG","MY","TH","ID","VN","BN","KH","LA","MM"]}'
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/ph-fta --body "$BODY")
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[duties:ph-fta] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
+
       - name: CN Duties — MFN (WITS)
         run: |
           OUT=$(bun run internal-request -- --path /internal/cron/import/duties/cn-mfn --body '{}')

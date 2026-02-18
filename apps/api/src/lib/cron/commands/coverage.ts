@@ -41,6 +41,7 @@ const DEFAULT_REQUIRED_LANES = ['US->NL:850440', 'US->DE:850440', 'NL->DE:851830
 const ASEAN_FTA_REQUIRED_JOBS = [
   'duties:id-fta',
   'duties:my-fta',
+  'duties:ph-fta',
   'duties:th-fta',
   'duties:vn-fta',
   'duties:sg-fta',

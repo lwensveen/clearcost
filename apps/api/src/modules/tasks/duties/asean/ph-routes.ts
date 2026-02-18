@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { importPhMfnExcel } from '../../../duty-rates/services/asean/ph/import-mfn-excel.js';
-import { TasksDutyPhBodySchema } from '@clearcost/types';
+import { importPhPreferential } from '../../../duty-rates/services/asean/ph/import-preferential.js';
+import { TasksDutyHs6BatchPartnerGeoIdsBodySchema, TasksDutyPhBodySchema } from '@clearcost/types';
 
 export default function phDutyRoutes(app: FastifyInstance) {
   const Body = TasksDutyPhBodySchema;
@@ -29,6 +30,28 @@ export default function phDutyRoutes(app: FastifyInstance) {
         skipSpecific: body.skipSpecific ?? true,
         batchSize: body.batchSize ?? 5_000,
         dryRun: body.dryRun,
+        importId: req.importCtx?.runId,
+      });
+
+      return reply.send({ importId: req.importCtx?.runId, ...result });
+    }
+  );
+
+  app.post(
+    '/cron/import/duties/ph-fta',
+    {
+      preHandler: app.requireApiKey(['tasks:duties:ph']),
+      schema: { body: TasksDutyHs6BatchPartnerGeoIdsBodySchema },
+      config: { importMeta: { importSource: 'WITS', job: 'duties:ph-fta' } },
+    },
+    async (req, reply) => {
+      const { hs6, partnerGeoIds, batchSize, dryRun } =
+        TasksDutyHs6BatchPartnerGeoIdsBodySchema.parse(req.body ?? {});
+      const result = await importPhPreferential({
+        hs6List: hs6,
+        partnerGeoIds,
+        batchSize,
+        dryRun,
         importId: req.importCtx?.runId,
       });
 

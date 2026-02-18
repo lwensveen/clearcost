@@ -294,6 +294,7 @@ bun run internal-request -- --path /internal/cron/fx/daily --body '{}'
   - `POST /internal/cron/import/duties/vn-mfn`
   - `POST /internal/cron/import/duties/vn-fta`
   - `POST /internal/cron/import/duties/ph-mfn`
+  - `POST /internal/cron/import/duties/ph-fta`
   - `POST /internal/cron/import/duties/id-mfn`
   - `POST /internal/cron/import/duties/id-fta`
   - `POST /internal/cron/id/btki/crawl`
@@ -388,8 +389,8 @@ TH/VN/SG MFN duty imports are also run daily via internal HTTP routes (`duties:t
 
 Critical workflow steps are configured to fail fast when imports return no usable activity:
 
-- `cron-daily-http.yml`: FX must return `fxAsOf`; VAT; duty imports (EU daily, JP MFN/FTA, UK MFN/FTA, ID/TH/VN/SG/CN MFN, ID/MY/TH/VN/SG/CN FTA, US MFN/FTA, plus MY/PH official imports when enabled); US/UK/EU remedy surcharges; and de-minimis imports must report rows (`count/inserted/updated > 0`).
-- `cron-daily-cli.yml`: `report:coverage` fails when MVP-required official freshness/coverage checks fail and when ASEAN FTA duty jobs (`duties:id-fta`, `duties:my-fta`, `duties:th-fta`, `duties:vn-fta`, `duties:sg-fta`) are missing/stale; successful runs upload `coverage-snapshot-<run_id>` artifact.
+- `cron-daily-http.yml`: FX must return `fxAsOf`; VAT; duty imports (EU daily, JP MFN/FTA, UK MFN/FTA, ID/TH/VN/SG/CN MFN, ID/MY/PH/TH/VN/SG/CN FTA, US MFN/FTA, plus MY/PH official imports when enabled); US/UK/EU remedy surcharges; and de-minimis imports must report rows (`count/inserted/updated > 0`).
+- `cron-daily-cli.yml`: `report:coverage` fails when MVP-required official freshness/coverage checks fail and when ASEAN FTA duty jobs (`duties:id-fta`, `duties:my-fta`, `duties:ph-fta`, `duties:th-fta`, `duties:vn-fta`, `duties:sg-fta`) are missing/stale; successful runs upload `coverage-snapshot-<run_id>` artifact.
 - `cron-weekly-cli.yml`: EU HS6, WITS duty imports (`fetchedRows > 0`), and freight JSON import (`count > 0`) fail the run if empty.
 
 This is deliberate so source/parser drift is visible in CI instead of silently succeeding with stale data.
