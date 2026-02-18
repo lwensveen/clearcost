@@ -2,9 +2,11 @@ import { FastifyInstance } from 'fastify';
 import { importPhMfn } from '../../../duty-rates/services/asean/ph/import-mfn.js';
 import { importPhMfnExcel } from '../../../duty-rates/services/asean/ph/import-mfn-excel.js';
 import { importPhPreferential } from '../../../duty-rates/services/asean/ph/import-preferential.js';
+import { importAseanPreferentialOfficialFromExcel } from '../../../duty-rates/services/asean/shared/import-preferential-official-excel.js';
 import {
   TasksDutyHs6BatchDryRunBodySchema,
   TasksDutyHs6BatchPartnerGeoIdsBodySchema,
+  TasksDutyMyFtaOfficialExcelBodySchema,
   TasksDutyPhBodySchema,
 } from '@clearcost/types';
 
@@ -82,6 +84,30 @@ export default function phDutyRoutes(app: FastifyInstance) {
         importId: req.importCtx?.runId,
       });
 
+      return reply.send({ importId: req.importCtx?.runId, ...result });
+    }
+  );
+
+  app.post(
+    '/cron/import/duties/ph-fta/official/excel',
+    {
+      preHandler: app.requireApiKey(['tasks:duties:ph']),
+      schema: { body: TasksDutyMyFtaOfficialExcelBodySchema },
+      config: { importMeta: { importSource: 'OFFICIAL', job: 'duties:ph-fta-official' } },
+    },
+    async (req, reply) => {
+      const { url, agreement, partner, sheet, batchSize, dryRun } =
+        TasksDutyMyFtaOfficialExcelBodySchema.parse(req.body ?? {});
+      const result = await importAseanPreferentialOfficialFromExcel({
+        dest: 'PH',
+        urlOrPath: url,
+        agreement,
+        partner,
+        sheet,
+        batchSize,
+        dryRun,
+        importId: req.importCtx?.runId,
+      });
       return reply.send({ importId: req.importCtx?.runId, ...result });
     }
   );

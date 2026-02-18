@@ -17,9 +17,17 @@ jobs:
       CLEARCOST_INTERNAL_API_URL: ${{ secrets.CLEARCOST_INTERNAL_API_URL }}
       CLEARCOST_TASKS_API_KEY: ${{ secrets.CLEARCOST_TASKS_API_KEY }}
       INTERNAL_SIGNING_SECRET: ${{ secrets.INTERNAL_SIGNING_SECRET }}
+      ID_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.ID_FTA_OFFICIAL_EXCEL_URL || '' }}
       MY_MFN_OFFICIAL_EXCEL_URL: ${{ secrets.MY_MFN_OFFICIAL_EXCEL_URL || '' }}
       MY_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.MY_FTA_OFFICIAL_EXCEL_URL || '' }}
       PH_TARIFF_EXCEL_URL: ${{ secrets.PH_TARIFF_EXCEL_URL || '' }}
+      PH_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.PH_FTA_OFFICIAL_EXCEL_URL || '' }}
+      TH_MFN_OFFICIAL_EXCEL_URL: ${{ secrets.TH_MFN_OFFICIAL_EXCEL_URL || '' }}
+      TH_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.TH_FTA_OFFICIAL_EXCEL_URL || '' }}
+      VN_MFN_OFFICIAL_EXCEL_URL: ${{ secrets.VN_MFN_OFFICIAL_EXCEL_URL || '' }}
+      VN_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.VN_FTA_OFFICIAL_EXCEL_URL || '' }}
+      SG_MFN_OFFICIAL_EXCEL_URL: ${{ secrets.SG_MFN_OFFICIAL_EXCEL_URL || '' }}
+      SG_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.SG_FTA_OFFICIAL_EXCEL_URL || '' }}
       UK_REMEDY_MEASURE_TYPES: ${{ vars.UK_REMEDY_MEASURE_TYPES || '552,551,695' }}
       EU_TARIC_REMEDY_TYPES: ${{ vars.EU_TARIC_REMEDY_TYPES || '' }}
       PRUNE_DAYS: ${{ vars.IMPORTS_PRUNE_DAYS || 90 }}
@@ -114,56 +122,78 @@ jobs:
             exit 1
           fi
 
-      - name: ID Duties — FTA (WITS)
+      - name: ID Duties — FTA (official Excel)
         run: |
-          BODY='{"partnerGeoIds":["SG","MY","TH","PH","VN","BN","KH","LA","MM"]}'
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/id-fta --body "$BODY")
+          if [ -z "${ID_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
+            echo "[duties:id-fta-official] missing ID_FTA_OFFICIAL_EXCEL_URL"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$ID_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/id-fta/official/excel --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:id-fta] expected >0 imported rows, got $ROWS"
+            echo "[duties:id-fta-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
-      - name: MY Duties — MFN (WITS)
+      - name: MY Duties — MFN (official Excel)
         run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/my-mfn --body '{}')
+          if [ -z "${MY_MFN_OFFICIAL_EXCEL_URL:-}" ]; then
+            echo "[duties:my-mfn-excel] missing MY_MFN_OFFICIAL_EXCEL_URL"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$MY_MFN_OFFICIAL_EXCEL_URL" '{url: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/my-mfn/official/excel --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:my-mfn] expected >0 imported rows, got $ROWS"
+            echo "[duties:my-mfn-excel] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
-      - name: PH Duties — MFN (WITS)
+      - name: PH Duties — MFN (official Excel)
         run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/ph-mfn/wits --body '{}')
+          if [ -z "${PH_TARIFF_EXCEL_URL:-}" ]; then
+            echo "[duties:ph-mfn-official] missing PH_TARIFF_EXCEL_URL"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$PH_TARIFF_EXCEL_URL" '{url: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/ph-mfn --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:ph-mfn-wits] expected >0 imported rows, got $ROWS"
+            echo "[duties:ph-mfn-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
-      - name: MY Duties — FTA (WITS)
+      - name: MY Duties — FTA (official Excel)
         run: |
-          BODY='{"partnerGeoIds":["SG","TH","ID","PH","VN","BN","KH","LA","MM"]}'
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/my-fta --body "$BODY")
+          if [ -z "${MY_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
+            echo "[duties:my-fta-excel] missing MY_FTA_OFFICIAL_EXCEL_URL"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$MY_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/my-fta/official/excel --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:my-fta] expected >0 imported rows, got $ROWS"
+            echo "[duties:my-fta-excel] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
-      - name: PH Duties — FTA (WITS)
+      - name: PH Duties — FTA (official Excel)
         run: |
-          BODY='{"partnerGeoIds":["SG","MY","TH","ID","VN","BN","KH","LA","MM"]}'
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/ph-fta --body "$BODY")
+          if [ -z "${PH_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
+            echo "[duties:ph-fta-official] missing PH_FTA_OFFICIAL_EXCEL_URL"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$PH_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/ph-fta/official/excel --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:ph-fta] expected >0 imported rows, got $ROWS"
+            echo "[duties:ph-fta-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
@@ -187,66 +217,93 @@ jobs:
             exit 1
           fi
 
-      - name: TH Duties — MFN (WITS)
+      - name: TH Duties — MFN (official Excel)
         run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/th-mfn --body '{}')
+          if [ -z "${TH_MFN_OFFICIAL_EXCEL_URL:-}" ]; then
+            echo "[duties:th-mfn-official] missing TH_MFN_OFFICIAL_EXCEL_URL"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$TH_MFN_OFFICIAL_EXCEL_URL" '{url: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/th-mfn/official/excel --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:th-mfn] expected >0 imported rows, got $ROWS"
+            echo "[duties:th-mfn-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
-      - name: TH Duties — FTA (WITS)
+      - name: TH Duties — FTA (official Excel)
         run: |
-          BODY='{"partnerGeoIds":["SG","MY","ID","PH","VN","BN","KH","LA","MM"]}'
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/th-fta --body "$BODY")
+          if [ -z "${TH_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
+            echo "[duties:th-fta-official] missing TH_FTA_OFFICIAL_EXCEL_URL"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$TH_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/th-fta/official/excel --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:th-fta] expected >0 imported rows, got $ROWS"
+            echo "[duties:th-fta-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
-      - name: VN Duties — MFN (WITS)
+      - name: VN Duties — MFN (official Excel)
         run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/vn-mfn --body '{}')
+          if [ -z "${VN_MFN_OFFICIAL_EXCEL_URL:-}" ]; then
+            echo "[duties:vn-mfn-official] missing VN_MFN_OFFICIAL_EXCEL_URL"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$VN_MFN_OFFICIAL_EXCEL_URL" '{url: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/vn-mfn/official/excel --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:vn-mfn] expected >0 imported rows, got $ROWS"
+            echo "[duties:vn-mfn-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
-      - name: VN Duties — FTA (WITS)
+      - name: VN Duties — FTA (official Excel)
         run: |
-          BODY='{"partnerGeoIds":["SG","MY","TH","ID","PH","BN","KH","LA","MM"]}'
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/vn-fta --body "$BODY")
+          if [ -z "${VN_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
+            echo "[duties:vn-fta-official] missing VN_FTA_OFFICIAL_EXCEL_URL"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$VN_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/vn-fta/official/excel --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:vn-fta] expected >0 imported rows, got $ROWS"
+            echo "[duties:vn-fta-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
-      - name: SG Duties — MFN (WITS)
+      - name: SG Duties — MFN (official Excel)
         run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/sg-mfn --body '{}')
+          if [ -z "${SG_MFN_OFFICIAL_EXCEL_URL:-}" ]; then
+            echo "[duties:sg-mfn-official] missing SG_MFN_OFFICIAL_EXCEL_URL"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$SG_MFN_OFFICIAL_EXCEL_URL" '{url: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/sg-mfn/official/excel --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:sg-mfn] expected >0 imported rows, got $ROWS"
+            echo "[duties:sg-mfn-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
-      - name: SG Duties — FTA (WITS)
+      - name: SG Duties — FTA (official Excel)
         run: |
-          BODY='{"partnerGeoIds":["MY","TH","ID","PH","VN","BN","KH","LA","MM"]}'
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/sg-fta --body "$BODY")
+          if [ -z "${SG_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
+            echo "[duties:sg-fta-official] missing SG_FTA_OFFICIAL_EXCEL_URL"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$SG_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/sg-fta/official/excel --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:sg-fta] expected >0 imported rows, got $ROWS"
+            echo "[duties:sg-fta-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
@@ -267,42 +324,6 @@ jobs:
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
             echo "[duties:us-fta] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
-
-      - name: MY Duties — MFN official Excel (if configured)
-        if: ${{ env.MY_MFN_OFFICIAL_EXCEL_URL != '' }}
-        run: |
-          BODY=$(jq -n --arg url "$MY_MFN_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/my-mfn/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:my-mfn-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
-
-      - name: MY Duties — FTA official Excel (if configured)
-        if: ${{ env.MY_FTA_OFFICIAL_EXCEL_URL != '' }}
-        run: |
-          BODY=$(jq -n --arg url "$MY_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/my-fta/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:my-fta-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
-
-      - name: PH Duties — MFN official Excel (if configured)
-        if: ${{ env.PH_TARIFF_EXCEL_URL != '' }}
-        run: |
-          BODY=$(jq -n --arg url "$PH_TARIFF_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/ph-mfn --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:ph-mfn-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 

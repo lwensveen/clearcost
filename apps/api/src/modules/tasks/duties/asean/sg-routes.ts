@@ -1,9 +1,13 @@
 import { FastifyInstance } from 'fastify';
 import { importSgMfn } from '../../../duty-rates/services/asean/sg/import-mfn.js';
 import { importSgPreferential } from '../../../duty-rates/services/asean/sg/import-preferential.js';
+import { importAseanMfnOfficialFromExcel } from '../../../duty-rates/services/asean/shared/import-mfn-official-excel.js';
+import { importAseanPreferentialOfficialFromExcel } from '../../../duty-rates/services/asean/shared/import-preferential-official-excel.js';
 import {
   TasksDutyHs6BatchDryRunBodySchema,
   TasksDutyHs6BatchPartnerGeoIdsBodySchema,
+  TasksDutyMyFtaOfficialExcelBodySchema,
+  TasksDutyMyOfficialExcelBodySchema,
 } from '@clearcost/types';
 
 export default function sgDutyRoutes(app: FastifyInstance) {
@@ -28,6 +32,28 @@ export default function sgDutyRoutes(app: FastifyInstance) {
     }
   );
 
+  app.post(
+    '/cron/import/duties/sg-mfn/official/excel',
+    {
+      ...Common,
+      schema: { body: TasksDutyMyOfficialExcelBodySchema },
+      config: { importMeta: { importSource: 'OFFICIAL', job: 'duties:sg-mfn-official' } },
+    },
+    async (req, reply) => {
+      const Body = TasksDutyMyOfficialExcelBodySchema;
+      const { url, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});
+      const res = await importAseanMfnOfficialFromExcel({
+        dest: 'SG',
+        urlOrPath: url,
+        sheet,
+        batchSize,
+        dryRun,
+        importId: req.importCtx?.runId,
+      });
+      return reply.send({ importId: req.importCtx?.runId, ...res });
+    }
+  );
+
   // Preferential (FTA)
   app.post(
     '/cron/import/duties/sg-fta',
@@ -43,6 +69,30 @@ export default function sgDutyRoutes(app: FastifyInstance) {
         importId: req.importCtx?.runId,
       });
       return reply.send(res);
+    }
+  );
+
+  app.post(
+    '/cron/import/duties/sg-fta/official/excel',
+    {
+      ...Common,
+      schema: { body: TasksDutyMyFtaOfficialExcelBodySchema },
+      config: { importMeta: { importSource: 'OFFICIAL', job: 'duties:sg-fta-official' } },
+    },
+    async (req, reply) => {
+      const Body = TasksDutyMyFtaOfficialExcelBodySchema;
+      const { url, agreement, partner, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});
+      const res = await importAseanPreferentialOfficialFromExcel({
+        dest: 'SG',
+        urlOrPath: url,
+        agreement,
+        partner,
+        sheet,
+        batchSize,
+        dryRun,
+        importId: req.importCtx?.runId,
+      });
+      return reply.send({ importId: req.importCtx?.runId, ...res });
     }
   );
 }

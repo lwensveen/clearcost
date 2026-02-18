@@ -1,9 +1,13 @@
 import { FastifyInstance } from 'fastify';
 import { importThMfn } from '../../../duty-rates/services/asean/th/import-mfn.js';
 import { importThPreferential } from '../../../duty-rates/services/asean/th/import-preferential.js';
+import { importAseanMfnOfficialFromExcel } from '../../../duty-rates/services/asean/shared/import-mfn-official-excel.js';
+import { importAseanPreferentialOfficialFromExcel } from '../../../duty-rates/services/asean/shared/import-preferential-official-excel.js';
 import {
   TasksDutyHs6BatchDryRunBodySchema,
   TasksDutyHs6BatchPartnerGeoIdsBodySchema,
+  TasksDutyMyFtaOfficialExcelBodySchema,
+  TasksDutyMyOfficialExcelBodySchema,
 } from '@clearcost/types';
 
 export default function thDutyRoutes(app: FastifyInstance) {
@@ -31,6 +35,32 @@ export default function thDutyRoutes(app: FastifyInstance) {
     );
   }
 
+  // TH MFN (official Excel)
+  {
+    const Body = TasksDutyMyOfficialExcelBodySchema;
+
+    app.post(
+      '/cron/import/duties/th-mfn/official/excel',
+      {
+        preHandler: app.requireApiKey(['tasks:duties:th']),
+        schema: { body: Body },
+        config: { importMeta: { importSource: 'OFFICIAL', job: 'duties:th-mfn-official' } },
+      },
+      async (req, reply) => {
+        const { url, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const res = await importAseanMfnOfficialFromExcel({
+          dest: 'TH',
+          urlOrPath: url,
+          sheet,
+          batchSize,
+          dryRun,
+          importId: req.importCtx?.runId,
+        });
+        return reply.send({ importId: req.importCtx?.runId, ...res });
+      }
+    );
+  }
+
   // TH Preferential (WITS)
   {
     const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
@@ -52,6 +82,34 @@ export default function thDutyRoutes(app: FastifyInstance) {
           importId: req.importCtx?.runId,
         });
         return reply.send(res);
+      }
+    );
+  }
+
+  // TH Preferential (official Excel)
+  {
+    const Body = TasksDutyMyFtaOfficialExcelBodySchema;
+
+    app.post(
+      '/cron/import/duties/th-fta/official/excel',
+      {
+        preHandler: app.requireApiKey(['tasks:duties:th']),
+        schema: { body: Body },
+        config: { importMeta: { importSource: 'OFFICIAL', job: 'duties:th-fta-official' } },
+      },
+      async (req, reply) => {
+        const { url, agreement, partner, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const res = await importAseanPreferentialOfficialFromExcel({
+          dest: 'TH',
+          urlOrPath: url,
+          agreement,
+          partner,
+          sheet,
+          batchSize,
+          dryRun,
+          importId: req.importCtx?.runId,
+        });
+        return reply.send({ importId: req.importCtx?.runId, ...res });
       }
     );
   }

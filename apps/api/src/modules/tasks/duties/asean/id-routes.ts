@@ -1,7 +1,12 @@
 import { FastifyInstance } from 'fastify';
 import { importIdMfn } from '../../../duty-rates/services/asean/id/import-mfn.js';
 import { importIdPreferential } from '../../../duty-rates/services/asean/id/import-preferential.js';
-import { TasksDutyIdBodySchema, TasksDutyIdFtaBodySchema } from '@clearcost/types';
+import { importAseanPreferentialOfficialFromExcel } from '../../../duty-rates/services/asean/shared/import-preferential-official-excel.js';
+import {
+  TasksDutyIdBodySchema,
+  TasksDutyIdFtaBodySchema,
+  TasksDutyMyFtaOfficialExcelBodySchema,
+} from '@clearcost/types';
 
 export default function idDutyRoutes(app: FastifyInstance) {
   const Body = TasksDutyIdBodySchema;
@@ -38,6 +43,31 @@ export default function idDutyRoutes(app: FastifyInstance) {
         partnerGeoIds,
       });
       return reply.send(res);
+    }
+  );
+
+  // Preferential (official Excel)
+  app.post(
+    '/cron/import/duties/id-fta/official/excel',
+    {
+      preHandler: app.requireApiKey(['tasks:duties:id']),
+      schema: { body: TasksDutyMyFtaOfficialExcelBodySchema },
+      config: { importMeta: { importSource: 'OFFICIAL', job: 'duties:id-fta-official' } },
+    },
+    async (req, reply) => {
+      const { url, agreement, partner, sheet, batchSize, dryRun } =
+        TasksDutyMyFtaOfficialExcelBodySchema.parse(req.body ?? {});
+      const res = await importAseanPreferentialOfficialFromExcel({
+        dest: 'ID',
+        urlOrPath: url,
+        agreement,
+        partner,
+        sheet,
+        batchSize,
+        dryRun,
+        importId: req.importCtx?.runId,
+      });
+      return reply.send({ importId: req.importCtx?.runId, ...res });
     }
   );
 }

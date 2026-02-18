@@ -288,16 +288,24 @@ bun run internal-request -- --path /internal/cron/fx/daily --body '{}'
   - `POST /internal/cron/import/duties/my-mfn/official/pdf`
   - `POST /internal/cron/import/duties/my-fta/official/excel`
   - `POST /internal/cron/import/duties/sg-mfn`
+  - `POST /internal/cron/import/duties/sg-mfn/official/excel`
   - `POST /internal/cron/import/duties/sg-fta`
+  - `POST /internal/cron/import/duties/sg-fta/official/excel`
   - `POST /internal/cron/import/duties/th-mfn`
+  - `POST /internal/cron/import/duties/th-mfn/official/excel`
   - `POST /internal/cron/import/duties/th-fta`
+  - `POST /internal/cron/import/duties/th-fta/official/excel`
   - `POST /internal/cron/import/duties/vn-mfn`
+  - `POST /internal/cron/import/duties/vn-mfn/official/excel`
   - `POST /internal/cron/import/duties/vn-fta`
+  - `POST /internal/cron/import/duties/vn-fta/official/excel`
   - `POST /internal/cron/import/duties/ph-mfn`
   - `POST /internal/cron/import/duties/ph-mfn/wits`
   - `POST /internal/cron/import/duties/ph-fta`
+  - `POST /internal/cron/import/duties/ph-fta/official/excel`
   - `POST /internal/cron/import/duties/id-mfn`
   - `POST /internal/cron/import/duties/id-fta`
+  - `POST /internal/cron/import/duties/id-fta/official/excel`
   - `POST /internal/cron/id/btki/crawl`
 
 - **Surcharges**
@@ -349,9 +357,17 @@ Both HTTP workflows (`cron-daily-http.yml` and `cron-hourly-http.yml`) require:
 
 | Name                        | Source | Required | Used for                                             |
 | --------------------------- | ------ | -------- | ---------------------------------------------------- |
-| `MY_MFN_OFFICIAL_EXCEL_URL` | secret | no       | Enables MY MFN official Excel import step.           |
-| `MY_FTA_OFFICIAL_EXCEL_URL` | secret | no       | Enables MY FTA official Excel import step.           |
-| `PH_TARIFF_EXCEL_URL`       | secret | no       | Enables PH MFN official Excel import step.           |
+| `ID_FTA_OFFICIAL_EXCEL_URL` | secret | yes      | Required ID FTA official Excel import source URL.    |
+| `MY_MFN_OFFICIAL_EXCEL_URL` | secret | yes      | Required MY MFN official Excel import source URL.    |
+| `MY_FTA_OFFICIAL_EXCEL_URL` | secret | yes      | Required MY FTA official Excel import source URL.    |
+| `PH_TARIFF_EXCEL_URL`       | secret | yes      | Required PH MFN official Excel import source URL.    |
+| `PH_FTA_OFFICIAL_EXCEL_URL` | secret | yes      | Required PH FTA official Excel import source URL.    |
+| `TH_MFN_OFFICIAL_EXCEL_URL` | secret | yes      | Required TH MFN official Excel import source URL.    |
+| `TH_FTA_OFFICIAL_EXCEL_URL` | secret | yes      | Required TH FTA official Excel import source URL.    |
+| `VN_MFN_OFFICIAL_EXCEL_URL` | secret | yes      | Required VN MFN official Excel import source URL.    |
+| `VN_FTA_OFFICIAL_EXCEL_URL` | secret | yes      | Required VN FTA official Excel import source URL.    |
+| `SG_MFN_OFFICIAL_EXCEL_URL` | secret | yes      | Required SG MFN official Excel import source URL.    |
+| `SG_FTA_OFFICIAL_EXCEL_URL` | secret | yes      | Required SG FTA official Excel import source URL.    |
 | `UK_REMEDY_MEASURE_TYPES`   | var    | no       | UK remedy measure types (defaults to `552,551,695`). |
 | `EU_TARIC_REMEDY_TYPES`     | var    | no       | Enables EU remedies surcharge import when non-empty. |
 | `IMPORTS_PRUNE_DAYS`        | var    | no       | Retention window for prune step (default `90`).      |
@@ -379,7 +395,6 @@ Both HTTP workflows (`cron-daily-http.yml` and `cron-hourly-http.yml`) require:
 | `DISCORD_WEBHOOK_URL` | secret | no       | Success/failure notifications.                            |
 
 US duties/surcharges are intentionally run in `cron-daily-http.yml` for fresher data and fail-fast checks.
-TH/VN/SG MFN duty imports are also run daily via internal HTTP routes (`duties:th-mfn`, `duties:vn-mfn`, `duties:sg-mfn`).
 
 ### `cron-daily-cli.yml`
 
@@ -391,8 +406,8 @@ TH/VN/SG MFN duty imports are also run daily via internal HTTP routes (`duties:t
 
 Critical workflow steps are configured to fail fast when imports return no usable activity:
 
-- `cron-daily-http.yml`: FX must return `fxAsOf`; VAT; duty imports (EU daily, JP MFN/FTA, UK MFN/FTA, ID/MY/PH/TH/VN/SG/CN MFN, ID/MY/PH/TH/VN/SG/CN FTA, US MFN/FTA, plus MY MFN/FTA and PH MFN official imports when enabled); US/UK/EU remedy surcharges; and de-minimis imports must report rows (`count/inserted/updated > 0`).
-- `cron-daily-cli.yml`: `report:coverage` fails when MVP-required official freshness/coverage checks fail; when ASEAN FTA duty jobs (`duties:id-fta`, `duties:my-fta`, `duties:ph-fta`, `duties:th-fta`, `duties:vn-fta`, `duties:sg-fta`) or ASEAN MFN duty jobs (`duties:id-mfn`, `duties:my-mfn`, `duties:ph-mfn-wits`, `duties:th-mfn`, `duties:vn-mfn`, `duties:sg-mfn`) are missing/stale; and when required ASEAN sample lanes (HS6 `850440`) are missing at the partner level.
+- `cron-daily-http.yml`: FX must return `fxAsOf`; VAT; duty imports (EU daily, JP MFN/FTA, UK MFN/FTA, ID MFN + ID/MY/PH/TH/VN/SG FTA official Excel, MY/PH/TH/VN/SG MFN official Excel, CN MFN/FTA, US MFN/FTA); US/UK/EU remedy surcharges; and de-minimis imports must report rows (`count/inserted/updated > 0`).
+- `cron-daily-cli.yml`: `report:coverage` fails when MVP-required official freshness/coverage checks fail; when ASEAN FTA duty jobs (`duties:id-fta-official`, `duties:my-fta-excel`, `duties:ph-fta-official`, `duties:th-fta-official`, `duties:vn-fta-official`, `duties:sg-fta-official`) or ASEAN MFN duty jobs (`duties:id-mfn`, `duties:my-mfn-excel`, `duties:ph-mfn-official`, `duties:th-mfn-official`, `duties:vn-mfn-official`, `duties:sg-mfn-official`) are missing/stale; and when required ASEAN sample lanes (HS6 `850440`) are missing at the partner level.
 - `cron-weekly-cli.yml`: EU HS6, WITS duty imports (`fetchedRows > 0`), and freight JSON import (`count > 0`) fail the run if empty.
 
 This is deliberate so source/parser drift is visible in CI instead of silently succeeding with stale data.

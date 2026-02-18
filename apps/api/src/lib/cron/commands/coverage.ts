@@ -49,36 +49,36 @@ type CoverageCheck = {
 const DEFAULT_REQUIRED_DESTINATIONS = ['NL', 'DE'] as const;
 const DEFAULT_REQUIRED_LANES = ['US->NL:850440', 'US->DE:850440', 'NL->DE:851830'] as const;
 const ASEAN_FTA_REQUIRED_JOBS = [
-  'duties:id-fta',
-  'duties:my-fta',
-  'duties:ph-fta',
-  'duties:th-fta',
-  'duties:vn-fta',
-  'duties:sg-fta',
+  'duties:id-fta-official',
+  'duties:my-fta-excel',
+  'duties:ph-fta-official',
+  'duties:th-fta-official',
+  'duties:vn-fta-official',
+  'duties:sg-fta-official',
 ] as const;
 const ASEAN_MFN_REQUIRED_JOBS = [
   'duties:id-mfn',
-  'duties:my-mfn',
-  'duties:ph-mfn-wits',
-  'duties:th-mfn',
-  'duties:vn-mfn',
-  'duties:sg-mfn',
+  'duties:my-mfn-excel',
+  'duties:ph-mfn-official',
+  'duties:th-mfn-official',
+  'duties:vn-mfn-official',
+  'duties:sg-mfn-official',
 ] as const;
 const ASEAN_MFN_REQUIRED_LANES: ReadonlyArray<DutyCoverageRequirement> = [
   { origin: null, dest: 'ID', hs6: '850440', dutyRule: 'mfn', expectedSources: ['official'] },
-  { origin: null, dest: 'MY', hs6: '850440', dutyRule: 'mfn', expectedSources: ['wits'] },
-  { origin: null, dest: 'PH', hs6: '850440', dutyRule: 'mfn', expectedSources: ['wits'] },
-  { origin: null, dest: 'TH', hs6: '850440', dutyRule: 'mfn', expectedSources: ['wits'] },
-  { origin: null, dest: 'VN', hs6: '850440', dutyRule: 'mfn', expectedSources: ['wits'] },
-  { origin: null, dest: 'SG', hs6: '850440', dutyRule: 'mfn', expectedSources: ['wits'] },
+  { origin: null, dest: 'MY', hs6: '850440', dutyRule: 'mfn', expectedSources: ['official'] },
+  { origin: null, dest: 'PH', hs6: '850440', dutyRule: 'mfn', expectedSources: ['official'] },
+  { origin: null, dest: 'TH', hs6: '850440', dutyRule: 'mfn', expectedSources: ['official'] },
+  { origin: null, dest: 'VN', hs6: '850440', dutyRule: 'mfn', expectedSources: ['official'] },
+  { origin: null, dest: 'SG', hs6: '850440', dutyRule: 'mfn', expectedSources: ['official'] },
 ] as const;
 const ASEAN_FTA_REQUIRED_LANES: ReadonlyArray<DutyCoverageRequirement> = [
-  { origin: 'SG', dest: 'ID', hs6: '850440', dutyRule: 'fta', expectedSources: ['wits'] },
-  { origin: 'SG', dest: 'MY', hs6: '850440', dutyRule: 'fta', expectedSources: ['wits'] },
-  { origin: 'SG', dest: 'PH', hs6: '850440', dutyRule: 'fta', expectedSources: ['wits'] },
-  { origin: 'SG', dest: 'TH', hs6: '850440', dutyRule: 'fta', expectedSources: ['wits'] },
-  { origin: 'SG', dest: 'VN', hs6: '850440', dutyRule: 'fta', expectedSources: ['wits'] },
-  { origin: 'MY', dest: 'SG', hs6: '850440', dutyRule: 'fta', expectedSources: ['wits'] },
+  { origin: 'SG', dest: 'ID', hs6: '850440', dutyRule: 'fta', expectedSources: ['official'] },
+  { origin: 'SG', dest: 'MY', hs6: '850440', dutyRule: 'fta', expectedSources: ['official'] },
+  { origin: 'SG', dest: 'PH', hs6: '850440', dutyRule: 'fta', expectedSources: ['official'] },
+  { origin: 'SG', dest: 'TH', hs6: '850440', dutyRule: 'fta', expectedSources: ['official'] },
+  { origin: 'SG', dest: 'VN', hs6: '850440', dutyRule: 'fta', expectedSources: ['official'] },
+  { origin: 'MY', dest: 'SG', hs6: '850440', dutyRule: 'fta', expectedSources: ['official'] },
 ] as const;
 const ASEAN_FTA_FRESHNESS_THRESHOLD_HOURS = 192;
 const ASEAN_MFN_FRESHNESS_THRESHOLD_HOURS = 192;
