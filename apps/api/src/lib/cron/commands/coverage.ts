@@ -28,6 +28,16 @@ type DutyCoverageRow = {
   dest: string;
   partner: string | null;
   hs6: string;
+  source: string;
+  dutyRule: string;
+};
+
+type DutyCoverageRequirement = {
+  origin: string | null;
+  dest: string;
+  hs6: string;
+  dutyRule: 'mfn' | 'fta';
+  expectedSources: ReadonlyArray<'official' | 'wits'>;
 };
 
 type CoverageCheck = {
@@ -53,6 +63,22 @@ const ASEAN_MFN_REQUIRED_JOBS = [
   'duties:th-mfn',
   'duties:vn-mfn',
   'duties:sg-mfn',
+] as const;
+const ASEAN_MFN_REQUIRED_LANES: ReadonlyArray<DutyCoverageRequirement> = [
+  { origin: null, dest: 'ID', hs6: '850440', dutyRule: 'mfn', expectedSources: ['official'] },
+  { origin: null, dest: 'MY', hs6: '850440', dutyRule: 'mfn', expectedSources: ['wits'] },
+  { origin: null, dest: 'PH', hs6: '850440', dutyRule: 'mfn', expectedSources: ['wits'] },
+  { origin: null, dest: 'TH', hs6: '850440', dutyRule: 'mfn', expectedSources: ['wits'] },
+  { origin: null, dest: 'VN', hs6: '850440', dutyRule: 'mfn', expectedSources: ['wits'] },
+  { origin: null, dest: 'SG', hs6: '850440', dutyRule: 'mfn', expectedSources: ['wits'] },
+] as const;
+const ASEAN_FTA_REQUIRED_LANES: ReadonlyArray<DutyCoverageRequirement> = [
+  { origin: 'SG', dest: 'ID', hs6: '850440', dutyRule: 'fta', expectedSources: ['wits'] },
+  { origin: 'SG', dest: 'MY', hs6: '850440', dutyRule: 'fta', expectedSources: ['wits'] },
+  { origin: 'SG', dest: 'PH', hs6: '850440', dutyRule: 'fta', expectedSources: ['wits'] },
+  { origin: 'SG', dest: 'TH', hs6: '850440', dutyRule: 'fta', expectedSources: ['wits'] },
+  { origin: 'SG', dest: 'VN', hs6: '850440', dutyRule: 'fta', expectedSources: ['wits'] },
+  { origin: 'MY', dest: 'SG', hs6: '850440', dutyRule: 'fta', expectedSources: ['wits'] },
 ] as const;
 const ASEAN_FTA_FRESHNESS_THRESHOLD_HOURS = 192;
 const ASEAN_MFN_FRESHNESS_THRESHOLD_HOURS = 192;
@@ -81,6 +107,30 @@ function hasOfficialDutyCoverage(rows: DutyCoverageRow[], lane: CoverageLane): b
     if (String(row.hs6).slice(0, 6) !== lane.hs6) return false;
     const partner = normalizePartner(row.partner);
     return partner === '' || partner === lane.origin;
+  });
+}
+
+function formatDutyCoverageRequirementLane(req: DutyCoverageRequirement): string {
+  const origin = req.origin ? req.origin.toUpperCase() : 'WLD';
+  return `${origin}->${req.dest.toUpperCase()}:${req.hs6}`;
+}
+
+function hasDutyCoverageForRequirement(
+  rows: DutyCoverageRow[],
+  requirement: DutyCoverageRequirement
+): boolean {
+  const dest = requirement.dest.toUpperCase();
+  const hs6 = requirement.hs6;
+  const dutyRule = requirement.dutyRule.toLowerCase();
+  const partner = requirement.origin == null ? '' : requirement.origin.toUpperCase();
+  const expectedSources = new Set(requirement.expectedSources.map((s) => s.toLowerCase()));
+
+  return rows.some((row) => {
+    if (row.dest.toUpperCase() !== dest) return false;
+    if (String(row.hs6).slice(0, 6) !== hs6) return false;
+    if (String(row.dutyRule).toLowerCase() !== dutyRule) return false;
+    if (normalizePartner(row.partner) !== partner) return false;
+    return expectedSources.has(String(row.source).toLowerCase());
   });
 }
 
@@ -219,15 +269,17 @@ export const coverageSnapshot: Command = async (args) => {
       dest: dutyRatesTable.dest,
       partner: dutyRatesTable.partner,
       hs6: dutyRatesTable.hs6,
+      source: dutyRatesTable.source,
+      dutyRule: dutyRatesTable.dutyRule,
     })
     .from(dutyRatesTable)
     .where(
       and(
-        eq(dutyRatesTable.source, 'official'),
         lte(dutyRatesTable.effectiveFrom, now),
         or(isNull(dutyRatesTable.effectiveTo), gt(dutyRatesTable.effectiveTo, now))
       )
     );
+  const officialDutyRows = dutyRows.filter((row) => row.source === 'official');
 
   const deMinimisRows = await db
     .select({ dest: deMinimisTable.dest })
@@ -265,7 +317,7 @@ export const coverageSnapshot: Command = async (args) => {
 
   const vatDestinations = [...new Set(vatRows.map((row) => String(row.dest).toUpperCase()))].sort();
   const dutyDestinations = [
-    ...new Set(dutyRows.map((row) => String(row.dest).toUpperCase())),
+    ...new Set(officialDutyRows.map((row) => String(row.dest).toUpperCase())),
   ].sort();
   const deMinimisDestinations = [
     ...new Set(deMinimisRows.map((row) => String(row.dest).toUpperCase())),
@@ -355,8 +407,24 @@ export const coverageSnapshot: Command = async (args) => {
   for (const lane of parsedRequiredLanes) {
     checks.push({
       key: `duties.official.lane.${lane.origin}->${lane.dest}:${lane.hs6}`,
-      ok: hasOfficialDutyCoverage(dutyRows, lane),
+      ok: hasOfficialDutyCoverage(officialDutyRows, lane),
       detail: `Official duty coverage for ${lane.origin}->${lane.dest} HS6 ${lane.hs6}`,
+    });
+  }
+  for (const requirement of ASEAN_MFN_REQUIRED_LANES) {
+    const lane = formatDutyCoverageRequirementLane(requirement);
+    checks.push({
+      key: `duties.asean_mfn.lane.${lane}`,
+      ok: hasDutyCoverageForRequirement(dutyRows, requirement),
+      detail: `ASEAN MFN coverage for ${lane} (${requirement.expectedSources.join('/')}, rule=${requirement.dutyRule})`,
+    });
+  }
+  for (const requirement of ASEAN_FTA_REQUIRED_LANES) {
+    const lane = formatDutyCoverageRequirementLane(requirement);
+    checks.push({
+      key: `duties.asean_fta.lane.${lane}`,
+      ok: hasDutyCoverageForRequirement(dutyRows, requirement),
+      detail: `ASEAN FTA coverage for ${lane} (${requirement.expectedSources.join('/')}, rule=${requirement.dutyRule})`,
     });
   }
 
@@ -368,6 +436,12 @@ export const coverageSnapshot: Command = async (args) => {
     required: {
       destinations: effectiveRequiredDestinations,
       lanes: parsedRequiredLanes.map((lane) => `${lane.origin}->${lane.dest}:${lane.hs6}`),
+      aseanMfnSampleLanes: ASEAN_MFN_REQUIRED_LANES.map((req) =>
+        formatDutyCoverageRequirementLane(req)
+      ),
+      aseanFtaSampleLanes: ASEAN_FTA_REQUIRED_LANES.map((req) =>
+        formatDutyCoverageRequirementLane(req)
+      ),
     },
     freshness: {
       fx: freshness.datasets.fx,
@@ -414,7 +488,7 @@ export const coverageSnapshot: Command = async (args) => {
         officialDestinations: vatDestinations,
       },
       duties: {
-        officialRowCount: dutyRows.length,
+        officialRowCount: officialDutyRows.length,
         officialDestinations: dutyDestinations,
       },
       deMinimis: {
