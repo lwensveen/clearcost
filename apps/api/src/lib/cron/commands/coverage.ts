@@ -46,7 +46,16 @@ const ASEAN_FTA_REQUIRED_JOBS = [
   'duties:vn-fta',
   'duties:sg-fta',
 ] as const;
+const ASEAN_MFN_REQUIRED_JOBS = [
+  'duties:id-mfn',
+  'duties:my-mfn',
+  'duties:ph-mfn-wits',
+  'duties:th-mfn',
+  'duties:vn-mfn',
+  'duties:sg-mfn',
+] as const;
 const ASEAN_FTA_FRESHNESS_THRESHOLD_HOURS = 192;
+const ASEAN_MFN_FRESHNESS_THRESHOLD_HOURS = 192;
 
 function up2(value: string): string {
   return value.trim().toUpperCase().slice(0, 2);
@@ -167,6 +176,11 @@ export const coverageSnapshot: Command = async (args) => {
   const aseanFtaFreshness = await Promise.all(
     ASEAN_FTA_REQUIRED_JOBS.map((job) =>
       getImportJobFreshness(job, now, ASEAN_FTA_FRESHNESS_THRESHOLD_HOURS)
+    )
+  );
+  const aseanMfnFreshness = await Promise.all(
+    ASEAN_MFN_REQUIRED_JOBS.map((job) =>
+      getImportJobFreshness(job, now, ASEAN_MFN_FRESHNESS_THRESHOLD_HOURS)
     )
   );
 
@@ -308,6 +322,16 @@ export const coverageSnapshot: Command = async (args) => {
           : `${jobFreshness.job} latest success ${jobFreshness.lastSuccessAt.toISOString()} (threshold ${jobFreshness.thresholdHours}h)`,
     });
   }
+  for (const jobFreshness of aseanMfnFreshness) {
+    checks.push({
+      key: `freshness.asean_mfn.${jobFreshness.job}`,
+      ok: jobFreshness.stale !== true,
+      detail:
+        jobFreshness.lastSuccessAt == null
+          ? `No successful import run for ${jobFreshness.job}`
+          : `${jobFreshness.job} latest success ${jobFreshness.lastSuccessAt.toISOString()} (threshold ${jobFreshness.thresholdHours}h)`,
+    });
+  }
 
   checks.push({
     key: 'fx.usd_eur_pair',
@@ -359,6 +383,16 @@ export const coverageSnapshot: Command = async (args) => {
       },
       aseanFta: {
         jobs: aseanFtaFreshness.map((jobFreshness) => ({
+          job: jobFreshness.job,
+          thresholdHours: jobFreshness.thresholdHours,
+          lastSuccessAt: jobFreshness.lastSuccessAt?.toISOString() ?? null,
+          lastAttemptAt: jobFreshness.lastAttemptAt?.toISOString() ?? null,
+          ageHours: jobFreshness.ageHours,
+          stale: jobFreshness.stale,
+        })),
+      },
+      aseanMfn: {
+        jobs: aseanMfnFreshness.map((jobFreshness) => ({
           job: jobFreshness.job,
           thresholdHours: jobFreshness.thresholdHours,
           lastSuccessAt: jobFreshness.lastSuccessAt?.toISOString() ?? null,

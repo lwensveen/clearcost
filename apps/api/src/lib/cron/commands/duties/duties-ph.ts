@@ -9,7 +9,7 @@ export const dutiesPhMfn: Command = async (args) => {
   if (!url) throw new Error('Provide --url=... or set PH_TARIFF_EXCEL_URL');
 
   const payload = await withRun(
-    { importSource: 'PH_TARIFF_COMMISSION', job: 'duties:ph-mfn', params: { url } },
+    { importSource: 'PH_TARIFF_COMMISSION', job: 'duties:ph-mfn-official', params: { url } },
     async (importId) => {
       const res = await importPhMfnExcel({
         urlOrPath: url,

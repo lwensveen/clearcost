@@ -141,7 +141,7 @@ jobs:
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:ph-mfn] expected >0 imported rows, got $ROWS"
+            echo "[duties:ph-mfn-wits] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
@@ -302,7 +302,7 @@ jobs:
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:ph-mfn] expected >0 imported rows, got $ROWS"
+            echo "[duties:ph-mfn-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 

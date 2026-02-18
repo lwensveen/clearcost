@@ -16,7 +16,9 @@ export default function phDutyRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:duties:ph']),
       schema: { body: Body },
-      config: { importMeta: { importSource: 'PH_TARIFF_COMMISSION', job: 'duties:ph-mfn' } },
+      config: {
+        importMeta: { importSource: 'PH_TARIFF_COMMISSION', job: 'duties:ph-mfn-official' },
+      },
     },
     async (req, reply) => {
       const body = Body.parse(req.body ?? {});
@@ -47,7 +49,7 @@ export default function phDutyRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:duties:ph']),
       schema: { body: TasksDutyHs6BatchDryRunBodySchema },
-      config: { importMeta: { importSource: 'WITS', job: 'duties:ph-mfn' } },
+      config: { importMeta: { importSource: 'WITS', job: 'duties:ph-mfn-wits' } },
     },
     async (req, reply) => {
       const { hs6, batchSize, dryRun } = TasksDutyHs6BatchDryRunBodySchema.parse(req.body ?? {});
