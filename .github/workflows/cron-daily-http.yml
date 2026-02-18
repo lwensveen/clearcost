@@ -124,6 +124,26 @@ jobs:
             exit 1
           fi
 
+      - name: MY Duties — MFN (WITS)
+        run: |
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/my-mfn --body '{}')
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[duties:my-mfn] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
+
+      - name: PH Duties — MFN (WITS)
+        run: |
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/ph-mfn/wits --body '{}')
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[duties:ph-mfn] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
+
       - name: MY Duties — FTA (WITS)
         run: |
           BODY='{"partnerGeoIds":["SG","TH","ID","PH","VN","BN","KH","LA","MM"]}'

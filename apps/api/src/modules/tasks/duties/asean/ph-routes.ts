@@ -1,7 +1,12 @@
 import { FastifyInstance } from 'fastify';
+import { importPhMfn } from '../../../duty-rates/services/asean/ph/import-mfn.js';
 import { importPhMfnExcel } from '../../../duty-rates/services/asean/ph/import-mfn-excel.js';
 import { importPhPreferential } from '../../../duty-rates/services/asean/ph/import-preferential.js';
-import { TasksDutyHs6BatchPartnerGeoIdsBodySchema, TasksDutyPhBodySchema } from '@clearcost/types';
+import {
+  TasksDutyHs6BatchDryRunBodySchema,
+  TasksDutyHs6BatchPartnerGeoIdsBodySchema,
+  TasksDutyPhBodySchema,
+} from '@clearcost/types';
 
 export default function phDutyRoutes(app: FastifyInstance) {
   const Body = TasksDutyPhBodySchema;
@@ -30,6 +35,26 @@ export default function phDutyRoutes(app: FastifyInstance) {
         skipSpecific: body.skipSpecific ?? true,
         batchSize: body.batchSize ?? 5_000,
         dryRun: body.dryRun,
+        importId: req.importCtx?.runId,
+      });
+
+      return reply.send({ importId: req.importCtx?.runId, ...result });
+    }
+  );
+
+  app.post(
+    '/cron/import/duties/ph-mfn/wits',
+    {
+      preHandler: app.requireApiKey(['tasks:duties:ph']),
+      schema: { body: TasksDutyHs6BatchDryRunBodySchema },
+      config: { importMeta: { importSource: 'WITS', job: 'duties:ph-mfn' } },
+    },
+    async (req, reply) => {
+      const { hs6, batchSize, dryRun } = TasksDutyHs6BatchDryRunBodySchema.parse(req.body ?? {});
+      const result = await importPhMfn({
+        hs6List: hs6,
+        batchSize,
+        dryRun,
         importId: req.importCtx?.runId,
       });
 
