@@ -18,6 +18,7 @@ jobs:
       CLEARCOST_TASKS_API_KEY: ${{ secrets.CLEARCOST_TASKS_API_KEY }}
       INTERNAL_SIGNING_SECRET: ${{ secrets.INTERNAL_SIGNING_SECRET }}
       MY_MFN_OFFICIAL_EXCEL_URL: ${{ secrets.MY_MFN_OFFICIAL_EXCEL_URL || '' }}
+      MY_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.MY_FTA_OFFICIAL_EXCEL_URL || '' }}
       PH_TARIFF_EXCEL_URL: ${{ secrets.PH_TARIFF_EXCEL_URL || '' }}
       UK_REMEDY_MEASURE_TYPES: ${{ vars.UK_REMEDY_MEASURE_TYPES || '552,551,695' }}
       EU_TARIC_REMEDY_TYPES: ${{ vars.EU_TARIC_REMEDY_TYPES || '' }}
@@ -278,6 +279,18 @@ jobs:
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
             echo "[duties:my-mfn-official] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
+
+      - name: MY Duties — FTA official Excel (if configured)
+        if: ${{ env.MY_FTA_OFFICIAL_EXCEL_URL != '' }}
+        run: |
+          BODY=$(jq -n --arg url "$MY_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/my-fta/official/excel --body "$BODY")
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[duties:my-fta-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 

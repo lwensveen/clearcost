@@ -350,6 +350,7 @@ Both HTTP workflows (`cron-daily-http.yml` and `cron-hourly-http.yml`) require:
 | Name                        | Source | Required | Used for                                             |
 | --------------------------- | ------ | -------- | ---------------------------------------------------- |
 | `MY_MFN_OFFICIAL_EXCEL_URL` | secret | no       | Enables MY MFN official Excel import step.           |
+| `MY_FTA_OFFICIAL_EXCEL_URL` | secret | no       | Enables MY FTA official Excel import step.           |
 | `PH_TARIFF_EXCEL_URL`       | secret | no       | Enables PH MFN official Excel import step.           |
 | `UK_REMEDY_MEASURE_TYPES`   | var    | no       | UK remedy measure types (defaults to `552,551,695`). |
 | `EU_TARIC_REMEDY_TYPES`     | var    | no       | Enables EU remedies surcharge import when non-empty. |
@@ -390,7 +391,7 @@ TH/VN/SG MFN duty imports are also run daily via internal HTTP routes (`duties:t
 
 Critical workflow steps are configured to fail fast when imports return no usable activity:
 
-- `cron-daily-http.yml`: FX must return `fxAsOf`; VAT; duty imports (EU daily, JP MFN/FTA, UK MFN/FTA, ID/MY/PH/TH/VN/SG/CN MFN, ID/MY/PH/TH/VN/SG/CN FTA, US MFN/FTA, plus MY/PH official imports when enabled); US/UK/EU remedy surcharges; and de-minimis imports must report rows (`count/inserted/updated > 0`).
+- `cron-daily-http.yml`: FX must return `fxAsOf`; VAT; duty imports (EU daily, JP MFN/FTA, UK MFN/FTA, ID/MY/PH/TH/VN/SG/CN MFN, ID/MY/PH/TH/VN/SG/CN FTA, US MFN/FTA, plus MY MFN/FTA and PH MFN official imports when enabled); US/UK/EU remedy surcharges; and de-minimis imports must report rows (`count/inserted/updated > 0`).
 - `cron-daily-cli.yml`: `report:coverage` fails when MVP-required official freshness/coverage checks fail and when ASEAN FTA duty jobs (`duties:id-fta`, `duties:my-fta`, `duties:ph-fta`, `duties:th-fta`, `duties:vn-fta`, `duties:sg-fta`) are missing/stale; successful runs upload `coverage-snapshot-<run_id>` artifact.
 - `cron-weekly-cli.yml`: EU HS6, WITS duty imports (`fetchedRows > 0`), and freight JSON import (`count > 0`) fail the run if empty.
 
