@@ -11,6 +11,7 @@ import { db, hsCodeAliasesTable, provenanceTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
 import { sha256Hex } from '../../../../../lib/provenance.js';
 import { httpFetch } from '../../../../../lib/http.js';
+import { resolveAhtnSourceUrls } from './source-urls.js';
 
 function hs6(code8: string): string | null {
   const s = (code8 ?? '').replace(/\D+/g, '').slice(0, 6);
@@ -93,14 +94,14 @@ function parseCsv(text: string): Record<string, string>[] {
 export type ImportAhtnResult = { ok: true; count: number; message?: string };
 
 type ImportAhtnOpts = {
-  url?: string; // CSV URL; default: process.env.AHTN_CSV_URL
+  url?: string; // CSV URL; default: source_registry hs.asean.ahtn.csv with env fallback
   batchSize?: number; // default 2000
   importId?: string; // provenance run id (optional)
   makeSourceRef?: (code8: string) => string | undefined; // optional provenance source ref builder
 };
 
 export async function importAhtnAliases(opts: ImportAhtnOpts = {}): Promise<ImportAhtnResult> {
-  const url = opts.url ?? process.env.AHTN_CSV_URL ?? '';
+  const { csvUrl: url } = await resolveAhtnSourceUrls({ csvUrl: opts.url });
   if (!url) return { ok: true as const, count: 0, message: 'AHTN_CSV_URL not set' };
 
   const text = await fetchText(url);

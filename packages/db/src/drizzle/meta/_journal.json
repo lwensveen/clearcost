@@ -211,6 +211,13 @@
       "when": 1771549000000,
       "tag": "0029_green_lotus",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1771549600000,
+      "tag": "0030_handy_tigra",
+      "breakpoints": true
     }
   ]
 }

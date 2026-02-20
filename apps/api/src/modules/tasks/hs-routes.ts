@@ -23,7 +23,9 @@ export default function hsRoutes(app: FastifyInstance) {
     '/cron/import/hs/ahtn',
     {
       preHandler: app.requireApiKey(['tasks:hs:ahtn']),
-      config: { importMeta: { importSource: 'AHTN', job: 'hs:ahtn' } },
+      config: {
+        importMeta: { importSource: 'AHTN', job: 'hs:ahtn', sourceKey: 'hs.asean.ahtn.csv' },
+      },
       schema: { body: TasksHsAhtnBodySchema },
     },
     async (req, reply) => {
