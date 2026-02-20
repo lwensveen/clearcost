@@ -1,10 +1,11 @@
 import { parse } from 'node-html-parser';
 import { httpFetch } from '../../../../lib/http.js';
-
-const JP_TARIFF_INDEX = process.env.JP_TARIFF_INDEX ?? 'https://www.customs.go.jp/english/tariff/';
+import { resolveJpTariffDutySourceUrls } from './source-urls.js';
 
 export async function getLatestJpTariffBase(): Promise<string> {
-  const res = await httpFetch(JP_TARIFF_INDEX, { redirect: 'follow' });
+  const { tariffIndexUrl } = await resolveJpTariffDutySourceUrls();
+
+  const res = await httpFetch(tariffIndexUrl, { redirect: 'follow' });
   if (!res.ok) throw new Error(`JP index fetch ${res.status}`);
   const root = parse(await res.text());
 
@@ -15,7 +16,7 @@ export async function getLatestJpTariffBase(): Promise<string> {
     .find((href) => /\/english\/tariff\/\d{4}_\d{1,2}(?:_\d{1,2})?\/index\.htm$/i.test(href));
   if (!a) throw new Error('No edition index found');
 
-  const url = new URL(a, JP_TARIFF_INDEX).href;
+  const url = new URL(a, tariffIndexUrl).href;
   // Normalize to the directory base; we’ll append data/e_XX.htm later
   return url.replace(/index\.htm$/i, '');
 }

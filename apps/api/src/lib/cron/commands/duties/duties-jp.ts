@@ -15,7 +15,11 @@ export const dutiesJpMfn: Command = async (args) => {
     {
       importSource: 'JP_CUSTOMS',
       job: 'duties:jp-mfn',
-      params: { hs6, dryRun: boolParam(dryRun) },
+      params: {
+        hs6,
+        dryRun: boolParam(dryRun),
+        sourceKey: 'duties.jp.customs.tariff_index',
+      },
     },
     async (importId) => {
       const res = await importJpMfn({ hs6List: hs6, dryRun, importId });
@@ -35,7 +39,12 @@ export const dutiesJpFta: Command = async (args) => {
     {
       importSource: 'WITS',
       job: 'duties:jp-fta',
-      params: { hs6, partners: partnerGeoIds, dryRun: boolParam(dryRun) },
+      params: {
+        hs6,
+        partners: partnerGeoIds,
+        dryRun: boolParam(dryRun),
+        sourceKey: 'duties.wits.sdmx.base',
+      },
     },
     async (importId) => {
       const res = await importJpPreferential({ hs6List: hs6, partnerGeoIds, dryRun, importId });
@@ -55,7 +64,11 @@ export const dutiesJpAll: Command = async (args) => {
     {
       importSource: 'JP_CUSTOMS',
       job: 'duties:jp-mfn',
-      params: { hs6, dryRun: boolParam(dryRun) },
+      params: {
+        hs6,
+        dryRun: boolParam(dryRun),
+        sourceKey: 'duties.jp.customs.tariff_index',
+      },
     },
     async (importId) => {
       const res = await importJpMfn({ hs6List: hs6, dryRun, importId });
@@ -68,7 +81,12 @@ export const dutiesJpAll: Command = async (args) => {
     {
       importSource: 'WITS',
       job: 'duties:jp-fta',
-      params: { hs6, partners, dryRun: boolParam(dryRun) },
+      params: {
+        hs6,
+        partners,
+        dryRun: boolParam(dryRun),
+        sourceKey: 'duties.wits.sdmx.base',
+      },
     },
     async (importId) => {
       const res = await importJpPreferential({
