@@ -288,6 +288,13 @@
       "when": 1771754400000,
       "tag": "0040_sudden_reaper",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1771840800000,
+      "tag": "0041_quick_beast",
+      "breakpoints": true
     }
   ]
 }

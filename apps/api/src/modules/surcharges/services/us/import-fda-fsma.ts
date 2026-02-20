@@ -1,12 +1,10 @@
 import { batchUpsertSurchargesFromStream } from '../../utils/batch-upsert.js';
 import type { SurchargeInsert } from '@clearcost/types';
 import { httpFetch } from '../../../../lib/http.js';
+import { resolveUsSurchargeSourceUrls } from './source-urls.js';
 
-const FDA_VQIP_URL = 'https://www.fda.gov/food/voluntary-qualified-importer-program-vqip/vqip-fees';
-
-// Federal Register search helper (probe by FY and FY-1)
-const FR_FSMA_SEARCH = (fy: number) =>
-  `https://www.federalregister.gov/search?term=Food%20Safety%20Modernization%20Act%20fee%20rates%20fiscal%20year%20${fy}`;
+const FDA_VQIP_SOURCE_KEY = 'surcharges.us.fda.vqip_fees';
+const FR_SEARCH_SOURCE_KEY = 'surcharges.us.federal_register.search';
 
 const DEBUG = process.argv.includes('--debug') || process.env.DEBUG === '1';
 
@@ -32,15 +30,21 @@ async function fetchText(url: string) {
   return await r.text();
 }
 
+function fsmaSearchUrl(searchBaseUrl: string, fy: number): string {
+  const url = new URL(searchBaseUrl);
+  url.searchParams.set('term', `Food Safety Modernization Act fee rates fiscal year ${fy}`);
+  return url.toString();
+}
+
 /** Parse VQIP fees (user + application) from FDA page. */
-async function scrapeVQIP(): Promise<{
+async function scrapeVQIP(vqipUrl: string): Promise<{
   userFee?: string | null;
   appFee?: string | null;
   fy?: number | null;
   url?: string;
 }> {
   try {
-    const html = await fetchText(FDA_VQIP_URL);
+    const html = await fetchText(vqipUrl);
     const H = $(html);
 
     // “Fee rates for fiscal year (FY) 20XX”
@@ -55,7 +59,7 @@ async function scrapeVQIP(): Promise<{
       fy,
       userFee: userM ? toUSDstr(userM[1]!) : null,
       appFee: appM ? toUSDstr(appM[1]!) : null,
-      url: FDA_VQIP_URL,
+      url: vqipUrl,
     };
   } catch (e) {
     if (DEBUG) console.warn('[FDA] VQIP scrape failed', (e as Error).message);
@@ -64,13 +68,19 @@ async function scrapeVQIP(): Promise<{
 }
 
 /** Parse FSMA Reinspection hourly rates (domestic/foreign) from Federal Register search. */
-async function scrapeFsmaReinspection(fy: number): Promise<{
+async function scrapeFsmaReinspection(
+  searchBaseUrl: string,
+  fy: number
+): Promise<{
   domestic?: string | null;
   foreign?: string | null;
   fy?: number;
   src?: string | null;
 }> {
-  const candidates: string[] = [FR_FSMA_SEARCH(fy), FR_FSMA_SEARCH(fy - 1)];
+  const candidates: string[] = [
+    fsmaSearchUrl(searchBaseUrl, fy),
+    fsmaSearchUrl(searchBaseUrl, fy - 1),
+  ];
 
   for (const url of candidates) {
     try {
@@ -102,14 +112,16 @@ async function scrapeFsmaReinspection(fy: number): Promise<{
 export async function importFdaFsmaSurcharges(
   opts: { fiscalYear?: number; effectiveFrom?: Date; batchSize?: number; importId?: string } = {}
 ) {
+  const { fdaVqipUrl, federalRegisterSearchBaseUrl } = await resolveUsSurchargeSourceUrls();
+
   // 1) VQIP (authoritative FDA page)
-  const vqip = await scrapeVQIP();
+  const vqip = await scrapeVQIP(fdaVqipUrl);
   const fyFromVqip = vqip.fy ?? currentFY();
   const effectiveFrom = opts.effectiveFrom ?? fyStart(fyFromVqip);
 
   // 2) FSMA reinspection (FR search)
   const fy = opts.fiscalYear ?? fyFromVqip ?? currentFY();
-  const fsma = await scrapeFsmaReinspection(fy);
+  const fsma = await scrapeFsmaReinspection(federalRegisterSearchBaseUrl, fy);
 
   const rows: SurchargeInsert[] = [];
   const base: Omit<
@@ -195,6 +207,18 @@ export async function importFdaFsmaSurcharges(
   const ret = await batchUpsertSurchargesFromStream(rows, {
     batchSize: opts.batchSize ?? 500,
     importId: opts.importId,
+    sourceKey: (r) => {
+      switch (r.surchargeCode) {
+        case 'FDA_VQIP_USER_FEE_ANNUAL':
+        case 'FDA_VQIP_APPLICATION_FEE':
+          return FDA_VQIP_SOURCE_KEY;
+        case 'FDA_FSMA_REINSPECTION_HOURLY_DOM':
+        case 'FDA_FSMA_REINSPECTION_HOURLY_FOR':
+          return FR_SEARCH_SOURCE_KEY;
+        default:
+          return null;
+      }
+    },
     makeSourceRef: (r) => {
       const ef =
         r.effectiveFrom instanceof Date

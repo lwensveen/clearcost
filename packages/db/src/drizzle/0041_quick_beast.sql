@@ -1,0 +1,106 @@
+INSERT INTO "source_registry" (
+  "key",
+  "dataset",
+  "source_type",
+  "base_url",
+  "download_url_template",
+  "schedule_hint",
+  "expected_format",
+  "auth_strategy",
+  "sla_max_age_hours",
+  "notes",
+  "last_verified_at"
+)
+VALUES
+  (
+    'surcharges.us.aphis.aqi_fees',
+    'surcharges',
+    'html',
+    'https://www.aphis.usda.gov',
+    'https://www.aphis.usda.gov/aphis/resources/fees',
+    'weekly',
+    'html',
+    'none',
+    168,
+    'APHIS AQI fees page used by US surcharge importer.',
+    NOW()
+  ),
+  (
+    'surcharges.us.aphis.aqi_fy25',
+    'surcharges',
+    'html',
+    'https://www.aphis.usda.gov',
+    'https://www.aphis.usda.gov/aphis/newsroom/stakeholder-info/aqi-fee-2025',
+    'manual',
+    'html',
+    'none',
+    720,
+    'APHIS FY-specific AQI fee explainer fallback page used by US surcharge importer.',
+    NOW()
+  ),
+  (
+    'surcharges.us.fda.vqip_fees',
+    'surcharges',
+    'html',
+    'https://www.fda.gov',
+    'https://www.fda.gov/food/voluntary-qualified-importer-program-vqip/vqip-fees',
+    'weekly',
+    'html',
+    'none',
+    168,
+    'FDA VQIP fees page used by US surcharge importer.',
+    NOW()
+  ),
+  (
+    'surcharges.us.federal_register.search',
+    'surcharges',
+    'html',
+    'https://www.federalregister.gov',
+    'https://www.federalregister.gov/search',
+    'weekly',
+    'html',
+    'none',
+    168,
+    'Federal Register search endpoint used for FSMA fee rate discovery.',
+    NOW()
+  ),
+  (
+    'surcharges.us.federal_register.documents_api',
+    'surcharges',
+    'api',
+    'https://www.federalregister.gov',
+    'https://www.federalregister.gov/api/v1/documents.json',
+    'weekly',
+    'json',
+    'none',
+    168,
+    'Federal Register documents API endpoint used for US MPF annual notice discovery.',
+    NOW()
+  ),
+  (
+    'surcharges.us.statute.hmf',
+    'surcharges',
+    'manual',
+    NULL,
+    'https://www.law.cornell.edu/uscode/text/26/4461',
+    'manual',
+    'other',
+    'none',
+    8760,
+    'Statutory source for US Harbor Maintenance Fee baseline rate.',
+    NOW()
+  ),
+  (
+    'surcharges.us.statute.mpf',
+    'surcharges',
+    'manual',
+    NULL,
+    'https://www.ecfr.gov/current/title-19/chapter-I/part-24/section-24.23',
+    'manual',
+    'other',
+    'none',
+    8760,
+    'Statutory fallback source for US MPF when FR annual notice parse is unavailable.',
+    NOW()
+  )
+ON CONFLICT ("key") DO NOTHING;

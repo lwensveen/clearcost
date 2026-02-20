@@ -8,6 +8,7 @@ type SurchargeSelectRow = typeof surchargesTable.$inferSelect;
 
 type ProvOpts = {
   importId?: string;
+  sourceKey?: string | ((row: SurchargeSelectRow) => string | null | undefined);
   makeSourceRef?: (row: SurchargeSelectRow) => string | undefined;
 };
 
@@ -204,6 +205,10 @@ export async function batchUpsertSurchargesFromStream(
         importId: opts.importId!,
         resourceType: 'surcharge' as const,
         resourceId: row.id,
+        sourceKey:
+          (typeof opts.sourceKey === 'function'
+            ? opts.sourceKey(row as unknown as SurchargeSelectRow)
+            : opts.sourceKey) ?? null,
         sourceRef: opts.makeSourceRef?.(row as unknown as SurchargeSelectRow),
         rowHash: sha256Hex(
           JSON.stringify({

@@ -3,6 +3,11 @@ import type { SurchargeInsert } from '@clearcost/types';
 import { batchUpsertSurchargesFromStream } from '../../utils/batch-upsert.js';
 import { and, desc, eq, isNull, lt, lte, sql } from 'drizzle-orm';
 import { httpFetch } from '../../../../lib/http.js';
+import { resolveUsSurchargeSourceUrls } from './source-urls.js';
+
+const FR_DOCUMENTS_SOURCE_KEY = 'surcharges.us.federal_register.documents_api';
+const HMF_STATUTE_SOURCE_KEY = 'surcharges.us.statute.hmf';
+const MPF_STATUTE_SOURCE_KEY = 'surcharges.us.statute.mpf';
 
 /**
  * Compute US Fiscal Year for a given UTC date.
@@ -29,12 +34,13 @@ const numStr = (n: number | null | undefined): string | null =>
 
 /** Federal Register API fetch for CBP “Customs User Fees” FY notice */
 async function fetchFRDocForFY(
-  fy: number
+  fy: number,
+  documentsApiUrl: string
 ): Promise<{ html: string; cite: string; url: string | null } | null> {
   const from = `${fy - 1}-07-01`;
   const to = `${fy - 1}-09-30`;
 
-  const url = new URL('https://www.federalregister.gov/api/v1/documents.json');
+  const url = new URL(documentsApiUrl);
   url.searchParams.set('per_page', '10');
   url.searchParams.append('conditions[agencies][]', 'U.S. Customs and Border Protection');
   url.searchParams.set('conditions[publication_date][gte]', from);
@@ -122,6 +128,7 @@ export async function upsertUSBaseSurcharges(opts?: { fy?: number; importId?: st
   const fy = opts?.fy ?? fiscalYear(new Date());
   const ef = fyStartUTC(fy);
   const dest = 'US';
+  const { federalRegisterDocumentsApiUrl } = await resolveUsSurchargeSourceUrls();
 
   // --- CLOSE OUT prior open rows for MPF/HMF at ef (no overlap)
   // MPF (ALL, ENTRY)
@@ -155,7 +162,7 @@ export async function upsertUSBaseSurcharges(opts?: { fy?: number; importId?: st
     );
 
   // --- Discover MPF details
-  const fr = await fetchFRDocForFY(fy);
+  const fr = await fetchFRDocForFY(fy, federalRegisterDocumentsApiUrl);
   const minmax = fr ? parseMpfMinMaxFromFR(fr.html) : null;
 
   // ad-valorem discovery for MPF
@@ -239,6 +246,11 @@ export async function upsertUSBaseSurcharges(opts?: { fy?: number; importId?: st
   const res = await batchUpsertSurchargesFromStream(rows, {
     batchSize: 100,
     importId: opts?.importId,
+    sourceKey: (r) => {
+      if (r.surchargeCode === 'HMF') return HMF_STATUTE_SOURCE_KEY;
+      if (r.surchargeCode === 'MPF') return fr ? FR_DOCUMENTS_SOURCE_KEY : MPF_STATUTE_SOURCE_KEY;
+      return null;
+    },
     makeSourceRef: (r) => {
       const efS =
         r.effectiveFrom instanceof Date

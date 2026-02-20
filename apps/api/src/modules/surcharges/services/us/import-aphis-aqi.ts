@@ -1,9 +1,9 @@
 import { batchUpsertSurchargesFromStream } from '../../utils/batch-upsert.js';
 import type { SurchargeInsert } from '@clearcost/types';
 import { httpFetch } from '../../../../lib/http.js';
+import { resolveUsSurchargeSourceUrls } from './source-urls.js';
 
-const APHIS_FEES_URL = 'https://www.aphis.usda.gov/aphis/resources/fees';
-const APHIS_FY25_URL = 'https://www.aphis.usda.gov/aphis/newsroom/stakeholder-info/aqi-fee-2025';
+const APHIS_SOURCE_KEY = 'surcharges.us.aphis.aqi_fees';
 const DEBUG = process.argv.includes('--debug') || process.env.DEBUG === '1';
 
 const $ = (s: string) => s.replace(/\s+/g, ' ').trim();
@@ -43,7 +43,8 @@ async function scrapeAphis(): Promise<{
   barge?: { amt: string | null; url: string } | null;
 }> {
   const out: any = {};
-  const pages = [APHIS_FEES_URL, APHIS_FY25_URL];
+  const { aphisFeesUrl, aphisFy25Url } = await resolveUsSurchargeSourceUrls();
+  const pages = [aphisFeesUrl, aphisFy25Url];
 
   for (const url of pages) {
     try {
@@ -176,6 +177,7 @@ export async function importAphisAqiSurcharges(
   const ret = await batchUpsertSurchargesFromStream(rows, {
     batchSize: opts.batchSize ?? 500,
     importId: opts.importId,
+    sourceKey: APHIS_SOURCE_KEY,
     makeSourceRef: (r) => {
       const ef =
         r.effectiveFrom instanceof Date
