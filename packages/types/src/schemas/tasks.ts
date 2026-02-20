@@ -80,20 +80,20 @@ export const TasksDutyEuDailyBodySchema = z.object({
 });
 
 export const TasksDutyMyOfficialExcelBodySchema = z.object({
-  url: z.string().url(),
+  url: z.string().url().optional(),
   sheet: z.union([z.string(), z.coerce.number()]).optional(),
   batchSize: BatchSizeSchema,
   dryRun: z.boolean().optional(),
 });
 
 export const TasksDutyMyOfficialPdfBodySchema = z.object({
-  url: z.string().url(),
+  url: z.string().url().optional(),
   batchSize: BatchSizeSchema,
   dryRun: z.boolean().optional(),
 });
 
 export const TasksDutyMyFtaOfficialExcelBodySchema = z.object({
-  url: z.string().url(),
+  url: z.string().url().optional(),
   agreement: z.string().optional(),
   partner: z.string().optional(),
   sheet: z.union([z.string(), z.coerce.number()]).optional(),
