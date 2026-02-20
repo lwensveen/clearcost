@@ -19,8 +19,8 @@ export async function httpGet(url: string, opts: RequestInit = {}) {
 }
 
 /** Latest immutable dataset version id, e.g. "v4.0.1083". */
-export async function getLatestVersionId(): Promise<string> {
-  const url = `${UK_10_DATA_API_BASE}/v1/datasets/${DATASET_ID}/versions?format=json`;
+export async function getLatestVersionIdFromBase(apiBaseUrl: string): Promise<string> {
+  const url = `${apiBaseUrl}/v1/datasets/${DATASET_ID}/versions?format=json`;
   const res = await httpGet(url);
   if (!res.ok) throw new Error(`DBT versions failed: ${res.status} ${await res.text()}`);
   const j = (await res.json()) as { versions: Array<{ id: string }> };
@@ -37,6 +37,11 @@ export async function getLatestVersionId(): Promise<string> {
     }
     return 0;
   })[0]!;
+}
+
+/** Latest immutable dataset version id from configured default API base. */
+export async function getLatestVersionId(): Promise<string> {
+  return await getLatestVersionIdFromBase(UK_10_DATA_API_BASE);
 }
 
 /** Zod for the columns we use (others pass through). */

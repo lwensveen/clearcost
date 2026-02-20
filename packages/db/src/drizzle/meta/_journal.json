@@ -218,6 +218,13 @@
       "when": 1771549600000,
       "tag": "0030_handy_tigra",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1771550200000,
+      "tag": "0031_eerie_nebula",
+      "breakpoints": true
     }
   ]
 }

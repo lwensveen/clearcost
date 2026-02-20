@@ -2,11 +2,8 @@ import { db, hsCodeAliasesTable, hsCodesTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
 import { cell, headerIndex, iterateCsvRecords } from '../../../../duty-rates/utils/stream-csv.js';
 import { httpFetch } from '../../../../../lib/http.js';
-import {
-  DATASET_ID,
-  getLatestVersionId,
-  UK_10_DATA_API_BASE,
-} from '../../../../duty-rates/services/uk/base.js';
+import { DATASET_ID, getLatestVersionIdFromBase } from '../../../../duty-rates/services/uk/base.js';
+import { resolveUkTariffHsSourceUrls } from './source-urls.js';
 
 export type ImportUk10AliasesResult = {
   ok: true;
@@ -54,10 +51,11 @@ async function httpJson<T = any>(url: string): Promise<T> {
 }
 
 async function fetchCsvStream(
+  apiBaseUrl: string,
   versionId: string,
   table: string
 ): Promise<ReadableStream<Uint8Array> | null> {
-  const url = `${UK_10_DATA_API_BASE}/v1/datasets/${DATASET_ID}/versions/${versionId}/tables/${table}/data?format=csv`;
+  const url = `${apiBaseUrl}/v1/datasets/${DATASET_ID}/versions/${versionId}/tables/${table}/data?format=csv`;
   const res = await httpFetch(url, {
     headers: { 'user-agent': 'clearcost-importer' },
     timeoutMs: 60000,
@@ -74,8 +72,8 @@ async function fetchCsvStream(
 
 type TableInfo = { name: string; columns: string[] };
 
-async function listTables(versionId: string): Promise<TableInfo[]> {
-  const url = `${UK_10_DATA_API_BASE}/v1/datasets/${DATASET_ID}/versions/${versionId}/tables?format=json`;
+async function listTables(apiBaseUrl: string, versionId: string): Promise<TableInfo[]> {
+  const url = `${apiBaseUrl}/v1/datasets/${DATASET_ID}/versions/${versionId}/tables?format=json`;
   try {
     const j = await httpJson<any>(url);
     if (Array.isArray(j)) {
@@ -134,9 +132,10 @@ function idxFromHeaderMap(hdr: Map<string, number>, candidates: string[], patter
 
 // ---- fast path: commodities-report (has code + description + suffix) ----
 async function loadRowsFromReport(
+  apiBaseUrl: string,
   versionId: string
 ): Promise<Array<{ code: string; title: string }>> {
-  const stream = await fetchCsvStream(versionId, 'commodities-report');
+  const stream = await fetchCsvStream(apiBaseUrl, versionId, 'commodities-report');
   if (!stream) return [];
 
   let isHeader = true;
@@ -241,11 +240,12 @@ function pickDescTables(tables: TableInfo[]): string[] {
 
 // ---- fallback: sid -> code from code tables ----
 async function loadSidToCode(
+  apiBaseUrl: string,
   versionId: string,
   candidates: string[]
 ): Promise<Map<string, string>> {
   for (const table of candidates) {
-    const stream = await fetchCsvStream(versionId, table);
+    const stream = await fetchCsvStream(apiBaseUrl, versionId, table);
     if (!stream) continue;
 
     let isHeader = true;
@@ -354,11 +354,12 @@ async function loadSidToCode(
 
 // ---- fallback: sid -> title from description tables ----
 async function loadSidToTitle(
+  apiBaseUrl: string,
   versionId: string,
   candidates: string[]
 ): Promise<Map<string, string>> {
   for (const table of candidates) {
-    const stream = await fetchCsvStream(versionId, table);
+    const stream = await fetchCsvStream(apiBaseUrl, versionId, table);
     if (!stream) continue;
 
     const map = new Map<string, string>();
@@ -409,7 +410,8 @@ export async function importUk10Aliases(): Promise<ImportUk10AliasesResult> {
   const VALID_HS6 = new Set(hs6Rows.map((r) => r.hs6));
   if (DEBUG) console.log(`[UK] Loaded ${VALID_HS6.size} HS6 from hs_codes`);
 
-  const versionId = VERSION_OVERRIDE || (await getLatestVersionId());
+  const { apiBaseUrl } = await resolveUkTariffHsSourceUrls();
+  const versionId = VERSION_OVERRIDE || (await getLatestVersionIdFromBase(apiBaseUrl));
   if (DEBUG) {
     console.log(
       VERSION_OVERRIDE
@@ -418,7 +420,7 @@ export async function importUk10Aliases(): Promise<ImportUk10AliasesResult> {
     );
   }
 
-  const tables = await listTables(versionId);
+  const tables = await listTables(apiBaseUrl, versionId);
   if (DEBUG)
     console.log(
       '[UK] Tables discovered:',
@@ -426,7 +428,7 @@ export async function importUk10Aliases(): Promise<ImportUk10AliasesResult> {
     );
 
   // 1) Fast path: commodities-report (code + description + suffix)
-  const reportRows = await loadRowsFromReport(versionId);
+  const reportRows = await loadRowsFromReport(apiBaseUrl, versionId);
   if (reportRows.length) {
     let inserted = 0,
       updated = 0,
@@ -513,7 +515,7 @@ export async function importUk10Aliases(): Promise<ImportUk10AliasesResult> {
 
   // 2) Fallback: sid/code + description tables
   const codeCandidates = pickCodeTable(tables);
-  const sidToCode = await loadSidToCode(versionId, codeCandidates);
+  const sidToCode = await loadSidToCode(apiBaseUrl, versionId, codeCandidates);
   if (!sidToCode.size) {
     throw new Error(
       '[UK] No 10-digit codes found in commodities/goods_nomenclatures (or alternates)'
@@ -521,7 +523,7 @@ export async function importUk10Aliases(): Promise<ImportUk10AliasesResult> {
   }
 
   const descCandidates = pickDescTables(tables);
-  const sidToTitle = await loadSidToTitle(versionId, descCandidates);
+  const sidToTitle = await loadSidToTitle(apiBaseUrl, versionId, descCandidates);
   if (!sidToTitle.size && DEBUG) {
     console.warn('[UK] No titles found in descriptions tables; inserting with "—"');
   }
