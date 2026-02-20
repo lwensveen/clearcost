@@ -7,6 +7,7 @@
 import type { SurchargeInsert } from '@clearcost/types';
 import { importSurcharges } from '../import-surcharges.js';
 import { adValoremPercentToFractionString } from '../pct.js';
+import { resolveSourceDownloadUrl } from '../../../../lib/source-registry.js';
 import {
   ERGA_OMNES_ID,
   hs6 as toHs6,
@@ -40,6 +41,34 @@ function resolveOriginIso2(geoId: string, geoName?: string): string | null {
   return null;
 }
 
+async function resolveRequiredTaricUrl(
+  override: string | undefined,
+  sourceKey: string,
+  fallbackEnv: string | undefined
+): Promise<string> {
+  if (override !== undefined) return override;
+  return await resolveSourceDownloadUrl({
+    sourceKey,
+    fallbackUrl: fallbackEnv ?? '',
+  });
+}
+
+async function resolveOptionalTaricUrl(
+  override: string | undefined,
+  sourceKey: string,
+  fallbackEnv: string | undefined
+): Promise<string> {
+  if (override !== undefined) return override;
+  try {
+    return await resolveSourceDownloadUrl({
+      sourceKey,
+      fallbackUrl: fallbackEnv ?? '',
+    });
+  } catch {
+    return '';
+  }
+}
+
 export async function importEuTradeRemediesAsSurcharges(
   opts: ImportOpts
 ): Promise<{ ok: true; count: number }> {
@@ -52,10 +81,28 @@ export async function importEuTradeRemediesAsSurcharges(
     );
   }
 
-  const measureUrl = opts.xmlMeasureUrl ?? process.env.EU_TARIC_MEASURE_URL ?? '';
-  const componentUrl = opts.xmlComponentUrl ?? process.env.EU_TARIC_COMPONENT_URL ?? '';
-  const geoDescUrl = opts.xmlGeoDescUrl ?? process.env.EU_TARIC_GEO_DESC_URL ?? '';
-  const dutyExprUrl = opts.xmlDutyExprUrl ?? process.env.EU_TARIC_DUTY_EXPR_URL ?? '';
+  const [measureUrl, componentUrl, geoDescUrl, dutyExprUrl] = await Promise.all([
+    resolveRequiredTaricUrl(
+      opts.xmlMeasureUrl,
+      'surcharges.eu.taric.measure',
+      process.env.EU_TARIC_MEASURE_URL
+    ),
+    resolveRequiredTaricUrl(
+      opts.xmlComponentUrl,
+      'surcharges.eu.taric.component',
+      process.env.EU_TARIC_COMPONENT_URL
+    ),
+    resolveOptionalTaricUrl(
+      opts.xmlGeoDescUrl,
+      'surcharges.eu.taric.geo_description',
+      process.env.EU_TARIC_GEO_DESC_URL
+    ),
+    resolveOptionalTaricUrl(
+      opts.xmlDutyExprUrl,
+      'surcharges.eu.taric.duty_expression',
+      process.env.EU_TARIC_DUTY_EXPR_URL
+    ),
+  ]);
   const lang = (opts.language ?? process.env.EU_TARIC_LANGUAGE ?? 'EN').toUpperCase();
 
   if (!measureUrl || !componentUrl) {

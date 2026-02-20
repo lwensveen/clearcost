@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   parseDutyExpressionsMock: vi.fn(),
   parseMeasuresMock: vi.fn(),
   parseComponentsMock: vi.fn(),
+  resolveSourceDownloadUrlMock: vi.fn(),
 }));
 
 vi.mock('../import-surcharges.js', () => ({
@@ -24,6 +25,10 @@ vi.mock('../../../duty-rates/services/eu/base.js', async () => {
     parseComponents: mocks.parseComponentsMock,
   };
 });
+
+vi.mock('../../../../lib/source-registry.js', () => ({
+  resolveSourceDownloadUrl: mocks.resolveSourceDownloadUrlMock,
+}));
 
 import { importEuTradeRemediesAsSurcharges } from './import-remedies.js';
 
@@ -57,6 +62,7 @@ describe('importEuTradeRemediesAsSurcharges', () => {
       }
     );
     mocks.parseComponentsMock.mockResolvedValue(new Map([['m1', { pct: 25, compound: false }]]));
+    mocks.resolveSourceDownloadUrlMock.mockResolvedValue('');
   });
 
   it('writes pctAmt as ad-valorem fraction (0..1) for EU remedy rows', async () => {
@@ -102,5 +108,43 @@ describe('importEuTradeRemediesAsSurcharges', () => {
         xmlDutyExprUrl: 'https://example.com/duty.xml',
       })
     ).rejects.toThrow(/produced 0 measures/i);
+  });
+
+  it('resolves TARIC URLs from source registry keys when XML overrides are not provided', async () => {
+    const urls = new Map<string, string>([
+      ['surcharges.eu.taric.measure', 'https://example.com/measure.xml'],
+      ['surcharges.eu.taric.component', 'https://example.com/component.xml'],
+      ['surcharges.eu.taric.geo_description', 'https://example.com/geo.xml'],
+      ['surcharges.eu.taric.duty_expression', 'https://example.com/duty.xml'],
+    ]);
+    mocks.resolveSourceDownloadUrlMock.mockImplementation(
+      async ({ sourceKey }: { sourceKey: string }) => urls.get(sourceKey) ?? ''
+    );
+
+    await importEuTradeRemediesAsSurcharges({
+      measureTypeIds: ['551'],
+    });
+
+    expect(mocks.resolveSourceDownloadUrlMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceKey: 'surcharges.eu.taric.measure' })
+    );
+    expect(mocks.resolveSourceDownloadUrlMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceKey: 'surcharges.eu.taric.component' })
+    );
+    expect(mocks.resolveSourceDownloadUrlMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceKey: 'surcharges.eu.taric.geo_description' })
+    );
+    expect(mocks.resolveSourceDownloadUrlMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceKey: 'surcharges.eu.taric.duty_expression' })
+    );
+    expect(mocks.parseMeasuresMock).toHaveBeenCalledWith(
+      'https://example.com/measure.xml',
+      expect.any(Function)
+    );
+    expect(mocks.parseComponentsMock).toHaveBeenCalledWith(
+      'https://example.com/component.xml',
+      expect.any(Set),
+      expect.any(Set)
+    );
   });
 });
