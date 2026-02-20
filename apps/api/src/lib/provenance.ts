@@ -54,6 +54,7 @@ export async function startImportRun(params: {
   importSource: ImportSource;
   job: string;
   version?: string;
+  sourceKey?: string;
   sourceUrl?: string;
   params?: Record<string, unknown>;
 }): Promise<ImportRun> {
@@ -63,6 +64,7 @@ export async function startImportRun(params: {
       importSource: params.importSource,
       job: params.job,
       version: params.version ?? null,
+      sourceKey: params.sourceKey ?? null,
       sourceUrl: params.sourceUrl ?? null,
       params: params.params ? JSON.stringify(params.params) : null,
       importStatus: 'running',
@@ -83,6 +85,7 @@ export async function finishImportRun(
     inserted?: number;
     updated?: number;
     version?: string | null;
+    sourceKey?: string | null;
     sourceUrl?: string | null;
     fileHash?: string | null;
     fileBytes?: number | null;
@@ -96,6 +99,7 @@ export async function finishImportRun(
       inserted: patch.inserted ?? undefined,
       updated: patch.updated ?? undefined,
       version: patch.version ?? undefined,
+      sourceKey: patch.sourceKey ?? undefined,
       sourceUrl: patch.sourceUrl ?? undefined,
       fileHash: patch.fileHash ?? undefined,
       fileBytes: patch.fileBytes ?? undefined,

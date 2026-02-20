@@ -13,6 +13,7 @@ export const provenanceTable = pgTable(
       .references(() => importsTable.id, { onDelete: 'cascade' }),
     resourceType: resourceTypeEnum('resource_type').notNull(),
     resourceId: uuid('resource_id').notNull(), // points to domain table row id
+    sourceKey: varchar('source_key', { length: 128 }), // source_registry.key when known
     sourceRef: text('source_ref'), // e.g., URL+fragment, SID, annex page, JSON pointer
     sourceHash: varchar('source_hash', { length: 64 }), // sha256 of source snippet/line
     rowHash: varchar('row_hash', { length: 64 }), // sha256 of normalized domain row

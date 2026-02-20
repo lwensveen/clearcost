@@ -29,6 +29,7 @@ vi.mock('@clearcost/db', () => {
     importSource: 'importSource',
     job: 'job',
     version: 'version',
+    sourceKey: 'sourceKey',
     sourceUrl: 'sourceUrl',
     params: 'params',
     importStatus: 'importStatus',
@@ -107,6 +108,7 @@ describe('provenance helpers', () => {
       importSource: 'WITS',
       job: 'duties:wits',
       version: null,
+      sourceKey: null,
       sourceUrl: null,
       params: '{"dests":["SG","MY"]}',
       importStatus: 'running',
@@ -125,6 +127,7 @@ describe('provenance helpers', () => {
       importSource: 'WITS',
       job: 'duties:wits',
       version: null,
+      sourceKey: null,
       sourceUrl: null,
       params: '{"dests":["SG","MY"]}',
       importStatus: 'running',
@@ -145,6 +148,7 @@ describe('provenance helpers', () => {
       inserted: 3,
       updated: 0,
       version: 'v1',
+      sourceKey: 'duties.eu.taric.mfn',
       sourceUrl: 'https://example.test/source.json',
       fileHash: 'abc123',
       fileBytes: 456,
@@ -158,6 +162,7 @@ describe('provenance helpers', () => {
       inserted: 3,
       updated: 0,
       version: 'v1',
+      sourceKey: 'duties.eu.taric.mfn',
       sourceUrl: 'https://example.test/source.json',
       fileHash: 'abc123',
       fileBytes: 456,
@@ -174,6 +179,7 @@ describe('provenance helpers', () => {
     expect(set.inserted).toBe(3);
     expect(set.updated).toBe(0);
     expect(set.version).toBe('v1');
+    expect(set.sourceKey).toBe('duties.eu.taric.mfn');
     expect(set.sourceUrl).toBe('https://example.test/source.json');
     expect(set.fileHash).toBe('abc123');
     expect(set.fileBytes).toBe(456);
@@ -199,6 +205,7 @@ describe('provenance helpers', () => {
     expect(set.inserted).toBeUndefined();
     expect(set.updated).toBeUndefined();
     expect(set.version).toBeUndefined();
+    expect(set.sourceKey).toBeUndefined();
     expect(set.sourceUrl).toBeUndefined();
     expect(set.fileHash).toBeUndefined();
     expect(set.fileBytes).toBeUndefined();

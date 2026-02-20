@@ -7,7 +7,13 @@ export default function vatRoutes(app: FastifyInstance) {
     '/cron/import/vat/auto',
     {
       preHandler: app.requireApiKey(['tasks:vat:auto']),
-      config: { importMeta: { importSource: 'OECD/IMF', job: 'vat:auto' } },
+      config: {
+        importMeta: {
+          importSource: 'OECD/IMF',
+          job: 'vat:auto',
+          sourceKey: 'vat.oecd_imf.standard',
+        },
+      },
     },
     async (req, reply) => {
       const rows = await fetchVatRowsFromOfficialSources();

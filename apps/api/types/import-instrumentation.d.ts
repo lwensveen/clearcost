@@ -4,12 +4,14 @@ import type { ImportSource } from '../src/lib/provenance.js';
 export type ImportMeta = {
   importSource: ImportSource;
   job: string;
+  sourceKey?: string;
   source?: string;
   sourceUrl?: string;
   version?: string;
 };
 
 export type ImportRunPatch = {
+  sourceKey?: string;
   sourceUrl?: string;
   version?: string;
   fileHash?: string | null;

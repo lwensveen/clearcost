@@ -176,6 +176,13 @@
       "when": 1771545923393,
       "tag": "0024_light_colleen_wing",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1771546217092,
+      "tag": "0025_clever_whiplash",
+      "breakpoints": true
     }
   ]
 }

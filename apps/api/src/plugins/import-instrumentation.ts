@@ -18,12 +18,14 @@ import { errorResponseForStatus } from '../lib/errors.js';
 type ImportMetaConfig = {
   importSource: ImportSource;
   job: string;
+  sourceKey?: string;
   source?: string;
   sourceUrl?: string;
   version?: string;
 };
 
 type ImportRunPatch = {
+  sourceKey?: string;
   sourceUrl?: string;
   version?: string;
   fileHash?: string | null;
@@ -57,6 +59,12 @@ function resolveSourceUrl(meta: ImportMetaConfig, req: any): string | undefined 
   );
 }
 
+function resolveSourceKey(meta: ImportMetaConfig, req: any): string | undefined {
+  const q = toRecord(req.query);
+  const b = toRecord(req.body);
+  return firstNonEmptyString(meta.sourceKey, q?.sourceKey, b?.sourceKey);
+}
+
 function resolveVersion(meta: ImportMetaConfig, req: any): string | undefined {
   const q = toRecord(req.query);
   const b = toRecord(req.body);
@@ -69,6 +77,7 @@ function mergeRunPatch<T extends Record<string, unknown>>(
 ): T & ImportRunPatch {
   if (!patch) return base as T & ImportRunPatch;
   const out = { ...base } as T & ImportRunPatch;
+  if (patch.sourceKey !== undefined) out.sourceKey = patch.sourceKey;
   if (patch.sourceUrl !== undefined) out.sourceUrl = patch.sourceUrl;
   if (patch.version !== undefined) out.version = patch.version;
   if (patch.fileHash !== undefined) out.fileHash = patch.fileHash;
@@ -98,20 +107,23 @@ const plugin: FastifyPluginAsync = async (app) => {
 
     // 3) start metrics + provenance
     const end = startImportTimer(meta);
+    const sourceKey = resolveSourceKey(meta, req);
     const sourceUrl = resolveSourceUrl(meta, req);
     const version = resolveVersion(meta, req);
+    const startParams = {
+      importSource: meta.importSource,
+      job: meta.job,
+      ...(sourceKey ? { sourceKey } : {}),
+      ...(version ? { version } : {}),
+      ...(sourceUrl ? { sourceUrl } : {}),
+      params: {
+        query: req.query ?? null,
+        body: req.body ?? null,
+      },
+    } satisfies Parameters<typeof startImportRun>[0];
     let run: { id: string };
     try {
-      run = await startImportRun({
-        importSource: meta.importSource,
-        job: meta.job,
-        version,
-        sourceUrl,
-        params: {
-          query: req.query ?? null,
-          body: req.body ?? null,
-        },
-      });
+      run = await startImportRun(startParams);
     } catch (err) {
       importErrors.inc({ ...meta, stage: 'start' });
       end();
@@ -132,6 +144,7 @@ const plugin: FastifyPluginAsync = async (app) => {
       endTimer: end,
       lockKey,
       runPatch: {
+        sourceKey,
         sourceUrl,
         version,
       },

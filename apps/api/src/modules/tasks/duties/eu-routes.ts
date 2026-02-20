@@ -18,7 +18,13 @@ export default function euDutyRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:eu']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'TARIC', job: 'duties:eu-mfn' } },
+        config: {
+          importMeta: {
+            importSource: 'TARIC',
+            job: 'duties:eu-mfn',
+            sourceKey: 'duties.eu.taric.mfn',
+          },
+        },
       },
       async (req, reply) => {
         const { hs6, batchSize, dryRun } = Body.parse(req.body ?? {});
@@ -42,7 +48,13 @@ export default function euDutyRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:eu']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'TARIC', job: 'duties:eu-fta' } },
+        config: {
+          importMeta: {
+            importSource: 'TARIC',
+            job: 'duties:eu-fta',
+            sourceKey: 'duties.eu.taric.preferential',
+          },
+        },
       },
       async (req, reply) => {
         const { hs6, partnerGeoIds, batchSize, dryRun } = Body.parse(req.body ?? {});
@@ -67,7 +79,13 @@ export default function euDutyRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:eu']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'TARIC', job: 'duties:eu-daily' } },
+        config: {
+          importMeta: {
+            importSource: 'TARIC',
+            job: 'duties:eu-daily',
+            sourceKey: 'duties.eu.taric.daily',
+          },
+        },
       },
       async (req, reply) => {
         const { date, include, partnerGeoIds, batchSize, dryRun } = Body.parse(req.body ?? {});

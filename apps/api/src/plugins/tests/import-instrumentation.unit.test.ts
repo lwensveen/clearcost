@@ -135,6 +135,7 @@ describe('import-instrumentation plugin (unit)', () => {
           importMeta: {
             importSource: 'MANUAL',
             job: 'duties:json',
+            sourceKey: 'duties.eu.taric.mfn',
             sourceUrl: 'https://meta.example/source.csv',
             version: 'meta-v1',
           },
@@ -145,25 +146,32 @@ describe('import-instrumentation plugin (unit)', () => {
 
     const r = await app.inject({
       method: 'POST',
-      url: '/imp?source=https%3A%2F%2Fquery.example%2Foverride.csv&version=query-v2',
+      url: '/imp?source=https%3A%2F%2Fquery.example%2Foverride.csv&version=query-v2&sourceKey=duties.eu.taric.daily',
       headers: jsonCT(),
-      payload: JSON.stringify({ source: 'body-source', version: 'body-v3' }),
+      payload: JSON.stringify({
+        source: 'body-source',
+        version: 'body-v3',
+        sourceKey: 'duties.eu.taric.body',
+      }),
     });
     expect(r.statusCode).toBe(200);
 
     expect(startImportRun).toHaveBeenCalledWith({
       importSource: 'MANUAL',
       job: 'duties:json',
+      sourceKey: 'duties.eu.taric.mfn',
       sourceUrl: 'https://meta.example/source.csv',
       version: 'meta-v1',
       params: {
         query: {
           source: 'https://query.example/override.csv',
           version: 'query-v2',
+          sourceKey: 'duties.eu.taric.daily',
         },
         body: {
           source: 'body-source',
           version: 'body-v3',
+          sourceKey: 'duties.eu.taric.body',
         },
       },
     });
