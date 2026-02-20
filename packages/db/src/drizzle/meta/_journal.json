@@ -232,6 +232,13 @@
       "when": 1771563600000,
       "tag": "0032_mellow_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1771566600000,
+      "tag": "0033_melodic_hawkeye",
+      "breakpoints": true
     }
   ]
 }

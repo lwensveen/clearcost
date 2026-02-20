@@ -7,6 +7,9 @@ import { httpFetch } from '../../../../lib/http.js';
 countries.registerLocale(en);
 
 export const SDMX_BASE =
+  process.env.WITS_SDMX_BASE ??
+  'https://wits.worldbank.org/API/V1/SDMX/V21/rest/data/DF_WITS_Tariff_TRAINS';
+export const DEFAULT_WITS_SDMX_BASE =
   'https://wits.worldbank.org/API/V1/SDMX/V21/rest/data/DF_WITS_Tariff_TRAINS';
 
 // 6 consecutive digits anywhere in a token (fallback extractor)
@@ -93,15 +96,17 @@ export async function fetchSdmx(
   reporterToken: string,
   partnerToken: string,
   startYear: number,
-  endYear: number
+  endYear: number,
+  opts: { sdmxBaseUrl?: string } = {}
 ): Promise<SdmxJson | null> {
+  const sdmxBaseUrl = opts.sdmxBaseUrl ?? SDMX_BASE;
   const qs = `startperiod=${startYear}&endperiod=${endYear}&detail=DataOnly`;
 
   const variants = [
     // reported first (MFN, or PRF if it exists)
-    `${SDMX_BASE}/.${reporterToken}.${partnerToken}..reported/?${qs}`,
+    `${sdmxBaseUrl}/.${reporterToken}.${partnerToken}..reported/?${qs}`,
     // fallback: aveestimated (often needed for bilateral PRF)
-    `${SDMX_BASE}/.${reporterToken}.${partnerToken}..aveestimated/?${qs}`,
+    `${sdmxBaseUrl}/.${reporterToken}.${partnerToken}..aveestimated/?${qs}`,
   ];
 
   for (const url of variants) {

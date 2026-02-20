@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   fetchWitsMfnDutyRatesMock: vi.fn(),
   fetchWitsPreferentialDutyRatesMock: vi.fn(),
   batchUpsertDutyRatesFromStreamMock: vi.fn(),
+  resolveWitsDutySourceUrlsMock: vi.fn(),
 }));
 
 vi.mock('./mfn.js', () => ({
@@ -17,6 +18,10 @@ vi.mock('./preferential.js', () => ({
 
 vi.mock('../../utils/batch-upsert.js', () => ({
   batchUpsertDutyRatesFromStream: mocks.batchUpsertDutyRatesFromStreamMock,
+}));
+
+vi.mock('./source-urls.js', () => ({
+  resolveWitsDutySourceUrls: mocks.resolveWitsDutySourceUrlsMock,
 }));
 
 import { importDutyRatesFromWITS } from './import-from-wits.js';
@@ -50,6 +55,9 @@ describe('importDutyRatesFromWITS', () => {
     vi.resetAllMocks();
     mocks.fetchWitsMfnDutyRatesMock.mockResolvedValue([]);
     mocks.fetchWitsPreferentialDutyRatesMock.mockResolvedValue([]);
+    mocks.resolveWitsDutySourceUrlsMock.mockResolvedValue({
+      sdmxBaseUrl: 'https://wits.worldbank.org/API/V1/SDMX/V21/rest/data/DF_WITS_Tariff_TRAINS',
+    });
     mocks.batchUpsertDutyRatesFromStreamMock.mockResolvedValue({
       inserted: 0,
       updated: 0,
@@ -81,6 +89,11 @@ describe('importDutyRatesFromWITS', () => {
       failedJobs: 0,
       totalJobs: 1,
     });
+    expect(mocks.fetchWitsMfnDutyRatesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sdmxBaseUrl: 'https://wits.worldbank.org/API/V1/SDMX/V21/rest/data/DF_WITS_Tariff_TRAINS',
+      })
+    );
     expect(mocks.batchUpsertDutyRatesFromStreamMock).toHaveBeenCalledTimes(1);
   });
 

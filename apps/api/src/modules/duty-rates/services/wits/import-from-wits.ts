@@ -4,6 +4,7 @@ import { fetchWitsMfnDutyRates } from './mfn.js';
 import { fetchWitsPreferentialDutyRates } from './preferential.js';
 import { batchUpsertDutyRatesFromStream } from '../../utils/batch-upsert.js';
 import { DEBUG } from '../../utils/utils.js';
+import { resolveWitsDutySourceUrls } from './source-urls.js';
 
 const DEFAULT_DESTS = [
   'US',
@@ -33,6 +34,7 @@ const ParamsSchema = z.object({
   concurrency: z.number().int().min(1).max(6).default(3),
   batchSize: z.number().int().min(1).max(20000).default(5000),
   hs6List: z.array(z.string().regex(/^\d{6}$/)).optional(),
+  sdmxBaseUrl: z.string().url().optional(),
   importId: z.string().optional(),
   exclude: z.array(z.string().length(2)).optional(),
 });
@@ -59,6 +61,7 @@ export type ImportFromWitsParams = ImportFromWitsCore & {
 
 export async function importDutyRatesFromWITS(params: ImportFromWitsParams) {
   const p = ParamsSchema.parse(params);
+  const { sdmxBaseUrl } = await resolveWitsDutySourceUrls({ sdmxBaseUrl: p.sdmxBaseUrl });
   const makeSourceRef = params.makeSourceRef ?? defaultMakeWitsSourceRef;
 
   const targetYear = p.year ?? new Date().getUTCFullYear() - 1;
@@ -81,6 +84,7 @@ export async function importDutyRatesFromWITS(params: ImportFromWitsParams) {
           year: targetYear,
           backfillYears: p.backfillYears,
           hs6List: p.hs6List,
+          sdmxBaseUrl,
         }),
     });
 
@@ -96,6 +100,7 @@ export async function importDutyRatesFromWITS(params: ImportFromWitsParams) {
             year: targetYear,
             backfillYears: p.backfillYears,
             hs6List: p.hs6List,
+            sdmxBaseUrl,
           }),
       });
     }

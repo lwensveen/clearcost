@@ -10,6 +10,7 @@ type PrefOpts = {
   year?: number;
   backfillYears?: number;
   hs6List?: string[];
+  sdmxBaseUrl?: string;
 };
 
 export async function fetchWitsPreferentialDutyRates(opts: PrefOpts): Promise<DutyRateInsert[]> {
@@ -33,7 +34,9 @@ export async function fetchWitsPreferentialDutyRates(opts: PrefOpts): Promise<Du
   const rows: DutyRateInsert[] = [];
 
   for (let y = targetYear; y >= targetYear - backfill; y--) {
-    const json = await fetchSdmx(reporter, partnerToken, y, y);
+    const json = await fetchSdmx(reporter, partnerToken, y, y, {
+      sdmxBaseUrl: opts.sdmxBaseUrl,
+    });
     if (!json) {
       if (DEBUG) console.log(`[wits] PRF ${displayDest}-${partnerDisplay} ${y} -> no JSON`);
       continue;

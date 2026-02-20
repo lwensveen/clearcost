@@ -9,6 +9,7 @@ type MfnOpts = {
   year?: number;
   backfillYears?: number;
   hs6List?: string[];
+  sdmxBaseUrl?: string;
 };
 
 export async function fetchWitsMfnDutyRates(opts: MfnOpts): Promise<DutyRateInsert[]> {
@@ -23,7 +24,7 @@ export async function fetchWitsMfnDutyRates(opts: MfnOpts): Promise<DutyRateInse
   const rows: DutyRateInsert[] = [];
 
   for (let y = targetYear; y >= targetYear - backfill; y--) {
-    const json = await fetchSdmx(reporter, '000', y, y); // 000 = world partner (MFN)
+    const json = await fetchSdmx(reporter, '000', y, y, { sdmxBaseUrl: opts.sdmxBaseUrl }); // 000 = world partner (MFN)
     if (!json) {
       if (DEBUG) console.log(`[wits] MFN ${display} ${y} -> no JSON`);
       continue;
