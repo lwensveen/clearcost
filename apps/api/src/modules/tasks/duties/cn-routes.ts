@@ -18,7 +18,13 @@ export default function cnDutyRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:cn']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'WITS', job: 'duties:cn-mfn' } },
+        config: {
+          importMeta: {
+            importSource: 'WITS',
+            job: 'duties:cn-mfn',
+            sourceKey: 'duties.wits.sdmx.base',
+          },
+        },
       },
       async (req, reply) => {
         const { hs6, batchSize, dryRun } = Body.parse(req.body ?? {});
@@ -42,7 +48,13 @@ export default function cnDutyRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:cn']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'WITS', job: 'duties:cn-fta' } },
+        config: {
+          importMeta: {
+            importSource: 'WITS',
+            job: 'duties:cn-fta',
+            sourceKey: 'duties.wits.sdmx.base',
+          },
+        },
       },
       async (req, reply) => {
         const { hs6, partnerGeoIds, batchSize, dryRun } = Body.parse(req.body ?? {});
@@ -66,7 +78,13 @@ export default function cnDutyRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:duties:cn']),
       schema: { body: Body },
-      config: { importMeta: { importSource: 'CN_TAXBOOK', job: 'duties:cn-mfn-pdf' } },
+      config: {
+        importMeta: {
+          importSource: 'CN_TAXBOOK',
+          job: 'duties:cn-mfn-pdf',
+          sourceKey: 'duties.cn.taxbook.pdf',
+        },
+      },
     },
     async (req, reply) => {
       const { url, batchSize, dryRun } = Body.parse(req.body ?? {});

@@ -17,7 +17,13 @@ export const dutiesCnMfnPdf: Command = async (args) => {
     {
       importSource: 'CN_TAXBOOK',
       job: 'duties:cn-mfn-pdf',
-      params: { url: urlOrPath, pages, mode, dryRun: boolParam(dryRun) },
+      params: {
+        url: urlOrPath,
+        pages,
+        mode,
+        dryRun: boolParam(dryRun),
+        sourceKey: 'duties.cn.taxbook.pdf',
+      },
     },
     async (importId) => {
       const res = await importCnMfnFromPdf({ urlOrPath, pages, mode, dryRun, importId });
