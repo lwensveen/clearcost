@@ -3,8 +3,8 @@ import { httpFetch } from '../../../../lib/http.js';
 
 export const DATASET_ID = 'uk-tariff-2021-01-01';
 export const TABLE_ID = 'commodities';
-export const UK_10_DATA_API_BASE =
-  process.env.UK_10_DATA_API_BASE ?? 'https://data.api.trade.gov.uk';
+export const DEFAULT_UK_10_DATA_API_BASE = 'https://data.api.trade.gov.uk';
+export const UK_10_DATA_API_BASE = process.env.UK_10_DATA_API_BASE ?? DEFAULT_UK_10_DATA_API_BASE;
 
 export const MEASURE_TYPE_MFN = '103'; // Third country duty (MFN)
 export const MEASURE_TYPE_PREF_STD = '142'; // Tariff preference
@@ -92,8 +92,13 @@ export function pickStartEnd(row: z.infer<typeof UkRowSchema>) {
 }
 
 /** S3-Select helper (returns array or null if unsupported). */
-export async function s3Select(versionId: string, query: string): Promise<any[] | null> {
-  const url = `${UK_10_DATA_API_BASE}/v1/datasets/${DATASET_ID}/versions/${versionId}/data?format=json&query-s3-select=${encodeURIComponent(query)}`;
+export async function s3Select(
+  versionId: string,
+  query: string,
+  opts: { apiBaseUrl?: string } = {}
+): Promise<any[] | null> {
+  const apiBaseUrl = opts.apiBaseUrl ?? UK_10_DATA_API_BASE;
+  const url = `${apiBaseUrl}/v1/datasets/${DATASET_ID}/versions/${versionId}/data?format=json&query-s3-select=${encodeURIComponent(query)}`;
   const res = await httpGet(url);
   if (!res.ok) return null;
   try {

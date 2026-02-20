@@ -10,7 +10,13 @@ export default function surchargeUkRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:surcharges:uk-remedies']),
       schema: { body: Body.optional() },
-      config: { importMeta: { importSource: 'UK_TT', job: 'surcharges:uk-remedies' } },
+      config: {
+        importMeta: {
+          importSource: 'UK_TT',
+          job: 'surcharges:uk-remedies',
+          sourceKey: 'duties.uk.tariff.api_base',
+        },
+      },
     },
     async (req, reply) => {
       const { measureTypeIds: bodyTypes, batchSize } = Body.parse(req.body ?? {});

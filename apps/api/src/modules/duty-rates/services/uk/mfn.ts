@@ -1,7 +1,7 @@
 import type { DutyRateInsert } from '@clearcost/types';
 import {
   ERGA_OMNES_ID,
-  getLatestVersionId,
+  getLatestVersionIdFromBase,
   hasCompoundComponent,
   MEASURE_TYPE_MFN,
   parseAdValoremPercent,
@@ -17,14 +17,15 @@ import {
   headerIndex,
   iterateCsvRecords,
 } from '../../utils/stream-csv.js';
+import { resolveUkTariffDutySourceUrls } from './source-urls.js';
 
-type FetchOpts = { hs6List?: string[] };
+type FetchOpts = { hs6List?: string[]; apiBaseUrl?: string };
 
 /** Row shape we yield from CSV/S3: headers → string values (some optional). */
 type UkRawRow = Record<string, string | undefined>;
 
 /** S3-Select JSON slice for MFN rows (type 103, ERGA OMNES 1011). */
-async function s3SelectMfn(versionId: string): Promise<UkRawRow[] | null> {
+async function s3SelectMfn(versionId: string, apiBaseUrl: string): Promise<UkRawRow[] | null> {
   const query = `
     SELECT m.commodity__code, m.measure__type__id, m.geographical_area__id,
            m.geographical_area__description, m.duty_rate,
@@ -36,13 +37,13 @@ async function s3SelectMfn(versionId: string): Promise<UkRawRow[] | null> {
       AND m.geographical_area__id = '${ERGA_OMNES_ID}'
   `.trim();
   // s3Select returns a plain array of objects; values may be missing → `undefined`
-  const rows = await s3Select(versionId, query);
+  const rows = await s3Select(versionId, query, { apiBaseUrl });
   return rows as UkRawRow[] | null;
 }
 
 /** Fallback: stream CSV and filter MFN rows on the fly. */
-async function* csvStreamMfn(versionId: string): AsyncGenerator<UkRawRow> {
-  const stream = await fetchTableCsvStream(versionId);
+async function* csvStreamMfn(versionId: string, apiBaseUrl: string): AsyncGenerator<UkRawRow> {
+  const stream = await fetchTableCsvStream(versionId, { apiBaseUrl });
 
   // Resolve column indices from header row once
   let isHeader = true;
@@ -95,18 +96,19 @@ async function* csvStreamMfn(versionId: string): AsyncGenerator<UkRawRow> {
 
 /** PUBLIC: streaming generator → yields DutyRateInsert for GB MFN (partner = null). */
 export async function* streamUkMfnDutyRates(opts: FetchOpts = {}): AsyncGenerator<DutyRateInsert> {
-  const versionId = await getLatestVersionId();
+  const { apiBaseUrl } = await resolveUkTariffDutySourceUrls({ apiBaseUrl: opts.apiBaseUrl });
+  const versionId = await getLatestVersionIdFromBase(apiBaseUrl);
   const hs6Allow = new Set((opts.hs6List ?? []).map((s) => String(s).slice(0, 6)));
 
   // Prefer S3-Select; if unavailable, stream CSV.
-  const s3Rows = await s3SelectMfn(versionId);
+  const s3Rows = await s3SelectMfn(versionId, apiBaseUrl);
 
   // Unify both branches as an AsyncGenerator<UkRawRow>
   const source: AsyncGenerator<UkRawRow> = s3Rows
     ? (async function* () {
         for (const row of s3Rows) yield row;
       })()
-    : csvStreamMfn(versionId);
+    : csvStreamMfn(versionId, apiBaseUrl);
 
   for await (const raw of source) {
     // Validate/normalize with zod

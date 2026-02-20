@@ -1,7 +1,7 @@
 import type { DutyRateInsert } from '@clearcost/types';
 import {
   ERGA_OMNES_ID,
-  getLatestVersionId,
+  getLatestVersionIdFromBase,
   hasCompoundComponent,
   MEASURE_TYPE_PREF_ENDUSE,
   MEASURE_TYPE_PREF_STD,
@@ -18,8 +18,9 @@ import {
   headerIndex,
   iterateCsvRecords,
 } from '../../utils/stream-csv.js';
+import { resolveUkTariffDutySourceUrls } from './source-urls.js';
 
-type FetchPrefOpts = { hs6List?: string[]; partners?: string[] };
+type FetchPrefOpts = { hs6List?: string[]; partners?: string[]; apiBaseUrl?: string };
 
 /** Sparse row shape we stream (values may be missing/undefined). */
 type UkRawRow = Record<string, string | undefined>;
@@ -66,7 +67,7 @@ function matchesPartner(
 }
 
 /** Try S3-Select for preferential rows (types 142/145, not 1011, with a '%' in duty_rate). */
-async function s3SelectPref(versionId: string): Promise<UkRawRow[] | null> {
+async function s3SelectPref(versionId: string, apiBaseUrl: string): Promise<UkRawRow[] | null> {
   const query = `
     SELECT m.commodity__code, m.measure__type__id, m.geographical_area__id,
            m.geographical_area__description, m.duty_rate,
@@ -78,13 +79,13 @@ async function s3SelectPref(versionId: string): Promise<UkRawRow[] | null> {
       AND m.geographical_area__id <> '${ERGA_OMNES_ID}'
       AND m.duty_rate LIKE '%%%' -- ad-valorem only
   `.trim();
-  const rows = await s3Select(versionId, query);
+  const rows = await s3Select(versionId, query, { apiBaseUrl });
   return rows as UkRawRow[] | null; // DBT returns a plain array; values may be undefined
 }
 
 /** Fallback: stream CSV and filter preferential rows on the fly. */
-async function* csvStreamPref(versionId: string): AsyncGenerator<UkRawRow> {
-  const stream = await fetchTableCsvStream(versionId);
+async function* csvStreamPref(versionId: string, apiBaseUrl: string): AsyncGenerator<UkRawRow> {
+  const stream = await fetchTableCsvStream(versionId, { apiBaseUrl });
 
   // Resolve header indices once
   let isHeader = true;
@@ -143,16 +144,17 @@ async function* csvStreamPref(versionId: string): AsyncGenerator<UkRawRow> {
 export async function* streamUkPreferentialDutyRates(
   opts: FetchPrefOpts = {}
 ): AsyncGenerator<DutyRateInsert> {
-  const versionId = await getLatestVersionId();
+  const { apiBaseUrl } = await resolveUkTariffDutySourceUrls({ apiBaseUrl: opts.apiBaseUrl });
+  const versionId = await getLatestVersionIdFromBase(apiBaseUrl);
   const hs6Allow = new Set((opts.hs6List ?? []).map((s) => String(s).slice(0, 6)));
 
   // Prefer S3-Select; if unavailable, stream CSV.
-  const s3Rows = await s3SelectPref(versionId);
+  const s3Rows = await s3SelectPref(versionId, apiBaseUrl);
   const source: AsyncGenerator<UkRawRow> = s3Rows
     ? (async function* () {
         for (const row of s3Rows) yield row;
       })()
-    : csvStreamPref(versionId);
+    : csvStreamPref(versionId, apiBaseUrl);
 
   for await (const raw of source) {
     if (opts.partners && !matchesPartner(raw, opts.partners)) continue;

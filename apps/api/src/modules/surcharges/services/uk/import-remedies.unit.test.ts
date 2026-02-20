@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  getLatestVersionIdMock: vi.fn(),
+  getLatestVersionIdFromBaseMock: vi.fn(),
   s3SelectMock: vi.fn(),
+  resolveUkTariffDutySourceUrlsMock: vi.fn(),
   batchUpsertSurchargesFromStreamMock: vi.fn(),
 }));
 
@@ -12,10 +13,14 @@ vi.mock('../../../duty-rates/services/uk/base.js', async () => {
   );
   return {
     ...actual,
-    getLatestVersionId: mocks.getLatestVersionIdMock,
+    getLatestVersionIdFromBase: mocks.getLatestVersionIdFromBaseMock,
     s3Select: mocks.s3SelectMock,
   };
 });
+
+vi.mock('../../../duty-rates/services/uk/source-urls.js', () => ({
+  resolveUkTariffDutySourceUrls: mocks.resolveUkTariffDutySourceUrlsMock,
+}));
 
 vi.mock('../../utils/batch-upsert.js', () => ({
   batchUpsertSurchargesFromStream: mocks.batchUpsertSurchargesFromStreamMock,
@@ -26,7 +31,10 @@ import { importUkTradeRemediesAsSurcharges } from './import-remedies.js';
 describe('importUkTradeRemediesAsSurcharges', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.getLatestVersionIdMock.mockResolvedValue('v1.0.0');
+    mocks.getLatestVersionIdFromBaseMock.mockResolvedValue('v1.0.0');
+    mocks.resolveUkTariffDutySourceUrlsMock.mockResolvedValue({
+      apiBaseUrl: 'https://data.api.trade.gov.uk',
+    });
     mocks.s3SelectMock.mockResolvedValue([
       {
         commodity__code: '1234567890',

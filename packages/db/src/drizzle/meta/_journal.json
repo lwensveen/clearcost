@@ -225,6 +225,13 @@
       "when": 1771550200000,
       "tag": "0031_eerie_nebula",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1771563600000,
+      "tag": "0032_mellow_polaris",
+      "breakpoints": true
     }
   ]
 }

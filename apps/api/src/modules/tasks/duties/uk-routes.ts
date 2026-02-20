@@ -11,7 +11,13 @@ export default function ukDutyRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:duties:uk']),
       schema: { body: TasksDutyHs6BatchBodySchema },
-      config: { importMeta: { importSource: 'UK_TT', job: 'duties:uk-mfn' } },
+      config: {
+        importMeta: {
+          importSource: 'UK_TT',
+          job: 'duties:uk-mfn',
+          sourceKey: 'duties.uk.tariff.api_base',
+        },
+      },
     },
     async (req, reply) => {
       const { hs6, batchSize } = TasksDutyHs6BatchBodySchema.parse(req.body ?? {});
@@ -33,7 +39,13 @@ export default function ukDutyRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:duties:uk']),
       schema: { body: TasksDutyHs6BatchPartnersBodySchema },
-      config: { importMeta: { importSource: 'UK_TT', job: 'duties:uk-fta' } },
+      config: {
+        importMeta: {
+          importSource: 'UK_TT',
+          job: 'duties:uk-fta',
+          sourceKey: 'duties.uk.tariff.api_base',
+        },
+      },
     },
     async (req, reply) => {
       const { hs6, partners, batchSize } = TasksDutyHs6BatchPartnersBodySchema.parse(

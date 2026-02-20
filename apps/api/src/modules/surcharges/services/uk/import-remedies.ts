@@ -2,7 +2,7 @@ import type { SurchargeInsert } from '@clearcost/types';
 import { adValoremPercentToFractionString } from '../pct.js';
 import {
   ERGA_OMNES_ID,
-  getLatestVersionId,
+  getLatestVersionIdFromBase,
   hasCompoundComponent,
   parseAdValoremPercent,
   pickStartEnd,
@@ -10,6 +10,7 @@ import {
   TABLE_ID,
   UkRowSchema,
 } from '../../../duty-rates/services/uk/base.js';
+import { resolveUkTariffDutySourceUrls } from '../../../duty-rates/services/uk/source-urls.js';
 import {
   cell,
   fetchTableCsvStream,
@@ -36,9 +37,11 @@ type ImportOpts = {
   importId?: string;
   /** Upsert batch size (default 5000). */
   batchSize?: number;
+  /** Optional UK tariff API base override. */
+  apiBaseUrl?: string;
 };
 
-async function* sourceUkRemedyRows(versionId: string, typeIds: string[]) {
+async function* sourceUkRemedyRows(versionId: string, typeIds: string[], apiBaseUrl: string) {
   if (typeIds.length) {
     const ors = typeIds.map((t) => `m.measure__type__id = '${t}'`).join(' OR ');
     const q = `
@@ -52,14 +55,14 @@ async function* sourceUkRemedyRows(versionId: string, typeIds: string[]) {
         AND m.geographical_area__id <> '${ERGA_OMNES_ID}'
     `.trim();
 
-    const s3 = await s3Select(versionId, q).catch(() => null);
+    const s3 = await s3Select(versionId, q, { apiBaseUrl }).catch(() => null);
     if (s3) {
       for (const r of s3) yield r;
       return;
     }
   }
 
-  const stream = await fetchTableCsvStream(versionId);
+  const stream = await fetchTableCsvStream(versionId, { apiBaseUrl });
   let isHeader = true;
   let idxCode = -1,
     idxType = -1,
@@ -111,7 +114,8 @@ async function* sourceUkRemedyRows(versionId: string, typeIds: string[]) {
 export async function importUkTradeRemediesAsSurcharges(
   opts: ImportOpts = {}
 ): Promise<{ ok: true; count: number }> {
-  const versionId = await getLatestVersionId();
+  const { apiBaseUrl } = await resolveUkTariffDutySourceUrls({ apiBaseUrl: opts.apiBaseUrl });
+  const versionId = await getLatestVersionIdFromBase(apiBaseUrl);
   const hs6Allow = new Set((opts.hs6List ?? []).map((s) => String(s).slice(0, 6)));
   const envTypes = (process.env.UK_REMEDY_MEASURE_TYPES ?? '')
     .split(',')
@@ -121,7 +125,7 @@ export async function importUkTradeRemediesAsSurcharges(
 
   const out: SurchargeInsert[] = [];
 
-  for await (const raw of sourceUkRemedyRows(versionId, typeIds)) {
+  for await (const raw of sourceUkRemedyRows(versionId, typeIds, apiBaseUrl)) {
     const parsed = UkRowSchema.safeParse(raw);
     if (!parsed.success) continue;
     const row = parsed.data;
