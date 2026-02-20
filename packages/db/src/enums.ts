@@ -148,6 +148,48 @@ export const importSourceEnum = pgEnum('import_source', [
 
 export const importStatusEnum = pgEnum('import_status', ['running', 'succeeded', 'failed']);
 
+export const sourceDatasetEnum = pgEnum('source_dataset', [
+  'fx',
+  'vat',
+  'duties',
+  'surcharges',
+  'hs',
+  'de_minimis',
+  'freight',
+  'notices',
+]);
+
+export const sourceTypeEnum = pgEnum('source_type', [
+  'api',
+  'csv',
+  'xlsx',
+  'xml',
+  'json',
+  'html',
+  'pdf',
+  'llm',
+  'manual',
+]);
+
+export const sourceScheduleHintEnum = pgEnum('source_schedule_hint', [
+  'hourly',
+  'daily',
+  'weekly',
+  'manual',
+]);
+
+export const sourceExpectedFormatEnum = pgEnum('source_expected_format', [
+  'json',
+  'csv',
+  'xlsx',
+  'xml',
+  'html',
+  'pdf',
+  'other',
+]);
+
+export const sourceAuthStrategyEnum = pgEnum('source_auth_strategy', ['none', 'api_key', 'oauth']);
+
 export const resourceTypeEnum = pgEnum('resource_type', [
   'de_minimis',
   'duty_rate',

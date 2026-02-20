@@ -169,6 +169,13 @@
       "when": 1770845511342,
       "tag": "0023_jittery_justice",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1771545923393,
+      "tag": "0024_light_colleen_wing",
+      "breakpoints": true
     }
   ]
 }

@@ -29,6 +29,7 @@ import { passkeysTable } from './auth/passkeys.js';
 import { provenanceTable } from './provenance.js';
 import { quoteSnapshotsTable } from './quote-snapshots.js';
 import { sessionsTable } from './auth/sessions.js';
+import { sourceRegistryTable } from './source-registry.js';
 import { surchargesTable } from './surcharges.js';
 import { taxRegistrationsTable } from './tax-registrations.js';
 import { tradeNoticeDocsTable } from './trade-notice-docs.js';
@@ -74,6 +75,7 @@ export * from './manifests.js';
 export * from './merchant-profiles.js';
 export * from './provenance.js';
 export * from './quote-snapshots.js';
+export * from './source-registry.js';
 export * from './surcharges.js';
 export * from './tax-registrations.js';
 export * from './trade-notice-docs.js';
@@ -116,6 +118,7 @@ export const schema = {
   passkeysTable,
   provenanceTable,
   quoteSnapshotsTable,
+  sourceRegistryTable,
   sessionsTable,
   surchargesTable,
   taxRegistrationsTable,
