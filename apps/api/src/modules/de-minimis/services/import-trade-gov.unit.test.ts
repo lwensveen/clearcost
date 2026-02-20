@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   httpFetchMock: vi.fn(),
   importDeMinimisMock: vi.fn(),
+  resolveTradeGovDeMinimisApiBaseMock: vi.fn(),
 }));
 
 vi.mock('../../../lib/http.js', () => ({
@@ -13,11 +14,18 @@ vi.mock('./import-de-minimis.js', () => ({
   importDeMinimis: mocks.importDeMinimisMock,
 }));
 
+vi.mock('./source-urls.js', () => ({
+  resolveTradeGovDeMinimisApiBase: mocks.resolveTradeGovDeMinimisApiBaseMock,
+}));
+
 import { importDeMinimisFromTradeGov } from './import-trade-gov.js';
 
 describe('importDeMinimisFromTradeGov', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.resolveTradeGovDeMinimisApiBaseMock.mockResolvedValue(
+      'https://api.trade.gov/v1/de_minimis/search'
+    );
     mocks.importDeMinimisMock.mockResolvedValue({
       ok: true,
       inserted: 1,
@@ -33,6 +41,7 @@ describe('importDeMinimisFromTradeGov', () => {
 
     await expect(importDeMinimisFromTradeGov()).rejects.toThrow(/source produced 0 rows/i);
     expect(mocks.importDeMinimisMock).not.toHaveBeenCalled();
+    expect(mocks.resolveTradeGovDeMinimisApiBaseMock).toHaveBeenCalledWith(undefined);
   });
 
   it('imports parsed DUTY/VAT rows when source provides data', async () => {
@@ -62,7 +71,7 @@ describe('importDeMinimisFromTradeGov', () => {
 
     expect(out).toMatchObject({ ok: true, inserted: 1, updated: 0, count: 1 });
     expect(mocks.importDeMinimisMock).toHaveBeenCalledTimes(1);
-    const [rows] = mocks.importDeMinimisMock.mock.calls[0] ?? [];
+    const [rows, options] = mocks.importDeMinimisMock.mock.calls[0] ?? [];
     expect(rows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -82,5 +91,6 @@ describe('importDeMinimisFromTradeGov', () => {
         }),
       ])
     );
+    expect(options).toMatchObject({ sourceKey: 'de-minimis.trade_gov.api' });
   });
 });

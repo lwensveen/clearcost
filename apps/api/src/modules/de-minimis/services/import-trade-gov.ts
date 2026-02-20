@@ -1,8 +1,9 @@
 import { importDeMinimis } from './import-de-minimis.js';
 import type { DeMinimisInsert } from '@clearcost/types';
 import { httpFetch } from '../../../lib/http.js';
+import { resolveTradeGovDeMinimisApiBase } from './source-urls.js';
 
-const API_BASE = 'https://api.trade.gov/v1/de_minimis/search';
+const TRADE_GOV_SOURCE_KEY = 'de-minimis.trade_gov.api';
 
 type TradeGovItem = {
   country: string; // ISO-2 (e.g. "CA")
@@ -94,8 +95,9 @@ function resolveTradeGovBasis(
  */
 export async function importDeMinimisFromTradeGov(
   effectiveOn?: Date,
-  opts: { importId?: string } = {}
+  opts: { importId?: string; apiBaseUrl?: string } = {}
 ) {
+  const apiBaseUrl = await resolveTradeGovDeMinimisApiBase(opts.apiBaseUrl);
   const apiKey = process.env.TRADE_GOV_API_KEY || '';
   const effectiveFrom = toMidnightUTC(effectiveOn ?? new Date());
 
@@ -105,7 +107,7 @@ export async function importDeMinimisFromTradeGov(
 
   // Page until exhausted
   while (true) {
-    const url = new URL(API_BASE);
+    const url = new URL(apiBaseUrl);
     url.searchParams.set('size', String(size));
     url.searchParams.set('offset', String(offset));
     if (apiKey) url.searchParams.set('api_key', apiKey);
@@ -156,6 +158,7 @@ export async function importDeMinimisFromTradeGov(
 
   const res = await importDeMinimis(rows, {
     importId: opts.importId,
+    sourceKey: TRADE_GOV_SOURCE_KEY,
     makeSourceRef: (row) =>
       `trade.gov:dest=${row.dest}:kind=${row.deMinimisKind}:ef=${row.effectiveFrom
         .toISOString()

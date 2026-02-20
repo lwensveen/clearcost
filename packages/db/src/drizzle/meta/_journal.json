@@ -281,6 +281,13 @@
       "when": 1771668000000,
       "tag": "0039_breezy_hummingbird",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1771754400000,
+      "tag": "0040_sudden_reaper",
+      "breakpoints": true
     }
   ]
 }

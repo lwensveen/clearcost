@@ -4,10 +4,11 @@ import { load } from 'cheerio';
 import { sha256Hex } from '../../../lib/provenance.js';
 import { httpFetch } from '../../../lib/http.js';
 import type { DeMinimisInsert } from '@clearcost/types';
+import { resolveZonosDeMinimisUrl } from './source-urls.js';
 
 type ParsedCell = { value: number; currency: string };
 type DeMinimisBasis = NonNullable<DeMinimisInsert['deMinimisBasis']>;
-const URL = 'https://zonos.com/docs/guides/de-minimis-values';
+const ZONOS_SOURCE_KEY = 'de-minimis.zonos.docs';
 
 const CURRENCY_FIX: Record<string, string> = { KM: 'BAM', RMB: 'CNY' };
 const toMidnightUTC = (d: Date) => new Date(d.toISOString().slice(0, 10));
@@ -77,10 +78,11 @@ function parseAmountCell(text: string): ParsedCell | null {
 
 export async function importDeMinimisFromZonos(
   effectiveOn = new Date(),
-  opts: { importId?: string; skipUS?: boolean } = {}
+  opts: { importId?: string; skipUS?: boolean; sourceUrl?: string } = {}
 ) {
-  const res = await httpFetch(URL, { headers: { 'user-agent': 'clearcost-seed/1.0' } });
-  if (!res.ok) throw new Error(`Fetch failed ${res.status} ${res.statusText} @ ${URL}`);
+  const sourceUrl = await resolveZonosDeMinimisUrl(opts.sourceUrl);
+  const res = await httpFetch(sourceUrl, { headers: { 'user-agent': 'clearcost-seed/1.0' } });
+  if (!res.ok) throw new Error(`Fetch failed ${res.status} ${res.statusText} @ ${sourceUrl}`);
   const html = await res.text();
   const $ = load(html);
 
@@ -104,6 +106,7 @@ export async function importDeMinimisFromZonos(
     importId: string;
     resourceType: 'de_minimis';
     resourceId: string;
+    sourceKey: string;
     sourceRef: string;
     sourceHash: string;
     rowHash: string;
@@ -185,6 +188,7 @@ export async function importDeMinimisFromZonos(
             importId: opts.importId,
             resourceType: 'de_minimis',
             resourceId: row.id,
+            sourceKey: ZONOS_SOURCE_KEY,
             sourceRef,
             sourceHash,
             rowHash,
@@ -213,7 +217,7 @@ export async function importDeMinimisFromZonos(
 
   return {
     ok: true as const,
-    source: URL,
+    source: sourceUrl,
     effectiveFrom,
     inserted,
     updated,

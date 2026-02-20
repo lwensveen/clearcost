@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   httpFetchMock: vi.fn(),
   transactionMock: vi.fn(),
+  resolveZonosDeMinimisUrlMock: vi.fn(),
 }));
 
 vi.mock('../../../lib/http.js', () => ({
@@ -17,11 +18,16 @@ vi.mock('@clearcost/db', () => ({
   provenanceTable: {},
 }));
 
+vi.mock('./source-urls.js', () => ({
+  resolveZonosDeMinimisUrl: mocks.resolveZonosDeMinimisUrlMock,
+}));
+
 import { importDeMinimisFromZonos, resolveZonosBasis } from './import-from-zonos.js';
 
 describe('importDeMinimisFromZonos', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.resolveZonosDeMinimisUrlMock.mockResolvedValue('https://zonos.test/de-minimis');
     mocks.transactionMock.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
       await fn({});
     });
@@ -50,6 +56,7 @@ describe('importDeMinimisFromZonos', () => {
     await expect(importDeMinimisFromZonos(new Date('2025-01-01T00:00:00.000Z'))).rejects.toThrow(
       /source produced 0 rows/i
     );
+    expect(mocks.resolveZonosDeMinimisUrlMock).toHaveBeenCalledWith(undefined);
   });
 
   it('resolves basis overrides and defaults conservatively for unknown destinations', () => {

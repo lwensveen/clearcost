@@ -1,0 +1,106 @@
+INSERT INTO "source_registry" (
+  "key",
+  "dataset",
+  "source_type",
+  "base_url",
+  "download_url_template",
+  "schedule_hint",
+  "expected_format",
+  "auth_strategy",
+  "sla_max_age_hours",
+  "notes",
+  "last_verified_at"
+)
+VALUES
+  (
+    'de-minimis.zonos.docs',
+    'de_minimis',
+    'html',
+    NULL,
+    'https://zonos.com/docs/guides/de-minimis-values',
+    'weekly',
+    'html',
+    'none',
+    168,
+    'Zonos de-minimis documentation page used by de-minimis:import-zonos scraper.',
+    NOW()
+  ),
+  (
+    'de-minimis.trade_gov.api',
+    'de_minimis',
+    'api',
+    'https://api.trade.gov/v1/de_minimis/search',
+    NULL,
+    'weekly',
+    'json',
+    'api_key',
+    168,
+    'Trade.gov de minimis API endpoint used by de-minimis:trade-gov importer.',
+    NOW()
+  ),
+  (
+    'de-minimis.official.us.section321',
+    'de_minimis',
+    'html',
+    'https://www.cbp.gov',
+    'https://www.cbp.gov/trade/trade-enforcement/tftea/section-321-programs',
+    'manual',
+    'html',
+    'none',
+    720,
+    'US official Section 321 de minimis reference used by de-minimis:official.',
+    NOW()
+  ),
+  (
+    'de-minimis.official.eu.reg_1186_2009',
+    'de_minimis',
+    'html',
+    'https://eur-lex.europa.eu',
+    'https://eur-lex.europa.eu/eli/reg/2009/1186/oj',
+    'manual',
+    'html',
+    'none',
+    720,
+    'EU Council Regulation (EC) No 1186/2009 reference used for EU duty de minimis defaults.',
+    NOW()
+  ),
+  (
+    'de-minimis.official.gb.vat_overseas_goods',
+    'de_minimis',
+    'html',
+    'https://www.gov.uk',
+    'https://www.gov.uk/guidance/vat-and-overseas-goods-sold-directly-to-customers-in-the-uk',
+    'manual',
+    'html',
+    'none',
+    720,
+    'UK official VAT guidance used for GB VAT de minimis defaults.',
+    NOW()
+  ),
+  (
+    'de-minimis.official.ca.lvs_vat',
+    'de_minimis',
+    'html',
+    'https://www.cbsa-asfc.gc.ca',
+    'https://www.cbsa-asfc.gc.ca/services/cusma-aceum/lvs-efv-eng.html',
+    'manual',
+    'html',
+    'none',
+    720,
+    'Canada CBSA low-value shipment VAT/GST threshold reference.',
+    NOW()
+  ),
+  (
+    'de-minimis.official.ca.lvs_duty',
+    'de_minimis',
+    'html',
+    'https://www.cbsa-asfc.gc.ca',
+    'https://www.cbsa-asfc.gc.ca/publications/dm-md/d8/d8-2-16-eng.html',
+    'manual',
+    'html',
+    'none',
+    720,
+    'Canada CBSA D8-2-16 duty threshold reference for de minimis defaults.',
+    NOW()
+  )
+ON CONFLICT ("key") DO NOTHING;

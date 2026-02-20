@@ -7,6 +7,9 @@ type DeMinimisBasis = 'INTRINSIC' | 'CIF';
 
 type ProvOpts = {
   importId?: string;
+  sourceKey?:
+    | string
+    | ((row: (typeof deMinimisTable)['$inferSelect']) => string | null | undefined);
   makeSourceRef?: (row: (typeof deMinimisTable)['$inferSelect']) => string | undefined;
 };
 
@@ -148,6 +151,8 @@ export async function importDeMinimis(
 
     if (opts.importId && ret.length) {
       const provRows = ret.map((row) => ({
+        sourceKey:
+          (typeof opts.sourceKey === 'function' ? opts.sourceKey(row) : opts.sourceKey) ?? null,
         importId: opts.importId!,
         resourceType: 'de_minimis' as const,
         resourceId: row.id,

@@ -1,5 +1,6 @@
 import { importDeMinimis } from './import-de-minimis.js';
 import type { DeMinimisInsert } from '@clearcost/types';
+import { resolveOfficialDeMinimisSourceUrls } from './source-urls.js';
 
 type Row = {
   dest: string; // ISO-3166-1 alpha-2
@@ -9,7 +10,6 @@ type Row = {
   value: number | string; // threshold amount
   effectiveFrom: string; // YYYY-MM-DD
   effectiveTo?: string | null;
-  sourceUrl: string; // provenance (not stored)
 };
 
 const EU_DESTS = [
@@ -56,7 +56,6 @@ async function fetchUS(effectiveFrom: string): Promise<Row[]> {
       currency: 'USD',
       value: 800,
       effectiveFrom,
-      sourceUrl: 'https://www.cbp.gov/trade/trade-enforcement/tftea/section-321-programs',
     },
   ];
 }
@@ -69,7 +68,6 @@ async function fetchEU(effectiveFrom: string): Promise<Row[]> {
     currency: 'EUR',
     value: 150,
     effectiveFrom,
-    sourceUrl: 'https://eur-lex.europa.eu/eli/reg/2009/1186/oj',
   }));
 }
 
@@ -82,8 +80,6 @@ async function fetchUK(effectiveFrom: string): Promise<Row[]> {
       currency: 'GBP',
       value: 135,
       effectiveFrom,
-      sourceUrl:
-        'https://www.gov.uk/guidance/vat-and-overseas-goods-sold-directly-to-customers-in-the-uk',
     },
   ];
 }
@@ -97,7 +93,6 @@ async function fetchCA(effectiveFrom: string): Promise<Row[]> {
       currency: 'CAD',
       value: 40,
       effectiveFrom,
-      sourceUrl: 'https://www.cbsa-asfc.gc.ca/services/cusma-aceum/lvs-efv-eng.html',
     },
     {
       dest: 'CA',
@@ -106,13 +101,37 @@ async function fetchCA(effectiveFrom: string): Promise<Row[]> {
       currency: 'CAD',
       value: 150,
       effectiveFrom,
-      sourceUrl: 'https://www.cbsa-asfc.gc.ca/publications/dm-md/d8/d8-2-16-eng.html',
     },
   ];
 }
 
 async function fetchAU(_effectiveFrom: string): Promise<Row[]> {
   return [];
+}
+
+function resolveOfficialSourceKey(
+  row: Pick<DeMinimisInsert, 'dest' | 'deMinimisKind'>
+): string | null {
+  if (row.dest === 'US' && row.deMinimisKind === 'DUTY') return 'de-minimis.official.us.section321';
+  if (EU_DESTS.includes(row.dest) && row.deMinimisKind === 'DUTY')
+    return 'de-minimis.official.eu.reg_1186_2009';
+  if (row.dest === 'GB' && row.deMinimisKind === 'VAT')
+    return 'de-minimis.official.gb.vat_overseas_goods';
+  if (row.dest === 'CA' && row.deMinimisKind === 'VAT') return 'de-minimis.official.ca.lvs_vat';
+  if (row.dest === 'CA' && row.deMinimisKind === 'DUTY') return 'de-minimis.official.ca.lvs_duty';
+  return null;
+}
+
+function resolveOfficialSourceUrl(
+  row: Pick<DeMinimisInsert, 'dest' | 'deMinimisKind'>,
+  urls: Awaited<ReturnType<typeof resolveOfficialDeMinimisSourceUrls>>
+): string | null {
+  if (row.dest === 'US' && row.deMinimisKind === 'DUTY') return urls.usSection321;
+  if (EU_DESTS.includes(row.dest) && row.deMinimisKind === 'DUTY') return urls.euRegulation;
+  if (row.dest === 'GB' && row.deMinimisKind === 'VAT') return urls.gbVatGuidance;
+  if (row.dest === 'CA' && row.deMinimisKind === 'VAT') return urls.caLvsVat;
+  if (row.dest === 'CA' && row.deMinimisKind === 'DUTY') return urls.caLvsDuty;
+  return null;
 }
 
 /**
@@ -124,6 +143,7 @@ export async function importDeMinimisFromOfficial(
   opts?: { importId?: string }
 ) {
   const effectiveFrom = toISO(effectiveOn ?? new Date());
+  const sourceUrls = await resolveOfficialDeMinimisSourceUrls();
 
   const [us, eu, uk, ca, au] = await Promise.all([
     fetchUS(effectiveFrom),
@@ -149,10 +169,12 @@ export async function importDeMinimisFromOfficial(
 
   const res = await importDeMinimis(rows, {
     importId: opts?.importId,
+    sourceKey: (row) => resolveOfficialSourceKey(row),
     makeSourceRef: (row) =>
-      `official:deminimis:dest=${row.dest}:kind=${row.deMinimisKind}:ef=${row.effectiveFrom
-        .toISOString()
-        .slice(0, 10)}`,
+      `official:deminimis:dest=${row.dest}:kind=${row.deMinimisKind}:source=${resolveOfficialSourceUrl(
+        row,
+        sourceUrls
+      )}:ef=${row.effectiveFrom.toISOString().slice(0, 10)}`,
   });
 
   return { ok: true as const, inserted: res.count, effectiveFrom };
