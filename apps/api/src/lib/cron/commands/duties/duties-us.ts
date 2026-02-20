@@ -20,7 +20,11 @@ export const dutiesUsMfn: Command = async (args) => {
   const effectiveFrom = parseDateMaybe(dateArg);
 
   const payload = await withRun(
-    { importSource: 'USITC_HTS', job: 'duties:us-mfn', params: { effectiveFrom: dateArg } },
+    {
+      importSource: 'USITC_HTS',
+      job: 'duties:us-mfn',
+      params: { effectiveFrom: dateArg },
+    },
     async () => {
       const res = await importUsMfn({ effectiveFrom });
       return {
@@ -84,7 +88,11 @@ export const dutiesUsAll: Command = async (args) => {
 
   // MFN
   const mfn = await withRun(
-    { importSource: 'USITC_HTS', job: 'duties:us-mfn', params: { effectiveFrom: dateArg } },
+    {
+      importSource: 'USITC_HTS',
+      job: 'duties:us-mfn',
+      params: { effectiveFrom: dateArg },
+    },
     async () => {
       const res = await importUsMfn({ effectiveFrom });
       return {

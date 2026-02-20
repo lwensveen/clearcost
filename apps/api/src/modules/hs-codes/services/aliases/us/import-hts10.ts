@@ -1,6 +1,7 @@
 import { db, hsCodeAliasesTable, hsCodesTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
 import { UsitcClient } from '../../../../duty-rates/services/us/usitc-client.js';
+import { resolveUsitcHsSourceUrls } from './source-urls.js';
 
 export type ImportUsHts10AliasesResult = {
   ok: true;
@@ -9,9 +10,6 @@ export type ImportUsHts10AliasesResult = {
   updated: number;
 };
 
-const HTS_BASE = process.env.HTS_API_BASE ?? 'https://hts.usitc.gov';
-const HTS_JSON_URL = process.env.HTS_JSON_URL;
-const HTS_CSV_URL = process.env.HTS_CSV_URL;
 const TITLE_MAX = Number(process.env.HS_ALIAS_TITLE_MAX ?? 255);
 const DEBUG = process.argv.includes('--debug') || process.env.DEBUG === '1';
 
@@ -122,16 +120,20 @@ const heading4Of = (code10: string) => code10.slice(0, 4);
 const hs6Of = (code10: string) => code10.slice(0, 6);
 
 // ---------- Fetchers (via client) ----------
-const client = new UsitcClient(HTS_BASE);
-
-async function fetchAllRowsViaCSV(): Promise<Record<string, unknown>[]> {
-  if (!HTS_CSV_URL) return [];
-  const csv = await client.getText(HTS_CSV_URL, 'text/csv,application/octet-stream,text/plain,*/*');
+async function fetchAllRowsViaCSV(
+  client: UsitcClient,
+  csvUrl: string
+): Promise<Record<string, unknown>[]> {
+  if (!csvUrl) return [];
+  const csv = await client.getText(csvUrl, 'text/csv,application/octet-stream,text/plain,*/*');
   return parseCsv(csv) as Record<string, unknown>[];
 }
-async function fetchAllRowsViaJSON(): Promise<Record<string, unknown>[]> {
-  if (!HTS_JSON_URL) return [];
-  const json = await client.getJson(HTS_JSON_URL);
+async function fetchAllRowsViaJSON(
+  client: UsitcClient,
+  jsonUrl: string
+): Promise<Record<string, unknown>[]> {
+  if (!jsonUrl) return [];
+  const json = await client.getJson(jsonUrl);
   if (Array.isArray(json)) return json;
   if (Array.isArray(json?.data)) return json.data;
   if (Array.isArray(json?.rows)) return json.rows;
@@ -149,7 +151,10 @@ function to4(ch: number) {
   return `${pad2(ch)}99`;
 }
 
-async function exportChapterJson(chapter: number): Promise<Record<string, unknown>[]> {
+async function exportChapterJson(
+  client: UsitcClient,
+  chapter: number
+): Promise<Record<string, unknown>[]> {
   const from = from4(chapter),
     to = to4(chapter);
   const paths = [
@@ -185,7 +190,7 @@ async function exportChapterJson(chapter: number): Promise<Record<string, unknow
   }
   return [];
 }
-async function fetchAllRowsViaRest(): Promise<Record<string, unknown>[]> {
+async function fetchAllRowsViaRest(client: UsitcClient): Promise<Record<string, unknown>[]> {
   const chapters = Array.from({ length: 97 }, (_, i) => i + 1);
   const CONCURRENCY = 4;
   const out: Record<string, unknown>[][] = [];
@@ -193,7 +198,7 @@ async function fetchAllRowsViaRest(): Promise<Record<string, unknown>[]> {
   async function worker() {
     while (idx < chapters.length) {
       const ch = chapters[idx++]!;
-      const rows = await exportChapterJson(ch);
+      const rows = await exportChapterJson(client, ch);
       if (rows.length === 0 && ch !== 77) console.warn(`HTS ch${ch} returned 0 rows`);
       out.push(rows);
       await new Promise((r) => setTimeout(r, 120 + Math.floor(Math.random() * 120)));
@@ -205,6 +210,8 @@ async function fetchAllRowsViaRest(): Promise<Record<string, unknown>[]> {
 
 // ---------- Importer ----------
 export async function importUsHts10Aliases(): Promise<ImportUsHts10AliasesResult> {
+  const { baseUrl, csvUrl, jsonUrl } = await resolveUsitcHsSourceUrls();
+  const client = new UsitcClient(baseUrl);
   await client.warm();
 
   // Load authoritative HS6 keys (used only for normal chapters 01–97)
@@ -214,16 +221,16 @@ export async function importUsHts10Aliases(): Promise<ImportUsHts10AliasesResult
 
   let rows: Record<string, unknown>[] = [];
   try {
-    if (!rows.length && HTS_CSV_URL) {
-      rows = await fetchAllRowsViaCSV();
+    if (!rows.length && csvUrl) {
+      rows = await fetchAllRowsViaCSV(client, csvUrl);
       if (rows.length) console.log(`HTS: CSV rows=${rows.length}`);
     }
   } catch (e) {
     console.warn('HTS: CSV failed:', (e as Error).message);
   }
   try {
-    if (!rows.length && HTS_JSON_URL) {
-      rows = await fetchAllRowsViaJSON();
+    if (!rows.length && jsonUrl) {
+      rows = await fetchAllRowsViaJSON(client, jsonUrl);
       if (rows.length) console.log(`HTS: JSON rows=${rows.length}`);
     }
   } catch (e) {
@@ -231,7 +238,7 @@ export async function importUsHts10Aliases(): Promise<ImportUsHts10AliasesResult
   }
   if (!rows.length) {
     console.warn('HTS: falling back to REST per chapter');
-    rows = await fetchAllRowsViaRest();
+    rows = await fetchAllRowsViaRest(client);
   }
   if (!rows.length) {
     console.warn('HTS: no rows from any source');

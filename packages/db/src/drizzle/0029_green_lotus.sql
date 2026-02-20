@@ -1,0 +1,80 @@
+INSERT INTO "source_registry" (
+  "key",
+  "dataset",
+  "source_type",
+  "base_url",
+  "download_url_template",
+  "schedule_hint",
+  "expected_format",
+  "auth_strategy",
+  "sla_max_age_hours",
+  "notes",
+  "last_verified_at"
+)
+VALUES
+  (
+    'duties.us.usitc.base',
+    'duties',
+    'api',
+    'https://hts.usitc.gov',
+    NULL,
+    'weekly',
+    'json',
+    'none',
+    168,
+    'USITC HTS API base URL for US MFN/FTA duty importers (and HTS-backed US surcharge helpers).',
+    NOW()
+  ),
+  (
+    'duties.us.usitc.csv',
+    'duties',
+    'csv',
+    NULL,
+    NULL,
+    'weekly',
+    'csv',
+    'none',
+    168,
+    'Optional USITC HTS CSV export URL override for US duties parser fallback.',
+    NOW()
+  ),
+  (
+    'hs.us.usitc.base',
+    'hs',
+    'api',
+    'https://hts.usitc.gov',
+    NULL,
+    'weekly',
+    'json',
+    'none',
+    168,
+    'USITC HTS API base URL for US HS10 alias importer.',
+    NOW()
+  ),
+  (
+    'hs.us.usitc.csv',
+    'hs',
+    'csv',
+    NULL,
+    NULL,
+    'weekly',
+    'csv',
+    'none',
+    168,
+    'Optional USITC HTS CSV export URL for US HS10 alias importer.',
+    NOW()
+  ),
+  (
+    'hs.us.usitc.json',
+    'hs',
+    'json',
+    NULL,
+    NULL,
+    'weekly',
+    'json',
+    'none',
+    168,
+    'Optional USITC HTS bulk JSON export URL for US HS10 alias importer.',
+    NOW()
+  )
+ON CONFLICT ("key") DO NOTHING;

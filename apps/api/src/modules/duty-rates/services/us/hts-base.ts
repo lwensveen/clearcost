@@ -13,10 +13,10 @@
 
 import { UsitcClient } from './usitc-client.js';
 import { DEBUG } from '../../utils/utils.js';
+import { resolveUsitcDutySourceUrls } from './source-urls.js';
 
-const HTS_BASE = process.env.HTS_API_BASE ?? 'https://hts.usitc.gov';
-const HTS_CSV_URL = process.env.HTS_CSV_URL || ''; // point this at your CSV mirror or official export URL
-const client = new UsitcClient(HTS_BASE);
+let sourceConfigPromise: Promise<{ baseUrl: string; csvUrl: string }> | null = null;
+let client: UsitcClient | null = null;
 
 // ---------------- tiny utils ----------------
 const norm = (s: string) =>
@@ -75,6 +75,21 @@ function to4(ch: number) {
 
 // ---------------- CSV fallback (cached) ----------------
 let csvCache: Record<string, unknown>[] | null = null;
+
+async function getSourceConfig() {
+  if (!sourceConfigPromise) {
+    sourceConfigPromise = resolveUsitcDutySourceUrls();
+  }
+  return await sourceConfigPromise;
+}
+
+async function getClient() {
+  if (!client) {
+    const { baseUrl } = await getSourceConfig();
+    client = new UsitcClient(baseUrl);
+  }
+  return client;
+}
 
 function parseCsv(text: string): Array<Record<string, string>> {
   const rows: string[][] = [];
@@ -141,16 +156,15 @@ function parseCsv(text: string): Array<Record<string, string>> {
 
 async function loadCsvIfAvailable(): Promise<void> {
   if (csvCache !== null) return; // already attempted
-  if (!HTS_CSV_URL) {
+  const { csvUrl } = await getSourceConfig();
+  if (!csvUrl) {
     csvCache = [];
     return;
   }
   try {
+    const client = await getClient();
     await client.warm();
-    const csv = await client.getText(
-      HTS_CSV_URL,
-      'text/csv,application/octet-stream,text/plain,*/*'
-    );
+    const csv = await client.getText(csvUrl, 'text/csv,application/octet-stream,text/plain,*/*');
     const rows = parseCsv(csv);
     csvCache = rows as unknown as Record<string, unknown>[];
     if (DEBUG) console.log(`[HTS] CSV loaded: rows=${rows.length}`);
@@ -164,6 +178,7 @@ async function loadCsvIfAvailable(): Promise<void> {
 /** Fetch one chapter as array of row objects. Uses CSV cache if present; otherwise HTS JSON (with retries). */
 export async function exportChapterJson(chapter: number): Promise<Record<string, unknown>[]> {
   await loadCsvIfAvailable();
+  const client = await getClient();
   const chapterPrefix = pad2(chapter);
 
   // 1) CSV path
