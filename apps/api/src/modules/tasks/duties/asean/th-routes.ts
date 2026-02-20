@@ -3,6 +3,7 @@ import { importThMfn } from '../../../duty-rates/services/asean/th/import-mfn.js
 import { importThPreferential } from '../../../duty-rates/services/asean/th/import-preferential.js';
 import { importAseanMfnOfficialFromExcel } from '../../../duty-rates/services/asean/shared/import-mfn-official-excel.js';
 import { importAseanPreferentialOfficialFromExcel } from '../../../duty-rates/services/asean/shared/import-preferential-official-excel.js';
+import { resolveAseanDutySourceUrl } from '../../../duty-rates/services/asean/source-urls.js';
 import {
   TasksDutyHs6BatchDryRunBodySchema,
   TasksDutyHs6BatchPartnerGeoIdsBodySchema,
@@ -60,9 +61,13 @@ export default function thDutyRoutes(app: FastifyInstance) {
       },
       async (req, reply) => {
         const { url, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const urlOrPath = await resolveAseanDutySourceUrl({
+          sourceKey: 'duties.th.official.mfn_excel',
+          fallbackUrl: url,
+        });
         const res = await importAseanMfnOfficialFromExcel({
           dest: 'TH',
-          urlOrPath: url,
+          urlOrPath,
           sheet,
           batchSize,
           dryRun,
@@ -123,9 +128,13 @@ export default function thDutyRoutes(app: FastifyInstance) {
       },
       async (req, reply) => {
         const { url, agreement, partner, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const urlOrPath = await resolveAseanDutySourceUrl({
+          sourceKey: 'duties.th.official.fta_excel',
+          fallbackUrl: url,
+        });
         const res = await importAseanPreferentialOfficialFromExcel({
           dest: 'TH',
-          urlOrPath: url,
+          urlOrPath,
           agreement,
           partner,
           sheet,

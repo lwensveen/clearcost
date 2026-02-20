@@ -3,6 +3,7 @@ import { importPhMfn } from '../../../duty-rates/services/asean/ph/import-mfn.js
 import { importPhMfnExcel } from '../../../duty-rates/services/asean/ph/import-mfn-excel.js';
 import { importPhPreferential } from '../../../duty-rates/services/asean/ph/import-preferential.js';
 import { importAseanPreferentialOfficialFromExcel } from '../../../duty-rates/services/asean/shared/import-preferential-official-excel.js';
+import { resolveAseanDutySourceUrl } from '../../../duty-rates/services/asean/source-urls.js';
 import {
   TasksDutyHs6BatchDryRunBodySchema,
   TasksDutyHs6BatchPartnerGeoIdsBodySchema,
@@ -28,13 +29,14 @@ export default function phDutyRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const body = Body.parse(req.body ?? {});
-      const urlOrPath =
-        body.url ??
-        process.env.PH_TARIFF_EXCEL_URL ??
-        // keep explicit error over guessing URLs
-        (() => {
-          throw new Error('Provide "url" in body or set PH_TARIFF_EXCEL_URL');
-        })();
+      const fallbackUrl = body.url ?? process.env.PH_TARIFF_EXCEL_URL;
+      if (!fallbackUrl) {
+        throw new Error('Provide "url" in body or set PH_TARIFF_EXCEL_URL');
+      }
+      const urlOrPath = await resolveAseanDutySourceUrl({
+        sourceKey: 'duties.ph.tariff_commission.xlsx',
+        fallbackUrl,
+      });
 
       const result = await importPhMfnExcel({
         urlOrPath,
@@ -120,9 +122,13 @@ export default function phDutyRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { url, agreement, partner, sheet, batchSize, dryRun } =
         TasksDutyMyFtaOfficialExcelBodySchema.parse(req.body ?? {});
+      const urlOrPath = await resolveAseanDutySourceUrl({
+        sourceKey: 'duties.ph.official.fta_excel',
+        fallbackUrl: url,
+      });
       const result = await importAseanPreferentialOfficialFromExcel({
         dest: 'PH',
-        urlOrPath: url,
+        urlOrPath,
         agreement,
         partner,
         sheet,

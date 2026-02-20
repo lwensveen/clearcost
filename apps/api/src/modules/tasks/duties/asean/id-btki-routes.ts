@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { crawlBtkiPdfs } from '../../../duty-rates/services/asean/id/btki-crawl.js';
+import { resolveAseanDutySourceUrl } from '../../../duty-rates/services/asean/source-urls.js';
 import { TasksDutyIdBtkiCrawlBodySchema } from '@clearcost/types';
 
 export default function idBtkiRoutes(app: FastifyInstance) {
@@ -20,8 +21,12 @@ export default function idBtkiRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const body = Body.parse(req.body ?? {});
-      const startUrl =
+      const fallbackStartUrl =
         body.startUrl ?? process.env.ID_BTKI_START_URL ?? 'https://repository.beacukai.go.id/';
+      const startUrl = await resolveAseanDutySourceUrl({
+        sourceKey: 'duties.id.btki.portal',
+        fallbackUrl: fallbackStartUrl,
+      });
       const result = await crawlBtkiPdfs({
         startUrl,
         maxDepth: body.maxDepth ?? 1,

@@ -78,8 +78,8 @@ function parseMaybeDate(value: unknown): Date | undefined {
   return Number.isNaN(+date) ? undefined : date;
 }
 
-export async function fetchIdMfnDutyRates(): Promise<DutyRateInsert[]> {
-  const urlOrPath = process.env.ID_BTKI_XLSX_URL;
+export async function fetchIdMfnDutyRates(urlOrPathOverride?: string): Promise<DutyRateInsert[]> {
+  const urlOrPath = urlOrPathOverride ?? process.env.ID_BTKI_XLSX_URL;
   if (!urlOrPath) throw new Error('ID_BTKI_XLSX_URL is not set');
 
   const buffer = await loadBuffer(urlOrPath);

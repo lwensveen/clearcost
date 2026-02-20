@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { importMyMfnFromExcel } from '../../../duty-rates/services/asean/my/import-mfn-excel.js';
 import { importMyMfnFromGazettePdf } from '../../../duty-rates/services/asean/my/import-mfn-gazette-pdf.js';
 import { importMyPreferentialFromExcel } from '../../../duty-rates/services/asean/my/import-preferential-excel.js';
+import { resolveAseanDutySourceUrl } from '../../../duty-rates/services/asean/source-urls.js';
 import {
   TasksDutyMyFtaOfficialExcelBodySchema,
   TasksDutyMyOfficialExcelBodySchema,
@@ -28,8 +29,12 @@ export default function myDutyRoutesOfficial(app: FastifyInstance) {
       },
       async (req, reply) => {
         const { url, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const urlOrPath = await resolveAseanDutySourceUrl({
+          sourceKey: 'duties.my.official.mfn_excel',
+          fallbackUrl: url,
+        });
         const result = await importMyMfnFromExcel({
-          url,
+          url: urlOrPath,
           sheet,
           batchSize,
           dryRun,
@@ -59,8 +64,12 @@ export default function myDutyRoutesOfficial(app: FastifyInstance) {
       },
       async (req, reply) => {
         const { url, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const urlOrPath = await resolveAseanDutySourceUrl({
+          sourceKey: 'duties.my.gazette.mfn_pdf',
+          fallbackUrl: url,
+        });
         const result = await importMyMfnFromGazettePdf({
-          url,
+          url: urlOrPath,
           batchSize,
           dryRun,
           importId: req.importCtx?.runId,
@@ -89,8 +98,12 @@ export default function myDutyRoutesOfficial(app: FastifyInstance) {
       },
       async (req, reply) => {
         const { url, agreement, partner, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const urlOrPath = await resolveAseanDutySourceUrl({
+          sourceKey: 'duties.my.official.fta_excel',
+          fallbackUrl: url,
+        });
         const result = await importMyPreferentialFromExcel({
-          url,
+          url: urlOrPath,
           agreement,
           partner,
           sheet,

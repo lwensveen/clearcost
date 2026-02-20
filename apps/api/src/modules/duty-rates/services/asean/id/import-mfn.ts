@@ -2,12 +2,13 @@ import { batchUpsertDutyRatesFromStream } from '../../../utils/batch-upsert.js';
 import { fetchIdMfnDutyRates } from './fetch-mfn.js';
 
 export async function importIdMfn(params: {
+  urlOrPath?: string;
   hs6List?: string[];
   batchSize?: number;
   importId?: string;
   dryRun?: boolean;
 }) {
-  const rows = await fetchIdMfnDutyRates();
+  const rows = await fetchIdMfnDutyRates(params.urlOrPath);
   if (!rows.length) {
     throw new Error(
       '[ID Duties] MFN produced 0 rows. Check official source availability and parser compatibility.'

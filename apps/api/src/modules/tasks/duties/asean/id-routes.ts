@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { importIdMfn } from '../../../duty-rates/services/asean/id/import-mfn.js';
 import { importIdPreferential } from '../../../duty-rates/services/asean/id/import-preferential.js';
 import { importAseanPreferentialOfficialFromExcel } from '../../../duty-rates/services/asean/shared/import-preferential-official-excel.js';
+import { resolveAseanDutySourceUrl } from '../../../duty-rates/services/asean/source-urls.js';
 import {
   TasksDutyIdBodySchema,
   TasksDutyIdFtaBodySchema,
@@ -27,7 +28,16 @@ export default function idDutyRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const { batchSize, dryRun } = Body.parse(req.body ?? {});
-      const res = await importIdMfn({ batchSize, dryRun, importId: req.importCtx?.runId });
+      const urlOrPath = await resolveAseanDutySourceUrl({
+        sourceKey: 'duties.id.btki.xlsx',
+        fallbackUrl: process.env.ID_BTKI_XLSX_URL,
+      });
+      const res = await importIdMfn({
+        urlOrPath,
+        batchSize,
+        dryRun,
+        importId: req.importCtx?.runId,
+      });
       return reply.send(res);
     }
   );
@@ -75,9 +85,13 @@ export default function idDutyRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { url, agreement, partner, sheet, batchSize, dryRun } =
         TasksDutyMyFtaOfficialExcelBodySchema.parse(req.body ?? {});
+      const urlOrPath = await resolveAseanDutySourceUrl({
+        sourceKey: 'duties.id.official.fta_excel',
+        fallbackUrl: url,
+      });
       const res = await importAseanPreferentialOfficialFromExcel({
         dest: 'ID',
-        urlOrPath: url,
+        urlOrPath,
         agreement,
         partner,
         sheet,
