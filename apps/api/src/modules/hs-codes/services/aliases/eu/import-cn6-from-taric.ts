@@ -8,6 +8,7 @@ import { db, hsCodesTable, provenanceTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
 import { activeOn, hs6, loadTaricBundle } from './taric-shared.js';
 import { sha256Hex } from '../../../../../lib/provenance.js';
+import { resolveEuTaricHsSourceUrls } from './source-urls.js';
 
 type ImportOpts = {
   /** GOODS_NOMENCLATURE.xml(.gz) */
@@ -29,8 +30,10 @@ function ymdUTC(d = new Date()) {
 }
 
 export async function importEuHs6FromTaric(opts: ImportOpts = {}) {
-  const goodsUrl = opts.xmlGoodsUrl ?? process.env.EU_TARIC_GOODS_URL ?? '';
-  const descUrl = opts.xmlDescUrl ?? process.env.EU_TARIC_GOODS_DESC_URL ?? '';
+  const { goodsUrl, descUrl } = await resolveEuTaricHsSourceUrls({
+    goodsUrl: opts.xmlGoodsUrl,
+    descUrl: opts.xmlDescUrl,
+  });
   const lang = (opts.language ?? process.env.EU_TARIC_LANGUAGE ?? 'EN').toUpperCase();
   const onYmd = ymdUTC(opts.activeOn ?? new Date());
 

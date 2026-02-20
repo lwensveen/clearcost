@@ -10,6 +10,7 @@
 import { db, hsCodeAliasesTable, hsCodesTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
 import { activeOn, code10, hs6 as hs6From8, loadTaricBundle } from './taric-shared.js';
+import { resolveEuTaricHsSourceUrls } from './source-urls.js';
 
 function todayUtcYmd(d = new Date()) {
   return d.toISOString().slice(0, 10);
@@ -40,8 +41,10 @@ const clampTitle = (s: string) => {
 };
 
 export async function importEuAliasesFromTaric(opts: ImportOpts = {}) {
-  const goodsUrl = opts.xmlGoodsUrl ?? process.env.EU_TARIC_GOODS_URL ?? '';
-  const descUrl = opts.xmlDescUrl ?? process.env.EU_TARIC_GOODS_DESC_URL ?? '';
+  const { goodsUrl, descUrl } = await resolveEuTaricHsSourceUrls({
+    goodsUrl: opts.xmlGoodsUrl,
+    descUrl: opts.xmlDescUrl,
+  });
   const lang = (opts.language ?? process.env.EU_TARIC_LANGUAGE ?? 'EN').toUpperCase();
   const onYmd = todayUtcYmd(opts.activeOn ?? new Date());
   const addTaric10 = opts.includeTaric10 ?? true;
