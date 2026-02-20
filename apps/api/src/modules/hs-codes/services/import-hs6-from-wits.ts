@@ -3,17 +3,14 @@ import { sql } from 'drizzle-orm';
 import sanitizeHtml from 'sanitize-html';
 import { decode as decodeEntities } from 'he';
 import { httpFetch } from '../../../lib/http.js';
-
-// SDMX endpoints (data + DSD)
-const SDMX_DATA_BASE = 'https://wits.worldbank.org/API/V1/SDMX/V21/rest/data/DF_WITS_Tariff_TRAINS';
-const SDMX_DSD_URL =
-  'https://wits.worldbank.org/API/V1/SDMX/V21/rest/datastructure/WBG_WITS/TARIFF_TRAINS/';
-
-// URL-based metadata fallback (XML)
-const URL_PRODUCTS_ALL = 'https://wits.worldbank.org/API/V1/wits/datasource/trn/product/all';
+import {
+  resolveWitsHsSourceUrls,
+  type ResolveWitsHsSourceUrlsOptions,
+} from './wits-source-urls.js';
 
 const ACCEPT_DATA = 'application/vnd.sdmx.data+json;version=1.0.0-wd';
 const ACCEPT_STRUCT = 'application/vnd.sdmx.structure+json;version=1.0.0-wd';
+type WitsHsSourceUrls = Awaited<ReturnType<typeof resolveWitsHsSourceUrls>>;
 
 type ImportHs6FromWitsResult = {
   ok: true;
@@ -52,9 +49,9 @@ function sanitizeTitle(raw: string): string {
 }
 
 // 1) Try SDMX /data (JSON)
-async function fetchHs6ViaData(year: number) {
+async function fetchHs6ViaData(year: number, sourceUrls: WitsHsSourceUrls) {
   const path = `A.842.0..reported`; // reporter=USA, partner=WLD, wildcard product
-  const url = `${SDMX_DATA_BASE}/${path}?startPeriod=${year}&endPeriod=${year}&detail=DataOnly`;
+  const url = `${sourceUrls.dataBaseUrl}/${path}?startPeriod=${year}&endPeriod=${year}&detail=DataOnly`;
   const r = await httpFetch(url, { headers: { ...baseHeaders, accept: ACCEPT_DATA } });
   if (!r.ok) throw new Error(`WITS /data fetch failed ${r.status} ${r.statusText}`);
   const json: any = await r.json();
@@ -79,8 +76,10 @@ async function fetchHs6ViaData(year: number) {
 }
 
 // 2) Try SDMX DSD (JSON). Some WITS deployments may only return XML here.
-async function fetchHs6ViaDSD_JSON() {
-  const r = await httpFetch(SDMX_DSD_URL, { headers: { ...baseHeaders, accept: ACCEPT_STRUCT } });
+async function fetchHs6ViaDSD_JSON(sourceUrls: WitsHsSourceUrls) {
+  const r = await httpFetch(sourceUrls.dsdUrl, {
+    headers: { ...baseHeaders, accept: ACCEPT_STRUCT },
+  });
   if (!r.ok) throw new Error(`WITS /datastructure fetch failed ${r.status} ${r.statusText}`);
   const json: any = await r.json();
 
@@ -133,8 +132,8 @@ async function fetchHs6ViaDSD_JSON() {
 }
 
 // 3) FINAL fallback: URL-based metadata (XML) — guaranteed to list all HS6 products
-async function fetchHs6ViaURL_XML() {
-  const r = await httpFetch(URL_PRODUCTS_ALL, {
+async function fetchHs6ViaURL_XML(sourceUrls: WitsHsSourceUrls) {
+  const r = await httpFetch(sourceUrls.productsAllUrl, {
     headers: { ...baseHeaders, accept: 'application/xml' },
   });
   if (!r.ok) throw new Error(`WITS product/all fetch failed ${r.status} ${r.statusText}`);
@@ -153,26 +152,30 @@ async function fetchHs6ViaURL_XML() {
   return Array.from(uniq, ([hs6, title]) => ({ hs6, title }));
 }
 
-async function fetchHs6FromWits(year: number) {
+async function fetchHs6FromWits(year: number, sourceUrls: WitsHsSourceUrls) {
   // Try /data → DSD(JSON) → URL(XML)
   try {
-    return await fetchHs6ViaData(year);
+    return await fetchHs6ViaData(year, sourceUrls);
   } catch (e) {
     console.warn('HS6: /data failed, trying DSD(JSON):', (e as Error)?.message ?? e);
   }
   try {
-    const viaDSD = await fetchHs6ViaDSD_JSON();
+    const viaDSD = await fetchHs6ViaDSD_JSON(sourceUrls);
     if (viaDSD.length) return viaDSD;
     console.warn('HS6: DSD(JSON) returned 0 items, falling back to URL/XML');
   } catch (e) {
     console.warn('HS6: DSD(JSON) failed, falling back to URL/XML:', (e as Error)?.message ?? e);
   }
-  return await fetchHs6ViaURL_XML();
+  return await fetchHs6ViaURL_XML(sourceUrls);
 }
 
-export async function importHs6FromWits(year?: number): Promise<ImportHs6FromWitsResult> {
+export async function importHs6FromWits(
+  year?: number,
+  sourceOpts: ResolveWitsHsSourceUrlsOptions = {}
+): Promise<ImportHs6FromWitsResult> {
   const targetYear = year ?? new Date().getUTCFullYear() - 1; // WITS data is typically T-1
-  const rows = await fetchHs6FromWits(targetYear);
+  const sourceUrls = await resolveWitsHsSourceUrls(sourceOpts);
+  const rows = await fetchHs6FromWits(targetYear, sourceUrls);
   if (!rows.length) return { ok: true as const, count: 0, inserted: 0, updated: 0 };
 
   let inserted = 0;

@@ -12,7 +12,7 @@ export const hsImportHs6: Command = async (args) => {
   const year = args?.[0] && !Number.isNaN(Number(args[0])) ? Number(args[0]) : undefined;
 
   const payload = await withRun(
-    { importSource: 'WITS', job: 'hs:hs6', params: { year } },
+    { importSource: 'WITS', job: 'hs:hs6', params: { year, sourceKey: 'hs.wits.sdmx.data_base' } },
     async () => {
       const res = await importHs6FromWits(year);
       return {
