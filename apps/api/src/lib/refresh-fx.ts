@@ -1,11 +1,13 @@
 import { db, fxRatesTable } from '@clearcost/db';
 import { XMLParser } from 'fast-xml-parser';
 import { httpFetch } from './http.js';
+import { resolveSourceDownloadUrl } from './source-registry.js';
 
 export type FxRefreshResult = { fxAsOf: string; inserted: number; base: 'EUR' };
+const ECB_DAILY_XML_URL = 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml';
 
-export async function fetchEcbXml(): Promise<string> {
-  const res = await httpFetch('https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml', {
+export async function fetchEcbXml(url = ECB_DAILY_XML_URL): Promise<string> {
+  const res = await httpFetch(url, {
     headers: {
       // ECB sometimes serves HTML when UA is weird; set a normal UA
       'user-agent': 'ClearCost/1.0 (+https://clearcost.dev)',
@@ -84,7 +86,11 @@ export async function upsertFxRatesEUR(
 }
 
 export async function refreshFx(): Promise<FxRefreshResult> {
-  const xml = await fetchEcbXml();
+  const sourceUrl = await resolveSourceDownloadUrl({
+    sourceKey: 'fx.ecb.daily',
+    fallbackUrl: ECB_DAILY_XML_URL,
+  });
+  const xml = await fetchEcbXml(sourceUrl);
   const { fxAsOf, rates } = parseEcb(xml);
   const inserted = await upsertFxRatesEUR(fxAsOf, rates);
   return { fxAsOf, inserted, base: 'EUR' };

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fx from '../refresh-fx.js';
+import { resolveSourceDownloadUrl } from '../source-registry.js';
 
 const { calls } = vi.hoisted(() => ({ calls: [] as any[] }));
 
@@ -22,6 +23,10 @@ vi.mock('@clearcost/db', () => {
 
   return { db, fxRatesTable, __calls: calls };
 });
+
+vi.mock('../source-registry.js', () => ({
+  resolveSourceDownloadUrl: vi.fn(async ({ fallbackUrl }: { fallbackUrl?: string }) => fallbackUrl),
+}));
 
 const SAMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <gesmes:Envelope xmlns:gesmes="http://www.gesmes.org/xml/2002-08-01" xmlns="http://www.ecb.int/vocabulary/2002-08-01/eurofxref">
@@ -96,6 +101,15 @@ describe('fetchEcbXml', () => {
     expect(opts?.headers?.accept).toMatch(/xml/);
   });
 
+  it('accepts an explicit URL override', async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, text: async () => '<xml/>' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fx.fetchEcbXml('https://example.test/fx.xml');
+    const [url]: any = fetchMock.mock.calls[0]!;
+    expect(url).toBe('https://example.test/fx.xml');
+  });
+
   it('throws a helpful error when response is not ok', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: false,
@@ -120,6 +134,10 @@ describe('refreshFx (integration of parse + upsert)', () => {
 
     const res = await fx.refreshFx();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(resolveSourceDownloadUrl).toHaveBeenCalledWith({
+      sourceKey: 'fx.ecb.daily',
+      fallbackUrl: 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml',
+    });
 
     expect(res).toEqual({ fxAsOf: '2025-08-31', inserted: 2, base: 'EUR' });
     expect(calls.length).toBe(2); // USD + JPY rows

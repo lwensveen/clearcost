@@ -17,6 +17,7 @@ import { read as readXlsx, utils as xlsxUtils } from 'xlsx';
 import countries from 'i18n-iso-countries';
 import en from 'i18n-iso-countries/langs/en.json' with { type: 'json' };
 import type { VatRuleInsert } from '@clearcost/types';
+import { resolveSourceDownloadUrl } from '../../../lib/source-registry.js';
 import { fetchArrayBuffer, parseRateCell, todayISO, toIso2, toNumeric3String } from './utils.js';
 
 countries.registerLocale(en);
@@ -462,10 +463,16 @@ export async function fetchVatRowsFromOfficialSources(opts?: {
   // Avoid readonly tuple unions by assigning into mutable arrays
   let oecdRows: RowRates[] = [];
   let imfRows: RowRates[] = [];
+  const oecdUrl = useOecd
+    ? await resolveSourceDownloadUrl({
+        sourceKey: 'vat.oecd_imf.standard',
+        fallbackUrl: OECD_XLSX_URL,
+      })
+    : null;
 
   if (useOecd && useImf) {
     const [oecdBuf, imfBuf] = await Promise.all([
-      fetchArrayBuffer(OECD_XLSX_URL),
+      fetchArrayBuffer(oecdUrl!),
       fetchArrayBuffer(IMF_XLSX_URL),
     ]);
     const oecdWb = readXlsx(new Uint8Array(oecdBuf), { type: 'array' });
@@ -473,7 +480,7 @@ export async function fetchVatRowsFromOfficialSources(opts?: {
     oecdRows = parseOecd(oecdWb, DEBUG);
     imfRows = parseImf(imfWb, DEBUG);
   } else if (useOecd) {
-    const oecdBuf = await fetchArrayBuffer(OECD_XLSX_URL);
+    const oecdBuf = await fetchArrayBuffer(oecdUrl!);
     const oecdWb = readXlsx(new Uint8Array(oecdBuf), { type: 'array' });
     oecdRows = parseOecd(oecdWb, DEBUG);
   } else if (useImf) {

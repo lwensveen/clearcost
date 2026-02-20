@@ -7,6 +7,7 @@ import { getDailyZipUrlForDate, getLatestDailyZipUrl } from './taric-daily-list.
 import { importEuMfn } from './import-mfn.js';
 import { importEuPreferential } from './import-preferential.js';
 import { httpFetch } from '../../../../lib/http.js';
+import { resolveSourceDownloadUrl } from '../../../../lib/source-registry.js';
 
 type ImportResult = {
   ok: true;
@@ -32,9 +33,12 @@ export async function importEuFromDaily({
   importId?: string;
   dryRun?: boolean;
 }): Promise<ImportResult> {
-  const listUrl =
-    process.env.EU_TARIC_DAILY_LIST ??
-    'https://ec.europa.eu/taxation_customs/dds2/taric/daily_publications.jsp?Lang=en';
+  const listUrl = await resolveSourceDownloadUrl({
+    sourceKey: 'duties.eu.taric.daily',
+    fallbackUrl:
+      process.env.EU_TARIC_DAILY_LIST ??
+      'https://ec.europa.eu/taxation_customs/dds2/taric/daily_publications.jsp?Lang=en',
+  });
 
   const zipUrl = date
     ? await getDailyZipUrlForDate(date, listUrl)
