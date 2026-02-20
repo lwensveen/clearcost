@@ -17,8 +17,8 @@ import { read as readXlsx, utils as xlsxUtils } from 'xlsx';
 import countries from 'i18n-iso-countries';
 import en from 'i18n-iso-countries/langs/en.json' with { type: 'json' };
 import type { VatRuleInsert } from '@clearcost/types';
-import { resolveSourceDownloadUrl } from '../../../lib/source-registry.js';
 import { fetchArrayBuffer, parseRateCell, todayISO, toIso2, toNumeric3String } from './utils.js';
+import { resolveVatOfficialSourceUrls } from './source-urls.js';
 
 countries.registerLocale(en);
 
@@ -27,11 +27,6 @@ type SourceId = 'oecd' | 'imf';
 
 const DEFAULT_BASE: VatRuleInsert['vatBase'] = 'CIF_PLUS_DUTY';
 const MAX_REASONABLE_RATE_PCT = 60;
-
-const OECD_XLSX_URL =
-  'https://www.oecd.org/content/dam/oecd/en/topics/policy-sub-issues/consumption-tax-trends/vat-gst-rates-ctt-trends.xlsx';
-
-const IMF_XLSX_URL = 'https://www.imf.org/external/np/fad/tpaf/files/vat_substandard_rates.xlsx';
 
 const NAME_ALIASES: Record<string, string> = {
   'viet nam': 'Vietnam',
@@ -463,28 +458,23 @@ export async function fetchVatRowsFromOfficialSources(opts?: {
   // Avoid readonly tuple unions by assigning into mutable arrays
   let oecdRows: RowRates[] = [];
   let imfRows: RowRates[] = [];
-  const oecdUrl = useOecd
-    ? await resolveSourceDownloadUrl({
-        sourceKey: 'vat.oecd_imf.standard',
-        fallbackUrl: OECD_XLSX_URL,
-      })
-    : null;
+  const { oecdXlsxUrl, imfXlsxUrl } = await resolveVatOfficialSourceUrls();
 
   if (useOecd && useImf) {
     const [oecdBuf, imfBuf] = await Promise.all([
-      fetchArrayBuffer(oecdUrl!),
-      fetchArrayBuffer(IMF_XLSX_URL),
+      fetchArrayBuffer(oecdXlsxUrl),
+      fetchArrayBuffer(imfXlsxUrl),
     ]);
     const oecdWb = readXlsx(new Uint8Array(oecdBuf), { type: 'array' });
     const imfWb = readXlsx(new Uint8Array(imfBuf), { type: 'array' });
     oecdRows = parseOecd(oecdWb, DEBUG);
     imfRows = parseImf(imfWb, DEBUG);
   } else if (useOecd) {
-    const oecdBuf = await fetchArrayBuffer(oecdUrl!);
+    const oecdBuf = await fetchArrayBuffer(oecdXlsxUrl);
     const oecdWb = readXlsx(new Uint8Array(oecdBuf), { type: 'array' });
     oecdRows = parseOecd(oecdWb, DEBUG);
   } else if (useImf) {
-    const imfBuf = await fetchArrayBuffer(IMF_XLSX_URL);
+    const imfBuf = await fetchArrayBuffer(imfXlsxUrl);
     const imfWb = readXlsx(new Uint8Array(imfBuf), { type: 'array' });
     imfRows = parseImf(imfWb, DEBUG);
   }

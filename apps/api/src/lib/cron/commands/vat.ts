@@ -31,19 +31,26 @@ export const vatAuto: Command = async (argv = []) => {
 
   console.log(`VAT: start (oecd=${wantOecd}, imf=${wantImf}, debug=${debug}, min=${minRows})`);
 
-  const payload = await withRun({ importSource: 'OECD/IMF', job: 'vat:auto' }, async () => {
-    console.log('VAT: fetching OECD + IMF workbooks…');
-    const rows = await fetchVatRowsFromOfficialSources({ oecd: wantOecd, imf: wantImf, debug });
-    console.log(`VAT: parsed ${rows.length} normalized rows`);
+  const payload = await withRun(
+    {
+      importSource: 'OECD/IMF',
+      job: 'vat:auto',
+      params: { sourceKeys: ['vat.oecd_imf.standard', 'vat.imf.standard'] },
+    },
+    async () => {
+      console.log('VAT: fetching OECD + IMF workbooks…');
+      const rows = await fetchVatRowsFromOfficialSources({ oecd: wantOecd, imf: wantImf, debug });
+      console.log(`VAT: parsed ${rows.length} normalized rows`);
 
-    if (rows.length < minRows) {
-      throw new Error(`VAT importer parsed ${rows.length} rows, below threshold ${minRows}.`);
+      if (rows.length < minRows) {
+        throw new Error(`VAT importer parsed ${rows.length} rows, below threshold ${minRows}.`);
+      }
+
+      const res = await importVatRules(rows, { source: 'official' });
+      const inserted = res?.count ?? rows.length ?? 0;
+      return { inserted, payload: res };
     }
-
-    const res = await importVatRules(rows, { source: 'official' });
-    const inserted = res?.count ?? rows.length ?? 0;
-    return { inserted, payload: res };
-  });
+  );
 
   console.log(payload);
 };
