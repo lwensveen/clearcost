@@ -1,4 +1,5 @@
 import type { DutyRateInsert } from '@clearcost/types';
+import { resolveSourceDownloadUrl } from '../../../../lib/source-registry.js';
 import {
   ERGA_OMNES_ID,
   hs6 as toHs6,
@@ -29,6 +30,22 @@ function isValidDate(value: unknown): value is Date {
   return value instanceof Date && !Number.isNaN(+value);
 }
 
+async function resolveOptionalTaricUrl(
+  override: string | undefined,
+  sourceKey: string,
+  fallbackEnv: string | undefined
+): Promise<string> {
+  if (override !== undefined) return override;
+  try {
+    return await resolveSourceDownloadUrl({
+      sourceKey,
+      fallbackUrl: fallbackEnv ?? '',
+    });
+  } catch {
+    return '';
+  }
+}
+
 /**
  * Best-effort resolver: map a TARIC geographical area to a partner code we store.
  * - If `geoId` is ISO2 → use it uppercased.
@@ -56,10 +73,28 @@ export async function fetchEuPreferentialDutyRates(
   const hs6Allowlist = new Set((options.hs6List ?? []).map(toHs6).filter(Boolean));
   const partnerGeoAllowlist = new Set((options.partnerGeoIds ?? []).filter(Boolean));
 
-  const measureXmlUrl = options.xmlMeasureUrl ?? process.env.EU_TARIC_MEASURE_URL ?? '';
-  const componentXmlUrl = options.xmlComponentUrl ?? process.env.EU_TARIC_COMPONENT_URL ?? '';
-  const geoDescXmlUrl = options.xmlGeoDescUrl ?? process.env.EU_TARIC_GEO_DESC_URL ?? '';
-  const dutyExprXmlUrl = options.xmlDutyExprUrl ?? process.env.EU_TARIC_DUTY_EXPR_URL ?? '';
+  const [measureXmlUrl, componentXmlUrl, geoDescXmlUrl, dutyExprXmlUrl] = await Promise.all([
+    resolveOptionalTaricUrl(
+      options.xmlMeasureUrl,
+      'duties.eu.taric.measure',
+      process.env.EU_TARIC_MEASURE_URL
+    ),
+    resolveOptionalTaricUrl(
+      options.xmlComponentUrl,
+      'duties.eu.taric.component',
+      process.env.EU_TARIC_COMPONENT_URL
+    ),
+    resolveOptionalTaricUrl(
+      options.xmlGeoDescUrl,
+      'duties.eu.taric.geo_description',
+      process.env.EU_TARIC_GEO_DESC_URL
+    ),
+    resolveOptionalTaricUrl(
+      options.xmlDutyExprUrl,
+      'duties.eu.taric.duty_expression',
+      process.env.EU_TARIC_DUTY_EXPR_URL
+    ),
+  ]);
   const uiLanguage = (options.language ?? process.env.EU_TARIC_LANGUAGE ?? 'EN').toUpperCase();
 
   if (!measureXmlUrl || !componentXmlUrl) return [];

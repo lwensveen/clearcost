@@ -183,6 +183,13 @@
       "when": 1771546217092,
       "tag": "0025_clever_whiplash",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1771547000000,
+      "tag": "0026_neat_mandarin",
+      "breakpoints": true
     }
   ]
 }

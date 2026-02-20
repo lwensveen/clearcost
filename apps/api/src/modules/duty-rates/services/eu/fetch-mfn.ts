@@ -1,4 +1,5 @@
 import type { DutyRateInsert } from '@clearcost/types';
+import { resolveSourceDownloadUrl } from '../../../../lib/source-registry.js';
 import {
   ERGA_OMNES_ID,
   hs6 as toHs6,
@@ -21,11 +22,53 @@ function hasDate(v: unknown): v is Date {
   return v instanceof Date && !isNaN(+v);
 }
 
+async function resolveRequiredTaricUrl(
+  override: string | undefined,
+  sourceKey: string,
+  fallbackEnv: string | undefined
+): Promise<string> {
+  if (override !== undefined) return override;
+  return await resolveSourceDownloadUrl({
+    sourceKey,
+    fallbackUrl: fallbackEnv ?? '',
+  });
+}
+
+async function resolveOptionalTaricUrl(
+  override: string | undefined,
+  sourceKey: string,
+  fallbackEnv: string | undefined
+): Promise<string> {
+  if (override !== undefined) return override;
+  try {
+    return await resolveSourceDownloadUrl({
+      sourceKey,
+      fallbackUrl: fallbackEnv ?? '',
+    });
+  } catch {
+    return '';
+  }
+}
+
 export async function fetchEuMfnDutyRates(options: FetchOptions = {}): Promise<DutyRateInsert[]> {
   const hs6Allowlist = new Set((options.hs6List ?? []).map(toHs6).filter(Boolean));
-  const measureXmlUrl = options.xmlMeasureUrl ?? process.env.EU_TARIC_MEASURE_URL ?? '';
-  const componentXmlUrl = options.xmlComponentUrl ?? process.env.EU_TARIC_COMPONENT_URL ?? '';
-  const dutyExprXmlUrl = options.xmlDutyExprUrl ?? process.env.EU_TARIC_DUTY_EXPR_URL ?? '';
+  const [measureXmlUrl, componentXmlUrl, dutyExprXmlUrl] = await Promise.all([
+    resolveRequiredTaricUrl(
+      options.xmlMeasureUrl,
+      'duties.eu.taric.measure',
+      process.env.EU_TARIC_MEASURE_URL
+    ),
+    resolveRequiredTaricUrl(
+      options.xmlComponentUrl,
+      'duties.eu.taric.component',
+      process.env.EU_TARIC_COMPONENT_URL
+    ),
+    resolveOptionalTaricUrl(
+      options.xmlDutyExprUrl,
+      'duties.eu.taric.duty_expression',
+      process.env.EU_TARIC_DUTY_EXPR_URL
+    ),
+  ]);
   const dutyExprLang = (options.language ?? process.env.EU_TARIC_LANGUAGE ?? 'EN').toUpperCase();
 
   if (!measureXmlUrl || !componentXmlUrl) {
