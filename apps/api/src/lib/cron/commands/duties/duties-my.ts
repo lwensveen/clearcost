@@ -8,7 +8,11 @@ export const dutiesMyMfn: Command = async (args) => {
   const hs6 = (flags.hs6 as string | undefined)?.split(',').filter(Boolean);
 
   const payload = await withRun(
-    { importSource: 'WITS', job: 'duties:my-mfn', params: { hs6 } },
+    {
+      importSource: 'WITS',
+      job: 'duties:my-mfn',
+      params: { hs6, sourceKey: 'duties.wits.sdmx.base' },
+    },
     async (importId) => {
       const res = await importMyMfn({
         hs6List: hs6,
@@ -33,7 +37,7 @@ export const dutiesMyFta: Command = async (args) => {
     {
       importSource: 'WITS',
       job: 'duties:my-fta',
-      params: { hs6, partners },
+      params: { hs6, partners, sourceKey: 'duties.wits.sdmx.base' },
     },
     async (importId) => {
       const res = await importMyPreferential({

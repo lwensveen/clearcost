@@ -19,7 +19,11 @@ export default function phDutyRoutes(app: FastifyInstance) {
       preHandler: app.requireApiKey(['tasks:duties:ph']),
       schema: { body: Body },
       config: {
-        importMeta: { importSource: 'PH_TARIFF_COMMISSION', job: 'duties:ph-mfn-official' },
+        importMeta: {
+          importSource: 'PH_TARIFF_COMMISSION',
+          job: 'duties:ph-mfn-official',
+          sourceKey: 'duties.ph.tariff_commission.xlsx',
+        },
       },
     },
     async (req, reply) => {
@@ -51,7 +55,13 @@ export default function phDutyRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:duties:ph']),
       schema: { body: TasksDutyHs6BatchDryRunBodySchema },
-      config: { importMeta: { importSource: 'WITS', job: 'duties:ph-mfn-wits' } },
+      config: {
+        importMeta: {
+          importSource: 'WITS',
+          job: 'duties:ph-mfn-wits',
+          sourceKey: 'duties.wits.sdmx.base',
+        },
+      },
     },
     async (req, reply) => {
       const { hs6, batchSize, dryRun } = TasksDutyHs6BatchDryRunBodySchema.parse(req.body ?? {});
@@ -71,7 +81,13 @@ export default function phDutyRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:duties:ph']),
       schema: { body: TasksDutyHs6BatchPartnerGeoIdsBodySchema },
-      config: { importMeta: { importSource: 'WITS', job: 'duties:ph-fta' } },
+      config: {
+        importMeta: {
+          importSource: 'WITS',
+          job: 'duties:ph-fta',
+          sourceKey: 'duties.wits.sdmx.base',
+        },
+      },
     },
     async (req, reply) => {
       const { hs6, partnerGeoIds, batchSize, dryRun } =
@@ -93,7 +109,13 @@ export default function phDutyRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:duties:ph']),
       schema: { body: TasksDutyMyFtaOfficialExcelBodySchema },
-      config: { importMeta: { importSource: 'OFFICIAL', job: 'duties:ph-fta-official' } },
+      config: {
+        importMeta: {
+          importSource: 'OFFICIAL',
+          job: 'duties:ph-fta-official',
+          sourceKey: 'duties.ph.official.fta_excel',
+        },
+      },
     },
     async (req, reply) => {
       const { url, agreement, partner, sheet, batchSize, dryRun } =

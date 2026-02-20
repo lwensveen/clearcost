@@ -5,7 +5,7 @@ import { importVnPreferential } from '../../../../modules/duty-rates/services/as
 
 export const dutiesVnMfn: Command = async () => {
   const payload = await withRun(
-    { importSource: 'WITS', job: 'duties:vn-mfn' },
+    { importSource: 'WITS', job: 'duties:vn-mfn', params: { sourceKey: 'duties.wits.sdmx.base' } },
     async (importId) => {
       const res = await importVnMfn({ importId });
       return { inserted: res.inserted, payload: res };
@@ -16,7 +16,7 @@ export const dutiesVnMfn: Command = async () => {
 
 export const dutiesVnFta: Command = async () => {
   const payload = await withRun(
-    { importSource: 'WITS', job: 'duties:vn-fta' },
+    { importSource: 'WITS', job: 'duties:vn-fta', params: { sourceKey: 'duties.wits.sdmx.base' } },
     async (importId) => {
       const res = await importVnPreferential({
         importId,

@@ -18,7 +18,13 @@ export default function myDutyRoutesOfficial(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:my']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'OFFICIAL', job: 'duties:my-mfn-excel' } },
+        config: {
+          importMeta: {
+            importSource: 'OFFICIAL',
+            job: 'duties:my-mfn-excel',
+            sourceKey: 'duties.my.official.mfn_excel',
+          },
+        },
       },
       async (req, reply) => {
         const { url, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});
@@ -43,7 +49,13 @@ export default function myDutyRoutesOfficial(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:my']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'MY_GAZETTE', job: 'duties:my-mfn-pdf' } },
+        config: {
+          importMeta: {
+            importSource: 'MY_GAZETTE',
+            job: 'duties:my-mfn-pdf',
+            sourceKey: 'duties.my.gazette.mfn_pdf',
+          },
+        },
       },
       async (req, reply) => {
         const { url, batchSize, dryRun } = Body.parse(req.body ?? {});
@@ -67,7 +79,13 @@ export default function myDutyRoutesOfficial(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:my']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'OFFICIAL', job: 'duties:my-fta-excel' } },
+        config: {
+          importMeta: {
+            importSource: 'OFFICIAL',
+            job: 'duties:my-fta-excel',
+            sourceKey: 'duties.my.official.fta_excel',
+          },
+        },
       },
       async (req, reply) => {
         const { url, agreement, partner, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});

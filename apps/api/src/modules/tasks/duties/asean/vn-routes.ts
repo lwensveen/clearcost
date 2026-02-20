@@ -21,7 +21,13 @@ export default function vnDutyRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:vn']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'WITS', job: 'duties:vn-mfn' } },
+        config: {
+          importMeta: {
+            importSource: 'WITS',
+            job: 'duties:vn-mfn',
+            sourceKey: 'duties.wits.sdmx.base',
+          },
+        },
       },
       async (req, reply) => {
         const { hs6, batchSize, dryRun } = Body.parse(req.body ?? {});
@@ -45,7 +51,13 @@ export default function vnDutyRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:vn']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'OFFICIAL', job: 'duties:vn-mfn-official' } },
+        config: {
+          importMeta: {
+            importSource: 'OFFICIAL',
+            job: 'duties:vn-mfn-official',
+            sourceKey: 'duties.vn.official.mfn_excel',
+          },
+        },
       },
       async (req, reply) => {
         const { url, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});
@@ -71,7 +83,13 @@ export default function vnDutyRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:vn']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'WITS', job: 'duties:vn-fta' } },
+        config: {
+          importMeta: {
+            importSource: 'WITS',
+            job: 'duties:vn-fta',
+            sourceKey: 'duties.wits.sdmx.base',
+          },
+        },
       },
       async (req, reply) => {
         const { hs6, partnerGeoIds, batchSize, dryRun } = Body.parse(req.body ?? {});
@@ -96,7 +114,13 @@ export default function vnDutyRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:vn']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'OFFICIAL', job: 'duties:vn-fta-official' } },
+        config: {
+          importMeta: {
+            importSource: 'OFFICIAL',
+            job: 'duties:vn-fta-official',
+            sourceKey: 'duties.vn.official.fta_excel',
+          },
+        },
       },
       async (req, reply) => {
         const { url, agreement, partner, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});

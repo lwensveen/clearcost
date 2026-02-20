@@ -20,7 +20,13 @@ export default function thDutyRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:th']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'WITS', job: 'duties:th-mfn' } },
+        config: {
+          importMeta: {
+            importSource: 'WITS',
+            job: 'duties:th-mfn',
+            sourceKey: 'duties.wits.sdmx.base',
+          },
+        },
       },
       async (req, reply) => {
         const { hs6, batchSize, dryRun } = Body.parse(req.body ?? {});
@@ -44,7 +50,13 @@ export default function thDutyRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:th']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'OFFICIAL', job: 'duties:th-mfn-official' } },
+        config: {
+          importMeta: {
+            importSource: 'OFFICIAL',
+            job: 'duties:th-mfn-official',
+            sourceKey: 'duties.th.official.mfn_excel',
+          },
+        },
       },
       async (req, reply) => {
         const { url, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});
@@ -70,7 +82,13 @@ export default function thDutyRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:th']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'WITS', job: 'duties:th-fta' } },
+        config: {
+          importMeta: {
+            importSource: 'WITS',
+            job: 'duties:th-fta',
+            sourceKey: 'duties.wits.sdmx.base',
+          },
+        },
       },
       async (req, reply) => {
         const { hs6, partnerGeoIds, batchSize, dryRun } = Body.parse(req.body ?? {});
@@ -95,7 +113,13 @@ export default function thDutyRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:th']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'OFFICIAL', job: 'duties:th-fta-official' } },
+        config: {
+          importMeta: {
+            importSource: 'OFFICIAL',
+            job: 'duties:th-fta-official',
+            sourceKey: 'duties.th.official.fta_excel',
+          },
+        },
       },
       async (req, reply) => {
         const { url, agreement, partner, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});

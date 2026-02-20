@@ -18,7 +18,16 @@ export default function sgDutyRoutes(app: FastifyInstance) {
   // MFN (mostly zero, WITS confirms)
   app.post(
     '/cron/import/duties/sg-mfn',
-    { ...Common, config: { importMeta: { importSource: 'WITS', job: 'duties:sg-mfn' } } },
+    {
+      ...Common,
+      config: {
+        importMeta: {
+          importSource: 'WITS',
+          job: 'duties:sg-mfn',
+          sourceKey: 'duties.wits.sdmx.base',
+        },
+      },
+    },
     async (req, reply) => {
       const Body = TasksDutyHs6BatchDryRunBodySchema;
       const { hs6, batchSize, dryRun } = Body.parse(req.body ?? {});
@@ -37,7 +46,13 @@ export default function sgDutyRoutes(app: FastifyInstance) {
     {
       ...Common,
       schema: { body: TasksDutyMyOfficialExcelBodySchema },
-      config: { importMeta: { importSource: 'OFFICIAL', job: 'duties:sg-mfn-official' } },
+      config: {
+        importMeta: {
+          importSource: 'OFFICIAL',
+          job: 'duties:sg-mfn-official',
+          sourceKey: 'duties.sg.official.mfn_excel',
+        },
+      },
     },
     async (req, reply) => {
       const Body = TasksDutyMyOfficialExcelBodySchema;
@@ -57,7 +72,16 @@ export default function sgDutyRoutes(app: FastifyInstance) {
   // Preferential (FTA)
   app.post(
     '/cron/import/duties/sg-fta',
-    { ...Common, config: { importMeta: { importSource: 'WITS', job: 'duties:sg-fta' } } },
+    {
+      ...Common,
+      config: {
+        importMeta: {
+          importSource: 'WITS',
+          job: 'duties:sg-fta',
+          sourceKey: 'duties.wits.sdmx.base',
+        },
+      },
+    },
     async (req, reply) => {
       const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
       const { hs6, partnerGeoIds, batchSize, dryRun } = Body.parse(req.body ?? {});
@@ -77,7 +101,13 @@ export default function sgDutyRoutes(app: FastifyInstance) {
     {
       ...Common,
       schema: { body: TasksDutyMyFtaOfficialExcelBodySchema },
-      config: { importMeta: { importSource: 'OFFICIAL', job: 'duties:sg-fta-official' } },
+      config: {
+        importMeta: {
+          importSource: 'OFFICIAL',
+          job: 'duties:sg-fta-official',
+          sourceKey: 'duties.sg.official.fta_excel',
+        },
+      },
     },
     async (req, reply) => {
       const Body = TasksDutyMyFtaOfficialExcelBodySchema;

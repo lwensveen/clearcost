@@ -10,7 +10,13 @@ export default function idBtkiRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:duties:id']),
       schema: { body: Body },
-      config: { importMeta: { importSource: 'ID_BTKI', job: 'btki:crawl' } },
+      config: {
+        importMeta: {
+          importSource: 'ID_BTKI',
+          job: 'btki:crawl',
+          sourceKey: 'duties.id.btki.portal',
+        },
+      },
     },
     async (req, reply) => {
       const body = Body.parse(req.body ?? {});

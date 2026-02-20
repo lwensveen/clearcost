@@ -16,7 +16,13 @@ export default function myDutyRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:my']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'WITS', job: 'duties:my-mfn' } },
+        config: {
+          importMeta: {
+            importSource: 'WITS',
+            job: 'duties:my-mfn',
+            sourceKey: 'duties.wits.sdmx.base',
+          },
+        },
       },
       async (req, reply) => {
         const { hs6, batchSize, dryRun } = Body.parse(req.body ?? {});
@@ -40,7 +46,13 @@ export default function myDutyRoutes(app: FastifyInstance) {
       {
         preHandler: app.requireApiKey(['tasks:duties:my']),
         schema: { body: Body },
-        config: { importMeta: { importSource: 'WITS', job: 'duties:my-fta' } },
+        config: {
+          importMeta: {
+            importSource: 'WITS',
+            job: 'duties:my-fta',
+            sourceKey: 'duties.wits.sdmx.base',
+          },
+        },
       },
       async (req, reply) => {
         const { hs6, partnerGeoIds, batchSize, dryRun } = Body.parse(req.body ?? {});
