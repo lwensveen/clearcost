@@ -143,6 +143,13 @@ const OFFICIAL_DE_MINIMIS_REQUIRED_SOURCE_KEYS = [
   'de-minimis.official.ca.lvs_vat',
   'de-minimis.official.ca.lvs_duty',
 ] as const;
+const OFFICIAL_HS_REQUIRED_SOURCE_KEYS = ['hs.asean.ahtn.csv'] as const;
+const OFFICIAL_NOTICES_REQUIRED_SOURCE_KEYS = [
+  'notices.cn.mof.list',
+  'notices.cn.gacc.list',
+  'notices.cn.mofcom.list',
+] as const;
+const OFFICIAL_SURCHARGES_REQUIRED_SOURCE_KEYS = ['duties.uk.tariff.api_base'] as const;
 const OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS = [
   'duties.eu.taric.daily',
   'duties.eu.taric.mfn',
@@ -451,6 +458,9 @@ export const coverageSnapshot: Command = async (args) => {
         ...OFFICIAL_FX_REQUIRED_SOURCE_KEYS,
         ...OFFICIAL_VAT_REQUIRED_SOURCE_KEYS,
         ...OFFICIAL_DE_MINIMIS_REQUIRED_SOURCE_KEYS,
+        ...OFFICIAL_HS_REQUIRED_SOURCE_KEYS,
+        ...OFFICIAL_NOTICES_REQUIRED_SOURCE_KEYS,
+        ...OFFICIAL_SURCHARGES_REQUIRED_SOURCE_KEYS,
       ])
     );
 
@@ -688,6 +698,23 @@ export const coverageSnapshot: Command = async (args) => {
       'de_minimis'
     )
   );
+  checks.push(
+    ...evaluateRequiredSourceKeys(OFFICIAL_HS_REQUIRED_SOURCE_KEYS, dutySourceRegistryRows, 'hs')
+  );
+  checks.push(
+    ...evaluateRequiredSourceKeys(
+      OFFICIAL_NOTICES_REQUIRED_SOURCE_KEYS,
+      dutySourceRegistryRows,
+      'notices'
+    )
+  );
+  checks.push(
+    ...evaluateRequiredSourceKeys(
+      OFFICIAL_SURCHARGES_REQUIRED_SOURCE_KEYS,
+      dutySourceRegistryRows,
+      'surcharges'
+    )
+  );
 
   const failedChecks = checks.filter((check) => !check.ok);
   const gateOk = failedChecks.length === 0;
@@ -719,6 +746,9 @@ export const coverageSnapshot: Command = async (args) => {
       officialFxSourceKeys: [...OFFICIAL_FX_REQUIRED_SOURCE_KEYS],
       officialVatSourceKeys: [...OFFICIAL_VAT_REQUIRED_SOURCE_KEYS],
       officialDeMinimisSourceKeys: [...OFFICIAL_DE_MINIMIS_REQUIRED_SOURCE_KEYS],
+      officialHsSourceKeys: [...OFFICIAL_HS_REQUIRED_SOURCE_KEYS],
+      officialNoticesSourceKeys: [...OFFICIAL_NOTICES_REQUIRED_SOURCE_KEYS],
+      officialSurchargesSourceKeys: [...OFFICIAL_SURCHARGES_REQUIRED_SOURCE_KEYS],
     },
     freshness: {
       fx: freshness.datasets.fx,
