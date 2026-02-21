@@ -13,9 +13,9 @@ import {
 } from '@clearcost/types';
 
 export default function vnDutyRoutes(app: FastifyInstance) {
-  // MFN
+  // MFN (official Excel default)
   {
-    const Body = TasksDutyHs6BatchDryRunBodySchema;
+    const Body = TasksDutyMyOfficialExcelBodySchema;
 
     app.post(
       '/cron/import/duties/vn-mfn',
@@ -24,8 +24,44 @@ export default function vnDutyRoutes(app: FastifyInstance) {
         schema: { body: Body },
         config: {
           importMeta: {
+            importSource: 'OFFICIAL',
+            job: 'duties:vn-mfn-official',
+            sourceKey: 'duties.vn.official.mfn_excel',
+          },
+        },
+      },
+      async (req, reply) => {
+        const { url, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const urlOrPath = await resolveAseanDutySourceUrl({
+          sourceKey: 'duties.vn.official.mfn_excel',
+          fallbackUrl: url,
+        });
+        const res = await importAseanMfnOfficialFromExcel({
+          dest: 'VN',
+          urlOrPath,
+          sheet,
+          batchSize,
+          dryRun,
+          importId: req.importCtx?.runId,
+        });
+        return reply.send({ importId: req.importCtx?.runId, ...res });
+      }
+    );
+  }
+
+  // MFN (WITS fallback)
+  {
+    const Body = TasksDutyHs6BatchDryRunBodySchema;
+
+    app.post(
+      '/cron/import/duties/vn-mfn/wits',
+      {
+        preHandler: app.requireApiKey(['tasks:duties:vn']),
+        schema: { body: Body },
+        config: {
+          importMeta: {
             importSource: 'WITS',
-            job: 'duties:vn-mfn',
+            job: 'duties:vn-mfn-wits',
             sourceKey: 'duties.wits.sdmx.base',
           },
         },
@@ -79,9 +115,9 @@ export default function vnDutyRoutes(app: FastifyInstance) {
     );
   }
 
-  // Preferential (FTA)
+  // Preferential (official Excel default)
   {
-    const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
+    const Body = TasksDutyMyFtaOfficialExcelBodySchema;
 
     app.post(
       '/cron/import/duties/vn-fta',
@@ -90,8 +126,46 @@ export default function vnDutyRoutes(app: FastifyInstance) {
         schema: { body: Body },
         config: {
           importMeta: {
+            importSource: 'OFFICIAL',
+            job: 'duties:vn-fta-official',
+            sourceKey: 'duties.vn.official.fta_excel',
+          },
+        },
+      },
+      async (req, reply) => {
+        const { url, agreement, partner, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const urlOrPath = await resolveAseanDutySourceUrl({
+          sourceKey: 'duties.vn.official.fta_excel',
+          fallbackUrl: url,
+        });
+        const res = await importAseanPreferentialOfficialFromExcel({
+          dest: 'VN',
+          urlOrPath,
+          agreement,
+          partner,
+          sheet,
+          batchSize,
+          dryRun,
+          importId: req.importCtx?.runId,
+        });
+        return reply.send({ importId: req.importCtx?.runId, ...res });
+      }
+    );
+  }
+
+  // Preferential (WITS fallback)
+  {
+    const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
+
+    app.post(
+      '/cron/import/duties/vn-fta/wits',
+      {
+        preHandler: app.requireApiKey(['tasks:duties:vn']),
+        schema: { body: Body },
+        config: {
+          importMeta: {
             importSource: 'WITS',
-            job: 'duties:vn-fta',
+            job: 'duties:vn-fta-wits',
             sourceKey: 'duties.wits.sdmx.base',
           },
         },

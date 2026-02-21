@@ -282,8 +282,10 @@ bun run internal-request -- --path /internal/cron/fx/daily --body '{}'
   - `POST /internal/cron/import/duties/cn-mfn/official/pdf`
   - `POST /internal/cron/import/duties/jp-mfn`
   - `POST /internal/cron/import/duties/jp-fta`
-  - `POST /internal/cron/import/duties/my-mfn`
-  - `POST /internal/cron/import/duties/my-fta`
+  - `POST /internal/cron/import/duties/my-mfn` (official Excel default)
+  - `POST /internal/cron/import/duties/my-mfn/wits` (WITS fallback)
+  - `POST /internal/cron/import/duties/my-fta` (official Excel default)
+  - `POST /internal/cron/import/duties/my-fta/wits` (WITS fallback)
   - `POST /internal/cron/import/duties/my-mfn/official/excel`
   - `POST /internal/cron/import/duties/my-mfn/official/pdf`
   - `POST /internal/cron/import/duties/my-fta/official/excel`
@@ -295,9 +297,11 @@ bun run internal-request -- --path /internal/cron/fx/daily --body '{}'
   - `POST /internal/cron/import/duties/th-mfn/official/excel`
   - `POST /internal/cron/import/duties/th-fta`
   - `POST /internal/cron/import/duties/th-fta/official/excel`
-  - `POST /internal/cron/import/duties/vn-mfn`
+  - `POST /internal/cron/import/duties/vn-mfn` (official Excel default)
+  - `POST /internal/cron/import/duties/vn-mfn/wits` (WITS fallback)
   - `POST /internal/cron/import/duties/vn-mfn/official/excel`
-  - `POST /internal/cron/import/duties/vn-fta`
+  - `POST /internal/cron/import/duties/vn-fta` (official Excel default)
+  - `POST /internal/cron/import/duties/vn-fta/wits` (WITS fallback)
   - `POST /internal/cron/import/duties/vn-fta/official/excel`
   - `POST /internal/cron/import/duties/ph-mfn`
   - `POST /internal/cron/import/duties/ph-mfn/wits`
