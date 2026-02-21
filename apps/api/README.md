@@ -298,6 +298,30 @@ bun run internal-request -- --path /internal/cron/fx/daily --body '{}'
   - `POST /internal/cron/import/duties/sg-fta` (official Excel default)
   - `POST /internal/cron/import/duties/sg-fta/wits` (WITS fallback)
   - `POST /internal/cron/import/duties/sg-fta/official/excel`
+  - `POST /internal/cron/import/duties/bn-mfn` (official Excel default)
+  - `POST /internal/cron/import/duties/bn-mfn/wits` (WITS fallback)
+  - `POST /internal/cron/import/duties/bn-mfn/official/excel`
+  - `POST /internal/cron/import/duties/bn-fta` (official Excel default)
+  - `POST /internal/cron/import/duties/bn-fta/wits` (WITS fallback)
+  - `POST /internal/cron/import/duties/bn-fta/official/excel`
+  - `POST /internal/cron/import/duties/kh-mfn` (official Excel default)
+  - `POST /internal/cron/import/duties/kh-mfn/wits` (WITS fallback)
+  - `POST /internal/cron/import/duties/kh-mfn/official/excel`
+  - `POST /internal/cron/import/duties/kh-fta` (official Excel default)
+  - `POST /internal/cron/import/duties/kh-fta/wits` (WITS fallback)
+  - `POST /internal/cron/import/duties/kh-fta/official/excel`
+  - `POST /internal/cron/import/duties/la-mfn` (official Excel default)
+  - `POST /internal/cron/import/duties/la-mfn/wits` (WITS fallback)
+  - `POST /internal/cron/import/duties/la-mfn/official/excel`
+  - `POST /internal/cron/import/duties/la-fta` (official Excel default)
+  - `POST /internal/cron/import/duties/la-fta/wits` (WITS fallback)
+  - `POST /internal/cron/import/duties/la-fta/official/excel`
+  - `POST /internal/cron/import/duties/mm-mfn` (official Excel default)
+  - `POST /internal/cron/import/duties/mm-mfn/wits` (WITS fallback)
+  - `POST /internal/cron/import/duties/mm-mfn/official/excel`
+  - `POST /internal/cron/import/duties/mm-fta` (official Excel default)
+  - `POST /internal/cron/import/duties/mm-fta/wits` (WITS fallback)
+  - `POST /internal/cron/import/duties/mm-fta/official/excel`
   - `POST /internal/cron/import/duties/th-mfn` (official Excel default)
   - `POST /internal/cron/import/duties/th-mfn/wits` (WITS fallback)
   - `POST /internal/cron/import/duties/th-mfn/official/excel`
@@ -370,7 +394,15 @@ Both HTTP workflows (`cron-daily-http.yml` and `cron-hourly-http.yml`) require:
 
 | Name                        | Source | Required | Used for                                             |
 | --------------------------- | ------ | -------- | ---------------------------------------------------- |
+| `BN_MFN_OFFICIAL_EXCEL_URL` | secret | yes      | Required BN MFN official Excel import source URL.    |
+| `BN_FTA_OFFICIAL_EXCEL_URL` | secret | yes      | Required BN FTA official Excel import source URL.    |
 | `ID_FTA_OFFICIAL_EXCEL_URL` | secret | yes      | Required ID FTA official Excel import source URL.    |
+| `KH_MFN_OFFICIAL_EXCEL_URL` | secret | yes      | Required KH MFN official Excel import source URL.    |
+| `KH_FTA_OFFICIAL_EXCEL_URL` | secret | yes      | Required KH FTA official Excel import source URL.    |
+| `LA_MFN_OFFICIAL_EXCEL_URL` | secret | yes      | Required LA MFN official Excel import source URL.    |
+| `LA_FTA_OFFICIAL_EXCEL_URL` | secret | yes      | Required LA FTA official Excel import source URL.    |
+| `MM_MFN_OFFICIAL_EXCEL_URL` | secret | yes      | Required MM MFN official Excel import source URL.    |
+| `MM_FTA_OFFICIAL_EXCEL_URL` | secret | yes      | Required MM FTA official Excel import source URL.    |
 | `MY_MFN_OFFICIAL_EXCEL_URL` | secret | yes      | Required MY MFN official Excel import source URL.    |
 | `MY_FTA_OFFICIAL_EXCEL_URL` | secret | yes      | Required MY FTA official Excel import source URL.    |
 | `PH_TARIFF_EXCEL_URL`       | secret | yes      | Required PH MFN official Excel import source URL.    |
@@ -419,8 +451,8 @@ US duties/surcharges are intentionally run in `cron-daily-http.yml` for fresher 
 
 Critical workflow steps are configured to fail fast when imports return no usable activity:
 
-- `cron-daily-http.yml`: FX must return `fxAsOf`; VAT; duty imports (EU daily, JP MFN/FTA, UK MFN/FTA, ID MFN + ID/MY/PH/TH/VN/SG FTA official Excel, MY/PH/TH/VN/SG MFN official Excel, CN MFN/FTA, US MFN/FTA); US/UK/EU remedy surcharges; and de-minimis imports must report rows (`count/inserted/updated > 0`).
-- `cron-daily-cli.yml`: `report:coverage` fails when MVP-required official freshness/coverage checks fail; when ASEAN FTA duty jobs (`duties:id-fta-official`, `duties:my-fta-excel`, `duties:ph-fta-official`, `duties:th-fta-official`, `duties:vn-fta-official`, `duties:sg-fta-official`) or ASEAN MFN duty jobs (`duties:id-mfn`, `duties:my-mfn-excel`, `duties:ph-mfn-official`, `duties:th-mfn-official`, `duties:vn-mfn-official`, `duties:sg-mfn-official`) are missing/stale; when JP/CN duty jobs (`duties:jp-mfn`, `duties:jp-fta-official`, `duties:cn-mfn-official`, `duties:cn-fta-official`) are missing/stale; when UK/US duty jobs (`duties:uk-mfn`, `duties:uk-fta`, `duties:us-mfn`, `duties:us-fta`) are missing/stale; when required duty source_registry keys are missing/disabled; when required ASEAN sample lanes (HS6 `850440`) are missing at the partner level; and when JP/CN/UK/US duty datasets are missing official MFN/FTA coverage.
+- `cron-daily-http.yml`: FX must return `fxAsOf`; VAT; duty imports (EU daily, JP MFN/FTA, UK MFN/FTA, ID/MY/PH/TH/VN/SG/BN/KH/LA/MM MFN+FTA official Excel, CN MFN/FTA, US MFN/FTA); US/UK/EU remedy surcharges; and de-minimis imports must report rows (`count/inserted/updated > 0`).
+- `cron-daily-cli.yml`: `report:coverage` fails when MVP-required official freshness/coverage checks fail; when ASEAN FTA duty jobs (`duties:bn-fta-official`, `duties:id-fta-official`, `duties:kh-fta-official`, `duties:la-fta-official`, `duties:mm-fta-official`, `duties:my-fta-excel`, `duties:ph-fta-official`, `duties:th-fta-official`, `duties:vn-fta-official`, `duties:sg-fta-official`) or ASEAN MFN duty jobs (`duties:bn-mfn-official`, `duties:id-mfn`, `duties:kh-mfn-official`, `duties:la-mfn-official`, `duties:mm-mfn-official`, `duties:my-mfn-excel`, `duties:ph-mfn-official`, `duties:th-mfn-official`, `duties:vn-mfn-official`, `duties:sg-mfn-official`) are missing/stale; when JP/CN duty jobs (`duties:jp-mfn`, `duties:jp-fta-official`, `duties:cn-mfn-official`, `duties:cn-fta-official`) are missing/stale; when UK/US duty jobs (`duties:uk-mfn`, `duties:uk-fta`, `duties:us-mfn`, `duties:us-fta`) are missing/stale; when required duty source_registry keys are missing/disabled; when required ASEAN sample lanes (HS6 `850440`) are missing at the partner level; and when JP/CN/UK/US duty datasets are missing official MFN/FTA coverage.
 - `cron-weekly-cli.yml`: EU HS6, WITS duty imports (`fetchedRows > 0`), and freight JSON import (`count > 0`) fail the run if empty.
 
 This is deliberate so source/parser drift is visible in CI instead of silently succeeding with stale data.
