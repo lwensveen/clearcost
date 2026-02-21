@@ -12,6 +12,10 @@ const mocks = vi.hoisted(() => ({
   importVnPreferentialFromOfficial: vi.fn(),
   importVnMfnFromWits: vi.fn(),
   importVnPreferentialFromWits: vi.fn(),
+  importThMfnFromWits: vi.fn(),
+  importThPreferentialFromWits: vi.fn(),
+  importSgMfnFromWits: vi.fn(),
+  importSgPreferentialFromWits: vi.fn(),
 }));
 
 vi.mock('../../../duty-rates/services/asean/source-urls.js', () => ({
@@ -50,7 +54,25 @@ vi.mock('../../../duty-rates/services/asean/vn/import-preferential.js', () => ({
   importVnPreferential: mocks.importVnPreferentialFromWits,
 }));
 
+vi.mock('../../../duty-rates/services/asean/th/import-mfn.js', () => ({
+  importThMfn: mocks.importThMfnFromWits,
+}));
+
+vi.mock('../../../duty-rates/services/asean/th/import-preferential.js', () => ({
+  importThPreferential: mocks.importThPreferentialFromWits,
+}));
+
+vi.mock('../../../duty-rates/services/asean/sg/import-mfn.js', () => ({
+  importSgMfn: mocks.importSgMfnFromWits,
+}));
+
+vi.mock('../../../duty-rates/services/asean/sg/import-preferential.js', () => ({
+  importSgPreferential: mocks.importSgPreferentialFromWits,
+}));
+
 import myDutyRoutes from './my-routes.js';
+import sgDutyRoutes from './sg-routes.js';
+import thDutyRoutes from './th-routes.js';
 import vnDutyRoutes from './vn-routes.js';
 
 async function buildApp(registerRoutes: (app: FastifyInstance) => void) {
@@ -101,6 +123,20 @@ beforeEach(() => {
   });
   mocks.importVnMfnFromWits.mockResolvedValue({ ok: true, inserted: 1, updated: 0, count: 1 });
   mocks.importVnPreferentialFromWits.mockResolvedValue({
+    ok: true,
+    inserted: 1,
+    updated: 0,
+    count: 1,
+  });
+  mocks.importThMfnFromWits.mockResolvedValue({ ok: true, inserted: 1, updated: 0, count: 1 });
+  mocks.importThPreferentialFromWits.mockResolvedValue({
+    ok: true,
+    inserted: 1,
+    updated: 0,
+    count: 1,
+  });
+  mocks.importSgMfnFromWits.mockResolvedValue({ ok: true, inserted: 1, updated: 0, count: 1 });
+  mocks.importSgPreferentialFromWits.mockResolvedValue({
     ok: true,
     inserted: 1,
     updated: 0,
@@ -192,6 +228,93 @@ describe('asean duties official-first defaults', () => {
       })
     );
     expect(mocks.importVnPreferentialFromOfficial).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('uses TH official MFN importer on /th-mfn', async () => {
+    const app = await buildApp((server) => thDutyRoutes(server));
+    const res = await app.inject({
+      method: 'POST',
+      url: '/cron/import/duties/th-mfn',
+      payload: { sheet: 'Rates' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.resolveSourceUrl).toHaveBeenCalledWith({
+      sourceKey: 'duties.th.official.mfn_excel',
+      fallbackUrl: undefined,
+    });
+    expect(mocks.importVnMfnFromOfficial).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dest: 'TH',
+        sheet: 'Rates',
+        urlOrPath: 'https://example.com/tariff.xlsx',
+      })
+    );
+    expect(mocks.importThMfnFromWits).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('uses TH WITS fallback on /th-fta/wits', async () => {
+    const app = await buildApp((server) => thDutyRoutes(server));
+    const res = await app.inject({
+      method: 'POST',
+      url: '/cron/import/duties/th-fta/wits',
+      payload: { partnerGeoIds: ['MY'], dryRun: true },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.importThPreferentialFromWits).toHaveBeenCalledWith(
+      expect.objectContaining({
+        partnerGeoIds: ['MY'],
+        dryRun: true,
+      })
+    );
+    expect(mocks.importVnPreferentialFromOfficial).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('uses SG official FTA importer on /sg-fta', async () => {
+    const app = await buildApp((server) => sgDutyRoutes(server));
+    const res = await app.inject({
+      method: 'POST',
+      url: '/cron/import/duties/sg-fta',
+      payload: { agreement: 'ATIGA', partner: 'TH' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.resolveSourceUrl).toHaveBeenCalledWith({
+      sourceKey: 'duties.sg.official.fta_excel',
+      fallbackUrl: undefined,
+    });
+    expect(mocks.importVnPreferentialFromOfficial).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dest: 'SG',
+        agreement: 'ATIGA',
+        partner: 'TH',
+        urlOrPath: 'https://example.com/tariff.xlsx',
+      })
+    );
+    expect(mocks.importSgPreferentialFromWits).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('uses SG WITS fallback on /sg-mfn/wits', async () => {
+    const app = await buildApp((server) => sgDutyRoutes(server));
+    const res = await app.inject({
+      method: 'POST',
+      url: '/cron/import/duties/sg-mfn/wits',
+      payload: { hs6: ['850440'], dryRun: true },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.importSgMfnFromWits).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hs6List: ['850440'],
+        dryRun: true,
+      })
+    );
+    expect(mocks.importVnMfnFromOfficial).not.toHaveBeenCalled();
     await app.close();
   });
 });

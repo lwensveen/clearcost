@@ -16,15 +16,49 @@ export default function sgDutyRoutes(app: FastifyInstance) {
     preHandler: app.requireApiKey(['tasks:duties:sg']),
   };
 
-  // MFN (mostly zero, WITS confirms)
+  // MFN (official Excel default)
   app.post(
     '/cron/import/duties/sg-mfn',
     {
       ...Common,
+      schema: { body: TasksDutyMyOfficialExcelBodySchema },
+      config: {
+        importMeta: {
+          importSource: 'OFFICIAL',
+          job: 'duties:sg-mfn-official',
+          sourceKey: 'duties.sg.official.mfn_excel',
+        },
+      },
+    },
+    async (req, reply) => {
+      const Body = TasksDutyMyOfficialExcelBodySchema;
+      const { url, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});
+      const urlOrPath = await resolveAseanDutySourceUrl({
+        sourceKey: 'duties.sg.official.mfn_excel',
+        fallbackUrl: url,
+      });
+      const res = await importAseanMfnOfficialFromExcel({
+        dest: 'SG',
+        urlOrPath,
+        sheet,
+        batchSize,
+        dryRun,
+        importId: req.importCtx?.runId,
+      });
+      return reply.send({ importId: req.importCtx?.runId, ...res });
+    }
+  );
+
+  // MFN (WITS fallback)
+  app.post(
+    '/cron/import/duties/sg-mfn/wits',
+    {
+      ...Common,
+      schema: { body: TasksDutyHs6BatchDryRunBodySchema },
       config: {
         importMeta: {
           importSource: 'WITS',
-          job: 'duties:sg-mfn',
+          job: 'duties:sg-mfn-wits',
           sourceKey: 'duties.wits.sdmx.base',
         },
       },
@@ -74,15 +108,51 @@ export default function sgDutyRoutes(app: FastifyInstance) {
     }
   );
 
-  // Preferential (FTA)
+  // Preferential (official Excel default)
   app.post(
     '/cron/import/duties/sg-fta',
     {
       ...Common,
+      schema: { body: TasksDutyMyFtaOfficialExcelBodySchema },
+      config: {
+        importMeta: {
+          importSource: 'OFFICIAL',
+          job: 'duties:sg-fta-official',
+          sourceKey: 'duties.sg.official.fta_excel',
+        },
+      },
+    },
+    async (req, reply) => {
+      const Body = TasksDutyMyFtaOfficialExcelBodySchema;
+      const { url, agreement, partner, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});
+      const urlOrPath = await resolveAseanDutySourceUrl({
+        sourceKey: 'duties.sg.official.fta_excel',
+        fallbackUrl: url,
+      });
+      const res = await importAseanPreferentialOfficialFromExcel({
+        dest: 'SG',
+        urlOrPath,
+        agreement,
+        partner,
+        sheet,
+        batchSize,
+        dryRun,
+        importId: req.importCtx?.runId,
+      });
+      return reply.send({ importId: req.importCtx?.runId, ...res });
+    }
+  );
+
+  // Preferential (WITS fallback)
+  app.post(
+    '/cron/import/duties/sg-fta/wits',
+    {
+      ...Common,
+      schema: { body: TasksDutyHs6BatchPartnerGeoIdsBodySchema },
       config: {
         importMeta: {
           importSource: 'WITS',
-          job: 'duties:sg-fta',
+          job: 'duties:sg-fta-wits',
           sourceKey: 'duties.wits.sdmx.base',
         },
       },

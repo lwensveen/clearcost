@@ -12,9 +12,9 @@ import {
 } from '@clearcost/types';
 
 export default function thDutyRoutes(app: FastifyInstance) {
-  // TH MFN (WITS)
+  // TH MFN (official Excel default)
   {
-    const Body = TasksDutyHs6BatchDryRunBodySchema;
+    const Body = TasksDutyMyOfficialExcelBodySchema;
 
     app.post(
       '/cron/import/duties/th-mfn',
@@ -23,8 +23,44 @@ export default function thDutyRoutes(app: FastifyInstance) {
         schema: { body: Body },
         config: {
           importMeta: {
+            importSource: 'OFFICIAL',
+            job: 'duties:th-mfn-official',
+            sourceKey: 'duties.th.official.mfn_excel',
+          },
+        },
+      },
+      async (req, reply) => {
+        const { url, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const urlOrPath = await resolveAseanDutySourceUrl({
+          sourceKey: 'duties.th.official.mfn_excel',
+          fallbackUrl: url,
+        });
+        const res = await importAseanMfnOfficialFromExcel({
+          dest: 'TH',
+          urlOrPath,
+          sheet,
+          batchSize,
+          dryRun,
+          importId: req.importCtx?.runId,
+        });
+        return reply.send({ importId: req.importCtx?.runId, ...res });
+      }
+    );
+  }
+
+  // TH MFN (WITS fallback)
+  {
+    const Body = TasksDutyHs6BatchDryRunBodySchema;
+
+    app.post(
+      '/cron/import/duties/th-mfn/wits',
+      {
+        preHandler: app.requireApiKey(['tasks:duties:th']),
+        schema: { body: Body },
+        config: {
+          importMeta: {
             importSource: 'WITS',
-            job: 'duties:th-mfn',
+            job: 'duties:th-mfn-wits',
             sourceKey: 'duties.wits.sdmx.base',
           },
         },
@@ -78,9 +114,9 @@ export default function thDutyRoutes(app: FastifyInstance) {
     );
   }
 
-  // TH Preferential (WITS)
+  // TH Preferential (official Excel default)
   {
-    const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
+    const Body = TasksDutyMyFtaOfficialExcelBodySchema;
 
     app.post(
       '/cron/import/duties/th-fta',
@@ -89,8 +125,46 @@ export default function thDutyRoutes(app: FastifyInstance) {
         schema: { body: Body },
         config: {
           importMeta: {
+            importSource: 'OFFICIAL',
+            job: 'duties:th-fta-official',
+            sourceKey: 'duties.th.official.fta_excel',
+          },
+        },
+      },
+      async (req, reply) => {
+        const { url, agreement, partner, sheet, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const urlOrPath = await resolveAseanDutySourceUrl({
+          sourceKey: 'duties.th.official.fta_excel',
+          fallbackUrl: url,
+        });
+        const res = await importAseanPreferentialOfficialFromExcel({
+          dest: 'TH',
+          urlOrPath,
+          agreement,
+          partner,
+          sheet,
+          batchSize,
+          dryRun,
+          importId: req.importCtx?.runId,
+        });
+        return reply.send({ importId: req.importCtx?.runId, ...res });
+      }
+    );
+  }
+
+  // TH Preferential (WITS fallback)
+  {
+    const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
+
+    app.post(
+      '/cron/import/duties/th-fta/wits',
+      {
+        preHandler: app.requireApiKey(['tasks:duties:th']),
+        schema: { body: Body },
+        config: {
+          importMeta: {
             importSource: 'WITS',
-            job: 'duties:th-fta',
+            job: 'duties:th-fta-wits',
             sourceKey: 'duties.wits.sdmx.base',
           },
         },
