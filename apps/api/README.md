@@ -277,7 +277,8 @@ bun run internal-request -- --path /internal/cron/fx/daily --body '{}'
   - `POST /internal/cron/import/duties/wits`
   - `POST /internal/cron/import/duties/wits/asean`
   - `POST /internal/cron/import/duties/wits/japan`
-  - `POST /internal/cron/import/duties/cn-mfn`
+  - `POST /internal/cron/import/duties/cn-mfn` (official PDF default)
+  - `POST /internal/cron/import/duties/cn-mfn/wits` (WITS fallback)
   - `POST /internal/cron/import/duties/cn-fta`
   - `POST /internal/cron/import/duties/cn-mfn/official/pdf`
   - `POST /internal/cron/import/duties/jp-mfn`

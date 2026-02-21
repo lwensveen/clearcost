@@ -2,16 +2,18 @@ import { FastifyInstance } from 'fastify';
 import { importCnMfn } from '../../duty-rates/services/cn/import-mfn.js';
 import { importCnPreferential } from '../../duty-rates/services/cn/import-preferential.js';
 import { importCnMfnFromPdf } from '../../duty-rates/services/cn/import-mfn-pdf.js';
+import { resolveSourceDownloadUrl } from '../../../lib/source-registry.js';
 import {
   TasksDutyCnMfnPdfBodySchema,
+  TasksDutyMyOfficialPdfBodySchema,
   TasksDutyHs6BatchDryRunBodySchema,
   TasksDutyHs6BatchPartnerGeoIdsBodySchema,
 } from '@clearcost/types';
 
 export default function cnDutyRoutes(app: FastifyInstance) {
-  // CN MFN (WITS)
+  // CN MFN (official PDF default)
   {
-    const Body = TasksDutyHs6BatchDryRunBodySchema;
+    const Body = TasksDutyMyOfficialPdfBodySchema;
 
     app.post(
       '/cron/import/duties/cn-mfn',
@@ -20,8 +22,42 @@ export default function cnDutyRoutes(app: FastifyInstance) {
         schema: { body: Body },
         config: {
           importMeta: {
+            importSource: 'CN_TAXBOOK',
+            job: 'duties:cn-mfn-official',
+            sourceKey: 'duties.cn.taxbook.pdf',
+          },
+        },
+      },
+      async (req, reply) => {
+        const { url, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const urlOrPath = await resolveSourceDownloadUrl({
+          sourceKey: 'duties.cn.taxbook.pdf',
+          fallbackUrl: url,
+        });
+        const res = await importCnMfnFromPdf({
+          urlOrPath,
+          batchSize,
+          dryRun,
+          importId: req.importCtx?.runId,
+        });
+        return reply.send(res);
+      }
+    );
+  }
+
+  // CN MFN (WITS fallback)
+  {
+    const Body = TasksDutyHs6BatchDryRunBodySchema;
+
+    app.post(
+      '/cron/import/duties/cn-mfn/wits',
+      {
+        preHandler: app.requireApiKey(['tasks:duties:cn']),
+        schema: { body: Body },
+        config: {
+          importMeta: {
             importSource: 'WITS',
-            job: 'duties:cn-mfn',
+            job: 'duties:cn-mfn-wits',
             sourceKey: 'duties.wits.sdmx.base',
           },
         },
