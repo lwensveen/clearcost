@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   importThPreferentialFromWits: vi.fn(),
   importSgMfnFromWits: vi.fn(),
   importSgPreferentialFromWits: vi.fn(),
+  importPhMfnFromOfficial: vi.fn(),
   importIdPreferentialFromWits: vi.fn(),
   importPhPreferentialFromWits: vi.fn(),
 }));
@@ -72,6 +73,10 @@ vi.mock('../../../duty-rates/services/asean/sg/import-preferential.js', () => ({
   importSgPreferential: mocks.importSgPreferentialFromWits,
 }));
 
+vi.mock('../../../duty-rates/services/asean/ph/import-mfn-excel.js', () => ({
+  importPhMfnExcel: mocks.importPhMfnFromOfficial,
+}));
+
 vi.mock('../../../duty-rates/services/asean/id/import-preferential.js', () => ({
   importIdPreferential: mocks.importIdPreferentialFromWits,
 }));
@@ -98,6 +103,7 @@ async function buildApp(registerRoutes: (app: FastifyInstance) => void) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  delete process.env.PH_TARIFF_EXCEL_URL;
   mocks.resolveSourceUrl.mockResolvedValue('https://example.com/tariff.xlsx');
   mocks.importMyMfnFromExcel.mockResolvedValue({ ok: true, inserted: 1, updated: 0, count: 1 });
   mocks.importMyPreferentialFromExcel.mockResolvedValue({
@@ -149,6 +155,12 @@ beforeEach(() => {
   });
   mocks.importSgMfnFromWits.mockResolvedValue({ ok: true, inserted: 1, updated: 0, count: 1 });
   mocks.importSgPreferentialFromWits.mockResolvedValue({
+    ok: true,
+    inserted: 1,
+    updated: 0,
+    count: 1,
+  });
+  mocks.importPhMfnFromOfficial.mockResolvedValue({
     ok: true,
     inserted: 1,
     updated: 0,
@@ -408,6 +420,29 @@ describe('asean duties official-first defaults', () => {
       })
     );
     expect(mocks.importPhPreferentialFromWits).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('uses PH official MFN importer on /ph-mfn', async () => {
+    const app = await buildApp((server) => phDutyRoutes(server));
+    const res = await app.inject({
+      method: 'POST',
+      url: '/cron/import/duties/ph-mfn',
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.resolveSourceUrl).toHaveBeenCalledWith({
+      sourceKey: 'duties.ph.tariff_commission.xlsx',
+      fallbackUrl: undefined,
+    });
+    expect(mocks.importPhMfnFromOfficial).toHaveBeenCalledWith(
+      expect.objectContaining({
+        urlOrPath: 'https://example.com/tariff.xlsx',
+        mapFreeToZero: true,
+        skipSpecific: true,
+      })
+    );
     await app.close();
   });
 

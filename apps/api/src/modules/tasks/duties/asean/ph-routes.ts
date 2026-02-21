@@ -29,13 +29,9 @@ export default function phDutyRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const body = Body.parse(req.body ?? {});
-      const fallbackUrl = body.url ?? process.env.PH_TARIFF_EXCEL_URL;
-      if (!fallbackUrl) {
-        throw new Error('Provide "url" in body or set PH_TARIFF_EXCEL_URL');
-      }
       const urlOrPath = await resolveAseanDutySourceUrl({
         sourceKey: 'duties.ph.tariff_commission.xlsx',
-        fallbackUrl,
+        fallbackUrl: body.url ?? process.env.PH_TARIFF_EXCEL_URL,
       });
 
       const result = await importPhMfnExcel({
