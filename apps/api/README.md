@@ -283,7 +283,7 @@ bun run internal-request -- --path /internal/cron/fx/daily --body '{}'
   - `POST /internal/cron/import/duties/cn-fta/wits` (WITS explicit)
   - `POST /internal/cron/import/duties/cn-mfn/official/pdf`
   - `POST /internal/cron/import/duties/jp-mfn`
-  - `POST /internal/cron/import/duties/jp-fta` (official default; WITS fallback for uncovered partners)
+  - `POST /internal/cron/import/duties/jp-fta` (strict official default; WITS fallback only after official rows exist for at least one partner)
   - `POST /internal/cron/import/duties/jp-fta/wits` (WITS explicit)
   - `POST /internal/cron/import/duties/my-mfn` (official Excel default)
   - `POST /internal/cron/import/duties/my-mfn/wits` (WITS fallback)

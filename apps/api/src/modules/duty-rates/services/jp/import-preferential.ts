@@ -10,6 +10,7 @@ type Params = {
   importId?: string;
   dryRun?: boolean;
   useWitsFallback?: boolean;
+  strictOfficial?: boolean;
 };
 
 export const JP_FTA_DEFAULT_PARTNER_GEOIDS = [
@@ -107,9 +108,16 @@ export async function importJpPreferential({
   importId,
   dryRun,
   useWitsFallback = true,
+  strictOfficial = false,
 }: Params) {
   const partners = normalizePartnerGeoIds(partnerGeoIds);
   const officialRows = await fetchJpPreferentialDutyRates({ hs6List, partnerGeoIds: partners });
+
+  if (strictOfficial && officialRows.length === 0) {
+    throw new Error(
+      '[JP Duties] Preferential produced 0 rows from official source; refusing WITS-only output in strict official mode.'
+    );
+  }
 
   let witsRows: DutyRateInsert[] = [];
   if (useWitsFallback) {

@@ -54,6 +54,7 @@ describe('jp duties WITS explicit FTA routes', () => {
       expect.objectContaining({
         partnerGeoIds: ['US'],
         dryRun: true,
+        strictOfficial: true,
         useWitsFallback: true,
       })
     );

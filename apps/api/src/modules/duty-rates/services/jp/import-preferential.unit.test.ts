@@ -93,7 +93,7 @@ describe('importJpPreferential', () => {
       dryRun: false,
     });
 
-    await importJpPreferential({ partnerGeoIds: ['AU', 'US'] });
+    await importJpPreferential({ partnerGeoIds: ['AU', 'US'], strictOfficial: true });
 
     expect(mocks.fetchWitsPreferentialDutyRatesMock).toHaveBeenCalledTimes(1);
     expect(mocks.fetchWitsPreferentialDutyRatesMock).toHaveBeenCalledWith({
@@ -149,6 +149,20 @@ describe('importJpPreferential', () => {
     await expect(
       importJpPreferential({ partnerGeoIds: ['AU'], useWitsFallback: false })
     ).rejects.toThrow(/0 rows from official source/i);
+    expect(mocks.fetchWitsPreferentialDutyRatesMock).not.toHaveBeenCalled();
+    expect(mocks.batchUpsertDutyRatesFromStreamMock).not.toHaveBeenCalled();
+  });
+
+  it('throws in strict official mode when official source returns zero rows', async () => {
+    mocks.fetchWitsPreferentialDutyRatesMock.mockResolvedValue([makeRow({ source: 'wits' })]);
+
+    await expect(
+      importJpPreferential({
+        partnerGeoIds: ['AU'],
+        useWitsFallback: true,
+        strictOfficial: true,
+      })
+    ).rejects.toThrow(/refusing WITS-only output in strict official mode/i);
     expect(mocks.fetchWitsPreferentialDutyRatesMock).not.toHaveBeenCalled();
     expect(mocks.batchUpsertDutyRatesFromStreamMock).not.toHaveBeenCalled();
   });
