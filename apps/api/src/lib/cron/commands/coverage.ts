@@ -136,6 +136,13 @@ const US_REQUIRED_DUTY_DATASETS: ReadonlyArray<DutyDatasetCoverageRequirement> =
 ] as const;
 const OFFICIAL_FX_REQUIRED_SOURCE_KEYS = ['fx.ecb.daily'] as const;
 const OFFICIAL_VAT_REQUIRED_SOURCE_KEYS = ['vat.oecd_imf.standard', 'vat.imf.standard'] as const;
+const OFFICIAL_DE_MINIMIS_REQUIRED_SOURCE_KEYS = [
+  'de-minimis.official.us.section321',
+  'de-minimis.official.eu.reg_1186_2009',
+  'de-minimis.official.gb.vat_overseas_goods',
+  'de-minimis.official.ca.lvs_vat',
+  'de-minimis.official.ca.lvs_duty',
+] as const;
 const OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS = [
   'duties.eu.taric.daily',
   'duties.eu.taric.mfn',
@@ -443,6 +450,7 @@ export const coverageSnapshot: Command = async (args) => {
         ...OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS,
         ...OFFICIAL_FX_REQUIRED_SOURCE_KEYS,
         ...OFFICIAL_VAT_REQUIRED_SOURCE_KEYS,
+        ...OFFICIAL_DE_MINIMIS_REQUIRED_SOURCE_KEYS,
       ])
     );
 
@@ -673,6 +681,13 @@ export const coverageSnapshot: Command = async (args) => {
   checks.push(
     ...evaluateRequiredSourceKeys(OFFICIAL_VAT_REQUIRED_SOURCE_KEYS, dutySourceRegistryRows, 'vat')
   );
+  checks.push(
+    ...evaluateRequiredSourceKeys(
+      OFFICIAL_DE_MINIMIS_REQUIRED_SOURCE_KEYS,
+      dutySourceRegistryRows,
+      'de_minimis'
+    )
+  );
 
   const failedChecks = checks.filter((check) => !check.ok);
   const gateOk = failedChecks.length === 0;
@@ -703,6 +718,7 @@ export const coverageSnapshot: Command = async (args) => {
       officialDutySourceKeys: [...OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS],
       officialFxSourceKeys: [...OFFICIAL_FX_REQUIRED_SOURCE_KEYS],
       officialVatSourceKeys: [...OFFICIAL_VAT_REQUIRED_SOURCE_KEYS],
+      officialDeMinimisSourceKeys: [...OFFICIAL_DE_MINIMIS_REQUIRED_SOURCE_KEYS],
     },
     freshness: {
       fx: freshness.datasets.fx,
