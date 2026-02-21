@@ -309,6 +309,13 @@
       "when": 1772013600000,
       "tag": "0043_modern_stature",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1772100000000,
+      "tag": "0044_calm_halcyon",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import { importCnMfn } from '../../duty-rates/services/cn/import-mfn.js';
-import { importCnPreferential } from '../../duty-rates/services/cn/import-preferential.js';
+import {
+  importCnPreferential,
+  importCnPreferentialFromWits,
+} from '../../duty-rates/services/cn/import-preferential.js';
 import { importCnMfnFromPdf } from '../../duty-rates/services/cn/import-mfn-pdf.js';
 import { resolveSourceDownloadUrl } from '../../../lib/source-registry.js';
 import {
@@ -75,7 +78,7 @@ export default function cnDutyRoutes(app: FastifyInstance) {
     );
   }
 
-  // CN Preferential (WITS default; no official source yet)
+  // CN Preferential (official default; WITS fallback)
   {
     const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
 
@@ -86,9 +89,9 @@ export default function cnDutyRoutes(app: FastifyInstance) {
         schema: { body: Body },
         config: {
           importMeta: {
-            importSource: 'WITS',
-            job: 'duties:cn-fta',
-            sourceKey: 'duties.wits.sdmx.base',
+            importSource: 'OFFICIAL',
+            job: 'duties:cn-fta-official',
+            sourceKey: 'duties.cn.official.fta_excel',
           },
         },
       },
@@ -99,6 +102,7 @@ export default function cnDutyRoutes(app: FastifyInstance) {
           partnerGeoIds,
           batchSize,
           dryRun,
+          useWitsFallback: true,
           importId: req.importCtx?.runId,
         });
         return reply.send(res);
@@ -125,7 +129,7 @@ export default function cnDutyRoutes(app: FastifyInstance) {
       },
       async (req, reply) => {
         const { hs6, partnerGeoIds, batchSize, dryRun } = Body.parse(req.body ?? {});
-        const res = await importCnPreferential({
+        const res = await importCnPreferentialFromWits({
           hs6List: hs6,
           partnerGeoIds,
           batchSize,

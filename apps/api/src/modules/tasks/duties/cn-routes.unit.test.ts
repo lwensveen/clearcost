@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   resolveSourceDownloadUrl: vi.fn(),
   importCnMfnFromPdf: vi.fn(),
   importCnMfnFromWits: vi.fn(),
+  importCnPreferential: vi.fn(),
   importCnPreferentialFromWits: vi.fn(),
 }));
 
@@ -22,7 +23,8 @@ vi.mock('../../duty-rates/services/cn/import-mfn.js', () => ({
 }));
 
 vi.mock('../../duty-rates/services/cn/import-preferential.js', () => ({
-  importCnPreferential: mocks.importCnPreferentialFromWits,
+  importCnPreferential: mocks.importCnPreferential,
+  importCnPreferentialFromWits: mocks.importCnPreferentialFromWits,
 }));
 
 import cnDutyRoutes from './cn-routes.js';
@@ -42,6 +44,12 @@ beforeEach(() => {
   mocks.importCnMfnFromPdf.mockResolvedValue({ ok: true, inserted: 1, updated: 0, count: 1 });
   mocks.importCnMfnFromWits.mockResolvedValue({ ok: true, inserted: 1, updated: 0, count: 1 });
   mocks.importCnPreferentialFromWits.mockResolvedValue({
+    ok: true,
+    inserted: 1,
+    updated: 0,
+    count: 1,
+  });
+  mocks.importCnPreferential.mockResolvedValue({
     ok: true,
     inserted: 1,
     updated: 0,
@@ -91,7 +99,7 @@ describe('cn duties official-first defaults', () => {
     await app.close();
   });
 
-  it('uses WITS importer on /cn-fta', async () => {
+  it('uses official importer on /cn-fta', async () => {
     const app = await buildApp();
     const res = await app.inject({
       method: 'POST',
@@ -100,10 +108,11 @@ describe('cn duties official-first defaults', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(mocks.importCnPreferentialFromWits).toHaveBeenCalledWith(
+    expect(mocks.importCnPreferential).toHaveBeenCalledWith(
       expect.objectContaining({
         partnerGeoIds: ['JP'],
         dryRun: true,
+        useWitsFallback: true,
       })
     );
     await app.close();
@@ -124,6 +133,7 @@ describe('cn duties official-first defaults', () => {
         dryRun: true,
       })
     );
+    expect(mocks.importCnPreferential).not.toHaveBeenCalled();
     await app.close();
   });
 });
