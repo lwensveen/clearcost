@@ -209,6 +209,12 @@ const OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS = [
   'duties.vn.official.mfn_excel',
   'duties.vn.official.fta_excel',
 ] as const;
+const OPTIONAL_FALLBACK_SOURCE_KEYS = [
+  'duties.wits.sdmx.base',
+  'hs.wits.sdmx.data_base',
+  'de-minimis.trade_gov.api',
+  'de-minimis.zonos.docs',
+] as const;
 
 export function evaluateRequiredSourceKeys(
   requiredKeys: ReadonlyArray<string>,
@@ -236,6 +242,29 @@ export function evaluateRequiredSourceKeys(
       key: `source_registry.${dataset}.${sourceKey}`,
       ok: true,
       detail: `source_registry row for ${sourceKey} is enabled`,
+    };
+  });
+}
+
+export function evaluateKnownSourceKeys(
+  knownKeys: ReadonlyArray<string>,
+  rows: ReadonlyArray<SourceRegistryCoverageRow>,
+  dataset: string = 'fallback'
+): CoverageCheck[] {
+  const byKey = new Map(rows.map((row) => [row.key, row]));
+  return knownKeys.map((sourceKey) => {
+    const row = byKey.get(sourceKey);
+    if (!row) {
+      return {
+        key: `source_registry.${dataset}.${sourceKey}`,
+        ok: false,
+        detail: `Missing source_registry row for ${sourceKey}`,
+      };
+    }
+    return {
+      key: `source_registry.${dataset}.${sourceKey}`,
+      ok: true,
+      detail: `source_registry row for ${sourceKey} is ${row.enabled ? 'enabled' : 'disabled'}`,
     };
   });
 }
@@ -483,6 +512,7 @@ export const coverageSnapshot: Command = async (args) => {
         ...OFFICIAL_HS_REQUIRED_SOURCE_KEYS,
         ...OFFICIAL_NOTICES_REQUIRED_SOURCE_KEYS,
         ...OFFICIAL_SURCHARGES_REQUIRED_SOURCE_KEYS,
+        ...OPTIONAL_FALLBACK_SOURCE_KEYS,
       ])
     );
 
@@ -737,6 +767,9 @@ export const coverageSnapshot: Command = async (args) => {
       'surcharges'
     )
   );
+  checks.push(
+    ...evaluateKnownSourceKeys(OPTIONAL_FALLBACK_SOURCE_KEYS, dutySourceRegistryRows, 'fallback')
+  );
 
   const failedChecks = checks.filter((check) => !check.ok);
   const gateOk = failedChecks.length === 0;
@@ -771,6 +804,7 @@ export const coverageSnapshot: Command = async (args) => {
       officialHsSourceKeys: [...OFFICIAL_HS_REQUIRED_SOURCE_KEYS],
       officialNoticesSourceKeys: [...OFFICIAL_NOTICES_REQUIRED_SOURCE_KEYS],
       officialSurchargesSourceKeys: [...OFFICIAL_SURCHARGES_REQUIRED_SOURCE_KEYS],
+      optionalFallbackSourceKeys: [...OPTIONAL_FALLBACK_SOURCE_KEYS],
     },
     freshness: {
       fx: freshness.datasets.fx,
