@@ -149,7 +149,20 @@ const OFFICIAL_NOTICES_REQUIRED_SOURCE_KEYS = [
   'notices.cn.gacc.list',
   'notices.cn.mofcom.list',
 ] as const;
-const OFFICIAL_SURCHARGES_REQUIRED_SOURCE_KEYS = ['duties.uk.tariff.api_base'] as const;
+const OFFICIAL_SURCHARGES_REQUIRED_SOURCE_KEYS = [
+  'duties.uk.tariff.api_base',
+  'surcharges.eu.taric.measure',
+  'surcharges.eu.taric.component',
+  'surcharges.eu.taric.geo_description',
+  'surcharges.eu.taric.duty_expression',
+  'surcharges.us.aphis.aqi_fees',
+  'surcharges.us.aphis.aqi_fy25',
+  'surcharges.us.fda.vqip_fees',
+  'surcharges.us.federal_register.search',
+  'surcharges.us.federal_register.documents_api',
+  'surcharges.us.statute.hmf',
+  'surcharges.us.statute.mpf',
+] as const;
 const OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS = [
   'duties.eu.taric.daily',
   'duties.eu.taric.mfn',
