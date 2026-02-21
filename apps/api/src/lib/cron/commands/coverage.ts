@@ -136,6 +136,8 @@ const US_REQUIRED_DUTY_DATASETS: ReadonlyArray<DutyDatasetCoverageRequirement> =
 ] as const;
 const OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS = [
   'duties.eu.taric.daily',
+  'duties.eu.taric.mfn',
+  'duties.eu.taric.preferential',
   'duties.eu.taric.measure',
   'duties.eu.taric.component',
   'duties.eu.taric.duty_expression',
