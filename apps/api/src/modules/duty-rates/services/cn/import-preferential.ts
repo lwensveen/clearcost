@@ -11,6 +11,7 @@ type Params = {
   importId?: string;
   dryRun?: boolean;
   useWitsFallback?: boolean;
+  strictOfficial?: boolean;
   officialExcelUrl?: string;
   sheet?: string | number;
 };
@@ -110,6 +111,7 @@ export async function importCnPreferential({
   importId,
   dryRun,
   useWitsFallback = true,
+  strictOfficial = false,
   officialExcelUrl,
   sheet,
 }: Params) {
@@ -134,9 +136,27 @@ export async function importCnPreferential({
     }
   }
 
+  if (!ftaExcelUrl && strictOfficial) {
+    throw new Error(
+      '[CN Duties] Preferential official source URL is not configured (set source_registry duties.cn.official.fta_excel or CN_FTA_OFFICIAL_EXCEL_URL).'
+    );
+  }
+
   if (!useWitsFallback && !ftaExcelUrl) {
     throw new Error(
       '[CN Duties] Preferential official source URL is not configured (set source_registry duties.cn.official.fta_excel or CN_FTA_OFFICIAL_EXCEL_URL).'
+    );
+  }
+
+  if (strictOfficial && officialError) {
+    const message =
+      officialError instanceof Error ? officialError.message : 'unknown official source error';
+    throw new Error(`[CN Duties] Preferential official source fetch failed. ${message}`);
+  }
+
+  if (strictOfficial && officialRows.length === 0) {
+    throw new Error(
+      '[CN Duties] Preferential produced 0 rows from official source; refusing WITS-only output in strict official mode.'
     );
   }
 

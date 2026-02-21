@@ -101,7 +101,7 @@ describe('importCnPreferential', () => {
       dryRun: false,
     });
 
-    await importCnPreferential({ partnerGeoIds: ['AU', 'KR'] });
+    await importCnPreferential({ partnerGeoIds: ['AU', 'KR'], strictOfficial: true });
 
     expect(mocks.fetchWitsPreferentialDutyRatesMock).toHaveBeenCalledTimes(1);
     expect(mocks.fetchWitsPreferentialDutyRatesMock).toHaveBeenCalledWith({
@@ -133,12 +133,38 @@ describe('importCnPreferential', () => {
     expect(mocks.fetchWitsPreferentialDutyRatesMock).toHaveBeenCalledTimes(1);
   });
 
-  it('throws when official-only mode has no configured source URL', async () => {
+  it('throws in strict mode when official source URL is missing', async () => {
     mocks.resolveCnPreferentialDutySourceUrlsMock.mockResolvedValue({ ftaExcelUrl: undefined });
 
     await expect(
-      importCnPreferential({ partnerGeoIds: ['AU'], useWitsFallback: false })
+      importCnPreferential({ partnerGeoIds: ['AU'], useWitsFallback: true, strictOfficial: true })
     ).rejects.toThrow(/official source URL is not configured/i);
+    expect(mocks.fetchWitsPreferentialDutyRatesMock).not.toHaveBeenCalled();
+    expect(mocks.batchUpsertDutyRatesFromStreamMock).not.toHaveBeenCalled();
+  });
+
+  it('throws in strict mode when official source fetch fails', async () => {
+    mocks.fetchCnPreferentialDutyRatesMock.mockRejectedValue(new Error('download failed'));
+    mocks.fetchWitsPreferentialDutyRatesMock.mockResolvedValue([
+      makeRow({ partner: 'AU', source: 'wits' }),
+    ]);
+
+    await expect(
+      importCnPreferential({ partnerGeoIds: ['AU'], useWitsFallback: true, strictOfficial: true })
+    ).rejects.toThrow(/official source fetch failed/i);
+    expect(mocks.fetchWitsPreferentialDutyRatesMock).not.toHaveBeenCalled();
+    expect(mocks.batchUpsertDutyRatesFromStreamMock).not.toHaveBeenCalled();
+  });
+
+  it('throws in strict mode when official source returns zero rows', async () => {
+    mocks.fetchCnPreferentialDutyRatesMock.mockResolvedValue([]);
+    mocks.fetchWitsPreferentialDutyRatesMock.mockResolvedValue([
+      makeRow({ partner: 'AU', source: 'wits' }),
+    ]);
+
+    await expect(
+      importCnPreferential({ partnerGeoIds: ['AU'], useWitsFallback: true, strictOfficial: true })
+    ).rejects.toThrow(/0 rows from official source/i);
     expect(mocks.fetchWitsPreferentialDutyRatesMock).not.toHaveBeenCalled();
     expect(mocks.batchUpsertDutyRatesFromStreamMock).not.toHaveBeenCalled();
   });

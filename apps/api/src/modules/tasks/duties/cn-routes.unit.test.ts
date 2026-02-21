@@ -112,6 +112,7 @@ describe('cn duties official-first defaults', () => {
       expect.objectContaining({
         partnerGeoIds: ['JP'],
         dryRun: true,
+        strictOfficial: true,
         useWitsFallback: true,
       })
     );

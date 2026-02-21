@@ -207,7 +207,7 @@ jobs:
             exit 1
           fi
 
-      - name: CN Duties — FTA (official default, WITS fallback)
+      - name: CN Duties — FTA (strict official default, partner-gap WITS fallback)
         run: |
           OUT=$(bun run internal-request -- --path /internal/cron/import/duties/cn-fta --body '{}')
           echo "$OUT" | jq .
