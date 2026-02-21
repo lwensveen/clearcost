@@ -90,8 +90,12 @@ const ASEAN_FTA_FRESHNESS_THRESHOLD_HOURS = 192;
 const ASEAN_MFN_FRESHNESS_THRESHOLD_HOURS = 192;
 const JP_REQUIRED_JOBS = ['duties:jp-mfn', 'duties:jp-fta-official'] as const;
 const CN_REQUIRED_JOBS = ['duties:cn-mfn-official', 'duties:cn-fta-official'] as const;
+const UK_REQUIRED_JOBS = ['duties:uk-mfn', 'duties:uk-fta'] as const;
+const US_REQUIRED_JOBS = ['duties:us-mfn', 'duties:us-fta'] as const;
 const JP_FRESHNESS_THRESHOLD_HOURS = 192;
 const CN_FRESHNESS_THRESHOLD_HOURS = 192;
+const UK_FRESHNESS_THRESHOLD_HOURS = 192;
+const US_FRESHNESS_THRESHOLD_HOURS = 192;
 const JP_REQUIRED_DUTY_DATASETS: ReadonlyArray<DutyDatasetCoverageRequirement> = [
   { dest: 'JP', dutyRule: 'mfn', expectedSources: ['official'] },
   { dest: 'JP', dutyRule: 'fta', expectedSources: ['official'] },
@@ -99,6 +103,14 @@ const JP_REQUIRED_DUTY_DATASETS: ReadonlyArray<DutyDatasetCoverageRequirement> =
 const CN_REQUIRED_DUTY_DATASETS: ReadonlyArray<DutyDatasetCoverageRequirement> = [
   { dest: 'CN', dutyRule: 'mfn', expectedSources: ['official'] },
   { dest: 'CN', dutyRule: 'fta', expectedSources: ['official'] },
+] as const;
+const UK_REQUIRED_DUTY_DATASETS: ReadonlyArray<DutyDatasetCoverageRequirement> = [
+  { dest: 'GB', dutyRule: 'mfn', expectedSources: ['official'] },
+  { dest: 'GB', dutyRule: 'fta', expectedSources: ['official'] },
+] as const;
+const US_REQUIRED_DUTY_DATASETS: ReadonlyArray<DutyDatasetCoverageRequirement> = [
+  { dest: 'US', dutyRule: 'mfn', expectedSources: ['official'] },
+  { dest: 'US', dutyRule: 'fta', expectedSources: ['official'] },
 ] as const;
 
 function up2(value: string): string {
@@ -276,6 +288,12 @@ export const coverageSnapshot: Command = async (args) => {
   const cnFreshness = await Promise.all(
     CN_REQUIRED_JOBS.map((job) => getImportJobFreshness(job, now, CN_FRESHNESS_THRESHOLD_HOURS))
   );
+  const ukFreshness = await Promise.all(
+    UK_REQUIRED_JOBS.map((job) => getImportJobFreshness(job, now, UK_FRESHNESS_THRESHOLD_HOURS))
+  );
+  const usFreshness = await Promise.all(
+    US_REQUIRED_JOBS.map((job) => getImportJobFreshness(job, now, US_FRESHNESS_THRESHOLD_HOURS))
+  );
 
   const [latestFx] = await db
     .select({ latest: fxRatesTable.fxAsOf })
@@ -447,6 +465,26 @@ export const coverageSnapshot: Command = async (args) => {
           : `${jobFreshness.job} latest success ${jobFreshness.lastSuccessAt.toISOString()} (threshold ${jobFreshness.thresholdHours}h)`,
     });
   }
+  for (const jobFreshness of ukFreshness) {
+    checks.push({
+      key: `freshness.uk.${jobFreshness.job}`,
+      ok: jobFreshness.stale !== true,
+      detail:
+        jobFreshness.lastSuccessAt == null
+          ? `No successful import run for ${jobFreshness.job}`
+          : `${jobFreshness.job} latest success ${jobFreshness.lastSuccessAt.toISOString()} (threshold ${jobFreshness.thresholdHours}h)`,
+    });
+  }
+  for (const jobFreshness of usFreshness) {
+    checks.push({
+      key: `freshness.us.${jobFreshness.job}`,
+      ok: jobFreshness.stale !== true,
+      detail:
+        jobFreshness.lastSuccessAt == null
+          ? `No successful import run for ${jobFreshness.job}`
+          : `${jobFreshness.job} latest success ${jobFreshness.lastSuccessAt.toISOString()} (threshold ${jobFreshness.thresholdHours}h)`,
+    });
+  }
 
   checks.push({
     key: 'fx.usd_eur_pair',
@@ -506,6 +544,22 @@ export const coverageSnapshot: Command = async (args) => {
       detail: `CN ${requirement.dutyRule.toUpperCase()} official coverage (${requirement.expectedSources.join('/')})`,
     });
   }
+  for (const requirement of UK_REQUIRED_DUTY_DATASETS) {
+    const dataset = formatDutyDatasetCoverageRequirement(requirement);
+    checks.push({
+      key: `duties.uk.dataset.${dataset}`,
+      ok: hasDutyDatasetCoverage(dutyRows, requirement),
+      detail: `UK ${requirement.dutyRule.toUpperCase()} official coverage (${requirement.expectedSources.join('/')})`,
+    });
+  }
+  for (const requirement of US_REQUIRED_DUTY_DATASETS) {
+    const dataset = formatDutyDatasetCoverageRequirement(requirement);
+    checks.push({
+      key: `duties.us.dataset.${dataset}`,
+      ok: hasDutyDatasetCoverage(dutyRows, requirement),
+      detail: `US ${requirement.dutyRule.toUpperCase()} official coverage (${requirement.expectedSources.join('/')})`,
+    });
+  }
 
   const failedChecks = checks.filter((check) => !check.ok);
   const gateOk = failedChecks.length === 0;
@@ -525,6 +579,12 @@ export const coverageSnapshot: Command = async (args) => {
         formatDutyDatasetCoverageRequirement(req)
       ),
       cnDutyDatasets: CN_REQUIRED_DUTY_DATASETS.map((req) =>
+        formatDutyDatasetCoverageRequirement(req)
+      ),
+      ukDutyDatasets: UK_REQUIRED_DUTY_DATASETS.map((req) =>
+        formatDutyDatasetCoverageRequirement(req)
+      ),
+      usDutyDatasets: US_REQUIRED_DUTY_DATASETS.map((req) =>
         formatDutyDatasetCoverageRequirement(req)
       ),
     },
@@ -572,6 +632,26 @@ export const coverageSnapshot: Command = async (args) => {
       },
       cn: {
         jobs: cnFreshness.map((jobFreshness) => ({
+          job: jobFreshness.job,
+          thresholdHours: jobFreshness.thresholdHours,
+          lastSuccessAt: jobFreshness.lastSuccessAt?.toISOString() ?? null,
+          lastAttemptAt: jobFreshness.lastAttemptAt?.toISOString() ?? null,
+          ageHours: jobFreshness.ageHours,
+          stale: jobFreshness.stale,
+        })),
+      },
+      uk: {
+        jobs: ukFreshness.map((jobFreshness) => ({
+          job: jobFreshness.job,
+          thresholdHours: jobFreshness.thresholdHours,
+          lastSuccessAt: jobFreshness.lastSuccessAt?.toISOString() ?? null,
+          lastAttemptAt: jobFreshness.lastAttemptAt?.toISOString() ?? null,
+          ageHours: jobFreshness.ageHours,
+          stale: jobFreshness.stale,
+        })),
+      },
+      us: {
+        jobs: usFreshness.map((jobFreshness) => ({
           job: jobFreshness.job,
           thresholdHours: jobFreshness.thresholdHours,
           lastSuccessAt: jobFreshness.lastSuccessAt?.toISOString() ?? null,
