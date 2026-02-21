@@ -134,6 +134,8 @@ const US_REQUIRED_DUTY_DATASETS: ReadonlyArray<DutyDatasetCoverageRequirement> =
   { dest: 'US', dutyRule: 'mfn', expectedSources: ['official'] },
   { dest: 'US', dutyRule: 'fta', expectedSources: ['official'] },
 ] as const;
+const OFFICIAL_FX_REQUIRED_SOURCE_KEYS = ['fx.ecb.daily'] as const;
+const OFFICIAL_VAT_REQUIRED_SOURCE_KEYS = ['vat.oecd_imf.standard', 'vat.imf.standard'] as const;
 const OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS = [
   'duties.eu.taric.daily',
   'duties.eu.taric.mfn',
@@ -174,27 +176,28 @@ const OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS = [
 
 export function evaluateRequiredSourceKeys(
   requiredKeys: ReadonlyArray<string>,
-  rows: ReadonlyArray<SourceRegistryCoverageRow>
+  rows: ReadonlyArray<SourceRegistryCoverageRow>,
+  dataset: string = 'duties'
 ): CoverageCheck[] {
   const byKey = new Map(rows.map((row) => [row.key, row]));
   return requiredKeys.map((sourceKey) => {
     const row = byKey.get(sourceKey);
     if (!row) {
       return {
-        key: `source_registry.duties.${sourceKey}`,
+        key: `source_registry.${dataset}.${sourceKey}`,
         ok: false,
         detail: `Missing source_registry row for ${sourceKey}`,
       };
     }
     if (!row.enabled) {
       return {
-        key: `source_registry.duties.${sourceKey}`,
+        key: `source_registry.${dataset}.${sourceKey}`,
         ok: false,
         detail: `source_registry row for ${sourceKey} is disabled`,
       };
     }
     return {
-      key: `source_registry.duties.${sourceKey}`,
+      key: `source_registry.${dataset}.${sourceKey}`,
       ok: true,
       detail: `source_registry row for ${sourceKey} is enabled`,
     };
@@ -435,7 +438,13 @@ export const coverageSnapshot: Command = async (args) => {
       enabled: sourceRegistryTable.enabled,
     })
     .from(sourceRegistryTable)
-    .where(inArray(sourceRegistryTable.key, [...OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS]));
+    .where(
+      inArray(sourceRegistryTable.key, [
+        ...OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS,
+        ...OFFICIAL_FX_REQUIRED_SOURCE_KEYS,
+        ...OFFICIAL_VAT_REQUIRED_SOURCE_KEYS,
+      ])
+    );
 
   const deMinimisRows = await db
     .select({ dest: deMinimisTable.dest })
@@ -658,6 +667,12 @@ export const coverageSnapshot: Command = async (args) => {
   checks.push(
     ...evaluateRequiredSourceKeys(OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS, dutySourceRegistryRows)
   );
+  checks.push(
+    ...evaluateRequiredSourceKeys(OFFICIAL_FX_REQUIRED_SOURCE_KEYS, dutySourceRegistryRows, 'fx')
+  );
+  checks.push(
+    ...evaluateRequiredSourceKeys(OFFICIAL_VAT_REQUIRED_SOURCE_KEYS, dutySourceRegistryRows, 'vat')
+  );
 
   const failedChecks = checks.filter((check) => !check.ok);
   const gateOk = failedChecks.length === 0;
@@ -686,6 +701,8 @@ export const coverageSnapshot: Command = async (args) => {
         formatDutyDatasetCoverageRequirement(req)
       ),
       officialDutySourceKeys: [...OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS],
+      officialFxSourceKeys: [...OFFICIAL_FX_REQUIRED_SOURCE_KEYS],
+      officialVatSourceKeys: [...OFFICIAL_VAT_REQUIRED_SOURCE_KEYS],
     },
     freshness: {
       fx: freshness.datasets.fx,

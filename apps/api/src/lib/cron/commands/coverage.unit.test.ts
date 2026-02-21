@@ -52,4 +52,20 @@ describe('coverage source-registry gates', () => {
       },
     ]);
   });
+
+  it('uses dataset namespace in generated check keys', () => {
+    const checks = evaluateRequiredSourceKeys(
+      ['fx.ecb.daily'],
+      [{ key: 'fx.ecb.daily', enabled: true }],
+      'fx'
+    );
+
+    expect(checks).toEqual([
+      {
+        key: 'source_registry.fx.fx.ecb.daily',
+        ok: true,
+        detail: 'source_registry row for fx.ecb.daily is enabled',
+      },
+    ]);
+  });
 });
