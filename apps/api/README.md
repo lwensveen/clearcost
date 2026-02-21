@@ -309,10 +309,12 @@ bun run internal-request -- --path /internal/cron/fx/daily --body '{}'
   - `POST /internal/cron/import/duties/vn-fta/official/excel`
   - `POST /internal/cron/import/duties/ph-mfn`
   - `POST /internal/cron/import/duties/ph-mfn/wits`
-  - `POST /internal/cron/import/duties/ph-fta`
+  - `POST /internal/cron/import/duties/ph-fta` (official Excel default)
+  - `POST /internal/cron/import/duties/ph-fta/wits` (WITS fallback)
   - `POST /internal/cron/import/duties/ph-fta/official/excel`
   - `POST /internal/cron/import/duties/id-mfn`
-  - `POST /internal/cron/import/duties/id-fta`
+  - `POST /internal/cron/import/duties/id-fta` (official Excel default)
+  - `POST /internal/cron/import/duties/id-fta/wits` (WITS fallback)
   - `POST /internal/cron/import/duties/id-fta/official/excel`
   - `POST /internal/cron/id/btki/crawl`
 

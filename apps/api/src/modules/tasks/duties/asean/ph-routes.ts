@@ -78,15 +78,51 @@ export default function phDutyRoutes(app: FastifyInstance) {
     }
   );
 
+  // Preferential (official Excel default)
   app.post(
     '/cron/import/duties/ph-fta',
+    {
+      preHandler: app.requireApiKey(['tasks:duties:ph']),
+      schema: { body: TasksDutyMyFtaOfficialExcelBodySchema },
+      config: {
+        importMeta: {
+          importSource: 'OFFICIAL',
+          job: 'duties:ph-fta-official',
+          sourceKey: 'duties.ph.official.fta_excel',
+        },
+      },
+    },
+    async (req, reply) => {
+      const { url, agreement, partner, sheet, batchSize, dryRun } =
+        TasksDutyMyFtaOfficialExcelBodySchema.parse(req.body ?? {});
+      const urlOrPath = await resolveAseanDutySourceUrl({
+        sourceKey: 'duties.ph.official.fta_excel',
+        fallbackUrl: url,
+      });
+      const result = await importAseanPreferentialOfficialFromExcel({
+        dest: 'PH',
+        urlOrPath,
+        agreement,
+        partner,
+        sheet,
+        batchSize,
+        dryRun,
+        importId: req.importCtx?.runId,
+      });
+      return reply.send({ importId: req.importCtx?.runId, ...result });
+    }
+  );
+
+  // Preferential (WITS fallback)
+  app.post(
+    '/cron/import/duties/ph-fta/wits',
     {
       preHandler: app.requireApiKey(['tasks:duties:ph']),
       schema: { body: TasksDutyHs6BatchPartnerGeoIdsBodySchema },
       config: {
         importMeta: {
           importSource: 'WITS',
-          job: 'duties:ph-fta',
+          job: 'duties:ph-fta-wits',
           sourceKey: 'duties.wits.sdmx.base',
         },
       },
