@@ -4,23 +4,14 @@ import { z } from 'zod/v4';
 import { readFile } from 'node:fs/promises';
 import { crawlAuthorityPdfs } from '../notices/crawl-authorities.js';
 import { attachNoticeDoc, ensureNotice } from '../notices/registry.js';
+import { resolveCnNoticeSeedUrls, type CnNoticeAuthority } from '../notices/source-urls.js';
 import { ErrorResponseSchema, TasksNoticesCrawlBodySchema } from '@clearcost/types';
 import { httpFetch } from '../../lib/http.js';
 import { errorResponseForStatus } from '../../lib/errors.js';
 
-type CnAuthority = 'MOF' | 'GACC' | 'MOFCOM';
-
 const UA =
   process.env.NOTICES_USER_AGENT ??
   'clearcost-notices/1.0 (+https://clearcost.io; contact: support@clearcost.io)';
-
-// Simple CSV env reader
-function csvEnv(name: string, fallback = ''): string[] {
-  return (process.env[name] ?? fallback)
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
 
 // Schema: defaults + normalization (so handler logic stays thin)
 const BodySchema = TasksNoticesCrawlBodySchema;
@@ -41,13 +32,26 @@ function deriveTitleFromUrl(url: string): string {
 }
 
 export default function noticesRoutes(app: FastifyInstance) {
-  async function handle(req: any, reply: any, authority: CnAuthority, seedsEnvKey: string) {
+  async function handle(req: any, reply: any, authority: CnNoticeAuthority) {
     const body: Body = BodySchema.parse(req.body ?? {});
     const importId = req.importCtx?.runId;
-
-    const seedUrls = body.urls ?? csvEnv(seedsEnvKey);
+    const {
+      sourceKey,
+      sourceUrl,
+      urls: seedUrls,
+    } = await resolveCnNoticeSeedUrls({
+      authority,
+      explicitUrls: body.urls,
+    });
     if (seedUrls.length === 0) {
       return reply.code(400).send(errorResponseForStatus(400, 'No seed URLs'));
+    }
+    if (req.importCtx) {
+      req.importCtx.runPatch = {
+        ...req.importCtx.runPatch,
+        sourceKey,
+        sourceUrl: sourceUrl ?? seedUrls[0],
+      };
     }
 
     const crawlResult = await crawlAuthorityPdfs({
@@ -142,6 +146,7 @@ export default function noticesRoutes(app: FastifyInstance) {
       ok: true,
       importId,
       authority,
+      sourceKey,
       seeds: seedUrls.length,
       found: crawlResult.found,
       downloaded: crawlResult.downloaded,
@@ -156,9 +161,15 @@ export default function noticesRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:notices']),
       schema: { body: BodySchema, response: { 400: ErrorResponseSchema } },
-      config: { importMeta: { importSource: 'CN_NOTICES', job: 'notices:cn-mof' } },
+      config: {
+        importMeta: {
+          importSource: 'CN_NOTICES',
+          job: 'notices:cn-mof',
+          sourceKey: 'notices.cn.mof.list',
+        },
+      },
     },
-    (req, reply) => handle(req, reply, 'MOF', 'CN_MOF_NOTICE_URLS')
+    (req, reply) => handle(req, reply, 'MOF')
   );
 
   // CN — GACC
@@ -167,9 +178,15 @@ export default function noticesRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:notices']),
       schema: { body: BodySchema, response: { 400: ErrorResponseSchema } },
-      config: { importMeta: { importSource: 'CN_NOTICES', job: 'notices:cn-gacc' } },
+      config: {
+        importMeta: {
+          importSource: 'CN_NOTICES',
+          job: 'notices:cn-gacc',
+          sourceKey: 'notices.cn.gacc.list',
+        },
+      },
     },
-    (req, reply) => handle(req, reply, 'GACC', 'CN_GACC_NOTICE_URLS')
+    (req, reply) => handle(req, reply, 'GACC')
   );
 
   // CN — MOFCOM
@@ -178,8 +195,14 @@ export default function noticesRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:notices']),
       schema: { body: BodySchema, response: { 400: ErrorResponseSchema } },
-      config: { importMeta: { importSource: 'CN_NOTICES', job: 'notices:cn-mofcom' } },
+      config: {
+        importMeta: {
+          importSource: 'CN_NOTICES',
+          job: 'notices:cn-mofcom',
+          sourceKey: 'notices.cn.mofcom.list',
+        },
+      },
     },
-    (req, reply) => handle(req, reply, 'MOFCOM', 'CN_MOFCOM_NOTICE_URLS')
+    (req, reply) => handle(req, reply, 'MOFCOM')
   );
 }

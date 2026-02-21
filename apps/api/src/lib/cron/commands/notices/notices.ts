@@ -2,18 +2,35 @@ import type { Command } from '../../runtime.js';
 import { withRun } from '../../runtime.js';
 import { parseFlags } from '../../utils.js';
 import { crawlNotices } from '../../../../modules/notices/crawl.js';
+import {
+  isCnNoticeAuthority,
+  resolveCnNoticeSeedUrls,
+} from '../../../../modules/notices/source-urls.js';
 
 export const crawlNoticesCmd: Command = async (argv) => {
   const flags = parseFlags(argv);
 
-  const dest = String(flags.dest ?? 'CN'); // --dest CN
-  const authority = String(flags.authority ?? 'MOF'); // --authority MOF
+  const dest = String(flags.dest ?? 'CN').toUpperCase(); // --dest CN
+  const authority = String(flags.authority ?? 'MOF')
+    .trim()
+    .toUpperCase(); // --authority MOF
   const type = String(flags.type ?? 'general') as Parameters<typeof crawlNotices>[0]['type']; // --type general
 
-  const urls = String(flags.urls ?? '')
+  const explicitUrls = String(flags.urls ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+
+  const resolved = isCnNoticeAuthority(authority)
+    ? await resolveCnNoticeSeedUrls({
+        authority,
+        explicitUrls,
+      })
+    : null;
+
+  const urls = resolved?.urls ?? explicitUrls;
+  const sourceKey = resolved?.sourceKey;
+  const sourceUrl = resolved?.sourceUrl ?? urls[0];
 
   if (!urls.length) {
     throw new Error('Provide at least one list URL via --urls <url1,url2,...>');
@@ -36,7 +53,16 @@ export const crawlNoticesCmd: Command = async (argv) => {
     {
       importSource: 'CN_NOTICES',
       job: `notices:crawl:${authority.toLowerCase()}`,
-      params: { dest, authority, type, seeds: urls.length, attach: Boolean(attach) },
+      params: {
+        dest,
+        authority,
+        type,
+        seeds: urls.length,
+        attach: Boolean(attach),
+        ...(sourceKey ? { sourceKey } : {}),
+      },
+      ...(sourceKey ? { sourceKey } : {}),
+      ...(sourceUrl ? { sourceUrl } : {}),
     },
     async () => {
       const payload = await crawlNotices({
