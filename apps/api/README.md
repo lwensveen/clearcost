@@ -429,15 +429,16 @@ Both HTTP workflows (`cron-daily-http.yml` and `cron-hourly-http.yml`) require:
 
 ### `cron-weekly-cli.yml`
 
-| Name                  | Source | Required | Used for                                                  |
-| --------------------- | ------ | -------- | --------------------------------------------------------- |
-| `DATABASE_URL`        | secret | yes      | Direct DB import jobs via CLI runtime.                    |
-| `DATA_REMOTE_BASE`    | secret | no       | Enables freight cards JSON import step.                   |
-| `AHTN_SOURCE_URL`     | secret | no       | Enables AHTN alias import step.                           |
-| `CN_MFN_PDF_URL`      | secret | no       | Enables CN MFN PDF importer step.                         |
-| `TABULA_JAR_URL`      | var    | no       | Override Tabula jar URL for CN PDF parsing (has default). |
-| `SLACK_WEBHOOK_URL`   | secret | no       | Success/failure notifications.                            |
-| `DISCORD_WEBHOOK_URL` | secret | no       | Success/failure notifications.                            |
+| Name                   | Source | Required | Used for                                                  |
+| ---------------------- | ------ | -------- | --------------------------------------------------------- |
+| `DATABASE_URL`         | secret | yes      | Direct DB import jobs via CLI runtime.                    |
+| `DATA_REMOTE_BASE`     | secret | no       | Enables freight cards JSON import step.                   |
+| `AHTN_SOURCE_URL`      | secret | no       | Enables AHTN alias import step.                           |
+| `ENABLE_WITS_BACKFILL` | var    | no       | Runs weekly WITS duty backfill steps when set to `true`.  |
+| `CN_MFN_PDF_URL`       | secret | no       | Enables CN MFN PDF importer step.                         |
+| `TABULA_JAR_URL`       | var    | no       | Override Tabula jar URL for CN PDF parsing (has default). |
+| `SLACK_WEBHOOK_URL`    | secret | no       | Success/failure notifications.                            |
+| `DISCORD_WEBHOOK_URL`  | secret | no       | Success/failure notifications.                            |
 
 US duties/surcharges are intentionally run in `cron-daily-http.yml` for fresher data and fail-fast checks.
 
@@ -453,7 +454,7 @@ Critical workflow steps are configured to fail fast when imports return no usabl
 
 - `cron-daily-http.yml`: FX must return `fxAsOf`; VAT; duty imports (EU daily, JP MFN/FTA, UK MFN/FTA, ID/MY/PH/TH/VN/SG/BN/KH/LA/MM MFN+FTA official Excel, CN MFN/FTA, US MFN/FTA); US/UK/EU remedy surcharges; and de-minimis imports must report rows (`count/inserted/updated > 0`).
 - `cron-daily-cli.yml`: `report:coverage` fails when MVP-required official freshness/coverage checks fail; when ASEAN FTA duty jobs (`duties:bn-fta-official`, `duties:id-fta-official`, `duties:kh-fta-official`, `duties:la-fta-official`, `duties:mm-fta-official`, `duties:my-fta-excel`, `duties:ph-fta-official`, `duties:th-fta-official`, `duties:vn-fta-official`, `duties:sg-fta-official`) or ASEAN MFN duty jobs (`duties:bn-mfn-official`, `duties:id-mfn`, `duties:kh-mfn-official`, `duties:la-mfn-official`, `duties:mm-mfn-official`, `duties:my-mfn-excel`, `duties:ph-mfn-official`, `duties:th-mfn-official`, `duties:vn-mfn-official`, `duties:sg-mfn-official`) are missing/stale; when JP/CN duty jobs (`duties:jp-mfn`, `duties:jp-fta-official`, `duties:cn-mfn-official`, `duties:cn-fta-official`) are missing/stale; when UK/US duty jobs (`duties:uk-mfn`, `duties:uk-fta`, `duties:us-mfn`, `duties:us-fta`) are missing/stale; when required duty source_registry keys are missing/disabled; when required ASEAN sample lanes (HS6 `850440`) are missing at the partner level; and when JP/CN/UK/US duty datasets are missing official MFN/FTA coverage.
-- `cron-weekly-cli.yml`: EU HS6, WITS duty imports (`fetchedRows > 0`), and freight JSON import (`count > 0`) fail the run if empty.
+- `cron-weekly-cli.yml`: EU HS6 and freight JSON import (`count > 0`) fail the run if empty; WITS duty backfill checks (`fetchedRows > 0`) apply only when `ENABLE_WITS_BACKFILL=true`.
 
 This is deliberate so source/parser drift is visible in CI instead of silently succeeding with stale data.
 

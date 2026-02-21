@@ -18,6 +18,7 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       DATA_REMOTE_BASE: ${{ secrets.DATA_REMOTE_BASE || '' }}
       AHTN_SOURCE_URL: ${{ secrets.AHTN_SOURCE_URL || '' }}
+      ENABLE_WITS_BACKFILL: ${{ vars.ENABLE_WITS_BACKFILL || 'false' }}
       TZ: UTC
     steps:
       - uses: actions/checkout@v5
@@ -55,6 +56,7 @@ jobs:
 
       # ---------- Duties (WITS) ----------
       - name: Duties — WITS (ASEAN)
+        if: ${{ env.ENABLE_WITS_BACKFILL == 'true' }}
         working-directory: apps/api
         run: |
           OUT=$(bun run src/lib/run-cron.ts import:duties:wits \
@@ -70,6 +72,7 @@ jobs:
           fi
 
       - name: Duties — WITS (Japan + partners)
+        if: ${{ env.ENABLE_WITS_BACKFILL == 'true' }}
         working-directory: apps/api
         run: |
           OUT=$(bun run src/lib/run-cron.ts import:duties:wits \
@@ -85,6 +88,7 @@ jobs:
           fi
 
       - name: Duties — WITS (China + partners)
+        if: ${{ env.ENABLE_WITS_BACKFILL == 'true' }}
         working-directory: apps/api
         run: |
           OUT=$(bun run src/lib/run-cron.ts import:duties:wits \
