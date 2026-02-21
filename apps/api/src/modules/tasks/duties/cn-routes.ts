@@ -75,7 +75,7 @@ export default function cnDutyRoutes(app: FastifyInstance) {
     );
   }
 
-  // CN Preferential (WITS)
+  // CN Preferential (WITS default; no official source yet)
   {
     const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
 
@@ -88,6 +88,37 @@ export default function cnDutyRoutes(app: FastifyInstance) {
           importMeta: {
             importSource: 'WITS',
             job: 'duties:cn-fta',
+            sourceKey: 'duties.wits.sdmx.base',
+          },
+        },
+      },
+      async (req, reply) => {
+        const { hs6, partnerGeoIds, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const res = await importCnPreferential({
+          hs6List: hs6,
+          partnerGeoIds,
+          batchSize,
+          dryRun,
+          importId: req.importCtx?.runId,
+        });
+        return reply.send(res);
+      }
+    );
+  }
+
+  // CN Preferential (WITS explicit)
+  {
+    const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
+
+    app.post(
+      '/cron/import/duties/cn-fta/wits',
+      {
+        preHandler: app.requireApiKey(['tasks:duties:cn']),
+        schema: { body: Body },
+        config: {
+          importMeta: {
+            importSource: 'WITS',
+            job: 'duties:cn-fta-wits',
             sourceKey: 'duties.wits.sdmx.base',
           },
         },

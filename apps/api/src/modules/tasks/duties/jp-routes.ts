@@ -37,7 +37,7 @@ export default function jpDutyRoutes(app: FastifyInstance) {
     );
   }
 
-  // JP Preferential (WITS)
+  // JP Preferential (WITS default; no official source yet)
   {
     const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
 
@@ -50,6 +50,37 @@ export default function jpDutyRoutes(app: FastifyInstance) {
           importMeta: {
             importSource: 'WITS',
             job: 'duties:jp-fta',
+            sourceKey: 'duties.wits.sdmx.base',
+          },
+        },
+      },
+      async (req, reply) => {
+        const { hs6, partnerGeoIds, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const res = await importJpPreferential({
+          hs6List: hs6,
+          partnerGeoIds,
+          batchSize,
+          dryRun,
+          importId: req.importCtx?.runId,
+        });
+        return reply.send({ importId: req.importCtx?.runId, ...res });
+      }
+    );
+  }
+
+  // JP Preferential (WITS explicit)
+  {
+    const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
+
+    app.post(
+      '/cron/import/duties/jp-fta/wits',
+      {
+        preHandler: app.requireApiKey(['tasks:duties:jp']),
+        schema: { body: Body },
+        config: {
+          importMeta: {
+            importSource: 'WITS',
+            job: 'duties:jp-fta-wits',
             sourceKey: 'duties.wits.sdmx.base',
           },
         },

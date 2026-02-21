@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   resolveSourceDownloadUrl: vi.fn(),
   importCnMfnFromPdf: vi.fn(),
   importCnMfnFromWits: vi.fn(),
+  importCnPreferentialFromWits: vi.fn(),
 }));
 
 vi.mock('../../../lib/source-registry.js', () => ({
@@ -18,6 +19,10 @@ vi.mock('../../duty-rates/services/cn/import-mfn-pdf.js', () => ({
 
 vi.mock('../../duty-rates/services/cn/import-mfn.js', () => ({
   importCnMfn: mocks.importCnMfnFromWits,
+}));
+
+vi.mock('../../duty-rates/services/cn/import-preferential.js', () => ({
+  importCnPreferential: mocks.importCnPreferentialFromWits,
 }));
 
 import cnDutyRoutes from './cn-routes.js';
@@ -36,6 +41,12 @@ beforeEach(() => {
   mocks.resolveSourceDownloadUrl.mockResolvedValue('https://example.com/cn-tariff.pdf');
   mocks.importCnMfnFromPdf.mockResolvedValue({ ok: true, inserted: 1, updated: 0, count: 1 });
   mocks.importCnMfnFromWits.mockResolvedValue({ ok: true, inserted: 1, updated: 0, count: 1 });
+  mocks.importCnPreferentialFromWits.mockResolvedValue({
+    ok: true,
+    inserted: 1,
+    updated: 0,
+    count: 1,
+  });
 });
 
 describe('cn duties official-first defaults', () => {
@@ -77,6 +88,42 @@ describe('cn duties official-first defaults', () => {
       })
     );
     expect(mocks.importCnMfnFromPdf).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('uses WITS importer on /cn-fta', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/cron/import/duties/cn-fta',
+      payload: { partnerGeoIds: ['JP'], dryRun: true },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.importCnPreferentialFromWits).toHaveBeenCalledWith(
+      expect.objectContaining({
+        partnerGeoIds: ['JP'],
+        dryRun: true,
+      })
+    );
+    await app.close();
+  });
+
+  it('uses WITS importer on /cn-fta/wits', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/cron/import/duties/cn-fta/wits',
+      payload: { partnerGeoIds: ['JP'], dryRun: true },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.importCnPreferentialFromWits).toHaveBeenCalledWith(
+      expect.objectContaining({
+        partnerGeoIds: ['JP'],
+        dryRun: true,
+      })
+    );
     await app.close();
   });
 });
