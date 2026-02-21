@@ -5,7 +5,15 @@ import { acquireRunLock, makeLockKey, releaseRunLock } from '../run-lock.js';
 export type Command = (args: string[]) => Promise<void>;
 
 export async function withRun<T>(
-  ctx: { importSource: ImportSource; job: string; params?: any; lockKey?: string },
+  ctx: {
+    importSource: ImportSource;
+    job: string;
+    params?: any;
+    lockKey?: string;
+    version?: string;
+    sourceKey?: string;
+    sourceUrl?: string;
+  },
   work: (importId: string) => Promise<{ inserted: number; payload: T }>
 ): Promise<T> {
   const lockKey = ctx.lockKey ?? makeLockKey({ importSource: ctx.importSource, job: ctx.job });
@@ -19,10 +27,16 @@ export async function withRun<T>(
 
   let runId: string | null = null;
   try {
-    const run = await startImportRun({
+    const startParams = {
       importSource: ctx.importSource,
       job: ctx.job,
       params: ctx.params ?? {},
+      ...(ctx.version ? { version: ctx.version } : {}),
+      ...(ctx.sourceKey ? { sourceKey: ctx.sourceKey } : {}),
+      ...(ctx.sourceUrl ? { sourceUrl: ctx.sourceUrl } : {}),
+    } satisfies Parameters<typeof startImportRun>[0];
+    const run = await startImportRun({
+      ...startParams,
     });
     runId = run.id;
     const { inserted, payload } = await work(run.id);

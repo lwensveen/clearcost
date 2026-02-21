@@ -15,6 +15,10 @@ import {
 } from '../../../modules/duty-rates/utils/stream-csv.js';
 import { parseFlags } from '../utils.js';
 import { httpFetch } from '../../http.js';
+import {
+  PROGRAMS_MEMBERS_SOURCE_KEY,
+  resolveProgramsMembersCsvUrl,
+} from './trade-programs-source-urls.js';
 
 /** --- Minimal seeds --------------------------------------------------- */
 const BASE_COUNTRIES: Array<{ iso2: string; name: string; iso3?: string; numeric?: string }> = [
@@ -222,18 +226,26 @@ export const programsSeed: Command = async (args) => {
  */
 export const programsLoadMembersCsv: Command = async (args) => {
   const flags = parseFlags(args);
-  const url = flags.url || args?.[0];
+  const urlFlag = typeof flags.url === 'string' ? flags.url : undefined;
+  const urlArg = typeof args?.[0] === 'string' ? args[0] : undefined;
+  const url = await resolveProgramsMembersCsvUrl(urlFlag ?? urlArg);
   const defaultOwner = (flags.owner || 'US').toUpperCase();
 
   if (!url) {
     console.error(
-      'Usage: import:programs:load-members --url=https://…/spi-members.csv [--owner=US]'
+      'Usage: import:programs:load-members --url=https://…/spi-members.csv [--owner=US], or configure source_registry key duties.us.trade_programs.members_csv'
     );
     return;
   }
 
   const payload = await withRun(
-    { importSource: 'CSV', job: 'programs:load-members', params: { url, defaultOwner } },
+    {
+      importSource: 'CSV',
+      job: 'programs:load-members',
+      sourceKey: PROGRAMS_MEMBERS_SOURCE_KEY,
+      sourceUrl: url,
+      params: { url, defaultOwner, sourceKey: PROGRAMS_MEMBERS_SOURCE_KEY },
+    },
     async (importId: string) => {
       // Ensure default owner exists
       const defaultOwnerId = await ensureJurisdictionId(defaultOwner);
