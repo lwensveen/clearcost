@@ -159,6 +159,7 @@ const OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS = [
   'duties.la.official.fta_excel',
   'duties.mm.official.mfn_excel',
   'duties.mm.official.fta_excel',
+  'duties.my.gazette.mfn_pdf',
   'duties.my.official.mfn_excel',
   'duties.my.official.fta_excel',
   'duties.ph.tariff_commission.xlsx',
