@@ -55,7 +55,7 @@ describe('jp duties WITS explicit FTA routes', () => {
         partnerGeoIds: ['US'],
         dryRun: true,
         strictOfficial: true,
-        useWitsFallback: true,
+        useWitsFallback: false,
       })
     );
     expect(mocks.importJpPreferentialWits).not.toHaveBeenCalled();

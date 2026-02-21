@@ -113,9 +113,10 @@ describe('cn duties official-first defaults', () => {
         partnerGeoIds: ['JP'],
         dryRun: true,
         strictOfficial: true,
-        useWitsFallback: true,
+        useWitsFallback: false,
       })
     );
+    expect(mocks.importCnPreferentialFromWits).not.toHaveBeenCalled();
     await app.close();
   });
 

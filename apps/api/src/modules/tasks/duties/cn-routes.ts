@@ -78,7 +78,7 @@ export default function cnDutyRoutes(app: FastifyInstance) {
     );
   }
 
-  // CN Preferential (strict official default; WITS fallback only for uncovered partners)
+  // CN Preferential (strict official default)
   {
     const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
 
@@ -103,7 +103,7 @@ export default function cnDutyRoutes(app: FastifyInstance) {
           batchSize,
           dryRun,
           strictOfficial: true,
-          useWitsFallback: true,
+          useWitsFallback: false,
           importId: req.importCtx?.runId,
         });
         return reply.send(res);

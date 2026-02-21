@@ -35,6 +35,7 @@ export const dutiesJpFta: Command = async (args) => {
   const partnerGeoIds = flags.partners ? String(flags.partners).split(',') : undefined;
   const dryRun = Boolean(flags.dryRun);
   const strictOfficial = true;
+  const useWitsFallback = false;
 
   const payload = await withRun(
     {
@@ -46,7 +47,6 @@ export const dutiesJpFta: Command = async (args) => {
         dryRun: boolParam(dryRun),
         strictOfficial: boolParam(strictOfficial),
         sourceKey: 'duties.jp.customs.tariff_index',
-        fallbackSourceKey: 'duties.wits.sdmx.base',
       },
     },
     async (importId) => {
@@ -55,7 +55,7 @@ export const dutiesJpFta: Command = async (args) => {
         partnerGeoIds,
         dryRun,
         strictOfficial,
-        useWitsFallback: true,
+        useWitsFallback,
         importId,
       });
       return { inserted: res.inserted, payload: res };
@@ -70,6 +70,7 @@ export const dutiesJpAll: Command = async (args) => {
   const partners = flags.partners ? String(flags.partners).split(',') : undefined;
   const dryRun = Boolean(flags.dryRun);
   const strictOfficial = true;
+  const useWitsFallback = false;
 
   const mfn = await withRun(
     {
@@ -98,7 +99,6 @@ export const dutiesJpAll: Command = async (args) => {
         dryRun: boolParam(dryRun),
         strictOfficial: boolParam(strictOfficial),
         sourceKey: 'duties.jp.customs.tariff_index',
-        fallbackSourceKey: 'duties.wits.sdmx.base',
       },
     },
     async (importId) => {
@@ -107,7 +107,7 @@ export const dutiesJpAll: Command = async (args) => {
         partnerGeoIds: partners,
         dryRun,
         strictOfficial,
-        useWitsFallback: true,
+        useWitsFallback,
         importId,
       });
       return { inserted: res.inserted, payload: res };

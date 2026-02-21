@@ -47,12 +47,13 @@ describe('duties-jp commands', () => {
         partnerGeoIds: ['US', 'AU'],
         dryRun: true,
         strictOfficial: true,
-        useWitsFallback: true,
+        useWitsFallback: false,
         importId: 'run-123',
       })
     );
     const [ctx] = mocks.withRunMock.mock.calls[0] ?? [];
     expect(ctx?.params?.strictOfficial).toBe('1');
+    expect(ctx?.params?.fallbackSourceKey).toBeUndefined();
   });
 
   it('forces strict official mode on the FTA step of import:duties:jp-all', async () => {
@@ -71,12 +72,13 @@ describe('duties-jp commands', () => {
         hs6List: ['850440'],
         partnerGeoIds: ['US'],
         strictOfficial: true,
-        useWitsFallback: true,
+        useWitsFallback: false,
         importId: 'run-123',
       })
     );
     const [mfnCtx, ftaCtx] = mocks.withRunMock.mock.calls;
     expect(mfnCtx?.[0]?.params?.strictOfficial).toBeUndefined();
     expect(ftaCtx?.[0]?.params?.strictOfficial).toBe('1');
+    expect(ftaCtx?.[0]?.params?.fallbackSourceKey).toBeUndefined();
   });
 });

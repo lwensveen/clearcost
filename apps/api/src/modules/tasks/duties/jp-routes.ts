@@ -40,7 +40,7 @@ export default function jpDutyRoutes(app: FastifyInstance) {
     );
   }
 
-  // JP Preferential (strict official default; WITS fallback for uncovered partners)
+  // JP Preferential (strict official default)
   {
     const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
 
@@ -65,7 +65,7 @@ export default function jpDutyRoutes(app: FastifyInstance) {
           batchSize,
           dryRun,
           strictOfficial: true,
-          useWitsFallback: true,
+          useWitsFallback: false,
           importId: req.importCtx?.runId,
         });
         return reply.send({ importId: req.importCtx?.runId, ...res });
