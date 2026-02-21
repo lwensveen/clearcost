@@ -7,10 +7,11 @@ import {
   freightRateCardsTable,
   fxRatesTable,
   importsTable,
+  sourceRegistryTable,
   surchargesTable,
   vatRulesTable,
 } from '@clearcost/db';
-import { and, desc, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import type { Command } from '../runtime.js';
 import { flagBool, flagCSV, flagStr, parseFlags } from '../utils.js';
 import {
@@ -50,6 +51,11 @@ type CoverageCheck = {
   key: string;
   ok: boolean;
   detail: string;
+};
+
+type SourceRegistryCoverageRow = {
+  key: string;
+  enabled: boolean;
 };
 
 const DEFAULT_REQUIRED_DESTINATIONS = ['NL', 'DE'] as const;
@@ -112,6 +118,60 @@ const US_REQUIRED_DUTY_DATASETS: ReadonlyArray<DutyDatasetCoverageRequirement> =
   { dest: 'US', dutyRule: 'mfn', expectedSources: ['official'] },
   { dest: 'US', dutyRule: 'fta', expectedSources: ['official'] },
 ] as const;
+const OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS = [
+  'duties.eu.taric.daily',
+  'duties.eu.taric.measure',
+  'duties.eu.taric.component',
+  'duties.eu.taric.duty_expression',
+  'duties.eu.taric.geo_description',
+  'duties.uk.tariff.api_base',
+  'duties.us.usitc.base',
+  'duties.us.usitc.csv',
+  'duties.jp.customs.tariff_index',
+  'duties.cn.taxbook.pdf',
+  'duties.cn.official.fta_excel',
+  'duties.id.btki.xlsx',
+  'duties.id.official.fta_excel',
+  'duties.my.official.mfn_excel',
+  'duties.my.official.fta_excel',
+  'duties.ph.tariff_commission.xlsx',
+  'duties.ph.official.fta_excel',
+  'duties.sg.official.mfn_excel',
+  'duties.sg.official.fta_excel',
+  'duties.th.official.mfn_excel',
+  'duties.th.official.fta_excel',
+  'duties.vn.official.mfn_excel',
+  'duties.vn.official.fta_excel',
+] as const;
+
+export function evaluateRequiredSourceKeys(
+  requiredKeys: ReadonlyArray<string>,
+  rows: ReadonlyArray<SourceRegistryCoverageRow>
+): CoverageCheck[] {
+  const byKey = new Map(rows.map((row) => [row.key, row]));
+  return requiredKeys.map((sourceKey) => {
+    const row = byKey.get(sourceKey);
+    if (!row) {
+      return {
+        key: `source_registry.duties.${sourceKey}`,
+        ok: false,
+        detail: `Missing source_registry row for ${sourceKey}`,
+      };
+    }
+    if (!row.enabled) {
+      return {
+        key: `source_registry.duties.${sourceKey}`,
+        ok: false,
+        detail: `source_registry row for ${sourceKey} is disabled`,
+      };
+    }
+    return {
+      key: `source_registry.duties.${sourceKey}`,
+      ok: true,
+      detail: `source_registry row for ${sourceKey} is enabled`,
+    };
+  });
+}
 
 function up2(value: string): string {
   return value.trim().toUpperCase().slice(0, 2);
@@ -341,6 +401,13 @@ export const coverageSnapshot: Command = async (args) => {
       )
     );
   const officialDutyRows = dutyRows.filter((row) => row.source === 'official');
+  const dutySourceRegistryRows = await db
+    .select({
+      key: sourceRegistryTable.key,
+      enabled: sourceRegistryTable.enabled,
+    })
+    .from(sourceRegistryTable)
+    .where(inArray(sourceRegistryTable.key, [...OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS]));
 
   const deMinimisRows = await db
     .select({ dest: deMinimisTable.dest })
@@ -560,6 +627,9 @@ export const coverageSnapshot: Command = async (args) => {
       detail: `US ${requirement.dutyRule.toUpperCase()} official coverage (${requirement.expectedSources.join('/')})`,
     });
   }
+  checks.push(
+    ...evaluateRequiredSourceKeys(OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS, dutySourceRegistryRows)
+  );
 
   const failedChecks = checks.filter((check) => !check.ok);
   const gateOk = failedChecks.length === 0;
@@ -587,6 +657,7 @@ export const coverageSnapshot: Command = async (args) => {
       usDutyDatasets: US_REQUIRED_DUTY_DATASETS.map((req) =>
         formatDutyDatasetCoverageRequirement(req)
       ),
+      officialDutySourceKeys: [...OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS],
     },
     freshness: {
       fx: freshness.datasets.fx,
@@ -675,6 +746,18 @@ export const coverageSnapshot: Command = async (args) => {
       duties: {
         officialRowCount: officialDutyRows.length,
         officialDestinations: dutyDestinations,
+        sourceRegistry: {
+          requiredKeyCount: OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS.length,
+          presentKeyCount: dutySourceRegistryRows.length,
+          enabledKeyCount: dutySourceRegistryRows.filter((row) => row.enabled).length,
+          missingKeys: OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS.filter(
+            (sourceKey) => !dutySourceRegistryRows.some((row) => row.key === sourceKey)
+          ),
+          disabledKeys: dutySourceRegistryRows
+            .filter((row) => !row.enabled)
+            .map((row) => row.key)
+            .sort(),
+        },
       },
       deMinimis: {
         rowCount: deMinimisRows.length,
