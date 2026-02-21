@@ -2,8 +2,10 @@ import type { Command } from '../../runtime.js';
 import { withRun } from '../../runtime.js';
 import { importVnMfn } from '../../../../modules/duty-rates/services/asean/vn/import-mfn.js';
 import { importVnPreferential } from '../../../../modules/duty-rates/services/asean/vn/import-preferential.js';
+import { assertWitsImportsEnabled } from '../../../wits-gate.js';
 
 export const dutiesVnMfn: Command = async () => {
+  assertWitsImportsEnabled();
   const payload = await withRun(
     { importSource: 'WITS', job: 'duties:vn-mfn', params: { sourceKey: 'duties.wits.sdmx.base' } },
     async (importId) => {
@@ -15,6 +17,7 @@ export const dutiesVnMfn: Command = async () => {
 };
 
 export const dutiesVnFta: Command = async () => {
+  assertWitsImportsEnabled();
   const payload = await withRun(
     { importSource: 'WITS', job: 'duties:vn-fta', params: { sourceKey: 'duties.wits.sdmx.base' } },
     async (importId) => {

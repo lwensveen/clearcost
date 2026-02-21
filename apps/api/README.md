@@ -434,11 +434,14 @@ Both HTTP workflows (`cron-daily-http.yml` and `cron-hourly-http.yml`) require:
 | `DATABASE_URL`         | secret | yes      | Direct DB import jobs via CLI runtime.                    |
 | `DATA_REMOTE_BASE`     | secret | no       | Enables freight cards JSON import step.                   |
 | `AHTN_SOURCE_URL`      | secret | no       | Enables AHTN alias import step.                           |
+| `ENABLE_WITS_IMPORTS`  | var    | no       | Enables WITS duty imports/routes when set to `true`.      |
 | `ENABLE_WITS_BACKFILL` | var    | no       | Runs weekly WITS duty backfill steps when set to `true`.  |
 | `CN_MFN_PDF_URL`       | secret | no       | Enables CN MFN PDF importer step.                         |
 | `TABULA_JAR_URL`       | var    | no       | Override Tabula jar URL for CN PDF parsing (has default). |
 | `SLACK_WEBHOOK_URL`    | secret | no       | Success/failure notifications.                            |
 | `DISCORD_WEBHOOK_URL`  | secret | no       | Success/failure notifications.                            |
+
+WITS HTTP routes (`/internal/cron/import/duties/*/wits`) and `import:duties:wits` CLI runs are disabled unless `ENABLE_WITS_IMPORTS=true` (or weekly backfill sets `ENABLE_WITS_BACKFILL=true`).
 
 US duties/surcharges are intentionally run in `cron-daily-http.yml` for fresher data and fail-fast checks.
 

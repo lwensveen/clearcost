@@ -2,6 +2,7 @@ import type { Command } from '../../runtime.js';
 import { withRun } from '../../runtime.js';
 import { importDutyRatesFromWITS } from '../../../../modules/duty-rates/services/wits/import-from-wits.js';
 import { buildImportId, parseCSV, parseFlags } from '../../utils.js';
+import { assertWitsImportsEnabled } from '../../../wits-gate.js';
 
 const DEFAULT_DESTS = [
   'AU',
@@ -22,6 +23,8 @@ const DEFAULT_DESTS = [
 ] as const;
 
 export const dutiesWits: Command = async (args) => {
+  assertWitsImportsEnabled();
+
   const flags = parseFlags(args.slice(0)); // keep all flags
 
   // --dests=US,GB or positional first arg (legacy)

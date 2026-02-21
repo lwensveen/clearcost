@@ -2,8 +2,10 @@ import { importMyPreferential } from '../../../../modules/duty-rates/services/as
 import { Command, withRun } from '../../runtime.js';
 import { parseFlags } from '../../utils.js';
 import { importMyMfn } from '../../../../modules/duty-rates/services/asean/my/import-mfn.js';
+import { assertWitsImportsEnabled } from '../../../wits-gate.js';
 
 export const dutiesMyMfn: Command = async (args) => {
+  assertWitsImportsEnabled();
   const flags = parseFlags(args);
   const hs6 = (flags.hs6 as string | undefined)?.split(',').filter(Boolean);
 
@@ -29,6 +31,7 @@ export const dutiesMyMfn: Command = async (args) => {
 
 // FTA
 export const dutiesMyFta: Command = async (args) => {
+  assertWitsImportsEnabled();
   const flags = parseFlags(args);
   const hs6 = (flags.hs6 as string | undefined)?.split(',').filter(Boolean);
   const partners = (flags.partners as string | undefined)?.split(',').filter(Boolean);
