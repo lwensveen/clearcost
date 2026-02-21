@@ -37,17 +37,24 @@ export const dutiesJpFta: Command = async (args) => {
 
   const payload = await withRun(
     {
-      importSource: 'WITS',
-      job: 'duties:jp-fta',
+      importSource: 'JP_CUSTOMS',
+      job: 'duties:jp-fta-official',
       params: {
         hs6,
         partners: partnerGeoIds,
         dryRun: boolParam(dryRun),
-        sourceKey: 'duties.wits.sdmx.base',
+        sourceKey: 'duties.jp.customs.tariff_index',
+        fallbackSourceKey: 'duties.wits.sdmx.base',
       },
     },
     async (importId) => {
-      const res = await importJpPreferential({ hs6List: hs6, partnerGeoIds, dryRun, importId });
+      const res = await importJpPreferential({
+        hs6List: hs6,
+        partnerGeoIds,
+        dryRun,
+        useWitsFallback: true,
+        importId,
+      });
       return { inserted: res.inserted, payload: res };
     }
   );
@@ -79,13 +86,14 @@ export const dutiesJpAll: Command = async (args) => {
 
   const fta = await withRun(
     {
-      importSource: 'WITS',
-      job: 'duties:jp-fta',
+      importSource: 'JP_CUSTOMS',
+      job: 'duties:jp-fta-official',
       params: {
         hs6,
         partners,
         dryRun: boolParam(dryRun),
-        sourceKey: 'duties.wits.sdmx.base',
+        sourceKey: 'duties.jp.customs.tariff_index',
+        fallbackSourceKey: 'duties.wits.sdmx.base',
       },
     },
     async (importId) => {
@@ -93,6 +101,7 @@ export const dutiesJpAll: Command = async (args) => {
         hs6List: hs6,
         partnerGeoIds: partners,
         dryRun,
+        useWitsFallback: true,
         importId,
       });
       return { inserted: res.inserted, payload: res };

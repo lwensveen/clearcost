@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   importJpMfn: vi.fn(),
-  importJpPreferential: vi.fn(),
+  importJpPreferentialOfficial: vi.fn(),
+  importJpPreferentialWits: vi.fn(),
 }));
 
 vi.mock('../../duty-rates/services/jp/import-mfn.js', () => ({
@@ -12,7 +13,8 @@ vi.mock('../../duty-rates/services/jp/import-mfn.js', () => ({
 }));
 
 vi.mock('../../duty-rates/services/jp/import-preferential.js', () => ({
-  importJpPreferential: mocks.importJpPreferential,
+  importJpPreferential: mocks.importJpPreferentialOfficial,
+  importJpPreferentialFromWits: mocks.importJpPreferentialWits,
 }));
 
 import jpDutyRoutes from './jp-routes.js';
@@ -29,11 +31,17 @@ async function buildApp() {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.importJpMfn.mockResolvedValue({ ok: true, inserted: 1, updated: 0, count: 1 });
-  mocks.importJpPreferential.mockResolvedValue({ ok: true, inserted: 1, updated: 0, count: 1 });
+  mocks.importJpPreferentialOfficial.mockResolvedValue({
+    ok: true,
+    inserted: 1,
+    updated: 0,
+    count: 1,
+  });
+  mocks.importJpPreferentialWits.mockResolvedValue({ ok: true, inserted: 1, updated: 0, count: 1 });
 });
 
 describe('jp duties WITS explicit FTA routes', () => {
-  it('uses WITS importer on /jp-fta', async () => {
+  it('uses official importer on /jp-fta', async () => {
     const app = await buildApp();
     const res = await app.inject({
       method: 'POST',
@@ -42,12 +50,14 @@ describe('jp duties WITS explicit FTA routes', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(mocks.importJpPreferential).toHaveBeenCalledWith(
+    expect(mocks.importJpPreferentialOfficial).toHaveBeenCalledWith(
       expect.objectContaining({
         partnerGeoIds: ['US'],
         dryRun: true,
+        useWitsFallback: true,
       })
     );
+    expect(mocks.importJpPreferentialWits).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -60,12 +70,13 @@ describe('jp duties WITS explicit FTA routes', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(mocks.importJpPreferential).toHaveBeenCalledWith(
+    expect(mocks.importJpPreferentialWits).toHaveBeenCalledWith(
       expect.objectContaining({
         partnerGeoIds: ['US'],
         dryRun: true,
       })
     );
+    expect(mocks.importJpPreferentialOfficial).not.toHaveBeenCalled();
     await app.close();
   });
 });

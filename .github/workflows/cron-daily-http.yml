@@ -82,9 +82,9 @@ jobs:
             exit 1
           fi
 
-      - name: JP Duties — FTA (WITS)
+      - name: JP Duties — FTA (official default, WITS fallback)
         run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/jp-fta/wits --body '{}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/jp-fta --body '{}')
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then

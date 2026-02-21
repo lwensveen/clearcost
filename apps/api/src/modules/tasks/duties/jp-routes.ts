@@ -1,6 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import { importJpMfn } from '../../duty-rates/services/jp/import-mfn.js';
-import { importJpPreferential } from '../../duty-rates/services/jp/import-preferential.js';
+import {
+  importJpPreferential,
+  importJpPreferentialFromWits,
+} from '../../duty-rates/services/jp/import-preferential.js';
 import {
   TasksDutyHs6BatchDryRunBodySchema,
   TasksDutyHs6BatchPartnerGeoIdsBodySchema,
@@ -37,7 +40,7 @@ export default function jpDutyRoutes(app: FastifyInstance) {
     );
   }
 
-  // JP Preferential (WITS default; no official source yet)
+  // JP Preferential (official default)
   {
     const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
 
@@ -48,9 +51,9 @@ export default function jpDutyRoutes(app: FastifyInstance) {
         schema: { body: Body },
         config: {
           importMeta: {
-            importSource: 'WITS',
-            job: 'duties:jp-fta',
-            sourceKey: 'duties.wits.sdmx.base',
+            importSource: 'JP_CUSTOMS',
+            job: 'duties:jp-fta-official',
+            sourceKey: 'duties.jp.customs.tariff_index',
           },
         },
       },
@@ -61,6 +64,7 @@ export default function jpDutyRoutes(app: FastifyInstance) {
           partnerGeoIds,
           batchSize,
           dryRun,
+          useWitsFallback: true,
           importId: req.importCtx?.runId,
         });
         return reply.send({ importId: req.importCtx?.runId, ...res });
@@ -87,7 +91,7 @@ export default function jpDutyRoutes(app: FastifyInstance) {
       },
       async (req, reply) => {
         const { hs6, partnerGeoIds, batchSize, dryRun } = Body.parse(req.body ?? {});
-        const res = await importJpPreferential({
+        const res = await importJpPreferentialFromWits({
           hs6List: hs6,
           partnerGeoIds,
           batchSize,

@@ -1,6 +1,7 @@
 import type { DutyRateInsert } from '@clearcost/types';
 import { batchUpsertDutyRatesFromStream } from '../../utils/batch-upsert.js';
 import { fetchWitsPreferentialDutyRates } from '../wits/preferential.js';
+import { fetchJpPreferentialDutyRates } from './fetch-preferential.js';
 
 type Params = {
   hs6List?: string[];
@@ -8,7 +9,7 @@ type Params = {
   batchSize?: number;
   importId?: string;
   dryRun?: boolean;
-  useWitsFallback?: boolean; // temporary compatibility flag; must remain true
+  useWitsFallback?: boolean;
 };
 
 export const JP_FTA_DEFAULT_PARTNER_GEOIDS = [
@@ -46,22 +47,10 @@ function normalizePartnerGeoIds(partnerGeoIds?: string[]): string[] {
   return [...out];
 }
 
-export async function importJpPreferential({
-  hs6List,
-  partnerGeoIds,
-  batchSize = 5_000,
-  importId,
-  dryRun,
-  useWitsFallback = true,
-}: Params) {
-  if (!useWitsFallback) {
-    throw new Error(
-      '[JP Duties] Preferential official source is not implemented; WITS source cannot be disabled.'
-    );
-  }
-
-  const partners = normalizePartnerGeoIds(partnerGeoIds);
-
+async function fetchJpPreferentialFromWits(
+  partners: string[],
+  hs6List?: string[]
+): Promise<DutyRateInsert[]> {
   const witsRows: DutyRateInsert[] = [];
   for (const partner of partners) {
     const rows = await fetchWitsPreferentialDutyRates({
@@ -72,7 +61,18 @@ export async function importJpPreferential({
     });
     witsRows.push(...rows);
   }
+  return witsRows;
+}
 
+export async function importJpPreferentialFromWits({
+  hs6List,
+  partnerGeoIds,
+  batchSize = 5_000,
+  importId,
+  dryRun,
+}: Params) {
+  const partners = normalizePartnerGeoIds(partnerGeoIds);
+  const witsRows = await fetchJpPreferentialFromWits(partners, hs6List);
   if (witsRows.length === 0) {
     throw new Error('[JP Duties] Preferential produced 0 rows from WITS source.');
   }
@@ -84,6 +84,57 @@ export async function importJpPreferential({
     makeSourceRef: (r) =>
       [
         'wits',
+        'JP',
+        r.partner && r.partner !== '' ? r.partner : 'ERGA',
+        r.dutyRule ?? 'fta',
+        r.hs6,
+      ].join(':'),
+  });
+
+  return {
+    ok: true as const,
+    inserted: res.inserted,
+    updated: res.updated,
+    count: res.count,
+    dryRun: !!res.dryRun,
+  };
+}
+
+export async function importJpPreferential({
+  hs6List,
+  partnerGeoIds,
+  batchSize = 5_000,
+  importId,
+  dryRun,
+  useWitsFallback = true,
+}: Params) {
+  const partners = normalizePartnerGeoIds(partnerGeoIds);
+  const officialRows = await fetchJpPreferentialDutyRates({ hs6List, partnerGeoIds: partners });
+
+  let witsRows: DutyRateInsert[] = [];
+  if (useWitsFallback) {
+    const officialPartners = new Set(officialRows.map((row) => row.partner).filter(Boolean));
+    const missingPartners = partners.filter((partner) => !officialPartners.has(partner));
+    if (missingPartners.length > 0) {
+      witsRows = await fetchJpPreferentialFromWits(missingPartners, hs6List);
+    }
+  }
+
+  const merged = [...officialRows, ...witsRows];
+  if (merged.length === 0) {
+    if (useWitsFallback) {
+      throw new Error('[JP Duties] Preferential produced 0 rows from official and WITS sources.');
+    }
+    throw new Error('[JP Duties] Preferential produced 0 rows from official source.');
+  }
+
+  const res = await batchUpsertDutyRatesFromStream(merged, {
+    batchSize,
+    importId,
+    dryRun,
+    makeSourceRef: (r) =>
+      [
+        r.source === 'wits' ? 'wits' : 'jp-customs',
         'JP',
         r.partner && r.partner !== '' ? r.partner : 'ERGA',
         r.dutyRule ?? 'fta',
