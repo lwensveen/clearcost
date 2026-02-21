@@ -153,6 +153,50 @@ describe('withRun', () => {
     expect(releaseRunLock).toHaveBeenCalledWith('custom:import-lock');
   });
 
+  it('promotes source hints from params into import provenance when top-level fields are absent', async () => {
+    const ctx = {
+      importSource: 'WITS' as const,
+      job: 'JOB',
+      params: {
+        sourceKey: 'duties.wits.sdmx.base',
+        sourceUrl: 'https://wits.example/data',
+      },
+    };
+    const work = vi.fn(async () => ({ inserted: 1, payload: { ok: true } }));
+
+    await withRun(ctx, work);
+
+    expect(startImportRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceKey: 'duties.wits.sdmx.base',
+        sourceUrl: 'https://wits.example/data',
+      })
+    );
+  });
+
+  it('top-level source hints override params source hints', async () => {
+    const ctx = {
+      importSource: 'WITS' as const,
+      job: 'JOB',
+      sourceKey: 'duties.eu.taric.mfn',
+      sourceUrl: 'https://taric.example/mfn',
+      params: {
+        sourceKey: 'duties.wits.sdmx.base',
+        sourceUrl: 'https://wits.example/data',
+      },
+    };
+    const work = vi.fn(async () => ({ inserted: 1, payload: { ok: true } }));
+
+    await withRun(ctx, work);
+
+    expect(startImportRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceKey: 'duties.eu.taric.mfn',
+        sourceUrl: 'https://taric.example/mfn',
+      })
+    );
+  });
+
   it('releases lock when provenance start fails', async () => {
     vi.mocked(startImportRun).mockRejectedValue(new Error('db unavailable'));
 

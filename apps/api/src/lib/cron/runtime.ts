@@ -4,6 +4,12 @@ import { acquireRunLock, makeLockKey, releaseRunLock } from '../run-lock.js';
 
 export type Command = (args: string[]) => Promise<void>;
 
+function nonEmptyString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 export async function withRun<T>(
   ctx: {
     importSource: ImportSource;
@@ -17,6 +23,10 @@ export async function withRun<T>(
   work: (importId: string) => Promise<{ inserted: number; payload: T }>
 ): Promise<T> {
   const lockKey = ctx.lockKey ?? makeLockKey({ importSource: ctx.importSource, job: ctx.job });
+  const paramsRecord =
+    ctx.params && typeof ctx.params === 'object' ? (ctx.params as Record<string, unknown>) : null;
+  const sourceKey = nonEmptyString(ctx.sourceKey) ?? nonEmptyString(paramsRecord?.sourceKey);
+  const sourceUrl = nonEmptyString(ctx.sourceUrl) ?? nonEmptyString(paramsRecord?.sourceUrl);
   const lockAcquired = await acquireRunLock(lockKey);
   const end = startImportTimer({ importSource: ctx.importSource, job: ctx.job });
   if (!lockAcquired) {
@@ -32,8 +42,8 @@ export async function withRun<T>(
       job: ctx.job,
       params: ctx.params ?? {},
       ...(ctx.version ? { version: ctx.version } : {}),
-      ...(ctx.sourceKey ? { sourceKey: ctx.sourceKey } : {}),
-      ...(ctx.sourceUrl ? { sourceUrl: ctx.sourceUrl } : {}),
+      ...(sourceKey ? { sourceKey } : {}),
+      ...(sourceUrl ? { sourceUrl } : {}),
     } satisfies Parameters<typeof startImportRun>[0];
     const run = await startImportRun({
       ...startParams,
