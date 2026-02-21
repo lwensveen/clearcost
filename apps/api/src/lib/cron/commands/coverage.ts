@@ -143,7 +143,15 @@ const OFFICIAL_DE_MINIMIS_REQUIRED_SOURCE_KEYS = [
   'de-minimis.official.ca.lvs_vat',
   'de-minimis.official.ca.lvs_duty',
 ] as const;
-const OFFICIAL_HS_REQUIRED_SOURCE_KEYS = ['hs.asean.ahtn.csv'] as const;
+const OFFICIAL_HS_REQUIRED_SOURCE_KEYS = [
+  'hs.asean.ahtn.csv',
+  'hs.eu.taric.goods',
+  'hs.eu.taric.goods_description',
+  'hs.uk.tariff.api_base',
+  'hs.us.usitc.base',
+  'hs.us.usitc.csv',
+  'hs.us.usitc.json',
+] as const;
 const OFFICIAL_NOTICES_REQUIRED_SOURCE_KEYS = [
   'notices.cn.mof.list',
   'notices.cn.gacc.list',
@@ -176,6 +184,7 @@ const OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS = [
   'duties.uk.tariff.api_base',
   'duties.us.usitc.base',
   'duties.us.usitc.csv',
+  'duties.us.trade_programs.members_csv',
   'duties.jp.customs.tariff_index',
   'duties.cn.taxbook.pdf',
   'duties.cn.official.fta_excel',
