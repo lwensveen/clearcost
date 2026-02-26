@@ -467,7 +467,7 @@ describe('quoteLandedCost', () => {
       'DE',
       '123456',
       expect.any(Date),
-      { partner: 'CN' }
+      { partner: 'CN', mvpOfficialOnly: true }
     );
   });
 
@@ -603,7 +603,7 @@ describe('quoteLandedCost', () => {
       'DE',
       '123456',
       expect.any(Date),
-      { partner: 'GB' }
+      { partner: 'GB', mvpOfficialOnly: true }
     );
     expect(mocks.getSurchargesScopedWithMetaMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -621,9 +621,11 @@ describe('quoteLandedCost', () => {
       'GB',
       '123456',
       expect.any(Date),
-      { partner: 'CN' }
+      { partner: 'CN', mvpOfficialOnly: true }
     );
-    expect(mocks.getVatForHs6WithMetaMock).toHaveBeenCalledWith('GB', '123456', expect.any(Date));
+    expect(mocks.getVatForHs6WithMetaMock).toHaveBeenCalledWith('GB', '123456', expect.any(Date), {
+      mvpOfficialOnly: true,
+    });
     expect(mocks.getSurchargesScopedWithMetaMock).toHaveBeenCalledWith(
       expect.objectContaining({
         dest: 'GB',

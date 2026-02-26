@@ -785,10 +785,11 @@ export async function quoteLandedCost(
 
   const dutyLookup = await getActiveDutyRateWithMeta(destCountry, hs6, now, {
     partner: toDutyPartnerIso2(originCountry),
+    mvpOfficialOnly: true,
   });
   const dutyMatchMode = dutyMatchModeFromLookup(dutyLookup.meta.note);
   const dutyRow = dutyLookup.value;
-  const vatLookup = await getVatForHs6WithMeta(destCountry, hs6, now);
+  const vatLookup = await getVatForHs6WithMeta(destCountry, hs6, now, { mvpOfficialOnly: true });
   const vatInfo = vatLookup.value; // { ratePct, base, source, effectiveFrom }
 
   // -----------------
