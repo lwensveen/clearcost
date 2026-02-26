@@ -73,6 +73,65 @@ describe('import-instrumentation plugin (unit)', () => {
     await app.close();
   });
 
+  it('rejects non-ops internal cron jobs without sourceKey at runtime', async () => {
+    const plugin = await loadPlugin();
+    const app = Fastify();
+    await app.register(plugin);
+    app.post(
+      '/internal/cron/missing-source-key',
+      { config: { importMeta: { importSource: 'WITS', job: 'seed' } } },
+      async (_req, reply) => reply.send({ inserted: 1 })
+    );
+
+    const r = await app.inject({
+      method: 'POST',
+      url: '/internal/cron/missing-source-key',
+      headers: jsonCT(),
+      payload: '{}',
+    });
+    expect(r.statusCode).toBe(500);
+    expect(r.json()).toMatchObject({
+      error: {
+        message: 'importMeta.sourceKey is required for non-ops cron jobs',
+        details: { job: 'seed' },
+      },
+    });
+
+    expect(acquireRunLockMock).not.toHaveBeenCalled();
+    expect(startImportTimer).not.toHaveBeenCalled();
+    expect(startImportRun).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('allows ops internal cron jobs without sourceKey', async () => {
+    const plugin = await loadPlugin();
+    const app = Fastify();
+    await app.register(plugin);
+    app.post(
+      '/internal/cron/ops-prune',
+      { config: { importMeta: { importSource: 'MANUAL', job: 'ops:prune' } } },
+      async (_req, reply) => reply.type('application/json').send({ inserted: 1 })
+    );
+
+    const r = await app.inject({
+      method: 'POST',
+      url: '/internal/cron/ops-prune',
+      headers: jsonCT(),
+      payload: '{}',
+    });
+    expect(r.statusCode).toBe(200);
+    expect(acquireRunLockMock).toHaveBeenCalledWith('MANUAL:ops:prune');
+    expect(startImportRun).toHaveBeenCalledWith({
+      importSource: 'MANUAL',
+      job: 'ops:prune',
+      params: {
+        query: {},
+        body: {},
+      },
+    });
+    await app.close();
+  });
+
   it('returns 409 when lock cannot be acquired and includes lockKey', async () => {
     acquireRunLockMock.mockResolvedValue(false);
 

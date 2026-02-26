@@ -14,7 +14,9 @@ export default function dutyJsonRoute(app: FastifyInstance) {
           200: TasksDutyJsonImportResponseSchema,
         },
       },
-      config: { importMeta: { importSource: 'FILE', job: 'duties:json' } },
+      config: {
+        importMeta: { importSource: 'FILE', job: 'duties:json', sourceKey: 'duties.file.json' },
+      },
     },
     async (req, reply) => {
       const artifact = await fetchJSONWithArtifact<DutyRateInsert[]>('duties/duty-rates.json');

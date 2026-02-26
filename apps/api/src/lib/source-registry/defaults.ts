@@ -113,8 +113,16 @@ export const TASK_ONLY_REQUIRED_SOURCE_KEYS = [
   'surcharges.us.usitc_hts.json',
   'surcharges.us.bundle',
   'freight.cards.json',
+  'duties.file.json',
+  'surcharges.file.json',
 ] as const;
 const OPTIONAL_FALLBACK_SOURCE_KEY_SET = new Set<string>(OPTIONAL_FALLBACK_SOURCE_KEYS);
+const TASK_ONLY_MANUAL_SOURCE_KEY_SET = new Set<string>([
+  'de-minimis.baseline.seed',
+  'freight.cards.json',
+  'duties.file.json',
+  'surcharges.file.json',
+]);
 
 function uniqueSourceKeys(keys: ReadonlyArray<string>): string[] {
   return [...new Set(keys)];
@@ -179,7 +187,7 @@ function inferExpectedFormat(sourceType: SourceType): SourceExpectedFormat {
 
 function inferScheduleHint(key: string): SourceScheduleHint {
   if (OPTIONAL_FALLBACK_SOURCE_KEY_SET.has(key)) return 'manual';
-  if (key === 'de-minimis.baseline.seed') return 'manual';
+  if (TASK_ONLY_MANUAL_SOURCE_KEY_SET.has(key)) return 'manual';
   if (key.startsWith('notices.')) return 'daily';
   return 'daily';
 }

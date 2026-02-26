@@ -11,7 +11,13 @@ export default function surchargeJsonRoute(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:surcharges:json']),
       schema: { body: Body.optional() },
-      config: { importMeta: { importSource: 'FILE', job: 'surcharges:json' } },
+      config: {
+        importMeta: {
+          importSource: 'FILE',
+          job: 'surcharges:json',
+          sourceKey: 'surcharges.file.json',
+        },
+      },
     },
     async (req, reply) => {
       const { path = 'surcharges/surcharges.json' } = Body.parse(req.body ?? {});

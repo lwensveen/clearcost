@@ -36,5 +36,10 @@ describe('source registry defaults', () => {
     expect(byKey.get('duties.eu.taric.daily')?.scheduleHint).toBe('daily');
     expect(byKey.get('de-minimis.baseline.seed')?.scheduleHint).toBe('manual');
     expect(byKey.get('freight.cards.json')?.dataset).toBe('freight');
+    expect(byKey.get('freight.cards.json')?.scheduleHint).toBe('manual');
+    expect(byKey.get('duties.file.json')?.dataset).toBe('duties');
+    expect(byKey.get('duties.file.json')?.scheduleHint).toBe('manual');
+    expect(byKey.get('surcharges.file.json')?.dataset).toBe('surcharges');
+    expect(byKey.get('surcharges.file.json')?.scheduleHint).toBe('manual');
   });
 });

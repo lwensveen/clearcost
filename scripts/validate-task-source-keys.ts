@@ -22,7 +22,14 @@ function listRouteFiles(dir: string): string[] {
       out.push(...listRouteFiles(full));
       continue;
     }
-    if (stat.isFile() && full.endsWith('-routes.ts')) out.push(full);
+    if (
+      stat.isFile() &&
+      full.endsWith('.ts') &&
+      !full.endsWith('.unit.test.ts') &&
+      !full.endsWith('.int.test.ts')
+    ) {
+      out.push(full);
+    }
   }
   return out.sort();
 }

@@ -71,6 +71,15 @@ function resolveVersion(meta: ImportMetaConfig, req: any): string | undefined {
   return firstNonEmptyString(meta.version, q?.version, b?.version);
 }
 
+function isOpsJob(job: string): boolean {
+  return job.trim().toLowerCase().startsWith('ops:');
+}
+
+function isInternalCronRoute(req: any): boolean {
+  const routeUrl = req.routeOptions?.url;
+  return typeof routeUrl === 'string' && routeUrl.startsWith('/internal/cron/');
+}
+
 function mergeRunPatch<T extends Record<string, unknown>>(
   base: T,
   patch: ImportRunPatch | undefined
@@ -92,6 +101,15 @@ const plugin: FastifyPluginAsync = async (app) => {
   app.addHook('preHandler', async (req, reply) => {
     const meta = req.routeOptions?.config?.importMeta as ImportMetaConfig | undefined;
     if (!meta) return;
+    const sourceKey = resolveSourceKey(meta, req);
+
+    if (isInternalCronRoute(req) && !isOpsJob(meta.job) && !sourceKey) {
+      return reply.code(500).send(
+        errorResponseForStatus(500, 'importMeta.sourceKey is required for non-ops cron jobs', {
+          job: meta.job,
+        })
+      );
+    }
 
     const cfg = req.routeOptions?.config;
     const custom =
@@ -107,7 +125,6 @@ const plugin: FastifyPluginAsync = async (app) => {
 
     // 3) start metrics + provenance
     const end = startImportTimer(meta);
-    const sourceKey = resolveSourceKey(meta, req);
     const sourceUrl = resolveSourceUrl(meta, req);
     const version = resolveVersion(meta, req);
     const startParams = {
