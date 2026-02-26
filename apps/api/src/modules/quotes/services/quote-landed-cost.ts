@@ -780,6 +780,7 @@ export async function quoteLandedCost(
     goodsDest: itemValDest,
     freightDest: freightInDest,
     fxAsOf,
+    officialOnly: true,
   });
 
   const dutyLookup = await getActiveDutyRateWithMeta(destCountry, hs6, now, {

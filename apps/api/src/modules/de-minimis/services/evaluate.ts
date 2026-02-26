@@ -68,6 +68,7 @@ export async function evaluateDeMinimis(opts: {
   goodsDest: number; // goods value in destination currency (intrinsic)
   freightDest: number; // freight/insurance in destination currency (for CIF add to goods)
   fxAsOf: Date; // FX date for converting thresholds -> destCurrency
+  officialOnly?: boolean; // restrict threshold selection to official rows
 }): Promise<DeMinimisDecision> {
   const day = toMidnightUTC(opts.fxAsOf);
   const destCountryIso2 = normalizeCountryIso2(opts.dest) ?? opts.dest.toUpperCase();
@@ -79,14 +80,16 @@ export async function evaluateDeMinimis(opts: {
     .where(
       and(
         eq(deMinimisTable.dest, destCountryIso2),
+        opts.officialOnly ? eq(deMinimisTable.source, 'official') : undefined,
         lte(deMinimisTable.effectiveFrom, day),
         or(isNull(deMinimisTable.effectiveTo), gte(deMinimisTable.effectiveTo, day))
       )
     )
     .orderBy(desc(deMinimisTable.effectiveFrom));
 
-  const dutyRow = pickPreferredThresholdRow(rows, 'DUTY');
-  const vatRow = pickPreferredThresholdRow(rows, 'VAT');
+  const candidateRows = opts.officialOnly ? rows.filter((row) => row.source === 'official') : rows;
+  const dutyRow = pickPreferredThresholdRow(candidateRows, 'DUTY');
+  const vatRow = pickPreferredThresholdRow(candidateRows, 'VAT');
 
   async function toDest(
     row?: (typeof rows)[number]

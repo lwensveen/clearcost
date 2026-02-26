@@ -394,6 +394,7 @@ describe('quoteLandedCost', () => {
       expect.objectContaining({
         dest: 'NL',
         destCurrency: 'EUR',
+        officialOnly: true,
       })
     );
   });
@@ -632,6 +633,7 @@ describe('quoteLandedCost', () => {
       expect.objectContaining({
         dest: 'GB',
         destCurrency: 'GBP',
+        officialOnly: true,
       })
     );
   });

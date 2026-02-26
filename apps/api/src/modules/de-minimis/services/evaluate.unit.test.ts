@@ -181,4 +181,30 @@ describe('evaluateDeMinimis', () => {
     expect(out.suppressDuty).toBe(true);
     expect(mocks.convertCurrencyMock).not.toHaveBeenCalled();
   });
+
+  it('ignores non-official thresholds when officialOnly is enabled', async () => {
+    mockRows([
+      {
+        deMinimisKind: 'DUTY',
+        deMinimisBasis: 'INTRINSIC',
+        source: 'fallback',
+        currency: 'EUR',
+        value: '150',
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+        effectiveTo: null,
+      },
+    ]);
+
+    const out = await evaluateDeMinimis({
+      dest: 'NL',
+      goodsDest: 90,
+      freightDest: 0,
+      fxAsOf: FX_AS_OF,
+      officialOnly: true,
+    });
+
+    expect(out.duty).toBeUndefined();
+    expect(out.suppressDuty).toBe(false);
+    expect(mocks.convertCurrencyMock).not.toHaveBeenCalled();
+  });
 });
