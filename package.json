@@ -36,8 +36,8 @@
     "test:watch": "vitest",
     "validate-docs": "bun run scripts/validate-docs.ts",
     "validate-duty-jobs": "bun run scripts/validate-duty-job-alignment.ts",
-    "validate-duty-source-keys": "bun run scripts/validate-duty-source-keys.ts",
     "validate-envs": "bun run scripts/validate-turbo-envs.ts",
+    "validate-source-keys": "bun run scripts/validate-task-source-keys.ts",
     "validate-tests": "bun run scripts/validate-test-files.ts"
   },
   "trustedDependencies": [

@@ -37,8 +37,8 @@ jobs:
       - name: Validate duty job alignment
         run: bun run validate-duty-jobs
 
-      - name: Validate duty source keys
-        run: bun run validate-duty-source-keys
+      - name: Validate task source keys
+        run: bun run validate-source-keys
 
   lint:
     needs: [validate]
