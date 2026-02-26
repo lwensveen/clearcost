@@ -21,7 +21,7 @@ export default function idDutyRoutes(app: FastifyInstance) {
       config: {
         importMeta: {
           importSource: 'OFFICIAL',
-          job: 'duties:id-mfn',
+          job: 'duties:id-mfn-official',
           sourceKey: 'duties.id.btki.xlsx',
         },
       },

@@ -74,7 +74,7 @@ const ASEAN_FTA_REQUIRED_JOBS = [
 ] as const;
 const ASEAN_MFN_REQUIRED_JOBS = [
   'duties:bn-mfn-official',
-  'duties:id-mfn',
+  'duties:id-mfn-official',
   'duties:kh-mfn-official',
   'duties:la-mfn-official',
   'duties:mm-mfn-official',
