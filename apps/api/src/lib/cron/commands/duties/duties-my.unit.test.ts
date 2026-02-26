@@ -98,7 +98,7 @@ describe('duties-my commands', () => {
     const [, ftaCall] = mocks.withRunMock.mock.calls;
     expect(ftaCall?.[0]).toMatchObject({
       importSource: 'OFFICIAL',
-      job: 'duties:my-fta-excel',
+      job: 'duties:my-fta-official',
       sourceKey: 'duties.my.official.fta_excel',
     });
   });

@@ -102,7 +102,7 @@ export const dutiesMyFtaOfficial: Command = async (args) => {
   const payload = await withRun(
     {
       importSource: 'OFFICIAL',
-      job: 'duties:my-fta-excel',
+      job: 'duties:my-fta-official',
       sourceKey: DUTIES_MY_FTA_SOURCE_KEY,
       sourceUrl: urlOrPath,
       params: {

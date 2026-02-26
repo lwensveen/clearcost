@@ -91,7 +91,7 @@ export default function myDutyRoutesOfficial(app: FastifyInstance) {
         config: {
           importMeta: {
             importSource: 'OFFICIAL',
-            job: 'duties:my-fta-excel',
+            job: 'duties:my-fta-official',
             sourceKey: 'duties.my.official.fta_excel',
           },
         },

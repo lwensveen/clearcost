@@ -66,7 +66,7 @@ const ASEAN_FTA_REQUIRED_JOBS = [
   'duties:kh-fta-official',
   'duties:la-fta-official',
   'duties:mm-fta-official',
-  'duties:my-fta-excel',
+  'duties:my-fta-official',
   'duties:ph-fta-official',
   'duties:th-fta-official',
   'duties:vn-fta-official',
