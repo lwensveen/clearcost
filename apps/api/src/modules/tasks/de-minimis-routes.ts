@@ -16,7 +16,13 @@ export default function deMinimisTaskRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:de-minimis:import-zonos']),
       schema: { body: Body.optional() },
-      config: { importMeta: { importSource: 'ZONOS', job: 'de-minimis:import-zonos' } },
+      config: {
+        importMeta: {
+          importSource: 'ZONOS',
+          job: 'de-minimis:import-zonos',
+          sourceKey: 'de-minimis.zonos.docs',
+        },
+      },
     },
     async (req, reply) => {
       const { effectiveOn } = Body.parse(req.body ?? {});
@@ -32,7 +38,13 @@ export default function deMinimisTaskRoutes(app: FastifyInstance) {
     '/cron/de-minimis/import-official',
     {
       preHandler: app.requireApiKey(['tasks:de-minimis:import-official']),
-      config: { importMeta: { importSource: 'OFFICIAL', job: 'de-minimis:import-official' } },
+      config: {
+        importMeta: {
+          importSource: 'OFFICIAL',
+          job: 'de-minimis:import-official',
+          sourceKey: 'de-minimis.official.bundle',
+        },
+      },
     },
     async (_req, reply) => {
       const result = await importDeMinimisFromOfficial();
@@ -46,7 +58,13 @@ export default function deMinimisTaskRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['tasks:de-minimis:seed-baseline']),
       schema: { body: Body.optional() },
-      config: { importMeta: { importSource: 'BASELINE', job: 'de-minimis:seed' } },
+      config: {
+        importMeta: {
+          importSource: 'BASELINE',
+          job: 'de-minimis:seed',
+          sourceKey: 'de-minimis.baseline.seed',
+        },
+      },
     },
     async (req, reply) => {
       const { effectiveOn } = Body.parse(req.body ?? {});

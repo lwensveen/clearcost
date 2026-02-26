@@ -23,7 +23,9 @@ export default function freightRoutes(app: FastifyInstance) {
     '/cron/import/freight',
     {
       preHandler: app.requireApiKey(['tasks:freight:import-json']),
-      config: { importMeta: { importSource: 'FILE', job: 'freight:json' } },
+      config: {
+        importMeta: { importSource: 'FILE', job: 'freight:json', sourceKey: 'freight.cards.json' },
+      },
     },
     async (req, reply) => {
       const artifact = await fetchJSONWithArtifact<FreightCardRow[]>('freight/freight-cards.json');

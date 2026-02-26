@@ -63,13 +63,44 @@ function extractImportMetaBlocks(text: string): string[] {
 function extractSourceKeysFromImportMeta(
   filePath: string,
   text: string
-): { sourceKeys: Set<string>; unresolvedIdentifiers: string[] } {
+): {
+  sourceKeys: Set<string>;
+  unresolvedIdentifiers: string[];
+  missingSourceKeyJobs: string[];
+} {
   const sourceKeys = new Set<string>();
   const unresolvedIdentifiers = new Set<string>();
+  const missingSourceKeyJobs: string[] = [];
   const blocks = extractImportMetaBlocks(text);
 
+  const parseJobs = (block: string): string[] => {
+    const jobs: string[] = [];
+    for (const match of block.matchAll(/job:\s*'([^']+)'/g)) {
+      const job = match[1]?.trim();
+      if (job) jobs.push(job);
+    }
+    for (const match of block.matchAll(/job:\s*`([^`]+)`/g)) {
+      const job = match[1]?.trim();
+      if (job) jobs.push(job);
+    }
+    return jobs;
+  };
+
+  const isOpsJob = (job: string): boolean => job.trim().toLowerCase().startsWith('ops:');
+
   for (const block of blocks) {
-    if (!block.includes('sourceKey:')) continue;
+    const hasSourceKey = /sourceKey:\s*/.test(block);
+    if (!hasSourceKey) {
+      const jobs = parseJobs(block);
+      if (jobs.length === 0) {
+        missingSourceKeyJobs.push(`${filePath}: <unknown-job>`);
+      } else {
+        for (const job of jobs) {
+          if (!isOpsJob(job)) missingSourceKeyJobs.push(`${filePath}: ${job}`);
+        }
+      }
+      continue;
+    }
 
     for (const match of block.matchAll(/sourceKey:\s*'([^']+)'/g)) {
       const sourceKey = match[1]?.trim();
@@ -95,7 +126,11 @@ function extractSourceKeysFromImportMeta(
     }
   }
 
-  return { sourceKeys, unresolvedIdentifiers: [...unresolvedIdentifiers].sort() };
+  return {
+    sourceKeys,
+    unresolvedIdentifiers: [...unresolvedIdentifiers].sort(),
+    missingSourceKeyJobs: [...new Set(missingSourceKeyJobs)].sort(),
+  };
 }
 
 function diff(source: ReadonlySet<string>, target: ReadonlySet<string>): string[] {
@@ -105,12 +140,14 @@ function diff(source: ReadonlySet<string>, target: ReadonlySet<string>): string[
 const routeFiles = listRouteFiles(tasksDir);
 const routeSourceKeys = new Set<string>();
 const unresolvedIdentifiers = new Set<string>();
+const missingSourceKeyJobs = new Set<string>();
 
 for (const filePath of routeFiles) {
   const text = readFileSync(filePath, 'utf8');
   const parsed = extractSourceKeysFromImportMeta(filePath, text);
   for (const sourceKey of parsed.sourceKeys) routeSourceKeys.add(sourceKey);
   for (const unresolved of parsed.unresolvedIdentifiers) unresolvedIdentifiers.add(unresolved);
+  for (const missing of parsed.missingSourceKeyJobs) missingSourceKeyJobs.add(missing);
 }
 
 const knownSourceKeys = new Set(ALL_REQUIRED_SOURCE_KEYS);
@@ -123,6 +160,14 @@ if (routeSourceKeys.size === 0) {
 if (unresolvedIdentifiers.size > 0) {
   errors.push(
     `Task route sourceKey identifiers could not be resolved statically: ${[...unresolvedIdentifiers]
+      .sort()
+      .join(', ')}`
+  );
+}
+
+if (missingSourceKeyJobs.size > 0) {
+  errors.push(
+    `Task routes missing importMeta.sourceKey for non-ops jobs: ${[...missingSourceKeyJobs]
       .sort()
       .join(', ')}`
   );

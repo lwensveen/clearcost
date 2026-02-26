@@ -5,6 +5,7 @@ import {
   OFFICIAL_FX_REQUIRED_SOURCE_KEYS,
   OPTIONAL_FALLBACK_SOURCE_KEYS,
   SOURCE_REGISTRY_DEFAULT_ENTRIES,
+  TASK_ONLY_REQUIRED_SOURCE_KEYS,
 } from './defaults.js';
 
 describe('source registry defaults', () => {
@@ -23,6 +24,7 @@ describe('source registry defaults', () => {
     for (const key of OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS) expect(keys.has(key)).toBe(true);
     for (const key of OFFICIAL_FX_REQUIRED_SOURCE_KEYS) expect(keys.has(key)).toBe(true);
     for (const key of OPTIONAL_FALLBACK_SOURCE_KEYS) expect(keys.has(key)).toBe(true);
+    for (const key of TASK_ONLY_REQUIRED_SOURCE_KEYS) expect(keys.has(key)).toBe(true);
   });
 
   it('derives expected dataset and schedule defaults for representative keys', () => {
@@ -32,5 +34,7 @@ describe('source registry defaults', () => {
     expect(byKey.get('de-minimis.official.us.section321')?.dataset).toBe('de_minimis');
     expect(byKey.get('duties.wits.sdmx.base')?.scheduleHint).toBe('manual');
     expect(byKey.get('duties.eu.taric.daily')?.scheduleHint).toBe('daily');
+    expect(byKey.get('de-minimis.baseline.seed')?.scheduleHint).toBe('manual');
+    expect(byKey.get('freight.cards.json')?.dataset).toBe('freight');
   });
 });

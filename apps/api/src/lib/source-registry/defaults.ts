@@ -107,6 +107,13 @@ export const OPTIONAL_FALLBACK_SOURCE_KEYS = [
   'de-minimis.trade_gov.api',
   'de-minimis.zonos.docs',
 ] as const;
+export const TASK_ONLY_REQUIRED_SOURCE_KEYS = [
+  'de-minimis.official.bundle',
+  'de-minimis.baseline.seed',
+  'surcharges.us.usitc_hts.json',
+  'surcharges.us.bundle',
+  'freight.cards.json',
+] as const;
 const OPTIONAL_FALLBACK_SOURCE_KEY_SET = new Set<string>(OPTIONAL_FALLBACK_SOURCE_KEYS);
 
 function uniqueSourceKeys(keys: ReadonlyArray<string>): string[] {
@@ -122,6 +129,7 @@ export const ALL_REQUIRED_SOURCE_KEYS = uniqueSourceKeys([
   ...OFFICIAL_NOTICES_REQUIRED_SOURCE_KEYS,
   ...OFFICIAL_SURCHARGES_REQUIRED_SOURCE_KEYS,
   ...OPTIONAL_FALLBACK_SOURCE_KEYS,
+  ...TASK_ONLY_REQUIRED_SOURCE_KEYS,
 ]);
 
 function inferDataset(key: string): SourceDataset {
@@ -171,6 +179,7 @@ function inferExpectedFormat(sourceType: SourceType): SourceExpectedFormat {
 
 function inferScheduleHint(key: string): SourceScheduleHint {
   if (OPTIONAL_FALLBACK_SOURCE_KEY_SET.has(key)) return 'manual';
+  if (key === 'de-minimis.baseline.seed') return 'manual';
   if (key.startsWith('notices.')) return 'daily';
   return 'daily';
 }
