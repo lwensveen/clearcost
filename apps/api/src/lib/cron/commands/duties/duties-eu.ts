@@ -11,7 +11,7 @@ export const dutiesEuDaily: Command = async (args) => {
   const dateArg = flags.date ?? flags.effectiveFrom ?? args?.[0];
 
   const payload = await withRun(
-    { importSource: 'TARIC', job: 'duties:eu-daily', params: { date: dateArg } },
+    { importSource: 'TARIC', job: 'duties:eu-daily-official', params: { date: dateArg } },
     async (importId) => {
       const res = await importEuFromDaily({ date: dateArg, include: 'both', importId });
       return { inserted: res.inserted, payload: res };
@@ -26,7 +26,7 @@ export const dutiesEuMfn: Command = async (args) => {
   const hs6 = (flags.hs6 ?? '').split(',').filter(Boolean);
 
   const payload = await withRun(
-    { importSource: 'TARIC', job: 'duties:eu-mfn', params: { hs6 } },
+    { importSource: 'TARIC', job: 'duties:eu-mfn-official', params: { hs6 } },
     async (importId) => {
       const res = await importEuMfn({ hs6List: hs6.length ? hs6 : undefined, importId });
       return { inserted: res.inserted, payload: res };
@@ -41,7 +41,7 @@ export const dutiesEuFta: Command = async (args) => {
   const partnerGeoIds = (flags.partners ?? '').split(',').filter(Boolean);
 
   const payload = await withRun(
-    { importSource: 'TARIC', job: 'duties:eu-fta', params: { hs6, partnerGeoIds } },
+    { importSource: 'TARIC', job: 'duties:eu-fta-official', params: { hs6, partnerGeoIds } },
     async (importId) => {
       const res = await importEuPreferential({
         hs6List: hs6.length ? hs6 : undefined,
@@ -72,7 +72,7 @@ export const dutiesEuBackfill: Command = async (args) => {
     count = 0;
   for (const day of days) {
     const step = await withRun(
-      { importSource: 'TARIC', job: 'duties:eu-daily', params: { date: day } },
+      { importSource: 'TARIC', job: 'duties:eu-daily-official', params: { date: day } },
       async (importId) => {
         const res = await importEuFromDaily({ date: day, include: 'both', importId });
         return { inserted: res.inserted, payload: res };

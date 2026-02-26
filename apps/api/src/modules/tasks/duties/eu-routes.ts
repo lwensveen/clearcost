@@ -21,7 +21,7 @@ export default function euDutyRoutes(app: FastifyInstance) {
         config: {
           importMeta: {
             importSource: 'TARIC',
-            job: 'duties:eu-mfn',
+            job: 'duties:eu-mfn-official',
             sourceKey: 'duties.eu.taric.mfn',
           },
         },
@@ -51,7 +51,7 @@ export default function euDutyRoutes(app: FastifyInstance) {
         config: {
           importMeta: {
             importSource: 'TARIC',
-            job: 'duties:eu-fta',
+            job: 'duties:eu-fta-official',
             sourceKey: 'duties.eu.taric.preferential',
           },
         },
@@ -82,7 +82,7 @@ export default function euDutyRoutes(app: FastifyInstance) {
         config: {
           importMeta: {
             importSource: 'TARIC',
-            job: 'duties:eu-daily',
+            job: 'duties:eu-daily-official',
             sourceKey: 'duties.eu.taric.daily',
           },
         },

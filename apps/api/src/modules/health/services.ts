@@ -287,7 +287,7 @@ const MVP_DATASET_FRESHNESS_RULES: Record<MvpDatasetFreshnessKey, MvpDatasetFres
   duties: {
     scheduled: true,
     freshnessThresholdHours: 192,
-    jobs: ['duties:eu-mfn', 'duties:eu-daily'],
+    jobs: ['duties:eu-mfn-official', 'duties:eu-daily-official'],
   },
 };
 

@@ -123,7 +123,7 @@ async function seedMvpData() {
     },
     {
       importSource: 'TARIC',
-      job: 'duties:eu-mfn',
+      job: 'duties:eu-mfn-official',
       version: 'mvp-e2e-v1',
       sourceUrl: 'test://duties',
       params: '{}',

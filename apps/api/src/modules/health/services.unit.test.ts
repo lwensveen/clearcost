@@ -164,7 +164,7 @@ describe('getMvpFreshnessSnapshot', () => {
             source: 'TARIC',
           },
         ],
-      }, // duties:eu-mfn|duties:eu-daily
+      }, // duties:eu-mfn-official|duties:eu-daily-official
     ];
 
     const { getMvpFreshnessSnapshot } = await import('./services.js');

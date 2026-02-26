@@ -180,7 +180,7 @@ async function seedImportFreshness() {
     },
     {
       importSource: 'TARIC',
-      job: 'duties:eu-mfn',
+      job: 'duties:eu-mfn-official',
       version: 'demo-mvp-v1',
       sourceUrl: 'demo://seed/duty',
       params: JSON.stringify({ hs6: HS6_CODES }),
