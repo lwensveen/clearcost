@@ -25,6 +25,7 @@ function makeRow(overrides: Partial<ScopedSurchargeRow> = {}): ScopedSurchargeRo
     maxAmt: overrides.maxAmt ?? null,
     unitAmt: overrides.unitAmt ?? null,
     unitCode: overrides.unitCode ?? null,
+    source: overrides.source ?? 'official',
     sourceUrl: overrides.sourceUrl ?? null,
     sourceRef: overrides.sourceRef ?? null,
     effectiveFrom: overrides.effectiveFrom ?? new Date('2025-01-01T00:00:00.000Z'),
@@ -123,6 +124,68 @@ describe('selectScopedSurchargeRows', () => {
     });
 
     expect(out.map((row) => row.id).sort()).toEqual(['hmf-generic', 'mpf-specific']);
+  });
+
+  it('prefers official rows over non-official rows for the same scoped surcharge key', () => {
+    const rows = [
+      makeRow({
+        id: 'official-generic',
+        surchargeCode: 'MPF',
+        source: 'official',
+        origin: null,
+        hs6: null,
+        transportMode: 'ALL',
+      }),
+      makeRow({
+        id: 'llm-specific',
+        surchargeCode: 'MPF',
+        source: 'llm',
+        origin: 'CN',
+        hs6: '123456',
+        transportMode: 'AIR',
+      }),
+    ];
+
+    const out = selectScopedSurchargeRows(rows, {
+      originUp: 'CN',
+      hs6Key: '123456',
+      mode: 'AIR',
+      level: null,
+    });
+
+    expect(out).toHaveLength(1);
+    expect(out[0]?.id).toBe('official-generic');
+  });
+
+  it('still selects non-official rows when no official row exists', () => {
+    const rows = [
+      makeRow({
+        id: 'fallback-generic',
+        surchargeCode: 'MPF',
+        source: 'fallback',
+        origin: null,
+        hs6: null,
+        transportMode: 'ALL',
+      }),
+      makeRow({
+        id: 'llm-specific',
+        surchargeCode: 'MPF',
+        source: 'llm',
+        origin: 'CN',
+        hs6: '123456',
+        transportMode: 'AIR',
+      }),
+    ];
+
+    const out = selectScopedSurchargeRows(rows, {
+      originUp: 'CN',
+      hs6Key: '123456',
+      mode: 'AIR',
+      level: null,
+    });
+
+    expect(out).toHaveLength(1);
+    expect(out[0]?.id).toBe('fallback-generic');
   });
 });
 

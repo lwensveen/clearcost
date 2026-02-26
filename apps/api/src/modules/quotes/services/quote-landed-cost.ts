@@ -864,6 +864,7 @@ export async function quoteLandedCost(
     hs6,
     on: now,
     transportMode: toSurchargeTransportMode(input.mode),
+    officialOnly: true,
   });
   const sur = surchargeLookup.value;
   const surchargeTotals = await totalSurcharges(

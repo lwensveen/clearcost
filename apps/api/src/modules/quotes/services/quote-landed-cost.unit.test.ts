@@ -559,6 +559,7 @@ describe('quoteLandedCost', () => {
         origin: 'CN',
         hs6: '123456',
         transportMode: 'AIR',
+        officialOnly: true,
       })
     );
 
@@ -568,6 +569,7 @@ describe('quoteLandedCost', () => {
     expect(mocks.getSurchargesScopedWithMetaMock).toHaveBeenLastCalledWith(
       expect.objectContaining({
         transportMode: 'OCEAN',
+        officialOnly: true,
       })
     );
   });

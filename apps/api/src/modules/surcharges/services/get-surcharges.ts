@@ -21,6 +21,7 @@ const SelectRowSchema = SurchargeSelectCoercedSchema.pick({
   maxAmt: true,
   unitAmt: true,
   unitCode: true,
+  source: true,
   sourceUrl: true,
   sourceRef: true,
   effectiveFrom: true,
@@ -40,6 +41,7 @@ export type GetSurchargesScopedInput = {
   hs6?: string | null;
   transportMode?: TransportMode | string | null; // allow string; normalize
   applyLevel?: ApplyLevel | string | null; // allow string; normalize
+  officialOnly?: boolean;
 };
 
 export type SurchargesLookupResult = LookupResult<SurchargeRowOut[]>;
@@ -60,6 +62,17 @@ export function latestSurchargeEffectiveFrom(
 // ---- helpers ---------------------------------------------------------------
 const MODES = ['ALL', 'OCEAN', 'AIR', 'TRUCK', 'RAIL', 'BARGE'] as const;
 const LEVELS = ['entry', 'line', 'shipment', 'program'] as const;
+const SURCHARGE_SOURCE_PRIORITY: Record<string, number> = {
+  official: 4,
+  manual: 3,
+  fallback: 2,
+  llm: 1,
+};
+
+function surchargeSourcePriority(source: string | null | undefined): number {
+  if (!source) return 0;
+  return SURCHARGE_SOURCE_PRIORITY[source.toLowerCase()] ?? 0;
+}
 
 function normMode(v?: string | null): TransportMode | null {
   if (!v) return null;
@@ -102,10 +115,15 @@ function scoreSurchargeRow(
   const matchOrigin =
     !!originUp && typeof row.origin === 'string' && row.origin.toUpperCase() === originUp;
   const matchHs6 = !!hs6Key && row.hs6 === hs6Key;
+  const sourcePriority = surchargeSourcePriority(row.source);
+
+  // Make source provenance dominant: official rows should beat non-official rows for same code scope.
+  score += sourcePriority * 16;
   if (matchOrigin) score += 2;
   if (matchHs6) score += 1;
 
   const tiebreak =
+    sourcePriority +
     (row.transportMode === 'ALL' ? 0 : 1) +
     (row.origin ? 1 : 0) +
     (row.hs6 ? 1 : 0) +
@@ -205,6 +223,7 @@ export async function getSurchargesScopedWithMeta(
     // Base active-window filter
     const baseWhere = and(
       eq(surchargesTable.dest, destUp),
+      input.officialOnly ? eq(surchargesTable.source, 'official') : undefined,
       lte(surchargesTable.effectiveFrom, input.on),
       or(isNull(surchargesTable.effectiveTo), gt(surchargesTable.effectiveTo, input.on))
     );
@@ -238,6 +257,7 @@ export async function getSurchargesScopedWithMeta(
         maxAmt: surchargesTable.maxAmt,
         unitAmt: surchargesTable.unitAmt,
         unitCode: surchargesTable.unitCode,
+        source: surchargesTable.source,
         sourceUrl: surchargesTable.sourceUrl,
         sourceRef: surchargesTable.sourceRef,
         effectiveFrom: surchargesTable.effectiveFrom,
@@ -294,7 +314,12 @@ export async function getSurchargesScopedWithMeta(
         effectiveFrom: surchargesTable.effectiveFrom,
       })
       .from(surchargesTable)
-      .where(eq(surchargesTable.dest, destUp))
+      .where(
+        and(
+          eq(surchargesTable.dest, destUp),
+          input.officialOnly ? eq(surchargesTable.source, 'official') : undefined
+        )
+      )
       .orderBy(desc(surchargesTable.effectiveFrom))
       .limit(1);
 
