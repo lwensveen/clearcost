@@ -38,6 +38,16 @@ import { vatLlmCrossCheck, vatLlmGrok, vatLlmOpenAI } from './commands/vat-llm.j
 import { dutiesEuBackfill, dutiesEuDaily } from './commands/duties/duties-eu.js';
 import { dutiesJpAll, dutiesJpFta, dutiesJpMfn } from './commands/duties/duties-jp.js';
 import { dutiesCnMfnPdf } from './commands/duties/duties-cn.js';
+import {
+  dutiesMyAllOfficial,
+  dutiesMyFtaOfficial,
+  dutiesMyMfnOfficial,
+} from './commands/duties/duties-my.js';
+import {
+  dutiesVnAllOfficial,
+  dutiesVnFtaOfficial,
+  dutiesVnMfnOfficial,
+} from './commands/duties/duties-vn.js';
 import { crawlNoticesCmd } from './commands/notices/notices.js';
 import { fetchNoticeDocsCmd } from './commands/notices/docs.js';
 import { crawlNoticesJsonCmd } from './commands/notices/json-feed.js';
@@ -61,9 +71,15 @@ export const commands: Record<string, Command> = {
   'import:duties:llm-crosscheck': dutiesLlmCrossCheck,
   'import:duties:llm-grok': dutiesLlmGrok,
   'import:duties:llm-openai': dutiesLlmOpenAI,
+  'import:duties:my-all-official': dutiesMyAllOfficial,
+  'import:duties:my-fta-official': dutiesMyFtaOfficial,
+  'import:duties:my-mfn-official': dutiesMyMfnOfficial,
   'import:duties:us-all': dutiesUsAll,
   'import:duties:us-fta': dutiesUsFta,
   'import:duties:us-mfn': dutiesUsMfn,
+  'import:duties:vn-all-official': dutiesVnAllOfficial,
+  'import:duties:vn-fta-official': dutiesVnFtaOfficial,
+  'import:duties:vn-mfn-official': dutiesVnMfnOfficial,
   'import:duties:wits': dutiesWits,
 
   'crawl:notices': crawlNoticesCmd,
