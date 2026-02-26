@@ -52,6 +52,7 @@ import { crawlNoticesCmd } from './commands/notices/notices.js';
 import { fetchNoticeDocsCmd } from './commands/notices/docs.js';
 import { crawlNoticesJsonCmd } from './commands/notices/json-feed.js';
 import { coverageSnapshot } from './commands/coverage.js';
+import { sourceRegistryBootstrap } from './commands/source-registry.js';
 
 export const commands: Record<string, Command> = {
   'fx:refresh': fxRefresh,
@@ -110,6 +111,7 @@ export const commands: Record<string, Command> = {
   'import:surcharges:us-trade-remedies': surchargesUsTradeRemedies,
 
   'import:sweep-stale': runSweepStale,
+  'import:sources:bootstrap': sourceRegistryBootstrap,
 
   'import:vat': vatAuto,
   'import:vat:llm-openai': vatLlmOpenAI,

@@ -47,6 +47,7 @@ export const COMMAND_KEYS = [
   'import:surcharges:us-aphis',
   'import:surcharges:us-fda',
   'import:surcharges:us-trade-remedies',
+  'import:sources:bootstrap',
   'import:sweep-stale',
   'import:vat',
   'import:vat:llm-openai',

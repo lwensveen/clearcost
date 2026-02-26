@@ -18,6 +18,16 @@ import {
   getDatasetFreshnessSnapshot,
   getMvpFreshnessSnapshot,
 } from '../../../modules/health/services.js';
+import {
+  OFFICIAL_DE_MINIMIS_REQUIRED_SOURCE_KEYS,
+  OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS,
+  OFFICIAL_FX_REQUIRED_SOURCE_KEYS,
+  OFFICIAL_HS_REQUIRED_SOURCE_KEYS,
+  OFFICIAL_NOTICES_REQUIRED_SOURCE_KEYS,
+  OFFICIAL_SURCHARGES_REQUIRED_SOURCE_KEYS,
+  OFFICIAL_VAT_REQUIRED_SOURCE_KEYS,
+  OPTIONAL_FALLBACK_SOURCE_KEYS,
+} from '../../source-registry/defaults.js';
 
 type CoverageLane = {
   origin: string;
@@ -134,88 +144,6 @@ const US_REQUIRED_DUTY_DATASETS: ReadonlyArray<DutyDatasetCoverageRequirement> =
   { dest: 'US', dutyRule: 'mfn', expectedSources: ['official'] },
   { dest: 'US', dutyRule: 'fta', expectedSources: ['official'] },
 ] as const;
-const OFFICIAL_FX_REQUIRED_SOURCE_KEYS = ['fx.ecb.daily'] as const;
-const OFFICIAL_VAT_REQUIRED_SOURCE_KEYS = ['vat.oecd_imf.standard', 'vat.imf.standard'] as const;
-const OFFICIAL_DE_MINIMIS_REQUIRED_SOURCE_KEYS = [
-  'de-minimis.official.us.section321',
-  'de-minimis.official.eu.reg_1186_2009',
-  'de-minimis.official.gb.vat_overseas_goods',
-  'de-minimis.official.ca.lvs_vat',
-  'de-minimis.official.ca.lvs_duty',
-] as const;
-const OFFICIAL_HS_REQUIRED_SOURCE_KEYS = [
-  'hs.asean.ahtn.csv',
-  'hs.eu.taric.goods',
-  'hs.eu.taric.goods_description',
-  'hs.uk.tariff.api_base',
-  'hs.us.usitc.base',
-  'hs.us.usitc.csv',
-  'hs.us.usitc.json',
-] as const;
-const OFFICIAL_NOTICES_REQUIRED_SOURCE_KEYS = [
-  'notices.cn.mof.list',
-  'notices.cn.gacc.list',
-  'notices.cn.mofcom.list',
-] as const;
-const OFFICIAL_SURCHARGES_REQUIRED_SOURCE_KEYS = [
-  'duties.uk.tariff.api_base',
-  'surcharges.eu.taric.measure',
-  'surcharges.eu.taric.component',
-  'surcharges.eu.taric.geo_description',
-  'surcharges.eu.taric.duty_expression',
-  'surcharges.us.aphis.aqi_fees',
-  'surcharges.us.aphis.aqi_fy25',
-  'surcharges.us.fda.vqip_fees',
-  'surcharges.us.federal_register.search',
-  'surcharges.us.federal_register.documents_api',
-  'surcharges.us.statute.hmf',
-  'surcharges.us.statute.mpf',
-] as const;
-const OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS = [
-  'duties.eu.taric.daily',
-  'duties.eu.taric.mfn',
-  'duties.eu.taric.preferential',
-  'duties.eu.taric.measure',
-  'duties.eu.taric.component',
-  'duties.eu.taric.duty_expression',
-  'duties.eu.taric.geo_description',
-  'duties.bn.official.mfn_excel',
-  'duties.bn.official.fta_excel',
-  'duties.uk.tariff.api_base',
-  'duties.us.usitc.base',
-  'duties.us.usitc.csv',
-  'duties.us.trade_programs.members_csv',
-  'duties.jp.customs.tariff_index',
-  'duties.cn.taxbook.pdf',
-  'duties.cn.official.fta_excel',
-  'duties.id.btki.xlsx',
-  'duties.id.btki.portal',
-  'duties.id.official.fta_excel',
-  'duties.kh.official.mfn_excel',
-  'duties.kh.official.fta_excel',
-  'duties.la.official.mfn_excel',
-  'duties.la.official.fta_excel',
-  'duties.mm.official.mfn_excel',
-  'duties.mm.official.fta_excel',
-  'duties.my.gazette.mfn_pdf',
-  'duties.my.official.mfn_excel',
-  'duties.my.official.fta_excel',
-  'duties.ph.tariff_commission.xlsx',
-  'duties.ph.official.fta_excel',
-  'duties.sg.official.mfn_excel',
-  'duties.sg.official.fta_excel',
-  'duties.th.official.mfn_excel',
-  'duties.th.official.fta_excel',
-  'duties.vn.official.mfn_excel',
-  'duties.vn.official.fta_excel',
-] as const;
-const OPTIONAL_FALLBACK_SOURCE_KEYS = [
-  'duties.wits.sdmx.base',
-  'hs.wits.sdmx.data_base',
-  'de-minimis.trade_gov.api',
-  'de-minimis.zonos.docs',
-] as const;
-
 export function evaluateRequiredSourceKeys(
   requiredKeys: ReadonlyArray<string>,
   rows: ReadonlyArray<SourceRegistryCoverageRow>,

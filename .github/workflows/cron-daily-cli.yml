@@ -148,6 +148,7 @@ jobs:
       - name: Build daily coverage snapshot + regression gate
         working-directory: apps/api
         run: |
+          bun run src/lib/run-cron.ts import:sources:bootstrap
           bun run src/lib/run-cron.ts report:coverage --out=artifacts/coverage-snapshot.json
 
       - name: Upload coverage snapshot artifact
