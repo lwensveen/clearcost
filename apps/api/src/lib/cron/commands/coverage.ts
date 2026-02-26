@@ -269,6 +269,31 @@ export function evaluateKnownSourceKeys(
   });
 }
 
+export function summarizeSourceRegistryKeys(
+  requiredKeys: ReadonlyArray<string>,
+  rows: ReadonlyArray<SourceRegistryCoverageRow>
+): {
+  requiredKeyCount: number;
+  presentKeyCount: number;
+  enabledKeyCount: number;
+  missingKeys: string[];
+  disabledKeys: string[];
+} {
+  const byKey = new Map(rows.map((row) => [row.key, row]));
+  const presentKeys = requiredKeys.filter((sourceKey) => byKey.has(sourceKey));
+  const enabledKeys = requiredKeys.filter((sourceKey) => byKey.get(sourceKey)?.enabled === true);
+  const missingKeys = requiredKeys.filter((sourceKey) => !byKey.has(sourceKey));
+  const disabledKeys = requiredKeys.filter((sourceKey) => byKey.get(sourceKey)?.enabled === false);
+
+  return {
+    requiredKeyCount: requiredKeys.length,
+    presentKeyCount: presentKeys.length,
+    enabledKeyCount: enabledKeys.length,
+    missingKeys,
+    disabledKeys,
+  };
+}
+
 function up2(value: string): string {
   return value.trim().toUpperCase().slice(0, 2);
 }
@@ -893,18 +918,10 @@ export const coverageSnapshot: Command = async (args) => {
       duties: {
         officialRowCount: officialDutyRows.length,
         officialDestinations: dutyDestinations,
-        sourceRegistry: {
-          requiredKeyCount: OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS.length,
-          presentKeyCount: dutySourceRegistryRows.length,
-          enabledKeyCount: dutySourceRegistryRows.filter((row) => row.enabled).length,
-          missingKeys: OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS.filter(
-            (sourceKey) => !dutySourceRegistryRows.some((row) => row.key === sourceKey)
-          ),
-          disabledKeys: dutySourceRegistryRows
-            .filter((row) => !row.enabled)
-            .map((row) => row.key)
-            .sort(),
-        },
+        sourceRegistry: summarizeSourceRegistryKeys(
+          OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS,
+          dutySourceRegistryRows
+        ),
       },
       deMinimis: {
         rowCount: deMinimisRows.length,

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateKnownSourceKeys, evaluateRequiredSourceKeys } from './coverage.js';
+import {
+  evaluateKnownSourceKeys,
+  evaluateRequiredSourceKeys,
+  summarizeSourceRegistryKeys,
+} from './coverage.js';
 
 describe('coverage source-registry gates', () => {
   it('passes when all required source keys exist and are enabled', () => {
@@ -112,5 +116,24 @@ describe('coverage source-registry gates', () => {
         detail: 'Missing source_registry row for de-minimis.zonos.docs',
       },
     ]);
+  });
+
+  it('summarizes required source-key status without counting unrelated keys', () => {
+    const summary = summarizeSourceRegistryKeys(
+      ['duties.eu.taric.daily', 'duties.us.usitc.base', 'duties.jp.customs.tariff_index'],
+      [
+        { key: 'duties.eu.taric.daily', enabled: true },
+        { key: 'duties.us.usitc.base', enabled: false },
+        { key: 'fx.ecb.daily', enabled: true },
+      ]
+    );
+
+    expect(summary).toEqual({
+      requiredKeyCount: 3,
+      presentKeyCount: 2,
+      enabledKeyCount: 1,
+      missingKeys: ['duties.jp.customs.tariff_index'],
+      disabledKeys: ['duties.us.usitc.base'],
+    });
   });
 });
