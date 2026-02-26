@@ -69,7 +69,13 @@ export default function surchargesAdminRoutes(app: FastifyInstance) {
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
-      const [inserted] = await db.insert(surchargesTable).values(req.body).returning();
+      const [inserted] = await db
+        .insert(surchargesTable)
+        .values({
+          ...req.body,
+          source: req.body.source ?? 'manual',
+        })
+        .returning();
       return reply.code(201).send(SurchargeSelectCoercedSchema.parse(inserted));
     }
   );
@@ -135,6 +141,9 @@ export default function surchargesAdminRoutes(app: FastifyInstance) {
       },
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
     },
-    async (req) => SurchargesAdminImportResponseSchema.parse(await importSurcharges(req.body))
+    async (req) =>
+      SurchargesAdminImportResponseSchema.parse(
+        await importSurcharges(req.body, { source: 'manual' })
+      )
   );
 }

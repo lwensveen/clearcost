@@ -330,6 +330,13 @@
       "when": 1772272800000,
       "tag": "0046_nimble_outrider",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1772359200000,
+      "tag": "0047_still_quicksilver",
+      "breakpoints": true
     }
   ]
 }

@@ -206,6 +206,7 @@ export async function importFdaFsmaSurcharges(
 
   const ret = await batchUpsertSurchargesFromStream(rows, {
     batchSize: opts.batchSize ?? 500,
+    source: 'official',
     importId: opts.importId,
     sourceKey: (r) => {
       switch (r.surchargeCode) {

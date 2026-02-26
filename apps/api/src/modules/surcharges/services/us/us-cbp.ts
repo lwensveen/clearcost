@@ -245,6 +245,7 @@ export async function upsertUSBaseSurcharges(opts?: { fy?: number; importId?: st
 
   const res = await batchUpsertSurchargesFromStream(rows, {
     batchSize: 100,
+    source: 'official',
     importId: opts?.importId,
     sourceKey: (r) => {
       if (r.surchargeCode === 'HMF') return HMF_STATUTE_SOURCE_KEY;

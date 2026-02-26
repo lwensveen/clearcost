@@ -169,6 +169,7 @@ export async function importUsTradeRemediesFromHTS(
 
   const res = await batchUpsertSurchargesFromStream(out, {
     batchSize: opts.batchSize ?? 5000,
+    source: 'official',
     importId: opts.importId,
     makeSourceRef: (r) => {
       const program = r.surchargeCode === 'TRADE_REMEDY_301' ? '301' : '232';

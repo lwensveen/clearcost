@@ -189,6 +189,6 @@ export async function importEuTradeRemediesAsSurcharges(
     );
   }
 
-  const res = await importSurcharges(out);
+  const res = await importSurcharges(out, { source: 'official' });
   return { ok: true, count: res.count ?? out.length };
 }

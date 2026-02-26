@@ -3,6 +3,7 @@ import {
   surchargeApplyLevelEnum,
   surchargeCodeEnum,
   surchargeRateTypeEnum,
+  surchargeSourceEnum,
   surchargeValueBasisEnum,
   transportModeEnum,
 } from '../enums.js';
@@ -28,6 +29,7 @@ export const surchargesTable = pgTable(
     maxAmt: numeric('max_amt', { precision: 12, scale: 2 }),
     unitAmt: numeric('unit_amt', { precision: 12, scale: 6 }), // per-unit monetary amount
     unitCode: varchar('unit_code', { length: 16 }), // e.g. 'HOUR','UNIT','KG'
+    source: surchargeSourceEnum('source').notNull().default('official'),
     sourceUrl: text('source_url'),
     sourceRef: text('source_ref'),
     notes: text('notes'),
@@ -57,6 +59,7 @@ export const surchargesTable = pgTable(
       t.effectiveTo
     ),
     index('surcharges_dest_code_idx').on(t.dest, t.surchargeCode),
+    index('surcharges_source_idx').on(t.source),
     {
       pct_non_negative_check: sql`CHECK (pct_amt IS NULL OR (pct_amt >= 0 AND pct_amt <= 1))`,
       min_max_order_check: sql`CHECK (min_amt IS NULL OR max_amt IS NULL OR min_amt <= max_amt)`,

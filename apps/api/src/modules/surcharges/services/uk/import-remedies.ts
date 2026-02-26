@@ -178,6 +178,7 @@ export async function importUkTradeRemediesAsSurcharges(
   // Provenance-enabled upsert
   const res = await batchUpsertSurchargesFromStream(out, {
     batchSize: opts.batchSize ?? 5000,
+    source: 'official',
     importId: opts.importId,
     makeSourceRef: (r) => {
       const origin = r.origin ?? 'group';

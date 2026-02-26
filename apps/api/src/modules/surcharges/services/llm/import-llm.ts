@@ -5,6 +5,8 @@ import type { SurchargeInsert } from '@clearcost/types';
 import type { LlmSurcharge } from './schema.js';
 import { resolveSurchargeRateType } from '../../utils/rate-type.js';
 
+const LLM_SOURCE: NonNullable<(typeof surchargesTable)['$inferInsert']['source']> = 'llm';
+
 const up2 = (s?: string | null) => (s ? s.trim().toUpperCase() : null);
 const onlyHs6 = (v?: string | null) => {
   if (!v) return null;
@@ -139,6 +141,7 @@ export async function importSurchargesFromLLM(
       unitAmt: numStr(r.unit_amount) ?? null,
       unitCode: up2(r.unit_code ?? null),
 
+      source: LLM_SOURCE,
       sourceUrl: r.source_url || null,
       sourceRef: null, // keep column empty; provenance carries the external URL
       notes: r.notes ?? null,
@@ -186,12 +189,19 @@ export async function importSurchargesFromLLM(
         currency: sql`EXCLUDED.currency`,
         rateType: sql`EXCLUDED.rate_type`,
         valueBasis: sql`EXCLUDED.value_basis`,
+        source: sql`EXCLUDED.source`,
         sourceUrl: sql`EXCLUDED.source_url`,
         sourceRef: sql`EXCLUDED.source_ref`,
         notes: sql`EXCLUDED.notes`,
         effectiveTo: sql`EXCLUDED.effective_to`,
         updatedAt: sql`now()`,
       },
+      setWhere: sql`
+        (
+          ${surchargesTable.source} = EXCLUDED.source
+          OR ${surchargesTable.source} <> 'official'
+        )
+      `,
     })
     .returning({
       id: surchargesTable.id,
@@ -211,6 +221,7 @@ export async function importSurchargesFromLLM(
       maxAmt: surchargesTable.maxAmt,
       unitAmt: surchargesTable.unitAmt,
       unitCode: surchargesTable.unitCode,
+      source: surchargesTable.source,
       effectiveFrom: surchargesTable.effectiveFrom,
       effectiveTo: surchargesTable.effectiveTo,
       notes: surchargesTable.notes,
@@ -257,6 +268,7 @@ export async function importSurchargesFromLLM(
             maxAmt: row.maxAmt,
             unitAmt: row.unitAmt,
             unitCode: row.unitCode ?? null,
+            source: row.source,
             ef: iso(row.effectiveFrom),
             et: iso(row.effectiveTo),
             notes: row.notes ?? null,

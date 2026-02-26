@@ -3,6 +3,8 @@ import { sql } from 'drizzle-orm';
 import { type SurchargeInsert, SurchargeInsertSchema } from '@clearcost/types';
 import { resolveSurchargeRateType } from '../utils/rate-type.js';
 
+type SurchargeSource = NonNullable<(typeof surchargesTable)['$inferInsert']['source']>;
+
 function normIso2(v?: string | null) {
   return v ? v.trim().toUpperCase() : null;
 }
@@ -48,7 +50,11 @@ function toDbNumeric(n?: string | number | null) {
  *
  * NOTE: Ensure SurchargeInsert(+Schema) include the new fields used below.
  */
-export async function importSurcharges(rows: SurchargeInsert[]) {
+export async function importSurcharges(
+  rows: SurchargeInsert[],
+  opts: { source?: SurchargeSource } = {}
+) {
+  const importSource: SurchargeSource = opts.source ?? 'official';
   const normalized = rows
     .map((raw) => {
       const parsed = SurchargeInsertSchema.safeParse(raw);
@@ -87,6 +93,7 @@ export async function importSurcharges(rows: SurchargeInsert[]) {
         maxAmt: toDbNumeric(r.maxAmt),
         unitAmt: toDbNumeric(r.unitAmt),
         unitCode: r.unitCode ? String(r.unitCode).trim().toUpperCase() : undefined,
+        source: (r.source ?? importSource) as SurchargeSource,
         sourceUrl: r.sourceUrl ?? undefined,
         sourceRef: r.sourceRef ?? undefined,
         notes: r.notes ?? undefined,
@@ -125,12 +132,19 @@ export async function importSurcharges(rows: SurchargeInsert[]) {
             maxAmt: sql`EXCLUDED.max_amt`,
             unitAmt: sql`EXCLUDED.unit_amt`,
             unitCode: sql`EXCLUDED.unit_code`,
+            source: sql`EXCLUDED.source`,
             sourceUrl: sql`EXCLUDED.source_url`,
             sourceRef: sql`EXCLUDED.source_ref`,
             notes: sql`EXCLUDED.notes`,
             effectiveTo: sql`EXCLUDED.effective_to`,
             updatedAt: sql`now()`,
           },
+          setWhere: sql`
+            (
+              ${surchargesTable.source} = EXCLUDED.source
+              OR ${surchargesTable.source} <> 'official'
+            )
+          `,
         });
     }
   });

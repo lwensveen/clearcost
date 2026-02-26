@@ -106,6 +106,13 @@ export const surchargeValueBasisEnum = pgEnum('surcharge_value_basis', [
   'other',
 ]);
 
+export const surchargeSourceEnum = pgEnum('surcharge_source', [
+  'official',
+  'fallback',
+  'llm',
+  'manual',
+]);
+
 /** Misc */
 export const transportModeEnum = pgEnum('transport_mode', [
   'ALL',

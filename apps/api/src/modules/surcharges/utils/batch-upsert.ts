@@ -5,6 +5,7 @@ import { resolveSurchargeRateType } from './rate-type.js';
 
 type SurchargeInsertRow = typeof surchargesTable.$inferInsert;
 type SurchargeSelectRow = typeof surchargesTable.$inferSelect;
+type SurchargeSource = NonNullable<SurchargeInsertRow['source']>;
 
 type ProvOpts = {
   importId?: string;
@@ -77,9 +78,10 @@ const dfltTransport = (s?: string | null) =>
  */
 export async function batchUpsertSurchargesFromStream(
   source: AsyncIterable<SurchargeInsertRow> | SurchargeInsertRow[],
-  opts: { batchSize?: number } & ProvOpts = {}
+  opts: { batchSize?: number; source?: SurchargeSource } & ProvOpts = {}
 ) {
   const batchSize = Math.max(1, opts.batchSize ?? 5000);
+  const importSource: SurchargeSource = opts.source ?? 'official';
   let totalInserted = 0;
   let totalUpdated = 0;
   let buf: SurchargeInsertRow[] = [];
@@ -127,6 +129,7 @@ export async function batchUpsertSurchargesFromStream(
         maxAmt: toDbNumeric(r.maxAmt),
         unitAmt: toDbNumeric(r.unitAmt),
         unitCode: up(r.unitCode ?? null),
+        source: (r.source ?? importSource) as SurchargeSource,
         sourceUrl: toDbText(r.sourceUrl ?? null),
         sourceRef: toDbText(r.sourceRef ?? null),
         notes: toDbNotes(r.notes),
@@ -159,12 +162,19 @@ export async function batchUpsertSurchargesFromStream(
           currency: sql`EXCLUDED.currency`,
           rateType: sql`EXCLUDED.rate_type`,
           valueBasis: sql`EXCLUDED.value_basis`,
+          source: sql`EXCLUDED.source`,
           sourceUrl: sql`EXCLUDED.source_url`,
           sourceRef: sql`EXCLUDED.source_ref`,
           notes: sql`EXCLUDED.notes`,
           effectiveTo: sql`EXCLUDED.effective_to`,
           updatedAt: sql`now()`,
         },
+        setWhere: sql`
+          (
+            ${surchargesTable.source} = EXCLUDED.source
+            OR ${surchargesTable.source} <> 'official'
+          )
+        `,
       })
       .returning({
         id: surchargesTable.id,
@@ -184,6 +194,7 @@ export async function batchUpsertSurchargesFromStream(
         maxAmt: surchargesTable.maxAmt,
         unitAmt: surchargesTable.unitAmt,
         unitCode: surchargesTable.unitCode,
+        source: surchargesTable.source,
         effectiveFrom: surchargesTable.effectiveFrom,
         effectiveTo: surchargesTable.effectiveTo,
         notes: surchargesTable.notes,
@@ -227,6 +238,7 @@ export async function batchUpsertSurchargesFromStream(
             maxAmt: row.maxAmt,
             unitAmt: row.unitAmt,
             unitCode: row.unitCode ?? null,
+            source: row.source,
             ef: isoOrNull(row.effectiveFrom),
             et: isoOrNull(row.effectiveTo),
             notes: row.notes ?? null,

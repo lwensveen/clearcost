@@ -75,15 +75,18 @@ describe('importEuTradeRemediesAsSurcharges', () => {
     });
 
     expect(out).toEqual({ ok: true, count: 1 });
-    expect(mocks.importSurchargesMock).toHaveBeenCalledWith([
-      expect.objectContaining({
-        dest: 'EU',
-        origin: 'CN',
-        hs6: '123456',
-        surchargeCode: 'TRADE_REMEDY_232',
-        pctAmt: '0.250000',
-      }),
-    ]);
+    expect(mocks.importSurchargesMock).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          dest: 'EU',
+          origin: 'CN',
+          hs6: '123456',
+          surchargeCode: 'TRADE_REMEDY_232',
+          pctAmt: '0.250000',
+        }),
+      ],
+      { source: 'official' }
+    );
   });
 
   it('fails fast when remedy measure types are not configured', async () => {

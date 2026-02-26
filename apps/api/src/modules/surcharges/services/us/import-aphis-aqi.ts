@@ -176,6 +176,7 @@ export async function importAphisAqiSurcharges(
 
   const ret = await batchUpsertSurchargesFromStream(rows, {
     batchSize: opts.batchSize ?? 500,
+    source: 'official',
     importId: opts.importId,
     sourceKey: APHIS_SOURCE_KEY,
     makeSourceRef: (r) => {

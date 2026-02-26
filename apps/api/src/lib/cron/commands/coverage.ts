@@ -557,6 +557,7 @@ export const coverageSnapshot: Command = async (args) => {
     .from(surchargesTable)
     .where(
       and(
+        eq(surchargesTable.source, 'official'),
         lte(surchargesTable.effectiveFrom, now),
         or(isNull(surchargesTable.effectiveTo), gt(surchargesTable.effectiveTo, now))
       )
