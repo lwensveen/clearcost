@@ -153,7 +153,7 @@ export default function cnDutyRoutes(app: FastifyInstance) {
       config: {
         importMeta: {
           importSource: 'CN_TAXBOOK',
-          job: 'duties:cn-mfn-pdf',
+          job: 'duties:cn-mfn-official',
           sourceKey: 'duties.cn.taxbook.pdf',
         },
       },

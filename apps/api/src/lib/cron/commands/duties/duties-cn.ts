@@ -25,7 +25,7 @@ export const dutiesCnMfnPdf: Command = async (args) => {
   const payload = await withRun(
     {
       importSource: 'CN_TAXBOOK',
-      job: 'duties:cn-mfn-pdf',
+      job: 'duties:cn-mfn-official',
       sourceKey,
       ...(sourceUrl ? { sourceUrl } : {}),
       params: {
