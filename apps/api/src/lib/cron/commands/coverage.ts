@@ -110,10 +110,10 @@ const ASEAN_FTA_REQUIRED_LANES: ReadonlyArray<DutyCoverageRequirement> = [
 ] as const;
 const ASEAN_FTA_FRESHNESS_THRESHOLD_HOURS = 192;
 const ASEAN_MFN_FRESHNESS_THRESHOLD_HOURS = 192;
-const JP_REQUIRED_JOBS = ['duties:jp-mfn', 'duties:jp-fta-official'] as const;
+const JP_REQUIRED_JOBS = ['duties:jp-mfn-official', 'duties:jp-fta-official'] as const;
 const CN_REQUIRED_JOBS = ['duties:cn-mfn-official', 'duties:cn-fta-official'] as const;
-const UK_REQUIRED_JOBS = ['duties:uk-mfn', 'duties:uk-fta'] as const;
-const US_REQUIRED_JOBS = ['duties:us-mfn', 'duties:us-fta'] as const;
+const UK_REQUIRED_JOBS = ['duties:uk-mfn-official', 'duties:uk-fta-official'] as const;
+const US_REQUIRED_JOBS = ['duties:us-mfn-official', 'duties:us-fta-official'] as const;
 const JP_FRESHNESS_THRESHOLD_HOURS = 192;
 const CN_FRESHNESS_THRESHOLD_HOURS = 192;
 const UK_FRESHNESS_THRESHOLD_HOURS = 192;

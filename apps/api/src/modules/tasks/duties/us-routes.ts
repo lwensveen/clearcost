@@ -11,7 +11,7 @@ export default function usDutyRoutes(app: FastifyInstance) {
       config: {
         importMeta: {
           importSource: 'USITC_HTS',
-          job: 'duties:us-mfn',
+          job: 'duties:us-mfn-official',
           sourceKey: 'duties.us.usitc.base',
         },
       },
@@ -31,7 +31,7 @@ export default function usDutyRoutes(app: FastifyInstance) {
       config: {
         importMeta: {
           importSource: 'USITC_HTS',
-          job: 'duties:us-fta',
+          job: 'duties:us-fta-official',
           sourceKey: 'duties.us.usitc.base',
         },
       },

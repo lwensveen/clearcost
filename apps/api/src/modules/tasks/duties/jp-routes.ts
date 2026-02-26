@@ -22,7 +22,7 @@ export default function jpDutyRoutes(app: FastifyInstance) {
         config: {
           importMeta: {
             importSource: 'JP_CUSTOMS',
-            job: 'duties:jp-mfn',
+            job: 'duties:jp-mfn-official',
             sourceKey: 'duties.jp.customs.tariff_index',
           },
         },

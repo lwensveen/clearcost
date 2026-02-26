@@ -86,7 +86,7 @@ jobs:
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:jp-mfn] expected >0 imported rows, got $ROWS"
+            echo "[duties:jp-mfn-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
@@ -106,7 +106,7 @@ jobs:
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:uk-mfn] expected >0 imported rows, got $ROWS"
+            echo "[duties:uk-mfn-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
@@ -116,7 +116,7 @@ jobs:
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:uk-fta] expected >0 imported rows, got $ROWS"
+            echo "[duties:uk-fta-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
@@ -441,7 +441,7 @@ jobs:
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:us-mfn] expected >0 imported rows, got $ROWS"
+            echo "[duties:us-mfn-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
@@ -451,7 +451,7 @@ jobs:
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:us-fta] expected >0 imported rows, got $ROWS"
+            echo "[duties:us-fta-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 

@@ -14,7 +14,7 @@ export const dutiesJpMfn: Command = async (args) => {
   const payload = await withRun(
     {
       importSource: 'JP_CUSTOMS',
-      job: 'duties:jp-mfn',
+      job: 'duties:jp-mfn-official',
       params: {
         hs6,
         dryRun: boolParam(dryRun),
@@ -75,7 +75,7 @@ export const dutiesJpAll: Command = async (args) => {
   const mfn = await withRun(
     {
       importSource: 'JP_CUSTOMS',
-      job: 'duties:jp-mfn',
+      job: 'duties:jp-mfn-official',
       params: {
         hs6,
         dryRun: boolParam(dryRun),

@@ -14,7 +14,7 @@ export default function ukDutyRoutes(app: FastifyInstance) {
       config: {
         importMeta: {
           importSource: 'UK_TT',
-          job: 'duties:uk-mfn',
+          job: 'duties:uk-mfn-official',
           sourceKey: 'duties.uk.tariff.api_base',
         },
       },
@@ -42,7 +42,7 @@ export default function ukDutyRoutes(app: FastifyInstance) {
       config: {
         importMeta: {
           importSource: 'UK_TT',
-          job: 'duties:uk-fta',
+          job: 'duties:uk-fta-official',
           sourceKey: 'duties.uk.tariff.api_base',
         },
       },
