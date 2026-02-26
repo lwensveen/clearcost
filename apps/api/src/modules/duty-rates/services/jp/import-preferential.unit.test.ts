@@ -93,7 +93,11 @@ describe('importJpPreferential', () => {
       dryRun: false,
     });
 
-    await importJpPreferential({ partnerGeoIds: ['AU', 'US'], strictOfficial: true });
+    await importJpPreferential({
+      partnerGeoIds: ['AU', 'US'],
+      strictOfficial: true,
+      useWitsFallback: true,
+    });
 
     expect(mocks.fetchWitsPreferentialDutyRatesMock).toHaveBeenCalledTimes(1);
     expect(mocks.fetchWitsPreferentialDutyRatesMock).toHaveBeenCalledWith({
@@ -121,6 +125,8 @@ describe('importJpPreferential', () => {
     await importJpPreferential({
       partnerGeoIds: ['au', 'AU', 'eu', 'invalid', ''],
       hs6List: ['010121'],
+      useWitsFallback: true,
+      strictOfficial: false,
     });
 
     expect(mocks.fetchWitsPreferentialDutyRatesMock).toHaveBeenCalledTimes(2);
@@ -140,7 +146,11 @@ describe('importJpPreferential', () => {
 
   it('throws when both official and fallback sources produce zero rows', async () => {
     await expect(
-      importJpPreferential({ partnerGeoIds: ['AU'], useWitsFallback: true })
+      importJpPreferential({
+        partnerGeoIds: ['AU'],
+        useWitsFallback: true,
+        strictOfficial: false,
+      })
     ).rejects.toThrow(/0 rows from official and WITS sources/i);
     expect(mocks.batchUpsertDutyRatesFromStreamMock).not.toHaveBeenCalled();
   });
@@ -209,5 +219,21 @@ describe('importJpPreferential', () => {
       backfillYears: 1,
       hs6List: undefined,
     });
+  });
+
+  it('does not fetch WITS fallback by default', async () => {
+    mocks.fetchJpPreferentialDutyRatesMock.mockResolvedValue([makeRow({ partner: 'AU' })]);
+    mocks.batchUpsertDutyRatesFromStreamMock.mockResolvedValue({
+      inserted: 1,
+      updated: 0,
+      count: 1,
+      dryRun: false,
+    });
+
+    await importJpPreferential({ partnerGeoIds: ['AU', 'US'] });
+
+    expect(mocks.fetchWitsPreferentialDutyRatesMock).not.toHaveBeenCalled();
+    const [rows] = mocks.batchUpsertDutyRatesFromStreamMock.mock.calls[0] ?? [];
+    expect(rows).toHaveLength(1);
   });
 });

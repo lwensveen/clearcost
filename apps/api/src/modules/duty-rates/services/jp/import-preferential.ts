@@ -107,8 +107,8 @@ export async function importJpPreferential({
   batchSize = 5_000,
   importId,
   dryRun,
-  useWitsFallback = true,
-  strictOfficial = false,
+  useWitsFallback = false,
+  strictOfficial = true,
 }: Params) {
   const partners = normalizePartnerGeoIds(partnerGeoIds);
   const officialRows = await fetchJpPreferentialDutyRates({ hs6List, partnerGeoIds: partners });

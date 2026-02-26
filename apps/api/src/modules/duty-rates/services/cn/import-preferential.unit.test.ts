@@ -101,7 +101,11 @@ describe('importCnPreferential', () => {
       dryRun: false,
     });
 
-    await importCnPreferential({ partnerGeoIds: ['AU', 'KR'], strictOfficial: true });
+    await importCnPreferential({
+      partnerGeoIds: ['AU', 'KR'],
+      strictOfficial: true,
+      useWitsFallback: true,
+    });
 
     expect(mocks.fetchWitsPreferentialDutyRatesMock).toHaveBeenCalledTimes(1);
     expect(mocks.fetchWitsPreferentialDutyRatesMock).toHaveBeenCalledWith({
@@ -114,7 +118,7 @@ describe('importCnPreferential', () => {
     expect(rows).toHaveLength(2);
   });
 
-  it('uses WITS fallback when official source URL is missing', async () => {
+  it('uses WITS fallback when official source URL is missing and explicitly enabled', async () => {
     mocks.resolveCnPreferentialDutySourceUrlsMock.mockResolvedValue({ ftaExcelUrl: undefined });
     mocks.fetchWitsPreferentialDutyRatesMock.mockResolvedValue([
       makeRow({ partner: 'AU', source: 'wits' }),
@@ -126,7 +130,11 @@ describe('importCnPreferential', () => {
       dryRun: false,
     });
 
-    const out = await importCnPreferential({ partnerGeoIds: ['AU'] });
+    const out = await importCnPreferential({
+      partnerGeoIds: ['AU'],
+      useWitsFallback: true,
+      strictOfficial: false,
+    });
 
     expect(out).toMatchObject({ ok: true, inserted: 1, count: 1 });
     expect(mocks.fetchCnPreferentialDutyRatesMock).not.toHaveBeenCalled();
@@ -182,7 +190,7 @@ describe('importCnPreferential', () => {
       dryRun: false,
     });
 
-    await importCnPreferential({ partnerGeoIds: ['AU', 'KR'] });
+    await importCnPreferential({ partnerGeoIds: ['AU', 'KR'], useWitsFallback: true });
 
     const [, options] = mocks.batchUpsertDutyRatesFromStreamMock.mock.calls[0] ?? [];
     const makeSourceRef = options?.makeSourceRef as ((r: DutyRateInsert) => string) | undefined;
@@ -212,5 +220,22 @@ describe('importCnPreferential', () => {
       backfillYears: 1,
       hs6List: undefined,
     });
+  });
+
+  it('does not fetch WITS fallback by default', async () => {
+    const officialRow = makeRow({ partner: 'AU', source: 'official' });
+    mocks.fetchCnPreferentialDutyRatesMock.mockResolvedValue([officialRow]);
+    mocks.batchUpsertDutyRatesFromStreamMock.mockResolvedValue({
+      inserted: 1,
+      updated: 0,
+      count: 1,
+      dryRun: false,
+    });
+
+    await importCnPreferential({ partnerGeoIds: ['AU', 'KR'] });
+
+    expect(mocks.fetchWitsPreferentialDutyRatesMock).not.toHaveBeenCalled();
+    const [rows] = mocks.batchUpsertDutyRatesFromStreamMock.mock.calls[0] ?? [];
+    expect(rows).toHaveLength(1);
   });
 });

@@ -110,8 +110,8 @@ export async function importCnPreferential({
   batchSize = 5_000,
   importId,
   dryRun,
-  useWitsFallback = true,
-  strictOfficial = false,
+  useWitsFallback = false,
+  strictOfficial = true,
   officialExcelUrl,
   sheet,
 }: Params) {
