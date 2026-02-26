@@ -59,6 +59,9 @@ jobs:
       - name: Validate turbo env list
         run: bun run validate-envs
 
+      - name: Validate duty job alignment
+        run: bun run validate-duty-jobs
+
       - name: Run DB migrations (if available)
         shell: bash
         run: |

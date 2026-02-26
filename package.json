@@ -35,6 +35,7 @@
     "test:coverage": "bun run build:runtime-packages && vitest run --coverage",
     "test:watch": "vitest",
     "validate-docs": "bun run scripts/validate-docs.ts",
+    "validate-duty-jobs": "bun run scripts/validate-duty-job-alignment.ts",
     "validate-envs": "bun run scripts/validate-turbo-envs.ts",
     "validate-tests": "bun run scripts/validate-test-files.ts"
   },

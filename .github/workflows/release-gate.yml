@@ -54,6 +54,9 @@ jobs:
       - name: Validate test filename conventions
         run: bun run validate-tests
 
+      - name: Validate duty job alignment
+        run: bun run validate-duty-jobs
+
       - name: Lint
         run: bun run lint
 

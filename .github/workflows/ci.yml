@@ -34,6 +34,9 @@ jobs:
       - name: Validate docs wiring
         run: bun run validate-docs
 
+      - name: Validate duty job alignment
+        run: bun run validate-duty-jobs
+
   lint:
     needs: [validate]
     runs-on: ubuntu-latest
