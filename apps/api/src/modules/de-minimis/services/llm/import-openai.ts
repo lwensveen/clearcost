@@ -89,6 +89,7 @@ export async function importDeMinimisFromOpenAI(
   // Ingest with provenance: attach source_url per row via makeSourceRef
   const res = await importDeMinimis(rows, {
     importId: opts.importId,
+    source: 'llm',
     makeSourceRef: (row) => {
       const efKey =
         row.effectiveFrom instanceof Date

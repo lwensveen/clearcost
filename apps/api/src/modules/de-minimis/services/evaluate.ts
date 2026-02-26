@@ -11,6 +11,31 @@ export type DeMinimisDecision = {
 };
 
 const toMidnightUTC = (d: Date) => new Date(d.toISOString().slice(0, 10));
+const SOURCE_PRIORITY = ['official', 'manual', 'fallback', 'llm'] as const;
+type DeMinimisSource = (typeof SOURCE_PRIORITY)[number];
+
+function sourcePriority(source: string | null | undefined): number {
+  const normalized = String(source ?? '')
+    .trim()
+    .toLowerCase() as DeMinimisSource;
+  const idx = SOURCE_PRIORITY.indexOf(normalized);
+  return idx === -1 ? SOURCE_PRIORITY.length : idx;
+}
+
+function pickPreferredThresholdRow(
+  rows: Array<(typeof deMinimisTable)['$inferSelect']>,
+  kind: 'DUTY' | 'VAT'
+): (typeof deMinimisTable)['$inferSelect'] | undefined {
+  const candidates = rows.filter((row) => row.deMinimisKind === kind);
+  if (candidates.length <= 1) return candidates[0];
+
+  candidates.sort((a, b) => {
+    const rankDelta = sourcePriority(a.source) - sourcePriority(b.source);
+    if (rankDelta !== 0) return rankDelta;
+    return b.effectiveFrom.getTime() - a.effectiveFrom.getTime();
+  });
+  return candidates[0];
+}
 
 function resolveDestinationCurrency(destCountryIso2: string, explicitCurrency?: string): string {
   const explicit = explicitCurrency?.trim().toUpperCase();
@@ -60,8 +85,8 @@ export async function evaluateDeMinimis(opts: {
     )
     .orderBy(desc(deMinimisTable.effectiveFrom));
 
-  const dutyRow = rows.find((r) => r.deMinimisKind === 'DUTY');
-  const vatRow = rows.find((r) => r.deMinimisKind === 'VAT');
+  const dutyRow = pickPreferredThresholdRow(rows, 'DUTY');
+  const vatRow = pickPreferredThresholdRow(rows, 'VAT');
 
   async function toDest(
     row?: (typeof rows)[number]

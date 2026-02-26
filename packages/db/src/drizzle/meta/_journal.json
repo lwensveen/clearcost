@@ -323,6 +323,13 @@
       "when": 1772186400000,
       "tag": "0045_brisk_jubilee",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1772272800000,
+      "tag": "0046_nimble_outrider",
+      "breakpoints": true
     }
   ]
 }

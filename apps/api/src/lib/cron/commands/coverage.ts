@@ -546,6 +546,7 @@ export const coverageSnapshot: Command = async (args) => {
     .from(deMinimisTable)
     .where(
       and(
+        eq(deMinimisTable.source, 'official'),
         lte(deMinimisTable.effectiveFrom, now),
         or(isNull(deMinimisTable.effectiveTo), gt(deMinimisTable.effectiveTo, now))
       )
@@ -700,7 +701,7 @@ export const coverageSnapshot: Command = async (args) => {
     checks.push({
       key: `de_minimis.dest.${dest}`,
       ok: deMinimisDestinations.includes(dest),
-      detail: `Active de-minimis coverage for destination ${dest}`,
+      detail: `Active official de-minimis coverage for destination ${dest}`,
     });
   }
 

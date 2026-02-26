@@ -61,4 +61,53 @@ describe('importDeMinimis', () => {
 
     expect(mocks.insertMock).not.toHaveBeenCalled();
   });
+
+  it('prevents non-official imports from overwriting official rows', async () => {
+    const onConflictDoUpdateMock = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([]),
+    });
+    const valuesMock = vi.fn().mockReturnValue({ onConflictDoUpdate: onConflictDoUpdateMock });
+    mocks.insertMock.mockReturnValue({ values: valuesMock });
+
+    await importDeMinimis(
+      [
+        {
+          dest: 'US',
+          deMinimisKind: 'DUTY',
+          deMinimisBasis: 'INTRINSIC',
+          currency: 'USD',
+          value: '800',
+          effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+          effectiveTo: null,
+        },
+      ],
+      { source: 'fallback' }
+    );
+
+    const [conflictOpts] = onConflictDoUpdateMock.mock.calls[0] ?? [];
+    expect(conflictOpts?.setWhere).toBeDefined();
+  });
+
+  it('allows official imports to upsert authoritative rows', async () => {
+    const onConflictDoUpdateMock = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([]),
+    });
+    const valuesMock = vi.fn().mockReturnValue({ onConflictDoUpdate: onConflictDoUpdateMock });
+    mocks.insertMock.mockReturnValue({ values: valuesMock });
+
+    await importDeMinimis([
+      {
+        dest: 'US',
+        deMinimisKind: 'DUTY',
+        deMinimisBasis: 'INTRINSIC',
+        currency: 'USD',
+        value: '800',
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+        effectiveTo: null,
+      },
+    ]);
+
+    const [conflictOpts] = onConflictDoUpdateMock.mock.calls[0] ?? [];
+    expect(conflictOpts?.setWhere).toBeUndefined();
+  });
 });

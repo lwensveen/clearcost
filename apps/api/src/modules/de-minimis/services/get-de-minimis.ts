@@ -29,7 +29,14 @@ export async function getDeMinimisForKind(
   const destIso2 = normalizeCountryIso2(dest) ?? dest.toUpperCase();
   const day = toMidnightUTC(on);
 
-  const [row] = await db
+  const activeWhere = and(
+    eq(deMinimisTable.dest, destIso2),
+    eq(deMinimisTable.deMinimisKind, kind),
+    lte(deMinimisTable.effectiveFrom, day),
+    or(isNull(deMinimisTable.effectiveTo), gt(deMinimisTable.effectiveTo, day)) // <-- exclusive end
+  );
+
+  const [officialRow] = await db
     .select({
       currency: deMinimisTable.currency,
       value: deMinimisTable.value,
@@ -37,16 +44,25 @@ export async function getDeMinimisForKind(
       effectiveFrom: deMinimisTable.effectiveFrom,
     })
     .from(deMinimisTable)
-    .where(
-      and(
-        eq(deMinimisTable.dest, destIso2),
-        eq(deMinimisTable.deMinimisKind, kind),
-        lte(deMinimisTable.effectiveFrom, day),
-        or(isNull(deMinimisTable.effectiveTo), gt(deMinimisTable.effectiveTo, day)) // <-- exclusive end
-      )
-    )
+    .where(and(activeWhere, eq(deMinimisTable.source, 'official')))
     .orderBy(desc(deMinimisTable.effectiveFrom))
     .limit(1);
+
+  const [fallbackRow] = officialRow
+    ? [officialRow]
+    : await db
+        .select({
+          currency: deMinimisTable.currency,
+          value: deMinimisTable.value,
+          deMinimisBasis: deMinimisTable.deMinimisBasis,
+          effectiveFrom: deMinimisTable.effectiveFrom,
+        })
+        .from(deMinimisTable)
+        .where(activeWhere)
+        .orderBy(desc(deMinimisTable.effectiveFrom))
+        .limit(1);
+
+  const row = fallbackRow;
 
   if (!row) return null;
 

@@ -155,6 +155,7 @@ export async function importDeMinimisCrossChecked(
   // 5) ingest with provenance (primary + secondary packed in sourceRef)
   const res = await importDeMinimis(rows, {
     importId: opts.importId,
+    source: 'llm',
     makeSourceRef: (row) => sourceRef.get(`${row.dest}|${row.deMinimisKind}`),
   });
 

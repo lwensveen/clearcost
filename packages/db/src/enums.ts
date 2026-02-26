@@ -8,6 +8,12 @@ export type DeMinimisKind = (typeof deMinimisKind)[number];
 
 export const deMinimisBasis = ['INTRINSIC', 'CIF'] as const;
 export type DeMinimisBasis = (typeof deMinimisBasis)[number];
+export const deMinimisSourceEnum = pgEnum('de_minimis_source', [
+  'official',
+  'fallback',
+  'llm',
+  'manual',
+]);
 
 export const vatRateKindEnum = pgEnum('vat_rate_kind', [
   'REDUCED',

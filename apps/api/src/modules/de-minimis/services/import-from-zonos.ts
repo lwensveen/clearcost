@@ -101,6 +101,7 @@ export async function importDeMinimisFromZonos(
 
   let inserted = 0;
   let updated = 0;
+  let parsedRows = 0;
 
   const provBatch: Array<{
     importId: string;
@@ -140,6 +141,7 @@ export async function importDeMinimisFromZonos(
             dest: iso,
             deMinimisKind: kind,
             deMinimisBasis: basis,
+            source: 'fallback',
             currency,
             value: value.toFixed(2),
             effectiveFrom,
@@ -153,10 +155,13 @@ export async function importDeMinimisFromZonos(
             ],
             set: {
               deMinimisBasis: basis,
+              source: 'fallback',
               currency,
               value: value.toFixed(2),
               updatedAt: new Date(),
             },
+            // Never overwrite official rows with scraped fallback data.
+            setWhere: sql`${deMinimisTable.source} <> 'official'`,
           })
           .returning({
             id: deMinimisTable.id,
@@ -197,9 +202,11 @@ export async function importDeMinimisFromZonos(
       };
 
       if (duty && duty.value > 0) {
+        parsedRows += 1;
         await upsertOne('DUTY', duty.value, duty.currency, resolveZonosBasis(iso, 'DUTY'));
       }
       if (tax && tax.value > 0) {
+        parsedRows += 1;
         await upsertOne('VAT', tax.value, tax.currency, resolveZonosBasis(iso, 'VAT'));
       }
     }
@@ -209,7 +216,7 @@ export async function importDeMinimisFromZonos(
     }
   });
 
-  if (inserted + updated === 0) {
+  if (parsedRows === 0) {
     throw new Error(
       '[De Minimis Zonos] source produced 0 rows. Check page structure and parsing selectors.'
     );

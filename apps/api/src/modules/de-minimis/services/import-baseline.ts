@@ -82,6 +82,7 @@ export async function seedDeMinimisBaseline(
 
   const res = await importDeMinimis(rows, {
     importId: opts.importId,
+    source: 'manual',
     makeSourceRef: (r) =>
       `baseline:dest=${r.dest}:kind=${r.deMinimisKind}:ef=${r.effectiveFrom.toISOString().slice(0, 10)}`,
   });

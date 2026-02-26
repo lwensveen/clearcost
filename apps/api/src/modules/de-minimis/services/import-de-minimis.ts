@@ -4,9 +4,11 @@ import { sql } from 'drizzle-orm';
 import { sha256Hex } from '../../../lib/provenance.js';
 
 type DeMinimisBasis = 'INTRINSIC' | 'CIF';
+type DeMinimisSource = 'official' | 'fallback' | 'llm' | 'manual';
 
 type ProvOpts = {
   importId?: string;
+  source?: DeMinimisSource;
   sourceKey?:
     | string
     | ((row: (typeof deMinimisTable)['$inferSelect']) => string | null | undefined);
@@ -107,6 +109,7 @@ export async function importDeMinimis(
   let inserted = 0;
   let updated = 0;
   let sourceRows = 0;
+  const importSource: DeMinimisSource = opts.source ?? 'official';
 
   const isAsync = (s: any): s is AsyncIterable<DeMinimisInsert> =>
     s && typeof s[Symbol.asyncIterator] === 'function';
@@ -114,7 +117,10 @@ export async function importDeMinimis(
   async function flush() {
     if (!buf.length) return;
 
-    const values = buf.map(normalizeInsertRow);
+    const values = buf.map((row, index) => ({
+      ...normalizeInsertRow(row, index),
+      source: importSource,
+    }));
 
     const ret = await db
       .insert(deMinimisTable)
@@ -123,11 +129,17 @@ export async function importDeMinimis(
         target: [deMinimisTable.dest, deMinimisTable.deMinimisKind, deMinimisTable.effectiveFrom],
         set: {
           deMinimisBasis: sql`EXCLUDED.de_minimis_basis`,
+          source: sql`EXCLUDED.source`,
           currency: sql`EXCLUDED.currency`,
           value: sql`EXCLUDED.value`,
           effectiveTo: sql`EXCLUDED.effective_to`,
           updatedAt: sql`now()`,
         },
+        // Keep official thresholds authoritative; non-official imports can only upsert
+        // non-official rows for the same key.
+        ...(importSource === 'official'
+          ? {}
+          : { setWhere: sql`${deMinimisTable.source} <> 'official'` }),
       })
       .returning({
         id: deMinimisTable.id,
@@ -135,6 +147,7 @@ export async function importDeMinimis(
         dest: deMinimisTable.dest,
         deMinimisKind: deMinimisTable.deMinimisKind,
         deMinimisBasis: deMinimisTable.deMinimisBasis,
+        source: deMinimisTable.source,
         currency: deMinimisTable.currency,
         value: deMinimisTable.value,
         effectiveFrom: deMinimisTable.effectiveFrom,
@@ -166,6 +179,7 @@ export async function importDeMinimis(
             dest: row.dest,
             kind: row.deMinimisKind,
             basis: row.deMinimisBasis,
+            source: row.source,
             currency: row.currency,
             value: row.value,
             ef: isoOrNull(row.effectiveFrom),

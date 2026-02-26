@@ -169,6 +169,7 @@ export async function importDeMinimisFromOfficial(
 
   const res = await importDeMinimis(rows, {
     importId: opts?.importId,
+    source: 'official',
     sourceKey: (row) => resolveOfficialSourceKey(row),
     makeSourceRef: (row) =>
       `official:deminimis:dest=${row.dest}:kind=${row.deMinimisKind}:source=${resolveOfficialSourceUrl(

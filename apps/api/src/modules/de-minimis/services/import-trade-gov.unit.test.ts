@@ -91,6 +91,6 @@ describe('importDeMinimisFromTradeGov', () => {
         }),
       ])
     );
-    expect(options).toMatchObject({ sourceKey: 'de-minimis.trade_gov.api' });
+    expect(options).toMatchObject({ source: 'fallback', sourceKey: 'de-minimis.trade_gov.api' });
   });
 });

@@ -100,6 +100,7 @@ export async function importDeMinimisFromGrok(
 
   const res = await importDeMinimis(rows, {
     importId: opts.importId,
+    source: 'llm',
     makeSourceRef: (stored) => {
       const efKey =
         stored.effectiveFrom instanceof Date

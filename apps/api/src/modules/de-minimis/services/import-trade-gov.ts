@@ -158,6 +158,7 @@ export async function importDeMinimisFromTradeGov(
 
   const res = await importDeMinimis(rows, {
     importId: opts.importId,
+    source: 'fallback',
     sourceKey: TRADE_GOV_SOURCE_KEY,
     makeSourceRef: (row) =>
       `trade.gov:dest=${row.dest}:kind=${row.deMinimisKind}:ef=${row.effectiveFrom

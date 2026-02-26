@@ -143,4 +143,42 @@ describe('evaluateDeMinimis', () => {
       code: 'DE_MINIMIS_FX_UNAVAILABLE',
     });
   });
+
+  it('prefers official rows over fallback rows for the same kind', async () => {
+    mockRows([
+      {
+        deMinimisKind: 'DUTY',
+        deMinimisBasis: 'INTRINSIC',
+        source: 'fallback',
+        currency: 'EUR',
+        value: '50',
+        effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+        effectiveTo: null,
+      },
+      {
+        deMinimisKind: 'DUTY',
+        deMinimisBasis: 'INTRINSIC',
+        source: 'official',
+        currency: 'EUR',
+        value: '100',
+        effectiveFrom: new Date('2024-01-01T00:00:00.000Z'),
+        effectiveTo: null,
+      },
+    ]);
+
+    const out = await evaluateDeMinimis({
+      dest: 'NL',
+      goodsDest: 90,
+      freightDest: 0,
+      fxAsOf: FX_AS_OF,
+    });
+
+    expect(out.duty).toEqual({
+      thresholdDest: 100,
+      deMinimisBasis: 'INTRINSIC',
+      under: true,
+    });
+    expect(out.suppressDuty).toBe(true);
+    expect(mocks.convertCurrencyMock).not.toHaveBeenCalled();
+  });
 });
