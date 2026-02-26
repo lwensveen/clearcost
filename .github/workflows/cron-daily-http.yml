@@ -148,7 +148,7 @@ jobs:
       - name: MY Duties — MFN (official Excel)
         run: |
           if [ -z "${MY_MFN_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:my-mfn-excel] missing MY_MFN_OFFICIAL_EXCEL_URL"
+            echo "[duties:my-mfn-official] missing MY_MFN_OFFICIAL_EXCEL_URL"
             exit 1
           fi
           BODY=$(jq -n --arg url "$MY_MFN_OFFICIAL_EXCEL_URL" '{url: $url}')
@@ -156,7 +156,7 @@ jobs:
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:my-mfn-excel] expected >0 imported rows, got $ROWS"
+            echo "[duties:my-mfn-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
@@ -178,7 +178,7 @@ jobs:
       - name: MY Duties — FTA (official Excel)
         run: |
           if [ -z "${MY_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:my-fta-excel] missing MY_FTA_OFFICIAL_EXCEL_URL"
+            echo "[duties:my-fta-official] missing MY_FTA_OFFICIAL_EXCEL_URL"
             exit 1
           fi
           BODY=$(jq -n --arg url "$MY_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
@@ -186,7 +186,7 @@ jobs:
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:my-fta-excel] expected >0 imported rows, got $ROWS"
+            echo "[duties:my-fta-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
@@ -211,7 +211,7 @@ jobs:
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:cn-mfn] expected >0 imported rows, got $ROWS"
+            echo "[duties:cn-mfn-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
@@ -221,7 +221,7 @@ jobs:
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:cn-fta] expected >0 imported rows, got $ROWS"
+            echo "[duties:cn-fta-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 
