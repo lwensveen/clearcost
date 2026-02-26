@@ -66,7 +66,7 @@ export const dutiesMyMfnOfficial: Command = async (args) => {
   const payload = await withRun(
     {
       importSource: 'OFFICIAL',
-      job: 'duties:my-mfn-excel',
+      job: 'duties:my-mfn-official',
       sourceKey: DUTIES_MY_MFN_SOURCE_KEY,
       sourceUrl: urlOrPath,
       params: {

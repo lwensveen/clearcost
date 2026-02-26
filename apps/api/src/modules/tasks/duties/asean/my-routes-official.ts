@@ -22,7 +22,7 @@ export default function myDutyRoutesOfficial(app: FastifyInstance) {
         config: {
           importMeta: {
             importSource: 'OFFICIAL',
-            job: 'duties:my-mfn-excel',
+            job: 'duties:my-mfn-official',
             sourceKey: 'duties.my.official.mfn_excel',
           },
         },
@@ -57,7 +57,7 @@ export default function myDutyRoutesOfficial(app: FastifyInstance) {
         config: {
           importMeta: {
             importSource: 'MY_GAZETTE',
-            job: 'duties:my-mfn-pdf',
+            job: 'duties:my-mfn-official',
             sourceKey: 'duties.my.gazette.mfn_pdf',
           },
         },

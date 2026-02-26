@@ -78,7 +78,7 @@ const ASEAN_MFN_REQUIRED_JOBS = [
   'duties:kh-mfn-official',
   'duties:la-mfn-official',
   'duties:mm-mfn-official',
-  'duties:my-mfn-excel',
+  'duties:my-mfn-official',
   'duties:ph-mfn-official',
   'duties:th-mfn-official',
   'duties:vn-mfn-official',

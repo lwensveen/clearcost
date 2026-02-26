@@ -24,7 +24,7 @@ export default function myDutyRoutes(app: FastifyInstance) {
         config: {
           importMeta: {
             importSource: 'OFFICIAL',
-            job: 'duties:my-mfn-excel',
+            job: 'duties:my-mfn-official',
             sourceKey: 'duties.my.official.mfn_excel',
           },
         },

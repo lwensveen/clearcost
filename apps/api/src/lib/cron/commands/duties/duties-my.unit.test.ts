@@ -71,7 +71,7 @@ describe('duties-my commands', () => {
     const [ctx] = mocks.withRunMock.mock.calls[0] ?? [];
     expect(ctx).toMatchObject({
       importSource: 'OFFICIAL',
-      job: 'duties:my-mfn-excel',
+      job: 'duties:my-mfn-official',
       sourceKey: 'duties.my.official.mfn_excel',
     });
   });
