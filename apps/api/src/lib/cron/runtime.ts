@@ -1,6 +1,8 @@
 import { importErrors, importRowsInserted, setLastRunNow, startImportTimer } from '../metrics.js';
 import { finishImportRun, type ImportSource, startImportRun } from '../provenance.js';
 import { acquireRunLock, makeLockKey, releaseRunLock } from '../run-lock.js';
+import { getSourceRegistryByKey } from '../source-registry.js';
+import { NON_REGISTRY_RUNTIME_SOURCE_KEYS } from '../source-registry/defaults.js';
 
 export type Command = (args: string[]) => Promise<void>;
 
@@ -12,6 +14,27 @@ function nonEmptyString(value: unknown): string | undefined {
 
 function isOpsJob(job: string): boolean {
   return job.trim().toLowerCase().startsWith('ops:');
+}
+
+const NON_REGISTRY_RUNTIME_SOURCE_KEY_SET = new Set<string>(NON_REGISTRY_RUNTIME_SOURCE_KEYS);
+
+async function assertSourceKeyEnabled(params: { job: string; sourceKey: string }): Promise<void> {
+  if (NON_REGISTRY_RUNTIME_SOURCE_KEY_SET.has(params.sourceKey)) {
+    return;
+  }
+
+  const source = await getSourceRegistryByKey(params.sourceKey);
+  if (!source) {
+    throw new Error(
+      `[${params.job}] sourceKey '${params.sourceKey}' is not registered in source_registry`
+    );
+  }
+
+  if (!source.enabled) {
+    throw new Error(
+      `[${params.job}] sourceKey '${params.sourceKey}' is disabled in source_registry`
+    );
+  }
 }
 
 export async function withRun<T>(
@@ -32,6 +55,9 @@ export async function withRun<T>(
   const sourceKey = nonEmptyString(ctx.sourceKey) ?? nonEmptyString(paramsRecord?.sourceKey);
   if (!isOpsJob(ctx.job) && !sourceKey) {
     throw new Error(`[${ctx.job}] sourceKey is required for non-ops cron jobs`);
+  }
+  if (!isOpsJob(ctx.job) && sourceKey) {
+    await assertSourceKeyEnabled({ job: ctx.job, sourceKey });
   }
   const sourceUrl = nonEmptyString(ctx.sourceUrl) ?? nonEmptyString(paramsRecord?.sourceUrl);
   const lockAcquired = await acquireRunLock(lockKey);

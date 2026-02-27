@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { importErrors, importRowsInserted, setLastRunNow, startImportTimer } from '../metrics.js';
 import { finishImportRun, startImportRun } from '../provenance.js';
 import { acquireRunLock, releaseRunLock } from '../run-lock.js';
+import { getSourceRegistryByKey } from '../source-registry.js';
 import { withRun } from './runtime.js';
 
 const { endTimerSpy } = vi.hoisted(() => ({ endTimerSpy: vi.fn() }));
@@ -26,6 +27,15 @@ vi.mock('../run-lock.js', () => ({
   releaseRunLock: vi.fn(async () => {}),
 }));
 
+vi.mock('../source-registry.js', () => ({
+  getSourceRegistryByKey: vi.fn(async () => ({
+    key: 'duties.wits.sdmx.base',
+    enabled: true,
+    baseUrl: null,
+    downloadUrlTemplate: null,
+  })),
+}));
+
 describe('withRun', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -33,6 +43,12 @@ describe('withRun', () => {
 
     vi.mocked(startImportRun).mockResolvedValue({ id: 'run-123' } as any);
     vi.mocked(acquireRunLock).mockResolvedValue(true);
+    vi.mocked(getSourceRegistryByKey).mockResolvedValue({
+      key: 'duties.wits.sdmx.base',
+      enabled: true,
+      baseUrl: null,
+      downloadUrlTemplate: null,
+    });
   });
 
   it('success path: starts run, calls work, records metrics, finishes succeeded, returns payload', async () => {
@@ -240,6 +256,47 @@ describe('withRun', () => {
     expect(work).not.toHaveBeenCalled();
   });
 
+  it('fails fast when non-ops sourceKey is missing in source_registry', async () => {
+    vi.mocked(getSourceRegistryByKey).mockResolvedValue(null);
+    const ctx = {
+      importSource: 'WITS' as const,
+      job: 'duties:wits',
+      sourceKey: 'duties.wits.sdmx.base',
+    };
+    const work = vi.fn(async () => ({ inserted: 1, payload: { ok: true } }));
+
+    await expect(withRun(ctx, work)).rejects.toThrow(
+      "[duties:wits] sourceKey 'duties.wits.sdmx.base' is not registered in source_registry"
+    );
+
+    expect(acquireRunLock).not.toHaveBeenCalled();
+    expect(startImportRun).not.toHaveBeenCalled();
+    expect(work).not.toHaveBeenCalled();
+  });
+
+  it('fails fast when non-ops sourceKey is disabled in source_registry', async () => {
+    vi.mocked(getSourceRegistryByKey).mockResolvedValue({
+      key: 'duties.wits.sdmx.base',
+      enabled: false,
+      baseUrl: null,
+      downloadUrlTemplate: null,
+    });
+    const ctx = {
+      importSource: 'WITS' as const,
+      job: 'duties:wits',
+      sourceKey: 'duties.wits.sdmx.base',
+    };
+    const work = vi.fn(async () => ({ inserted: 1, payload: { ok: true } }));
+
+    await expect(withRun(ctx, work)).rejects.toThrow(
+      "[duties:wits] sourceKey 'duties.wits.sdmx.base' is disabled in source_registry"
+    );
+
+    expect(acquireRunLock).not.toHaveBeenCalled();
+    expect(startImportRun).not.toHaveBeenCalled();
+    expect(work).not.toHaveBeenCalled();
+  });
+
   it('allows ops-prefixed jobs without sourceKey', async () => {
     const ctx = { importSource: 'MANUAL' as const, job: 'ops:sweep-stale' };
     const work = vi.fn(async () => ({ inserted: 1, payload: { ok: true } }));
@@ -251,5 +308,24 @@ describe('withRun', () => {
       job: 'ops:sweep-stale',
       params: {},
     });
+  });
+
+  it('allows non-registry runtime sourceKey values used by bootstrap and seed jobs', async () => {
+    vi.mocked(getSourceRegistryByKey).mockResolvedValue(null);
+    const ctx = {
+      importSource: 'SEED' as const,
+      job: 'source-registry:bootstrap',
+      sourceKey: 'source-registry.defaults',
+    };
+    const work = vi.fn(async () => ({ inserted: 1, payload: { ok: true } }));
+
+    await withRun(ctx, work);
+
+    expect(getSourceRegistryByKey).not.toHaveBeenCalled();
+    expect(startImportRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceKey: 'source-registry.defaults',
+      })
+    );
   });
 });
