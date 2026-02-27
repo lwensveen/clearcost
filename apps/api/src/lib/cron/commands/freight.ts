@@ -8,7 +8,7 @@ export const freightJson: Command = async (args) => {
   if (!url) throw new Error('Pass URL to JSON (freight cards)');
 
   const payload = await withRun(
-    { importSource: 'FILE', job: 'freight:json', params: { url } },
+    { importSource: 'FILE', job: 'freight:json', sourceKey: 'freight.cards.json', params: { url } },
     async () => {
       const rows: any = await fetchJSON(url);
       const res = await importFreightCards(rows, { enforceCoverageGuardrails: true });

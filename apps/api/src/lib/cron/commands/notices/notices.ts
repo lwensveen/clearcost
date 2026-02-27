@@ -29,11 +29,18 @@ export const crawlNoticesCmd: Command = async (argv) => {
     : null;
 
   const urls = resolved?.urls ?? explicitUrls;
-  const sourceKey = resolved?.sourceKey;
+  const sourceKey =
+    resolved?.sourceKey ??
+    (typeof flags.sourceKey === 'string' ? flags.sourceKey.trim() : undefined);
   const sourceUrl = resolved?.sourceUrl ?? urls[0];
 
   if (!urls.length) {
     throw new Error('Provide at least one list URL via --urls <url1,url2,...>');
+  }
+  if (!sourceKey) {
+    throw new Error(
+      'Provide --sourceKey=<registry-key> for non-CN notice crawls, or use a CN authority seed source.'
+    );
   }
 
   const include = flags.include
@@ -59,9 +66,9 @@ export const crawlNoticesCmd: Command = async (argv) => {
         type,
         seeds: urls.length,
         attach: Boolean(attach),
-        ...(sourceKey ? { sourceKey } : {}),
+        sourceKey,
       },
-      ...(sourceKey ? { sourceKey } : {}),
+      sourceKey,
       ...(sourceUrl ? { sourceUrl } : {}),
     },
     async () => {

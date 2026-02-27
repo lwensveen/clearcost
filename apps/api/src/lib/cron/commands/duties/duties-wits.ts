@@ -80,6 +80,7 @@ export const dutiesWits: Command = async (args) => {
     {
       importSource: 'WITS',
       job: 'duties:wits',
+      sourceKey: 'duties.wits.sdmx.base',
       params: { dests, partners, year, backfillYears, concurrency, batchSize, hs6List },
     },
     async (runId) => {

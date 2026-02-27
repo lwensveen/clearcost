@@ -20,6 +20,7 @@ export const vatLlmOpenAI: Command = async (args) => {
     {
       importSource: 'OPENAI',
       job: 'vat:llm-openai',
+      sourceKey: 'vat.llm.openai',
       params: {
         effectiveOn: effectiveOn.toISOString().slice(0, 10),
         model: flags.model,
@@ -55,6 +56,7 @@ export const vatLlmGrok: Command = async (args) => {
     {
       importSource: 'GROK',
       job: 'vat:llm-grok',
+      sourceKey: 'vat.llm.grok',
       params: {
         effectiveOn: effectiveOn.toISOString().slice(0, 10),
         model: flags.model,
@@ -92,6 +94,7 @@ export const vatLlmCrossCheck: Command = async (args) => {
     {
       importSource: 'LLM_CROSSCHECK',
       job: 'vat:llm-crosscheck',
+      sourceKey: 'vat.llm.crosscheck',
       params: {
         effectiveOn: effectiveOn.toISOString().slice(0, 10),
         mode,

@@ -20,7 +20,7 @@ export const dutiesJson: Command = async (args) => {
   if (!url) throw new Error('Pass URL to JSON (duty rates)');
 
   const payload = await withRun<any>(
-    { importSource: 'FILE', job: 'duties:json', params: { url } },
+    { importSource: 'FILE', job: 'duties:json', sourceKey: 'duties.file.json', params: { url } },
     async () => {
       const wire = await fetchJSON<DutyRateWire[]>(url);
       const normalized = wire.map((r) => ({

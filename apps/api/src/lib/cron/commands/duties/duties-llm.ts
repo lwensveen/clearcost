@@ -18,6 +18,7 @@ export const dutiesLlmOpenAI: Command = async (args) => {
     {
       importSource: 'OPENAI',
       job: 'duties:llm-openai',
+      sourceKey: 'duties.llm.openai',
       params: { effectiveOn: effectiveOn.toISOString().slice(0, 10) },
     },
     async (importId) => {
@@ -39,6 +40,7 @@ export const dutiesLlmGrok: Command = async (args) => {
     {
       importSource: 'GROK',
       job: 'duties:llm-grok',
+      sourceKey: 'duties.llm.grok',
       params: { effectiveOn: effectiveOn.toISOString().slice(0, 10) },
     },
     async (importId) => {
@@ -60,6 +62,7 @@ export const dutiesLlmCrossCheck: Command = async (args) => {
     {
       importSource: 'LLM_CROSSCHECK',
       job: 'duties:llm-crosscheck',
+      sourceKey: 'duties.llm.crosscheck',
       params: { mode, effectiveOn: effectiveOn.toISOString().slice(0, 10) },
     },
     async (importId) => {

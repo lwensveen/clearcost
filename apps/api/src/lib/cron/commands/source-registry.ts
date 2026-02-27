@@ -21,6 +21,7 @@ export const sourceRegistryBootstrap: Command = async (argv = []) => {
     {
       importSource: 'SEED',
       job: 'source-registry:bootstrap',
+      sourceKey: 'source-registry.defaults',
       params: { keyCount: SOURCE_REGISTRY_DEFAULT_ENTRIES.length },
     },
     async () => {

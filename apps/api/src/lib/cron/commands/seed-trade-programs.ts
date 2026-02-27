@@ -353,10 +353,17 @@ export const seedCountriesBasic: Command = async (args) => {
   const flags = parseFlags(args);
   const dryRun = Boolean(flags.dryRun);
 
-  const payload = await withRun({ importSource: 'SEED', job: 'seed:countries:basic' }, async () => {
-    const res = await upsertCountries(BASIC_COUNTRIES, dryRun);
-    return { inserted: res.insertedOrUpdated, payload: res };
-  });
+  const payload = await withRun(
+    {
+      importSource: 'SEED',
+      job: 'seed:countries:basic',
+      sourceKey: 'seed.countries.basic',
+    },
+    async () => {
+      const res = await upsertCountries(BASIC_COUNTRIES, dryRun);
+      return { inserted: res.insertedOrUpdated, payload: res };
+    }
+  );
 
   console.log(payload);
 };
@@ -375,7 +382,12 @@ export const seedTradeProgramsUS: Command = async (args) => {
   const dryRun = Boolean(flags.dryRun);
 
   const payload = await withRun(
-    { importSource: 'SEED', job: 'seed:trade-programs:us', params: { owner, dryRun } },
+    {
+      importSource: 'SEED',
+      job: 'seed:trade-programs:us',
+      sourceKey: 'seed.trade_programs.us',
+      params: { owner, dryRun },
+    },
     async () => {
       // make sure owner exists and get its id
       const ownerId = await ensureJurisdictionId(owner);

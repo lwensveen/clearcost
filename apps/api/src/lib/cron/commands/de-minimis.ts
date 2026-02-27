@@ -22,6 +22,7 @@ export const deMinimisZonos: Command = async (args) => {
     {
       importSource: 'ZONOS',
       job: 'de-minimis:import-zonos',
+      sourceKey: 'de-minimis.zonos.docs',
       params: { effectiveOn: effectiveOn.toISOString().slice(0, 10) },
     },
     async (importId) => {
@@ -44,6 +45,7 @@ export const deMinimisOfficial: Command = async (args) => {
     {
       importSource: 'OFFICIAL',
       job: 'de-minimis:official',
+      sourceKey: 'de-minimis.official.bundle',
       params: { effectiveOn: effectiveOn.toISOString().slice(0, 10) },
     },
     async (importId) => {
@@ -66,6 +68,7 @@ export const deMinimisSeedBaseline: Command = async (args) => {
     {
       importSource: 'BASELINE',
       job: 'de-minimis:seed',
+      sourceKey: 'de-minimis.baseline.seed',
       params: { effectiveOn: effectiveOn.toISOString().slice(0, 10) },
     },
     async (importId) => {
@@ -88,6 +91,7 @@ export const deMinimisTradeGov: Command = async (args) => {
     {
       importSource: 'TRADE_GOV',
       job: 'de-minimis:trade-gov',
+      sourceKey: 'de-minimis.trade_gov.api',
       params: { effectiveOn: effectiveOn.toISOString().slice(0, 10) },
     },
     async (importId) => {
@@ -111,6 +115,7 @@ export const deMinimisOpenAI: Command = async (args) => {
     {
       importSource: 'OPENAI',
       job: 'de-minimis:openai',
+      sourceKey: 'de-minimis.llm.openai',
       params: { effectiveOn: effectiveOn.toISOString().slice(0, 10), prompt },
     },
     async (importId) => {
@@ -134,6 +139,7 @@ export const deMinimisGrok: Command = async (args) => {
     {
       importSource: 'GROK',
       job: 'de-minimis:grok',
+      sourceKey: 'de-minimis.llm.grok',
       params: { effectiveOn: effectiveOn.toISOString().slice(0, 10), prompt },
     },
     async (importId) => {
@@ -157,6 +163,7 @@ export const deMinimisCrossCheck: Command = async (args) => {
     {
       importSource: 'LLM_CROSSCHECK',
       job: 'de-minimis:crosscheck',
+      sourceKey: 'de-minimis.llm.crosscheck',
       params: { effectiveOn: effectiveOn.toISOString().slice(0, 10), mode },
     },
     async (importId) => {

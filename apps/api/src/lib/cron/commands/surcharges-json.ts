@@ -32,7 +32,12 @@ export const surchargesJson: Command = async (args) => {
   if (!url) throw new Error('Pass URL to JSON (surcharges)');
 
   const payload = await withRun(
-    { importSource: 'FILE', job: 'surcharges:json', params: { url } },
+    {
+      importSource: 'FILE',
+      job: 'surcharges:json',
+      sourceKey: 'surcharges.file.json',
+      params: { url },
+    },
     async (importId) => {
       const wire = await fetchJSON<SurchargeWire[]>(url);
       const mapped = wire.map((r) => ({

@@ -21,6 +21,7 @@ export const surchargesLlmOpenAI: Command = async (args) => {
     {
       importSource: 'OPENAI',
       job: 'surcharges:llm-openai',
+      sourceKey: 'surcharges.llm.openai',
       params: {
         effectiveOn: effectiveOn.toISOString().slice(0, 10),
         model: flags.model,
@@ -61,6 +62,7 @@ export const surchargesLlmGrok: Command = async (args) => {
     {
       importSource: 'GROK',
       job: 'surcharges:llm-grok',
+      sourceKey: 'surcharges.llm.grok',
       params: {
         effectiveOn: effectiveOn.toISOString().slice(0, 10),
         model: flags.model,
@@ -103,6 +105,7 @@ export const surchargesLlmCrossCheck: Command = async (args) => {
     {
       importSource: 'LLM_CROSSCHECK',
       job: 'surcharges:llm-crosscheck',
+      sourceKey: 'surcharges.llm.crosscheck',
       params: {
         effectiveOn: effectiveOn.toISOString().slice(0, 10),
         mode,

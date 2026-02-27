@@ -37,7 +37,12 @@ export const surchargesUsAll: Command = async (args) => {
         : undefined;
 
   const run = await withRun(
-    { importSource: 'US', job: 'surcharges:us-all', params: { fy, batchSize } },
+    {
+      importSource: 'US',
+      job: 'surcharges:us-all',
+      sourceKey: 'surcharges.us.bundle',
+      params: { fy, batchSize },
+    },
     async (importId: string) => {
       const results: Record<string, unknown> = {};
       let inserted = 0;
@@ -105,6 +110,7 @@ export const surchargesUsTradeRemedies: Command = async (args) => {
     {
       importSource: 'USITC_HTS',
       job: 'surcharges:us-trade-remedies',
+      sourceKey: 'surcharges.us.usitc_hts.json',
       params: { effectiveFrom, skipFree },
     },
     async (importId: string) => {
@@ -119,7 +125,11 @@ export const surchargesUsTradeRemedies: Command = async (args) => {
 
 export const surchargesUsAphis: Command = async () => {
   const payload = await withRun(
-    { importSource: 'APHIS', job: 'surcharges:us-aphis' },
+    {
+      importSource: 'APHIS',
+      job: 'surcharges:us-aphis',
+      sourceKey: 'surcharges.us.aphis.aqi_fees',
+    },
     async (id /* importId: string */) => {
       const res = await importAphisAqiSurcharges({ importId: id });
       const inserted = res?.count ?? 0;
@@ -131,7 +141,11 @@ export const surchargesUsAphis: Command = async () => {
 
 export const surchargesUsFda: Command = async () => {
   const payload = await withRun(
-    { importSource: 'FDA', job: 'surcharges:us-fda' },
+    {
+      importSource: 'FDA',
+      job: 'surcharges:us-fda',
+      sourceKey: 'surcharges.us.fda.vqip_fees',
+    },
     async (id /* importId: string */) => {
       const res = await importFdaFsmaSurcharges({ importId: id });
       const inserted = res?.count ?? 0;

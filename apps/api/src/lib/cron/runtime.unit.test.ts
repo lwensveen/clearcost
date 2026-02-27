@@ -36,7 +36,12 @@ describe('withRun', () => {
   });
 
   it('success path: starts run, calls work, records metrics, finishes succeeded, returns payload', async () => {
-    const ctx = { importSource: 'WITS' as const, job: 'JOB', params: { a: 1 } };
+    const ctx = {
+      importSource: 'WITS' as const,
+      job: 'JOB',
+      sourceKey: 'duties.wits.sdmx.base',
+      params: { a: 1 },
+    };
     const work = vi.fn(async (importId: string) => {
       expect(importId).toBe('run-123');
       return { inserted: 5, payload: { ok: true } };
@@ -51,6 +56,7 @@ describe('withRun', () => {
     expect(startImportRun).toHaveBeenCalledWith({
       importSource: 'WITS',
       job: 'JOB',
+      sourceKey: 'duties.wits.sdmx.base',
       params: { a: 1 },
     });
     expect(importRowsInserted.inc).toHaveBeenCalledWith({ importSource: 'WITS', job: 'JOB' }, 5);
@@ -64,7 +70,7 @@ describe('withRun', () => {
   });
 
   it('defaults params to {} when absent', async () => {
-    const ctx = { importSource: 'WITS' as const, job: 'B' };
+    const ctx = { importSource: 'WITS' as const, job: 'B', sourceKey: 'duties.wits.sdmx.base' };
     const work = vi.fn(async () => ({ inserted: 1, payload: 'x' }));
 
     await withRun(ctx, work);
@@ -72,13 +78,14 @@ describe('withRun', () => {
     expect(startImportRun).toHaveBeenCalledWith({
       importSource: 'WITS',
       job: 'B',
+      sourceKey: 'duties.wits.sdmx.base',
       params: {},
     });
     expect(releaseRunLock).toHaveBeenCalledWith('WITS:B');
   });
 
   it('uses inserted=0 when work returns undefined inserted', async () => {
-    const ctx = { importSource: 'WITS' as const, job: 'J' };
+    const ctx = { importSource: 'WITS' as const, job: 'J', sourceKey: 'duties.wits.sdmx.base' };
 
     // Cast to the signature that withRun expects (inserted: number)
     const work = vi.fn(async () => ({ inserted: undefined, payload: 42 })) as unknown as (
@@ -93,7 +100,7 @@ describe('withRun', () => {
   });
 
   it('error path: records error metric, finishes failed, rethrows', async () => {
-    const ctx = { importSource: 'WITS' as const, job: 'JOB' };
+    const ctx = { importSource: 'WITS' as const, job: 'JOB', sourceKey: 'duties.wits.sdmx.base' };
     const err = new Error('boom');
     const work = vi.fn(async () => {
       throw err;
@@ -120,7 +127,11 @@ describe('withRun', () => {
 
   it('lock-conflict path: records lock metric and fails before provenance', async () => {
     vi.mocked(acquireRunLock).mockResolvedValue(false);
-    const ctx = { importSource: 'WITS' as const, job: 'LOCKED' };
+    const ctx = {
+      importSource: 'WITS' as const,
+      job: 'LOCKED',
+      sourceKey: 'duties.wits.sdmx.base',
+    };
     const work = vi.fn(async () => ({ inserted: 1, payload: 'x' }));
 
     await expect(withRun(ctx, work)).rejects.toThrow(
@@ -143,6 +154,7 @@ describe('withRun', () => {
     const ctx = {
       importSource: 'WITS' as const,
       job: 'JOB',
+      sourceKey: 'duties.wits.sdmx.base',
       lockKey: 'custom:import-lock',
     };
     const work = vi.fn(async () => ({ inserted: 2, payload: { ok: true } }));
@@ -200,7 +212,7 @@ describe('withRun', () => {
   it('releases lock when provenance start fails', async () => {
     vi.mocked(startImportRun).mockRejectedValue(new Error('db unavailable'));
 
-    const ctx = { importSource: 'WITS' as const, job: 'JOB' };
+    const ctx = { importSource: 'WITS' as const, job: 'JOB', sourceKey: 'duties.wits.sdmx.base' };
     const work = vi.fn(async () => ({ inserted: 1, payload: { ok: true } }));
 
     await expect(withRun(ctx, work)).rejects.toThrow('db unavailable');
@@ -213,5 +225,31 @@ describe('withRun', () => {
     });
     expect(finishImportRun).not.toHaveBeenCalled();
     expect(releaseRunLock).toHaveBeenCalledWith('WITS:JOB');
+  });
+
+  it('fails fast when non-ops jobs do not provide sourceKey', async () => {
+    const ctx = { importSource: 'WITS' as const, job: 'duties:wits' };
+    const work = vi.fn(async () => ({ inserted: 1, payload: { ok: true } }));
+
+    await expect(withRun(ctx, work)).rejects.toThrow(
+      '[duties:wits] sourceKey is required for non-ops cron jobs'
+    );
+
+    expect(acquireRunLock).not.toHaveBeenCalled();
+    expect(startImportRun).not.toHaveBeenCalled();
+    expect(work).not.toHaveBeenCalled();
+  });
+
+  it('allows ops-prefixed jobs without sourceKey', async () => {
+    const ctx = { importSource: 'MANUAL' as const, job: 'ops:sweep-stale' };
+    const work = vi.fn(async () => ({ inserted: 1, payload: { ok: true } }));
+
+    await withRun(ctx, work);
+
+    expect(startImportRun).toHaveBeenCalledWith({
+      importSource: 'MANUAL',
+      job: 'ops:sweep-stale',
+      params: {},
+    });
   });
 });

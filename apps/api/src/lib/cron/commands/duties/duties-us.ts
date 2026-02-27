@@ -23,6 +23,7 @@ export const dutiesUsMfn: Command = async (args) => {
     {
       importSource: 'USITC_HTS',
       job: 'duties:us-mfn-official',
+      sourceKey: 'duties.us.usitc.base',
       params: { effectiveFrom: dateArg },
     },
     async () => {
@@ -57,6 +58,7 @@ export const dutiesUsFta: Command = async (args) => {
     {
       importSource: 'USITC_HTS',
       job: 'duties:us-fta-official',
+      sourceKey: 'duties.us.usitc.base',
       params: { effectiveFrom: dateArg, skipFree: boolParam(skipFree) },
     },
     async () => {
@@ -91,6 +93,7 @@ export const dutiesUsAll: Command = async (args) => {
     {
       importSource: 'USITC_HTS',
       job: 'duties:us-mfn-official',
+      sourceKey: 'duties.us.usitc.base',
       params: { effectiveFrom: dateArg },
     },
     async () => {
@@ -110,6 +113,7 @@ export const dutiesUsAll: Command = async (args) => {
     {
       importSource: 'USITC_HTS',
       job: 'duties:us-fta-official',
+      sourceKey: 'duties.us.usitc.base',
       params: { effectiveFrom: dateArg, skipFree: boolParam(skipFree) },
     },
     async () => {

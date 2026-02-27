@@ -4,6 +4,10 @@ import { parseFlags } from '../../utils.js';
 import { db, tradeNoticesTable } from '@clearcost/db';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { attachNoticeDoc, markNoticeStatus } from '../../../../modules/notices/registry.js';
+import {
+  getCnNoticeSourceConfig,
+  isCnNoticeAuthority,
+} from '../../../../modules/notices/source-urls.js';
 import { parse } from 'node-html-parser';
 import { httpFetch } from '../../../http.js';
 
@@ -49,22 +53,35 @@ function extractPdfLinks(html: string, baseUrl: string): string[] {
 export const fetchNoticeDocsCmd: Command = async (argv) => {
   const flags = parseFlags(argv);
 
-  const dest = flags.dest ? String(flags.dest) : undefined; // --dest CN
-  const authority = flags.authority ? String(flags.authority) : undefined; // --authority MOF
+  const dest = flags.dest ? String(flags.dest).toUpperCase() : undefined; // --dest CN
+  const authority = flags.authority ? String(flags.authority).toUpperCase() : undefined; // --authority MOF
   const statuses = (flags.status ? String(flags.status) : 'new')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean) as Array<'new' | 'fetched' | 'parsed' | 'ignored' | 'error'>;
+  const sourceKeyFromFlag =
+    typeof flags.sourceKey === 'string' ? flags.sourceKey.trim() : undefined;
+  const sourceKey =
+    sourceKeyFromFlag ??
+    (authority && isCnNoticeAuthority(authority)
+      ? getCnNoticeSourceConfig(authority).sourceKey
+      : undefined);
 
   const limit = Math.max(1, Math.min(500, Number(flags.limit ?? 50)));
   const attachNonPdf = Boolean(flags.attachNonPdf); // also open HTML pages and find PDFs
   const concurrency = Math.max(1, Math.min(8, Number(flags.concurrency ?? 3)));
+  if (!sourceKey) {
+    throw new Error(
+      'Provide --sourceKey=<registry-key> when fetching notice docs without a CN authority.'
+    );
+  }
 
   const result = await withRun(
     {
       importSource: 'CN_NOTICES',
       job: `notices:docs:${(authority ?? 'any').toLowerCase()}`,
-      params: { dest, authority, statuses, limit, attachNonPdf, concurrency },
+      sourceKey,
+      params: { dest, authority, statuses, limit, attachNonPdf, concurrency, sourceKey },
     },
     async () => {
       // Build WHERE

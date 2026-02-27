@@ -2,6 +2,10 @@ import type { Command } from '../../runtime.js';
 import { withRun } from '../../runtime.js';
 import { parseFlags } from '../../utils.js';
 import { ingestJsonFeed } from '../../../../modules/notices/adapters/json-feed.js';
+import {
+  getCnNoticeSourceConfig,
+  isCnNoticeAuthority,
+} from '../../../../modules/notices/source-urls.js';
 import { NOTICE_TYPE_VALUES } from '@clearcost/db';
 import { z } from 'zod/v4';
 
@@ -27,6 +31,7 @@ const FlagsSchema = z.object({
   summaryKey: z.string().optional(),
   lang: z.string().min(2).max(8).default('zh'),
   userAgent: z.string().optional(),
+  sourceKey: z.string().optional(),
 });
 
 // minimal nested getter (supports dots + [idx])
@@ -43,12 +48,29 @@ const get = (obj: unknown, path?: string): unknown => {
 
 export const crawlNoticesJsonCmd: Command = async (argv) => {
   const flags = FlagsSchema.parse(parseFlags(argv));
+  const sourceKey =
+    flags.sourceKey ??
+    (isCnNoticeAuthority(flags.authority)
+      ? getCnNoticeSourceConfig(flags.authority).sourceKey
+      : undefined);
+  if (!sourceKey) {
+    throw new Error(
+      'Provide --sourceKey=<registry-key> when ingesting notice JSON feeds without a CN authority.'
+    );
+  }
 
   const result = await withRun(
     {
       importSource: 'NOTICES',
       job: `notices:json:${flags.authority.toLowerCase()}`,
-      params: { dest: flags.dest, authority: flags.authority, type: flags.type, url: flags.url },
+      sourceKey,
+      params: {
+        dest: flags.dest,
+        authority: flags.authority,
+        type: flags.type,
+        url: flags.url,
+        sourceKey,
+      },
     },
     async () => {
       const payload = await ingestJsonFeed({

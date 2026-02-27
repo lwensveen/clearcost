@@ -35,6 +35,7 @@ export const vatAuto: Command = async (argv = []) => {
     {
       importSource: 'OECD/IMF',
       job: 'vat:auto',
+      sourceKey: 'vat.oecd_imf.standard',
       params: { sourceKeys: ['vat.oecd_imf.standard', 'vat.imf.standard'] },
     },
     async () => {

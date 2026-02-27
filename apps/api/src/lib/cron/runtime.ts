@@ -10,6 +10,10 @@ function nonEmptyString(value: unknown): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function isOpsJob(job: string): boolean {
+  return job.trim().toLowerCase().startsWith('ops:');
+}
+
 export async function withRun<T>(
   ctx: {
     importSource: ImportSource;
@@ -26,6 +30,9 @@ export async function withRun<T>(
   const paramsRecord =
     ctx.params && typeof ctx.params === 'object' ? (ctx.params as Record<string, unknown>) : null;
   const sourceKey = nonEmptyString(ctx.sourceKey) ?? nonEmptyString(paramsRecord?.sourceKey);
+  if (!isOpsJob(ctx.job) && !sourceKey) {
+    throw new Error(`[${ctx.job}] sourceKey is required for non-ops cron jobs`);
+  }
   const sourceUrl = nonEmptyString(ctx.sourceUrl) ?? nonEmptyString(paramsRecord?.sourceUrl);
   const lockAcquired = await acquireRunLock(lockKey);
   const end = startImportTimer({ importSource: ctx.importSource, job: ctx.job });

@@ -123,7 +123,12 @@ export const programsSeed: Command = async (args) => {
   const owner = (flags.owner ? flags.owner : 'US').toUpperCase();
 
   const payload = await withRun(
-    { importSource: 'SEED', job: 'programs:seed', params: { owner } },
+    {
+      importSource: 'SEED',
+      job: 'programs:seed',
+      sourceKey: 'trade-programs.seed.base',
+      params: { owner },
+    },
     async (importId: string) => {
       // Ensure owner jurisdiction exists (and get id)
       const ownerId = await ensureJurisdictionId(owner);
