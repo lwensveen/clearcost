@@ -422,6 +422,7 @@ Both HTTP workflows (`cron-daily-http.yml` and `cron-hourly-http.yml`) require:
 | `UK_10_DATA_API_BASE`       | secret | yes      | Required UK Tariff API base URL for official imports. |
 | `HTS_API_BASE`              | secret | yes      | Required USITC HTS base URL for US duty imports.      |
 | `HTS_CSV_URL`               | secret | no       | Optional USITC HTS CSV snapshot URL override.         |
+| `EU_TARIC_DAILY_LIST`       | secret | yes      | Required EU TARIC daily publications list URL.        |
 | `UK_REMEDY_MEASURE_TYPES`   | var    | no       | UK remedy measure types (defaults to `552,551,695`).  |
 | `EU_TARIC_REMEDY_TYPES`     | var    | no       | Enables EU remedies surcharge import when non-empty.  |
 | `IMPORTS_PRUNE_DAYS`        | var    | no       | Retention window for prune step (default `90`).       |

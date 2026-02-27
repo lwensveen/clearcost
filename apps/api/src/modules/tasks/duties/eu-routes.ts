@@ -88,11 +88,14 @@ export default function euDutyRoutes(app: FastifyInstance) {
         },
       },
       async (req, reply) => {
-        const { date, include, partnerGeoIds, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const { date, include, partnerGeoIds, dailyListUrl, language, batchSize, dryRun } =
+          Body.parse(req.body ?? {});
         const result = await importEuFromDaily({
           date,
           include,
           partnerGeoIds,
+          dailyListUrl,
+          language,
           batchSize,
           dryRun,
           importId: req.importCtx?.runId,

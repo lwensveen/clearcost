@@ -21,6 +21,8 @@ export async function importEuFromDaily({
   date,
   include = 'both',
   partnerGeoIds,
+  dailyListUrl,
+  language,
   batchSize,
   importId,
   dryRun,
@@ -29,15 +31,15 @@ export async function importEuFromDaily({
   date?: string;
   include?: 'mfn' | 'fta' | 'both';
   partnerGeoIds?: string[];
+  dailyListUrl?: string;
+  language?: string;
   batchSize?: number;
   importId?: string;
   dryRun?: boolean;
 }): Promise<ImportResult> {
   const listUrl = await resolveSourceDownloadUrl({
     sourceKey: 'duties.eu.taric.daily',
-    fallbackUrl:
-      process.env.EU_TARIC_DAILY_LIST ??
-      'https://ec.europa.eu/taxation_customs/dds2/taric/daily_publications.jsp?Lang=en',
+    fallbackUrl: dailyListUrl ?? process.env.EU_TARIC_DAILY_LIST ?? '',
   });
 
   const zipUrl = date
@@ -78,7 +80,7 @@ export async function importEuFromDaily({
       componentUrl: `file://${join(dir, component)}`,
       dutyExprUrl: dutyExpr ? `file://${join(dir, dutyExpr)}` : undefined,
       geoDescUrl: geoDesc ? `file://${join(dir, geoDesc)}` : undefined,
-      language: process.env.EU_TARIC_LANGUAGE ?? 'EN',
+      language: (language ?? process.env.EU_TARIC_LANGUAGE ?? 'EN').toUpperCase(),
     };
 
     let inserted = 0;

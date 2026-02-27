@@ -46,6 +46,7 @@ jobs:
       UK_10_DATA_API_BASE: ${{ secrets.UK_10_DATA_API_BASE || '' }}
       HTS_API_BASE: ${{ secrets.HTS_API_BASE || '' }}
       HTS_CSV_URL: ${{ secrets.HTS_CSV_URL || '' }}
+      EU_TARIC_DAILY_LIST: ${{ secrets.EU_TARIC_DAILY_LIST || '' }}
       UK_REMEDY_MEASURE_TYPES: ${{ vars.UK_REMEDY_MEASURE_TYPES || '552,551,695' }}
       EU_TARIC_REMEDY_TYPES: ${{ vars.EU_TARIC_REMEDY_TYPES || '' }}
       PRUNE_DAYS: ${{ vars.IMPORTS_PRUNE_DAYS || 90 }}
@@ -88,7 +89,12 @@ jobs:
 
       - name: EU Duties (TARIC — daily)
         run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/eu/daily --body '{}')
+          if [ -z "${EU_TARIC_DAILY_LIST:-}" ]; then
+            echo "[duties:eu-daily-official] missing EU_TARIC_DAILY_LIST"
+            exit 1
+          fi
+          BODY=$(jq -n --arg dailyListUrl "$EU_TARIC_DAILY_LIST" '{dailyListUrl: $dailyListUrl}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/eu/daily --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then

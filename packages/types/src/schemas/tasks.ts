@@ -81,6 +81,8 @@ export const TasksDutyEuDailyBodySchema = z.object({
     .optional(),
   include: z.enum(['mfn', 'fta', 'both']).optional().default('both'),
   partnerGeoIds: z.array(z.string()).optional(),
+  dailyListUrl: z.string().url().optional(),
+  language: z.string().min(2).max(8).optional(),
   batchSize: BatchSizeSchema,
   dryRun: z.boolean().optional(),
 });
