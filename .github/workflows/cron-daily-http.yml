@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
       CLEARCOST_INTERNAL_API_URL: ${{ secrets.CLEARCOST_INTERNAL_API_URL }}
       CLEARCOST_TASKS_API_KEY: ${{ secrets.CLEARCOST_TASKS_API_KEY }}
       INTERNAL_SIGNING_SECRET: ${{ secrets.INTERNAL_SIGNING_SECRET }}
@@ -49,6 +50,12 @@ jobs:
 
       - name: Validate internal envs
         run: bun run internal-request -- --validate
+
+      - name: Preflight source registry alignment
+        working-directory: apps/api
+        run: |
+          bun run src/lib/run-cron.ts import:sources:bootstrap
+          bun run src/lib/run-cron.ts report:source-registry
 
       - name: FX daily (ECB)
         run: |

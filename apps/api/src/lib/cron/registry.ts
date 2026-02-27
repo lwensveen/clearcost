@@ -53,6 +53,7 @@ import { fetchNoticeDocsCmd } from './commands/notices/docs.js';
 import { crawlNoticesJsonCmd } from './commands/notices/json-feed.js';
 import { coverageSnapshot } from './commands/coverage.js';
 import { sourceRegistryBootstrap } from './commands/source-registry.js';
+import { sourceRegistryPreflight } from './commands/source-registry-preflight.js';
 
 export const commands: Record<string, Command> = {
   'fx:refresh': fxRefresh,
@@ -121,4 +122,5 @@ export const commands: Record<string, Command> = {
   'seed:countries:basic': seedCountriesBasic,
   'seed:trade-programs:us': seedTradeProgramsUS,
   'report:coverage': coverageSnapshot,
+  'report:source-registry': sourceRegistryPreflight,
 };

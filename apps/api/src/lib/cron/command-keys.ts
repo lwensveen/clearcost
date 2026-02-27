@@ -56,6 +56,7 @@ export const COMMAND_KEYS = [
   'seed:countries:basic',
   'seed:trade-programs:us',
   'report:coverage',
+  'report:source-registry',
 ] as const;
 
 export type CommandKey = (typeof COMMAND_KEYS)[number];

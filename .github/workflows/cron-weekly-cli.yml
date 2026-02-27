@@ -29,6 +29,12 @@ jobs:
           node-version: '22'
           bun-version: '1.3.8'
 
+      - name: Preflight source registry alignment
+        working-directory: apps/api
+        run: |
+          bun run src/lib/run-cron.ts import:sources:bootstrap
+          bun run src/lib/run-cron.ts report:source-registry
+
       # ------------ HS ------------
       - name: HS — EU HS6 titles (TARIC)
         working-directory: apps/api
