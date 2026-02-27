@@ -13,6 +13,8 @@ import {
   type ImportSource,
 } from '../lib/provenance.js';
 import { acquireRunLock, makeLockKey, releaseRunLock } from '../lib/run-lock.js'; // 👈 NEW
+import { getSourceRegistryByKey } from '../lib/source-registry.js';
+import { NON_REGISTRY_RUNTIME_SOURCE_KEYS } from '../lib/source-registry/defaults.js';
 import { errorResponseForStatus } from '../lib/errors.js';
 
 type ImportMetaConfig = {
@@ -80,6 +82,26 @@ function isInternalCronRoute(req: any): boolean {
   return typeof routeUrl === 'string' && routeUrl.startsWith('/internal/cron/');
 }
 
+const NON_REGISTRY_RUNTIME_SOURCE_KEY_SET = new Set<string>(NON_REGISTRY_RUNTIME_SOURCE_KEYS);
+
+async function assertSourceKeyEnabled(params: { job: string; sourceKey: string }): Promise<void> {
+  if (NON_REGISTRY_RUNTIME_SOURCE_KEY_SET.has(params.sourceKey)) {
+    return;
+  }
+
+  const source = await getSourceRegistryByKey(params.sourceKey);
+  if (!source) {
+    throw new Error(
+      `[${params.job}] sourceKey '${params.sourceKey}' is not registered in source_registry`
+    );
+  }
+  if (!source.enabled) {
+    throw new Error(
+      `[${params.job}] sourceKey '${params.sourceKey}' is disabled in source_registry`
+    );
+  }
+}
+
 function mergeRunPatch<T extends Record<string, unknown>>(
   base: T,
   patch: ImportRunPatch | undefined
@@ -109,6 +131,21 @@ const plugin: FastifyPluginAsync = async (app) => {
           job: meta.job,
         })
       );
+    }
+    if (isInternalCronRoute(req) && !isOpsJob(meta.job) && sourceKey) {
+      try {
+        await assertSourceKeyEnabled({ job: meta.job, sourceKey });
+      } catch (err) {
+        return reply
+          .code(500)
+          .send(
+            errorResponseForStatus(
+              500,
+              String((err as { message?: unknown } | null)?.message ?? err),
+              { job: meta.job, sourceKey }
+            )
+          );
+      }
     }
 
     const cfg = req.routeOptions?.config;

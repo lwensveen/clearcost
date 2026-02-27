@@ -19,6 +19,14 @@ const { acquireRunLockMock, releaseRunLockMock, makeLockKeyMock, endTimerSpy } =
     endTimerSpy: vi.fn(),
   };
 });
+const { getSourceRegistryByKeyMock } = vi.hoisted(() => ({
+  getSourceRegistryByKeyMock: vi.fn(async () => ({
+    key: 'duties.wits.sdmx.base',
+    enabled: true,
+    baseUrl: null,
+    downloadUrlTemplate: null,
+  })),
+}));
 
 // ---------------- Mocks (note the ../../lib paths) ----------------
 vi.mock('../../lib/metrics.js', () => ({
@@ -39,6 +47,9 @@ vi.mock('../../lib/run-lock.js', () => ({
   releaseRunLock: releaseRunLockMock,
   makeLockKey: makeLockKeyMock,
 }));
+vi.mock('../../lib/source-registry.js', () => ({
+  getSourceRegistryByKey: getSourceRegistryByKeyMock,
+}));
 
 // Dynamically import the SUT AFTER mocks are applied
 async function loadPlugin() {
@@ -57,6 +68,12 @@ describe('import-instrumentation plugin (unit)', () => {
     endTimerSpy.mockClear();
     acquireRunLockMock.mockResolvedValue(true);
     makeLockKeyMock.mockImplementation((meta: any) => `${meta.importSource}:${meta.job}`);
+    getSourceRegistryByKeyMock.mockResolvedValue({
+      key: 'duties.wits.sdmx.base',
+      enabled: true,
+      baseUrl: null,
+      downloadUrlTemplate: null,
+    });
   });
 
   it('no-op when route has no config.importMeta', async () => {
@@ -129,6 +146,128 @@ describe('import-instrumentation plugin (unit)', () => {
         body: {},
       },
     });
+    expect(getSourceRegistryByKeyMock).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('rejects non-ops internal cron jobs when sourceKey is missing in source_registry', async () => {
+    getSourceRegistryByKeyMock.mockResolvedValueOnce(null as any);
+
+    const plugin = await loadPlugin();
+    const app = Fastify();
+    await app.register(plugin);
+    app.post(
+      '/internal/cron/missing-registry-source-key',
+      {
+        config: {
+          importMeta: {
+            importSource: 'WITS',
+            job: 'seed',
+            sourceKey: 'duties.eu.taric.mfn',
+          },
+        },
+      },
+      async (_req, reply) => reply.send({ inserted: 1 })
+    );
+
+    const r = await app.inject({
+      method: 'POST',
+      url: '/internal/cron/missing-registry-source-key',
+      headers: jsonCT(),
+      payload: '{}',
+    });
+    expect(r.statusCode).toBe(500);
+    expect(r.json()).toMatchObject({
+      error: {
+        message: "[seed] sourceKey 'duties.eu.taric.mfn' is not registered in source_registry",
+        details: { job: 'seed', sourceKey: 'duties.eu.taric.mfn' },
+      },
+    });
+
+    expect(getSourceRegistryByKeyMock).toHaveBeenCalledWith('duties.eu.taric.mfn');
+    expect(acquireRunLockMock).not.toHaveBeenCalled();
+    expect(startImportRun).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('rejects non-ops internal cron jobs when sourceKey is disabled in source_registry', async () => {
+    getSourceRegistryByKeyMock.mockResolvedValueOnce({
+      key: 'duties.eu.taric.mfn',
+      enabled: false,
+      baseUrl: null,
+      downloadUrlTemplate: null,
+    });
+
+    const plugin = await loadPlugin();
+    const app = Fastify();
+    await app.register(plugin);
+    app.post(
+      '/internal/cron/disabled-registry-source-key',
+      {
+        config: {
+          importMeta: {
+            importSource: 'WITS',
+            job: 'seed',
+            sourceKey: 'duties.eu.taric.mfn',
+          },
+        },
+      },
+      async (_req, reply) => reply.send({ inserted: 1 })
+    );
+
+    const r = await app.inject({
+      method: 'POST',
+      url: '/internal/cron/disabled-registry-source-key',
+      headers: jsonCT(),
+      payload: '{}',
+    });
+    expect(r.statusCode).toBe(500);
+    expect(r.json()).toMatchObject({
+      error: {
+        message: "[seed] sourceKey 'duties.eu.taric.mfn' is disabled in source_registry",
+        details: { job: 'seed', sourceKey: 'duties.eu.taric.mfn' },
+      },
+    });
+
+    expect(getSourceRegistryByKeyMock).toHaveBeenCalledWith('duties.eu.taric.mfn');
+    expect(acquireRunLockMock).not.toHaveBeenCalled();
+    expect(startImportRun).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('allows runtime-only source keys for internal non-ops bootstrap jobs', async () => {
+    const plugin = await loadPlugin();
+    const app = Fastify();
+    await app.register(plugin);
+    app.post(
+      '/internal/cron/source-registry/bootstrap',
+      {
+        config: {
+          importMeta: {
+            importSource: 'SEED',
+            job: 'source-registry:bootstrap',
+            sourceKey: 'source-registry.defaults',
+          },
+        },
+      },
+      async (_req, reply) => reply.type('application/json').send({ inserted: 1 })
+    );
+
+    const r = await app.inject({
+      method: 'POST',
+      url: '/internal/cron/source-registry/bootstrap',
+      headers: jsonCT(),
+      payload: '{}',
+    });
+    expect(r.statusCode).toBe(200);
+    expect(getSourceRegistryByKeyMock).not.toHaveBeenCalled();
+    expect(startImportRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        importSource: 'SEED',
+        job: 'source-registry:bootstrap',
+        sourceKey: 'source-registry.defaults',
+      })
+    );
     await app.close();
   });
 
