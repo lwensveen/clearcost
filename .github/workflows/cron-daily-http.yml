@@ -544,47 +544,10 @@ jobs:
             exit 1
           fi
 
-      - name: Tier-1 Country Duties — optional scaffold imports
+      - name: Country Duties — scaffold enabled imports (optional)
+        working-directory: apps/api
         run: |
-          COUNTRIES=(AU NZ CA MX CH NO IS LI CL PE PK)
-          RAN=0
-
-          for COUNTRY in "${COUNTRIES[@]}"; do
-            SLUG="$(echo "$COUNTRY" | tr '[:upper:]' '[:lower:]')"
-            MFN_VAR="${COUNTRY}_MFN_OFFICIAL_EXCEL_URL"
-            FTA_VAR="${COUNTRY}_FTA_OFFICIAL_EXCEL_URL"
-            MFN_URL="${!MFN_VAR:-}"
-            FTA_URL="${!FTA_VAR:-}"
-
-            if [ -z "$MFN_URL" ] || [ -z "$FTA_URL" ]; then
-              echo "duties-${SLUG}-official skipped (missing ${MFN_VAR}/${FTA_VAR})"
-              continue
-            fi
-
-            RAN=1
-
-            MFN_BODY=$(jq -n --arg url "$MFN_URL" '{url: $url}')
-            MFN_OUT=$(bun run internal-request -- --path "/internal/cron/import/duties/${SLUG}-mfn" --body "$MFN_BODY")
-            echo "$MFN_OUT" | jq .
-            MFN_ROWS=$(echo "$MFN_OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-            if [ "$MFN_ROWS" -lt 1 ]; then
-              echo "duties-${SLUG}-mfn-official expected >0 imported rows, got $MFN_ROWS"
-              exit 1
-            fi
-
-            FTA_BODY=$(jq -n --arg url "$FTA_URL" '{url: $url}')
-            FTA_OUT=$(bun run internal-request -- --path "/internal/cron/import/duties/${SLUG}-fta" --body "$FTA_BODY")
-            echo "$FTA_OUT" | jq .
-            FTA_ROWS=$(echo "$FTA_OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-            if [ "$FTA_ROWS" -lt 1 ]; then
-              echo "duties-${SLUG}-fta-official expected >0 imported rows, got $FTA_ROWS"
-              exit 1
-            fi
-          done
-
-          if [ "$RAN" -eq 0 ]; then
-            echo "duties-tier1-scaffold no country URLs configured; skipping"
-          fi
+          bun run src/lib/run-cron.ts import:duties:country-scaffold-enabled-all-official
 
       - name: US Duties — MFN (HTS)
         run: |

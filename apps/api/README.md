@@ -438,6 +438,9 @@ For scaffolded country duty routes, the API also accepts per-country env fallbac
 
 Example: `AU_MFN_OFFICIAL_EXCEL_URL`, `AU_FTA_OFFICIAL_EXCEL_URL`.
 
+To run all scaffolded countries in one CLI step (only where both MFN+FTA sources are configured),
+use `bun run src/lib/run-cron.ts import:duties:country-scaffold-enabled-all-official`.
+
 ### `cron-hourly-http.yml`
 
 | Name                              | Source | Required | Used for                                                                     |
