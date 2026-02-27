@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ALL_KNOWN_SOURCE_KEYS,
   ALL_REQUIRED_SOURCE_KEYS,
+  NON_REGISTRY_RUNTIME_SOURCE_KEYS,
   OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS,
   OFFICIAL_FX_REQUIRED_SOURCE_KEYS,
+  OPTIONAL_LLM_SOURCE_KEYS,
   OPTIONAL_FALLBACK_SOURCE_KEYS,
+  SOURCE_REGISTRY_SEEDED_SOURCE_KEYS,
   SOURCE_REGISTRY_DEFAULT_ENTRIES,
   TASK_ONLY_REQUIRED_SOURCE_KEYS,
 } from './defaults.js';
@@ -13,18 +17,30 @@ describe('source registry defaults', () => {
     expect(new Set(ALL_REQUIRED_SOURCE_KEYS).size).toBe(ALL_REQUIRED_SOURCE_KEYS.length);
   });
 
-  it('builds one default entry per required key', () => {
-    expect(SOURCE_REGISTRY_DEFAULT_ENTRIES).toHaveLength(ALL_REQUIRED_SOURCE_KEYS.length);
-    const keys = new Set(SOURCE_REGISTRY_DEFAULT_ENTRIES.map((entry) => entry.key));
-    expect(keys.size).toBe(ALL_REQUIRED_SOURCE_KEYS.length);
+  it('keeps known source keys unique', () => {
+    expect(new Set(ALL_KNOWN_SOURCE_KEYS).size).toBe(ALL_KNOWN_SOURCE_KEYS.length);
   });
 
-  it('includes duty, fx, and fallback key families', () => {
+  it('builds one default entry per seeded source key', () => {
+    expect(SOURCE_REGISTRY_DEFAULT_ENTRIES).toHaveLength(SOURCE_REGISTRY_SEEDED_SOURCE_KEYS.length);
+    const keys = new Set(SOURCE_REGISTRY_DEFAULT_ENTRIES.map((entry) => entry.key));
+    expect(keys.size).toBe(SOURCE_REGISTRY_SEEDED_SOURCE_KEYS.length);
+  });
+
+  it('includes required and optional seeded source families', () => {
     const keys = new Set(SOURCE_REGISTRY_DEFAULT_ENTRIES.map((entry) => entry.key));
     for (const key of OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS) expect(keys.has(key)).toBe(true);
     for (const key of OFFICIAL_FX_REQUIRED_SOURCE_KEYS) expect(keys.has(key)).toBe(true);
     for (const key of OPTIONAL_FALLBACK_SOURCE_KEYS) expect(keys.has(key)).toBe(true);
     for (const key of TASK_ONLY_REQUIRED_SOURCE_KEYS) expect(keys.has(key)).toBe(true);
+    for (const key of OPTIONAL_LLM_SOURCE_KEYS) expect(keys.has(key)).toBe(true);
+  });
+
+  it('keeps runtime-only source keys out of seeded source rows', () => {
+    const keys = new Set(SOURCE_REGISTRY_DEFAULT_ENTRIES.map((entry) => entry.key));
+    for (const key of NON_REGISTRY_RUNTIME_SOURCE_KEYS) {
+      expect(keys.has(key)).toBe(false);
+    }
   });
 
   it('derives expected dataset and schedule defaults for representative keys', () => {
@@ -41,5 +57,8 @@ describe('source registry defaults', () => {
     expect(byKey.get('duties.file.json')?.scheduleHint).toBe('manual');
     expect(byKey.get('surcharges.file.json')?.dataset).toBe('surcharges');
     expect(byKey.get('surcharges.file.json')?.scheduleHint).toBe('manual');
+    expect(byKey.get('duties.llm.openai')?.sourceType).toBe('llm');
+    expect(byKey.get('duties.llm.openai')?.scheduleHint).toBe('manual');
+    expect(byKey.get('duties.llm.openai')?.authStrategy).toBe('api_key');
   });
 });

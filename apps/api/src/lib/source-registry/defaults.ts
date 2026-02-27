@@ -107,6 +107,20 @@ export const OPTIONAL_FALLBACK_SOURCE_KEYS = [
   'de-minimis.trade_gov.api',
   'de-minimis.zonos.docs',
 ] as const;
+export const OPTIONAL_LLM_SOURCE_KEYS = [
+  'de-minimis.llm.openai',
+  'de-minimis.llm.grok',
+  'de-minimis.llm.crosscheck',
+  'duties.llm.openai',
+  'duties.llm.grok',
+  'duties.llm.crosscheck',
+  'surcharges.llm.openai',
+  'surcharges.llm.grok',
+  'surcharges.llm.crosscheck',
+  'vat.llm.openai',
+  'vat.llm.grok',
+  'vat.llm.crosscheck',
+] as const;
 export const TASK_ONLY_REQUIRED_SOURCE_KEYS = [
   'de-minimis.official.bundle',
   'de-minimis.baseline.seed',
@@ -115,6 +129,12 @@ export const TASK_ONLY_REQUIRED_SOURCE_KEYS = [
   'freight.cards.json',
   'duties.file.json',
   'surcharges.file.json',
+] as const;
+export const NON_REGISTRY_RUNTIME_SOURCE_KEYS = [
+  'source-registry.defaults',
+  'trade-programs.seed.base',
+  'seed.countries.basic',
+  'seed.trade_programs.us',
 ] as const;
 const OPTIONAL_FALLBACK_SOURCE_KEY_SET = new Set<string>(OPTIONAL_FALLBACK_SOURCE_KEYS);
 const TASK_ONLY_MANUAL_SOURCE_KEY_SET = new Set<string>([
@@ -139,6 +159,14 @@ export const ALL_REQUIRED_SOURCE_KEYS = uniqueSourceKeys([
   ...OPTIONAL_FALLBACK_SOURCE_KEYS,
   ...TASK_ONLY_REQUIRED_SOURCE_KEYS,
 ]);
+export const SOURCE_REGISTRY_SEEDED_SOURCE_KEYS = uniqueSourceKeys([
+  ...ALL_REQUIRED_SOURCE_KEYS,
+  ...OPTIONAL_LLM_SOURCE_KEYS,
+]);
+export const ALL_KNOWN_SOURCE_KEYS = uniqueSourceKeys([
+  ...SOURCE_REGISTRY_SEEDED_SOURCE_KEYS,
+  ...NON_REGISTRY_RUNTIME_SOURCE_KEYS,
+]);
 
 function inferDataset(key: string): SourceDataset {
   if (key.startsWith('fx.')) return 'fx';
@@ -153,6 +181,7 @@ function inferDataset(key: string): SourceDataset {
 
 function inferSourceType(key: string): SourceType {
   const token = key.toLowerCase();
+  if (token.includes('.llm.')) return 'llm';
   if (token.endsWith('.csv') || token.includes('_csv')) return 'csv';
   if (token.endsWith('.xlsx') || token.includes('_excel')) return 'xlsx';
   if (token.endsWith('.pdf') || token.includes('_pdf')) return 'pdf';
@@ -185,23 +214,29 @@ function inferExpectedFormat(sourceType: SourceType): SourceExpectedFormat {
   }
 }
 
-function inferScheduleHint(key: string): SourceScheduleHint {
+function inferScheduleHint(key: string, sourceType: SourceType): SourceScheduleHint {
+  if (sourceType === 'llm') return 'manual';
   if (OPTIONAL_FALLBACK_SOURCE_KEY_SET.has(key)) return 'manual';
   if (TASK_ONLY_MANUAL_SOURCE_KEY_SET.has(key)) return 'manual';
   if (key.startsWith('notices.')) return 'daily';
   return 'daily';
 }
 
+function inferAuthStrategy(sourceType: SourceType): SourceAuthStrategy {
+  if (sourceType === 'llm') return 'api_key';
+  return 'none';
+}
+
 export const SOURCE_REGISTRY_DEFAULT_ENTRIES: ReadonlyArray<SourceRegistryDefaultEntry> =
-  ALL_REQUIRED_SOURCE_KEYS.map((key) => {
+  SOURCE_REGISTRY_SEEDED_SOURCE_KEYS.map((key) => {
     const sourceType = inferSourceType(key);
     return {
       key,
       dataset: inferDataset(key),
       sourceType,
-      scheduleHint: inferScheduleHint(key),
+      scheduleHint: inferScheduleHint(key, sourceType),
       expectedFormat: inferExpectedFormat(sourceType),
-      authStrategy: 'none',
+      authStrategy: inferAuthStrategy(sourceType),
       parserVersion: 'v1',
       notes: null,
     };

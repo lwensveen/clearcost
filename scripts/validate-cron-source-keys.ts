@@ -1,9 +1,13 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ALL_KNOWN_SOURCE_KEYS } from '../apps/api/src/lib/source-registry/defaults.ts';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const commandsDir = join(repoRoot, 'apps', 'api', 'src', 'lib', 'cron', 'commands');
+const SOURCE_KEY_IDENTIFIER_MAP: Record<string, string[]> = {
+  PROGRAMS_MEMBERS_SOURCE_KEY: ['duties.us.trade_programs.members_csv'],
+};
 
 function listCommandFiles(dir: string): string[] {
   const out: string[] = [];
@@ -94,8 +98,88 @@ function firstCallObjectArg(text: string, withRunIndex: number): string | null {
   return null;
 }
 
-function extractNonOpsMissingSourceKeys(filePath: string, text: string): string[] {
-  const missing: string[] = [];
+function extractConstStringAssignments(text: string): Map<string, string[]> {
+  const byName = new Map<string, string[]>();
+  for (const match of text.matchAll(
+    /\bconst\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(["'`])([^"'`$]+)\2/g
+  )) {
+    const name = match[1];
+    const value = match[3]?.trim();
+    if (!name || !value) continue;
+    const existing = byName.get(name);
+    if (existing) {
+      existing.push(value);
+      continue;
+    }
+    byName.set(name, [value]);
+  }
+  return byName;
+}
+
+function extractNonOpsWithRunMetadata(
+  filePath: string,
+  text: string
+): {
+  sourceKeys: Set<string>;
+  unresolvedIdentifiers: string[];
+  missingSourceKeyJobs: string[];
+} {
+  const sourceKeys = new Set<string>();
+  const unresolvedIdentifiers = new Set<string>();
+  const missingSourceKeyJobs = new Set<string>();
+  const constValues = extractConstStringAssignments(text);
+
+  const parseJobs = (block: string): string[] => {
+    const jobs: string[] = [];
+    for (const match of block.matchAll(/job\s*:\s*['`]([^'`]+)['`]/g)) {
+      const job = String(match[1] ?? '').trim();
+      if (job) jobs.push(job);
+    }
+    return jobs;
+  };
+
+  const parseSourceKeys = (block: string): string[] => {
+    const extracted: string[] = [];
+
+    for (const match of block.matchAll(/sourceKey\s*:\s*'([^']+)'/g)) {
+      const sourceKey = String(match[1] ?? '').trim();
+      if (sourceKey) extracted.push(sourceKey);
+    }
+
+    for (const match of block.matchAll(/sourceKey\s*:\s*"([^"]+)"/g)) {
+      const sourceKey = String(match[1] ?? '').trim();
+      if (sourceKey) extracted.push(sourceKey);
+    }
+
+    for (const match of block.matchAll(/sourceKey\s*:\s*`([^`]+)`/g)) {
+      const sourceKey = String(match[1] ?? '').trim();
+      if (!sourceKey) continue;
+      if (sourceKey.includes('${')) continue;
+      extracted.push(sourceKey);
+    }
+
+    for (const match of block.matchAll(/sourceKey\s*:\s*([A-Za-z_][A-Za-z0-9_]*)/g)) {
+      const identifier = match[1];
+      if (!identifier) continue;
+      if (identifier === 'sourceKey') continue; // runtime-supplied explicit sourceKey
+
+      const mappedValues = SOURCE_KEY_IDENTIFIER_MAP[identifier];
+      if (mappedValues && mappedValues.length > 0) {
+        extracted.push(...mappedValues);
+        continue;
+      }
+
+      const localValues = constValues.get(identifier);
+      if (localValues && localValues.length > 0) {
+        extracted.push(...localValues);
+        continue;
+      }
+
+      unresolvedIdentifiers.add(`${filePath}: ${identifier}`);
+    }
+
+    return extracted;
+  };
 
   let searchFrom = 0;
   while (true) {
@@ -109,45 +193,88 @@ function extractNonOpsMissingSourceKeys(filePath: string, text: string): string[
     }
 
     const hasSourceKey = /\bsourceKey\b/.test(objectArg);
-    const jobs = [...objectArg.matchAll(/job\s*:\s*['`]([^'`]+)['`]/g)].map((match) =>
-      String(match[1] ?? '').trim()
-    );
+    const jobs = parseJobs(objectArg);
 
     if (!hasSourceKey) {
       if (jobs.length === 0) {
-        missing.push(`${filePath}: <unknown-job>`);
+        missingSourceKeyJobs.add(`${filePath}: <unknown-job>`);
       } else {
         for (const job of jobs) {
           if (!job.toLowerCase().startsWith('ops:')) {
-            missing.push(`${filePath}: ${job}`);
+            missingSourceKeyJobs.add(`${filePath}: ${job}`);
           }
         }
       }
+      searchFrom = withRunIndex + 'withRun'.length;
+      continue;
+    }
+
+    for (const sourceKey of parseSourceKeys(objectArg)) {
+      sourceKeys.add(sourceKey);
     }
 
     searchFrom = withRunIndex + 'withRun'.length;
   }
 
-  return [...new Set(missing)].sort();
+  return {
+    sourceKeys,
+    unresolvedIdentifiers: [...unresolvedIdentifiers].sort(),
+    missingSourceKeyJobs: [...missingSourceKeyJobs].sort(),
+  };
 }
 
 const commandFiles = listCommandFiles(commandsDir);
 const missingSourceKeyJobs = new Set<string>();
+const unresolvedIdentifiers = new Set<string>();
+const commandSourceKeys = new Set<string>();
 
 for (const filePath of commandFiles) {
   const text = readFileSync(filePath, 'utf8');
-  const missing = extractNonOpsMissingSourceKeys(filePath, text);
-  for (const m of missing) missingSourceKeyJobs.add(m);
+  const parsed = extractNonOpsWithRunMetadata(filePath, text);
+  for (const m of parsed.missingSourceKeyJobs) missingSourceKeyJobs.add(m);
+  for (const unresolved of parsed.unresolvedIdentifiers) unresolvedIdentifiers.add(unresolved);
+  for (const sourceKey of parsed.sourceKeys) commandSourceKeys.add(sourceKey);
+}
+
+const knownSourceKeys = new Set(ALL_KNOWN_SOURCE_KEYS);
+const unknownCommandSourceKeys = [...commandSourceKeys]
+  .filter((sourceKey) => !knownSourceKeys.has(sourceKey))
+  .sort();
+
+const errors: string[] = [];
+
+if (commandSourceKeys.size === 0) {
+  errors.push('No withRun sourceKey values found in cron command files.');
 }
 
 if (missingSourceKeyJobs.size > 0) {
-  console.error('Cron source key validation failed:');
-  console.error(
-    `- Cron withRun jobs missing sourceKey for non-ops jobs: ${[...missingSourceKeyJobs]
+  errors.push(
+    `Cron withRun jobs missing sourceKey for non-ops jobs: ${[...missingSourceKeyJobs]
       .sort()
       .join(', ')}`
   );
+}
+
+if (unresolvedIdentifiers.size > 0) {
+  errors.push(
+    `Cron sourceKey identifiers could not be resolved statically: ${[...unresolvedIdentifiers]
+      .sort()
+      .join(', ')}`
+  );
+}
+
+if (unknownCommandSourceKeys.length > 0) {
+  errors.push(
+    `Cron source keys missing from known source manifest: ${unknownCommandSourceKeys.join(', ')}`
+  );
+}
+
+if (errors.length > 0) {
+  console.error('Cron source key validation failed:');
+  for (const error of errors) console.error(`- ${error}`);
   process.exit(1);
 }
 
-console.log(`cron source key alignment OK (commandFiles=${commandFiles.length})`);
+console.log(
+  `cron source key alignment OK (commandFiles=${commandFiles.length}, commandSourceKeys=${commandSourceKeys.size}, knownSourceKeys=${knownSourceKeys.size})`
+);
