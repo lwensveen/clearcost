@@ -27,10 +27,10 @@ export default function idDutyRoutes(app: FastifyInstance) {
       },
     },
     async (req, reply) => {
-      const { batchSize, dryRun } = Body.parse(req.body ?? {});
+      const { url, batchSize, dryRun } = Body.parse(req.body ?? {});
       const urlOrPath = await resolveAseanDutySourceUrl({
         sourceKey: 'duties.id.btki.xlsx',
-        fallbackUrl: process.env.ID_BTKI_XLSX_URL,
+        fallbackUrl: url ?? process.env.ID_BTKI_XLSX_URL,
       });
       const res = await importIdMfn({
         urlOrPath,

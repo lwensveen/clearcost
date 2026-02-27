@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   importSgMfnFromWits: vi.fn(),
   importSgPreferentialFromWits: vi.fn(),
   importPhMfnFromOfficial: vi.fn(),
+  importIdMfnFromOfficial: vi.fn(),
   importIdPreferentialFromWits: vi.fn(),
   importPhPreferentialFromWits: vi.fn(),
 }));
@@ -77,6 +78,10 @@ vi.mock('../../../duty-rates/services/asean/ph/import-mfn-excel.js', () => ({
   importPhMfnExcel: mocks.importPhMfnFromOfficial,
 }));
 
+vi.mock('../../../duty-rates/services/asean/id/import-mfn.js', () => ({
+  importIdMfn: mocks.importIdMfnFromOfficial,
+}));
+
 vi.mock('../../../duty-rates/services/asean/id/import-preferential.js', () => ({
   importIdPreferential: mocks.importIdPreferentialFromWits,
 }));
@@ -104,6 +109,7 @@ async function buildApp(registerRoutes: (app: FastifyInstance) => void) {
 beforeEach(() => {
   vi.clearAllMocks();
   delete process.env.PH_TARIFF_EXCEL_URL;
+  delete process.env.ID_BTKI_XLSX_URL;
   mocks.resolveSourceUrl.mockResolvedValue('https://example.com/tariff.xlsx');
   mocks.importMyMfnFromExcel.mockResolvedValue({ ok: true, inserted: 1, updated: 0, count: 1 });
   mocks.importMyPreferentialFromExcel.mockResolvedValue({
@@ -161,6 +167,12 @@ beforeEach(() => {
     count: 1,
   });
   mocks.importPhMfnFromOfficial.mockResolvedValue({
+    ok: true,
+    inserted: 1,
+    updated: 0,
+    count: 1,
+  });
+  mocks.importIdMfnFromOfficial.mockResolvedValue({
     ok: true,
     inserted: 1,
     updated: 0,
@@ -376,6 +388,28 @@ describe('asean duties official-first defaults', () => {
       })
     );
     expect(mocks.importIdPreferentialFromWits).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('uses ID official MFN importer on /id-mfn with explicit URL override', async () => {
+    const app = await buildApp((server) => idDutyRoutes(server));
+    const res = await app.inject({
+      method: 'POST',
+      url: '/cron/import/duties/id-mfn',
+      payload: { url: 'https://example.com/id-btki.xlsx', dryRun: true },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.resolveSourceUrl).toHaveBeenCalledWith({
+      sourceKey: 'duties.id.btki.xlsx',
+      fallbackUrl: 'https://example.com/id-btki.xlsx',
+    });
+    expect(mocks.importIdMfnFromOfficial).toHaveBeenCalledWith(
+      expect.objectContaining({
+        urlOrPath: 'https://example.com/tariff.xlsx',
+        dryRun: true,
+      })
+    );
     await app.close();
   });
 

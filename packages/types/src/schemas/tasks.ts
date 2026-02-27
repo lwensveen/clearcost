@@ -102,6 +102,7 @@ export const TasksDutyMyFtaOfficialExcelBodySchema = z.object({
 });
 
 export const TasksDutyIdBodySchema = z.object({
+  url: z.string().url().optional(),
   batchSize: BatchSizeSchema,
   dryRun: z.boolean().optional(),
 });

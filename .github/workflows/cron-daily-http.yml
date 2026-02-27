@@ -20,6 +20,7 @@ jobs:
       INTERNAL_SIGNING_SECRET: ${{ secrets.INTERNAL_SIGNING_SECRET }}
       BN_MFN_OFFICIAL_EXCEL_URL: ${{ secrets.BN_MFN_OFFICIAL_EXCEL_URL || '' }}
       BN_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.BN_FTA_OFFICIAL_EXCEL_URL || '' }}
+      ID_BTKI_XLSX_URL: ${{ secrets.ID_BTKI_XLSX_URL || '' }}
       ID_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.ID_FTA_OFFICIAL_EXCEL_URL || '' }}
       KH_MFN_OFFICIAL_EXCEL_URL: ${{ secrets.KH_MFN_OFFICIAL_EXCEL_URL || '' }}
       KH_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.KH_FTA_OFFICIAL_EXCEL_URL || '' }}
@@ -161,7 +162,12 @@ jobs:
 
       - name: ID Duties — MFN (official)
         run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/id-mfn --body '{}')
+          if [ -z "${ID_BTKI_XLSX_URL:-}" ]; then
+            echo "[duties:id-mfn-official] missing ID_BTKI_XLSX_URL"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$ID_BTKI_XLSX_URL" '{url: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/id-mfn --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
