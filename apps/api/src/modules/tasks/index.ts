@@ -3,6 +3,7 @@ import { errorResponseForStatus } from '../../lib/errors.js';
 import { isWitsImportsEnabled, witsImportsDisabledMessage } from '../../lib/wits-gate.js';
 import aseanDutyRoutes from './duties/asean/index.js';
 import cnDutyRoutes from './duties/cn-routes.js';
+import countryScaffoldDutyRoutes from './duties/country-scaffold-routes.js';
 import deMinimisRoutes from './de-minimis-routes.js';
 import dutyJsonRoute from './duties/generic-json.js';
 import euDutyRoutes from './duties/eu-routes.js';
@@ -39,6 +40,7 @@ export default function taskRoutes(app: FastifyInstance) {
   // Duties
   aseanDutyRoutes(app);
   cnDutyRoutes(app);
+  countryScaffoldDutyRoutes(app);
   euDutyRoutes(app);
   jpDutyRoutes(app);
   krDutyRoutes(app);
