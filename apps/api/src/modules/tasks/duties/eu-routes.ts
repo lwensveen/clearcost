@@ -4,14 +4,14 @@ import { importEuPreferential } from '../../duty-rates/services/eu/import-prefer
 import { importEuFromDaily } from '../../duty-rates/services/eu/import-daily.js';
 import {
   TasksDutyEuDailyBodySchema,
-  TasksDutyHs6BatchDryRunBodySchema,
-  TasksDutyHs6BatchPartnerGeoIdsBodySchema,
+  TasksDutyEuFtaBodySchema,
+  TasksDutyEuMfnBodySchema,
 } from '@clearcost/types';
 
 export default function euDutyRoutes(app: FastifyInstance) {
   // EU MFN (TARIC)
   {
-    const Body = TasksDutyHs6BatchDryRunBodySchema;
+    const Body = TasksDutyEuMfnBodySchema;
 
     app.post(
       '/cron/import/duties/eu-mfn',
@@ -27,11 +27,18 @@ export default function euDutyRoutes(app: FastifyInstance) {
         },
       },
       async (req, reply) => {
-        const { hs6, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const { hs6, xmlMeasureUrl, xmlComponentUrl, xmlDutyExprUrl, language, batchSize, dryRun } =
+          Body.parse(req.body ?? {});
         const res = await importEuMfn({
           hs6List: hs6,
           batchSize,
           dryRun,
+          xml: {
+            measureUrl: xmlMeasureUrl,
+            componentUrl: xmlComponentUrl,
+            dutyExprUrl: xmlDutyExprUrl,
+            language,
+          },
           importId: req.importCtx?.runId,
         });
         return reply.send(res);
@@ -41,7 +48,7 @@ export default function euDutyRoutes(app: FastifyInstance) {
 
   // EU Preferential (TARIC)
   {
-    const Body = TasksDutyHs6BatchPartnerGeoIdsBodySchema;
+    const Body = TasksDutyEuFtaBodySchema;
 
     app.post(
       '/cron/import/duties/eu-fta',
@@ -57,12 +64,29 @@ export default function euDutyRoutes(app: FastifyInstance) {
         },
       },
       async (req, reply) => {
-        const { hs6, partnerGeoIds, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const {
+          hs6,
+          partnerGeoIds,
+          xmlMeasureUrl,
+          xmlComponentUrl,
+          xmlGeoDescUrl,
+          xmlDutyExprUrl,
+          language,
+          batchSize,
+          dryRun,
+        } = Body.parse(req.body ?? {});
         const res = await importEuPreferential({
           hs6List: hs6,
           partnerGeoIds,
           batchSize,
           dryRun,
+          xml: {
+            measureUrl: xmlMeasureUrl,
+            componentUrl: xmlComponentUrl,
+            geoDescUrl: xmlGeoDescUrl,
+            dutyExprUrl: xmlDutyExprUrl,
+            language,
+          },
           importId: req.importCtx?.runId,
         });
         return reply.send(res);

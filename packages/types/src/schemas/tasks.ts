@@ -87,6 +87,21 @@ export const TasksDutyEuDailyBodySchema = z.object({
   dryRun: z.boolean().optional(),
 });
 
+export const TasksDutyEuMfnBodySchema = TasksDutyHs6BatchDryRunBodySchema.extend({
+  xmlMeasureUrl: z.string().url().optional(),
+  xmlComponentUrl: z.string().url().optional(),
+  xmlDutyExprUrl: z.string().url().optional(),
+  language: z.string().min(2).max(8).optional(),
+});
+
+export const TasksDutyEuFtaBodySchema = TasksDutyHs6BatchPartnerGeoIdsBodySchema.extend({
+  xmlMeasureUrl: z.string().url().optional(),
+  xmlComponentUrl: z.string().url().optional(),
+  xmlGeoDescUrl: z.string().url().optional(),
+  xmlDutyExprUrl: z.string().url().optional(),
+  language: z.string().min(2).max(8).optional(),
+});
+
 export const TasksDutyUkMfnBodySchema = TasksDutyHs6BatchBodySchema.extend({
   apiBaseUrl: z.string().url().optional(),
 });

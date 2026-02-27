@@ -39,6 +39,70 @@ beforeEach(() => {
 });
 
 describe('eu duties routes', () => {
+  it('passes TARIC XML overrides on /eu-mfn', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/cron/import/duties/eu-mfn',
+      payload: {
+        hs6: ['850440'],
+        xmlMeasureUrl: 'https://example.com/taric/measure.xml',
+        xmlComponentUrl: 'https://example.com/taric/component.xml',
+        xmlDutyExprUrl: 'https://example.com/taric/duty-expression.xml',
+        language: 'EN',
+        dryRun: true,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.importEuMfn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hs6List: ['850440'],
+        dryRun: true,
+        xml: {
+          measureUrl: 'https://example.com/taric/measure.xml',
+          componentUrl: 'https://example.com/taric/component.xml',
+          dutyExprUrl: 'https://example.com/taric/duty-expression.xml',
+          language: 'EN',
+        },
+      })
+    );
+    await app.close();
+  });
+
+  it('passes TARIC XML overrides on /eu-fta', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/cron/import/duties/eu-fta',
+      payload: {
+        partnerGeoIds: ['JP'],
+        xmlMeasureUrl: 'https://example.com/taric/measure.xml',
+        xmlComponentUrl: 'https://example.com/taric/component.xml',
+        xmlGeoDescUrl: 'https://example.com/taric/geo-description.xml',
+        xmlDutyExprUrl: 'https://example.com/taric/duty-expression.xml',
+        language: 'EN',
+        dryRun: true,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.importEuPreferential).toHaveBeenCalledWith(
+      expect.objectContaining({
+        partnerGeoIds: ['JP'],
+        dryRun: true,
+        xml: {
+          measureUrl: 'https://example.com/taric/measure.xml',
+          componentUrl: 'https://example.com/taric/component.xml',
+          geoDescUrl: 'https://example.com/taric/geo-description.xml',
+          dutyExprUrl: 'https://example.com/taric/duty-expression.xml',
+          language: 'EN',
+        },
+      })
+    );
+    await app.close();
+  });
+
   it('passes daily TARIC source override on /eu/daily', async () => {
     const app = await buildApp();
     const res = await app.inject({

@@ -3,7 +3,9 @@ import {
   TasksDeMinimisImportBodySchema,
   TasksDutyCnFtaOfficialExcelBodySchema,
   TasksDutyCnMfnPdfBodySchema,
+  TasksDutyEuFtaBodySchema,
   TasksDutyEuDailyBodySchema,
+  TasksDutyEuMfnBodySchema,
   TasksDutyHs6BatchBodySchema,
   TasksDutyHs6BatchDryRunBodySchema,
   TasksDutyHs6BatchPartnerGeoIdsBodySchema,
@@ -48,6 +50,8 @@ export type TasksDutyHs6BatchPartnerGeoIdsBody = z.infer<
 export type TasksDutyCnMfnPdfBody = z.infer<typeof TasksDutyCnMfnPdfBodySchema>;
 export type TasksDutyCnFtaOfficialExcelBody = z.infer<typeof TasksDutyCnFtaOfficialExcelBodySchema>;
 export type TasksDutyEuDailyBody = z.infer<typeof TasksDutyEuDailyBodySchema>;
+export type TasksDutyEuMfnBody = z.infer<typeof TasksDutyEuMfnBodySchema>;
+export type TasksDutyEuFtaBody = z.infer<typeof TasksDutyEuFtaBodySchema>;
 export type TasksDutyUkMfnBody = z.infer<typeof TasksDutyUkMfnBodySchema>;
 export type TasksDutyUkFtaBody = z.infer<typeof TasksDutyUkFtaBodySchema>;
 export type TasksDutyJpMfnBody = z.infer<typeof TasksDutyJpMfnBodySchema>;
