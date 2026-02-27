@@ -25,6 +25,25 @@ function ftaSourceKey(slug: string): string {
   return `duties.${slug}.official.fta_excel`;
 }
 
+function normalizeOptionalUrl(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : undefined;
+}
+
+function scaffoldEnvVarName(slug: string, kind: 'mfn' | 'fta'): string {
+  return `${slug.toUpperCase()}_${kind.toUpperCase()}_OFFICIAL_EXCEL_URL`;
+}
+
+function resolveScaffoldFallbackUrl(
+  slug: string,
+  kind: 'mfn' | 'fta',
+  requestedUrl: string | undefined
+): string | undefined {
+  const explicitUrl = normalizeOptionalUrl(requestedUrl);
+  if (explicitUrl) return explicitUrl;
+  return normalizeOptionalUrl(process.env[scaffoldEnvVarName(slug, kind)]);
+}
+
 export default function countryScaffoldDutyRoutes(app: FastifyInstance) {
   for (const country of COUNTRY_SCAFFOLD) {
     const common = {
@@ -44,9 +63,10 @@ export default function countryScaffoldDutyRoutes(app: FastifyInstance) {
       const { url, sheet, batchSize, dryRun } = TasksDutyMyOfficialExcelBodySchema.parse(
         body ?? {}
       );
+      const fallbackUrl = resolveScaffoldFallbackUrl(country.slug, 'mfn', url);
       const urlOrPath = await resolveAseanDutySourceUrl({
         sourceKey: mfnKey,
-        fallbackUrl: url,
+        fallbackUrl,
       });
 
       return importAseanMfnOfficialFromExcel({
@@ -64,9 +84,10 @@ export default function countryScaffoldDutyRoutes(app: FastifyInstance) {
     const runFtaOfficial = async (body: unknown, importId: string | undefined) => {
       const { url, agreement, partner, sheet, batchSize, dryRun } =
         TasksDutyMyFtaOfficialExcelBodySchema.parse(body ?? {});
+      const fallbackUrl = resolveScaffoldFallbackUrl(country.slug, 'fta', url);
       const urlOrPath = await resolveAseanDutySourceUrl({
         sourceKey: ftaKey,
-        fallbackUrl: url,
+        fallbackUrl,
       });
 
       return importAseanPreferentialOfficialFromExcel({

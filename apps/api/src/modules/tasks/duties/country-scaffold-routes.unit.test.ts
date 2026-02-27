@@ -38,6 +38,10 @@ async function buildApp() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  delete process.env.AD_MFN_OFFICIAL_EXCEL_URL;
+  delete process.env.AD_FTA_OFFICIAL_EXCEL_URL;
+  delete process.env.ZA_MFN_OFFICIAL_EXCEL_URL;
+  delete process.env.ZA_FTA_OFFICIAL_EXCEL_URL;
   mocks.resolveSourceUrl.mockResolvedValue('https://example.com/source.xlsx');
   mocks.importOfficialMfn.mockResolvedValue({
     ok: true,
@@ -106,6 +110,40 @@ describe('country scaffold duties routes', () => {
         urlOrPath: 'https://example.com/source.xlsx',
       })
     );
+    await app.close();
+  });
+
+  it('uses country env fallback when body URL is omitted', async () => {
+    process.env.AD_MFN_OFFICIAL_EXCEL_URL = 'https://env.test/ad-mfn.xlsx';
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/cron/import/duties/ad-mfn',
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.resolveSourceUrl).toHaveBeenCalledWith({
+      sourceKey: 'duties.ad.official.mfn_excel',
+      fallbackUrl: 'https://env.test/ad-mfn.xlsx',
+    });
+    await app.close();
+  });
+
+  it('prefers explicit request URL over country env fallback', async () => {
+    process.env.AD_FTA_OFFICIAL_EXCEL_URL = 'https://env.test/ad-fta.xlsx';
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/cron/import/duties/ad-fta',
+      payload: { url: 'https://body.test/ad-fta.xlsx', agreement: 'Demo FTA', partner: 'US' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.resolveSourceUrl).toHaveBeenCalledWith({
+      sourceKey: 'duties.ad.official.fta_excel',
+      fallbackUrl: 'https://body.test/ad-fta.xlsx',
+    });
     await app.close();
   });
 });

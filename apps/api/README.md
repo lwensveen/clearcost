@@ -343,6 +343,8 @@ bun run internal-request -- --path /internal/cron/fx/daily --body '{}'
   - `POST /internal/cron/import/duties/id-fta` (official Excel default)
   - `POST /internal/cron/import/duties/id-fta/wits` (WITS fallback)
   - `POST /internal/cron/import/duties/id-fta/official/excel`
+  - `POST /internal/cron/import/duties/{iso2}-mfn` (country scaffold, official Excel)
+  - `POST /internal/cron/import/duties/{iso2}-fta` (country scaffold, official Excel)
   - `POST /internal/cron/id/btki/crawl`
 
 - **Surcharges**
@@ -428,6 +430,13 @@ Both HTTP workflows (`cron-daily-http.yml` and `cron-hourly-http.yml`) require:
 | `IMPORTS_PRUNE_DAYS`        | var    | no       | Retention window for prune step (default `90`).       |
 | `SLACK_WEBHOOK_URL`         | secret | no       | Success/failure notifications.                        |
 | `DISCORD_WEBHOOK_URL`       | secret | no       | Success/failure notifications.                        |
+
+For scaffolded country duty routes, the API also accepts per-country env fallbacks:
+
+- `${ISO2}_MFN_OFFICIAL_EXCEL_URL` for `/internal/cron/import/duties/{iso2}-mfn`
+- `${ISO2}_FTA_OFFICIAL_EXCEL_URL` for `/internal/cron/import/duties/{iso2}-fta`
+
+Example: `AU_MFN_OFFICIAL_EXCEL_URL`, `AU_FTA_OFFICIAL_EXCEL_URL`.
 
 ### `cron-hourly-http.yml`
 
