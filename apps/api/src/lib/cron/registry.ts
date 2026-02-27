@@ -87,7 +87,7 @@ import {
   dutiesVnFtaOfficial,
   dutiesVnMfnOfficial,
 } from './commands/duties/duties-vn.js';
-import { dutiesCountryScaffoldEnabledAllOfficial } from './commands/duties/duties-country-scaffold-enabled.js';
+import { dutiesCountryOfficialEnabledAll } from './commands/duties/duties-country-official-enabled.js';
 import { crawlNoticesCmd } from './commands/notices/notices.js';
 import { fetchNoticeDocsCmd } from './commands/notices/docs.js';
 import { crawlNoticesJsonCmd } from './commands/notices/json-feed.js';
@@ -108,7 +108,7 @@ export const commands: Record<string, Command> = {
   'import:duties:asean-all-official': dutiesAseanAllOfficial,
   'import:duties:asean-fta-official': dutiesAseanFtaOfficial,
   'import:duties:asean-mfn-official': dutiesAseanMfnOfficial,
-  'import:duties:country-scaffold-enabled-all-official': dutiesCountryScaffoldEnabledAllOfficial,
+  'import:duties:country-official-enabled-all': dutiesCountryOfficialEnabledAll,
   ...DUTY_COUNTRY_SCAFFOLD_COMMANDS,
   'import:duties:bn-all-official': dutiesBnAllOfficial,
   'import:duties:bn-fta-official': dutiesBnFtaOfficial,

@@ -544,10 +544,10 @@ jobs:
             exit 1
           fi
 
-      - name: Country Duties — scaffold enabled imports (optional)
+      - name: Country Duties — enabled official imports (optional)
         working-directory: apps/api
         run: |
-          bun run src/lib/run-cron.ts import:duties:country-scaffold-enabled-all-official
+          bun run src/lib/run-cron.ts import:duties:country-official-enabled-all
 
       - name: US Duties — MFN (HTS)
         run: |

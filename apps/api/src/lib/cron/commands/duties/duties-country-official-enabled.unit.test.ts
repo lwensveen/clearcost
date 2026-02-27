@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  evaluateScaffoldCountryReadiness,
-  parseRequestedScaffoldSlugs,
-} from './duties-country-scaffold-enabled.js';
+  evaluateCountryOfficialReadiness,
+  parseRequestedCountrySlugs,
+} from './duties-country-official-enabled.js';
 
 type SourceRow = {
   key: string;
@@ -11,19 +11,17 @@ type SourceRow = {
   downloadUrlTemplate: string | null;
 };
 
-describe('parseRequestedScaffoldSlugs', () => {
+describe('parseRequestedCountrySlugs', () => {
   it('normalizes and deduplicates explicit country slugs', () => {
-    expect(parseRequestedScaffoldSlugs(['AU', 'au', ' nz '])).toEqual(['au', 'nz']);
+    expect(parseRequestedCountrySlugs(['AU', 'au', ' nz '])).toEqual(['au', 'nz']);
   });
 
   it('throws for unknown slugs', () => {
-    expect(() => parseRequestedScaffoldSlugs(['zz'])).toThrow(
-      /Unknown duty scaffold country slug\(s\): zz/
-    );
+    expect(() => parseRequestedCountrySlugs(['zz'])).toThrow(/Unknown duty country slug\(s\): zz/);
   });
 });
 
-describe('evaluateScaffoldCountryReadiness', () => {
+describe('evaluateCountryOfficialReadiness', () => {
   it('marks country runnable when MFN and FTA URLs are configured in source_registry', () => {
     const rows: SourceRow[] = [
       {
@@ -40,7 +38,7 @@ describe('evaluateScaffoldCountryReadiness', () => {
       },
     ];
 
-    const out = evaluateScaffoldCountryReadiness({
+    const out = evaluateCountryOfficialReadiness({
       slugs: ['au'],
       rows,
       env: {},
@@ -76,7 +74,7 @@ describe('evaluateScaffoldCountryReadiness', () => {
       },
     ];
 
-    const out = evaluateScaffoldCountryReadiness({
+    const out = evaluateCountryOfficialReadiness({
       slugs: ['au'],
       rows,
       env: {
@@ -105,7 +103,7 @@ describe('evaluateScaffoldCountryReadiness', () => {
       },
     ];
 
-    const out = evaluateScaffoldCountryReadiness({
+    const out = evaluateCountryOfficialReadiness({
       slugs: ['nz'],
       rows,
       env: {},

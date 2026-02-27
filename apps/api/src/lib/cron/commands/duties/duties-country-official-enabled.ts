@@ -12,7 +12,7 @@ type SourceRegistryUrlRow = {
   downloadUrlTemplate: string | null;
 };
 
-export type ScaffoldCountryReadiness = {
+export type CountryOfficialReadiness = {
   slug: string;
   commandKey: string;
   mfnSourceKey: string;
@@ -50,7 +50,7 @@ function hasConfiguredRegistryUrl(row: SourceRegistryUrlRow | undefined): boolea
   return Boolean(normalizeOptional(row.downloadUrlTemplate) ?? normalizeOptional(row.baseUrl));
 }
 
-export function parseRequestedScaffoldSlugs(tokens: ReadonlyArray<string>): string[] {
+export function parseRequestedCountrySlugs(tokens: ReadonlyArray<string>): string[] {
   if (tokens.length === 0) return [...DUTY_COUNTRY_SCAFFOLD_SLUGS];
 
   const normalized = [
@@ -63,18 +63,18 @@ export function parseRequestedScaffoldSlugs(tokens: ReadonlyArray<string>): stri
 
   if (unknown.length > 0) {
     throw new Error(
-      `Unknown duty scaffold country slug(s): ${unknown.join(', ')} (supported: ${DUTY_COUNTRY_SCAFFOLD_SLUGS.join(', ')})`
+      `Unknown duty country slug(s): ${unknown.join(', ')} (supported: ${DUTY_COUNTRY_SCAFFOLD_SLUGS.join(', ')})`
     );
   }
 
   return normalized;
 }
 
-export function evaluateScaffoldCountryReadiness(params: {
+export function evaluateCountryOfficialReadiness(params: {
   slugs: ReadonlyArray<string>;
   rows: ReadonlyArray<SourceRegistryUrlRow>;
   env: NodeJS.ProcessEnv;
-}): ScaffoldCountryReadiness[] {
+}): CountryOfficialReadiness[] {
   const byKey = new Map(params.rows.map((row) => [row.key, row]));
 
   return params.slugs.map((slug) => {
@@ -145,10 +145,10 @@ type FailedCountryRun = {
   error: string;
 };
 
-export const dutiesCountryScaffoldEnabledAllOfficial: Command = async (args) => {
+export const dutiesCountryOfficialEnabledAll: Command = async (args) => {
   const flags = parseFlags(args);
   const strict = flagBool(flags, 'strict');
-  const requestedSlugs = parseRequestedScaffoldSlugs(flagCSV(flags, 'countries'));
+  const requestedSlugs = parseRequestedCountrySlugs(flagCSV(flags, 'countries'));
   const passthroughArgs = args.filter(
     (arg) => !arg.startsWith('--countries=') && arg !== '--strict' && !arg.startsWith('--strict=')
   );
@@ -156,7 +156,7 @@ export const dutiesCountryScaffoldEnabledAllOfficial: Command = async (args) => 
   const sourceRows = await loadSourceRegistryRows(
     unique(requestedSlugs.flatMap((slug) => [mfnSourceKey(slug), ftaSourceKey(slug)]))
   );
-  const readiness = evaluateScaffoldCountryReadiness({
+  const readiness = evaluateCountryOfficialReadiness({
     slugs: requestedSlugs,
     rows: sourceRows,
     env: process.env,
@@ -205,7 +205,7 @@ export const dutiesCountryScaffoldEnabledAllOfficial: Command = async (args) => 
 
   if (failed.length > 0) {
     throw new Error(
-      `country scaffold duties import failed for ${failed.length} country(ies): ${failed
+      `country official duties import failed for ${failed.length} country(ies): ${failed
         .map((item) => item.slug)
         .join(', ')}`
     );
@@ -213,7 +213,7 @@ export const dutiesCountryScaffoldEnabledAllOfficial: Command = async (args) => 
 
   if (strict && skipped.length > 0) {
     throw new Error(
-      `country scaffold duties import skipped ${skipped.length} country(ies) in strict mode: ${skipped
+      `country official duties import skipped ${skipped.length} country(ies) in strict mode: ${skipped
         .map((item) => item.slug)
         .join(', ')}`
     );
