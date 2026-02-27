@@ -5,15 +5,19 @@ import { DEBUG } from '../../utils/utils.js';
 export async function importUsMfn({
   effectiveFrom,
   importId,
-}: { effectiveFrom?: Date; importId?: string } = {}) {
+  baseUrl,
+  csvUrl,
+}: { effectiveFrom?: Date; importId?: string; baseUrl?: string; csvUrl?: string } = {}) {
   if (DEBUG) {
     console.log('[US Duties] MFN starting', {
       effectiveFrom: effectiveFrom ? effectiveFrom.toISOString() : null,
       importId: importId ?? null,
+      baseUrl: baseUrl ?? null,
+      csvUrl: csvUrl ?? null,
     });
   }
 
-  const rows = await fetchUsMfnDutyRates({ effectiveFrom });
+  const rows = await fetchUsMfnDutyRates({ effectiveFrom, baseUrl, csvUrl });
 
   if (DEBUG) {
     const hs6Set = new Set(rows.map((r) => r.hs6));

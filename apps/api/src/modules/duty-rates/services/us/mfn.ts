@@ -17,6 +17,8 @@ import {
 type FetchUsMfnOpts = {
   /** Chapters to include (2-digit). Defaults to 1..97. */
   chapters?: number[];
+  baseUrl?: string;
+  csvUrl?: string;
   /**
    * Effective date to stamp on rows. If omitted, we use today's UTC date.
    * (You can pass a specific HTS revision date if you target an archive JSON.)
@@ -40,7 +42,10 @@ export async function fetchUsMfnDutyRates(opts: FetchUsMfnOpts = {}): Promise<Du
   >();
 
   for (const ch of chapters) {
-    const rows = await exportChapterJson(ch).catch(() => [] as Record<string, unknown>[]);
+    const rows = await exportChapterJson(ch, {
+      baseUrl: opts.baseUrl,
+      csvUrl: opts.csvUrl,
+    }).catch(() => [] as Record<string, unknown>[]);
     for (const row of rows) {
       const hts10 = parseHts10(row);
       if (!hts10) continue;

@@ -44,6 +44,8 @@ jobs:
       CN_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.CN_FTA_OFFICIAL_EXCEL_URL || '' }}
       JP_TARIFF_INDEX: ${{ secrets.JP_TARIFF_INDEX || '' }}
       UK_10_DATA_API_BASE: ${{ secrets.UK_10_DATA_API_BASE || '' }}
+      HTS_API_BASE: ${{ secrets.HTS_API_BASE || '' }}
+      HTS_CSV_URL: ${{ secrets.HTS_CSV_URL || '' }}
       UK_REMEDY_MEASURE_TYPES: ${{ vars.UK_REMEDY_MEASURE_TYPES || '552,551,695' }}
       EU_TARIC_REMEDY_TYPES: ${{ vars.EU_TARIC_REMEDY_TYPES || '' }}
       PRUNE_DAYS: ${{ vars.IMPORTS_PRUNE_DAYS || 90 }}
@@ -516,7 +518,12 @@ jobs:
 
       - name: US Duties — MFN (HTS)
         run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/us-mfn --body '{}')
+          if [ -z "${HTS_API_BASE:-}" ]; then
+            echo "[duties:us-mfn-official] missing HTS_API_BASE"
+            exit 1
+          fi
+          BODY=$(jq -n --arg baseUrl "$HTS_API_BASE" --arg csvUrl "$HTS_CSV_URL" '{baseUrl: $baseUrl} + (if $csvUrl != "" then {csvUrl: $csvUrl} else {} end)')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/us-mfn --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
@@ -526,7 +533,12 @@ jobs:
 
       - name: US Duties — FTA (HTS)
         run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/us-preferential --body '{}')
+          if [ -z "${HTS_API_BASE:-}" ]; then
+            echo "[duties:us-fta-official] missing HTS_API_BASE"
+            exit 1
+          fi
+          BODY=$(jq -n --arg baseUrl "$HTS_API_BASE" --arg csvUrl "$HTS_CSV_URL" '{baseUrl: $baseUrl} + (if $csvUrl != "" then {csvUrl: $csvUrl} else {} end)')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/us-preferential --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then

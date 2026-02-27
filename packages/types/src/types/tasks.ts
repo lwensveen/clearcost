@@ -20,6 +20,7 @@ import {
   TasksDutyJpMfnBodySchema,
   TasksDutyUkFtaBodySchema,
   TasksDutyUkMfnBodySchema,
+  TasksDutyUsBodySchema,
   TasksDutyWitsAseanBodySchema,
   TasksDutyWitsGenericBodySchema,
   TasksDutyWitsJapanBodySchema,
@@ -51,6 +52,7 @@ export type TasksDutyUkMfnBody = z.infer<typeof TasksDutyUkMfnBodySchema>;
 export type TasksDutyUkFtaBody = z.infer<typeof TasksDutyUkFtaBodySchema>;
 export type TasksDutyJpMfnBody = z.infer<typeof TasksDutyJpMfnBodySchema>;
 export type TasksDutyJpFtaBody = z.infer<typeof TasksDutyJpFtaBodySchema>;
+export type TasksDutyUsBody = z.infer<typeof TasksDutyUsBodySchema>;
 export type TasksDutyJsonImportResponse = z.infer<typeof TasksDutyJsonImportResponseSchema>;
 export type TasksDutyMyOfficialExcelBody = z.infer<typeof TasksDutyMyOfficialExcelBodySchema>;
 export type TasksDutyMyOfficialPdfBody = z.infer<typeof TasksDutyMyOfficialPdfBodySchema>;

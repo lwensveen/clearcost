@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { importUsMfn } from '../../duty-rates/services/us/import-mfn.js';
 import { importUsPreferential } from '../../duty-rates/services/us/import-preferential.js';
+import { TasksDutyUsBodySchema } from '@clearcost/types';
 
 export default function usDutyRoutes(app: FastifyInstance) {
   // US MFN (Column 1 “General” from HTS)
@@ -8,6 +9,7 @@ export default function usDutyRoutes(app: FastifyInstance) {
     '/cron/import/duties/us-mfn',
     {
       preHandler: app.requireApiKey(['tasks:duties:us:mfn']),
+      schema: { body: TasksDutyUsBodySchema },
       config: {
         importMeta: {
           importSource: 'USITC_HTS',
@@ -17,8 +19,9 @@ export default function usDutyRoutes(app: FastifyInstance) {
       },
     },
     async (req, reply) => {
+      const { baseUrl, csvUrl } = TasksDutyUsBodySchema.parse(req.body ?? {});
       const importId = req.importCtx?.runId;
-      const res = await importUsMfn({ importId });
+      const res = await importUsMfn({ importId, baseUrl, csvUrl });
       return reply.send(res);
     }
   );
@@ -28,6 +31,7 @@ export default function usDutyRoutes(app: FastifyInstance) {
     '/cron/import/duties/us-preferential',
     {
       preHandler: app.requireApiKey(['tasks:duties:us:fta']),
+      schema: { body: TasksDutyUsBodySchema },
       config: {
         importMeta: {
           importSource: 'USITC_HTS',
@@ -37,8 +41,9 @@ export default function usDutyRoutes(app: FastifyInstance) {
       },
     },
     async (req, reply) => {
+      const { baseUrl, csvUrl } = TasksDutyUsBodySchema.parse(req.body ?? {});
       const importId = req.importCtx?.runId;
-      const res = await importUsPreferential({ importId });
+      const res = await importUsPreferential({ importId, baseUrl, csvUrl });
       return reply.send(res);
     }
   );

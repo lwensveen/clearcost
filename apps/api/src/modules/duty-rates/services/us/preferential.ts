@@ -20,6 +20,8 @@ type FetchUsPrefOpts = {
   membershipCsvUrl?: string;
   conservativeMax?: boolean;
   owner?: string; // e.g. 'US'
+  baseUrl?: string;
+  csvUrl?: string;
 };
 
 function jan1OfCurrentYearUTC(): Date {
@@ -73,7 +75,10 @@ export async function fetchUsPreferentialDutyRates(
   const isHs6 = (t: string) => /^\d{6}$/.test(t);
 
   for (const chapter of chapters) {
-    const rows = await exportChapterJson(chapter).catch(() => [] as Record<string, unknown>[]);
+    const rows = await exportChapterJson(chapter, {
+      baseUrl: opts.baseUrl,
+      csvUrl: opts.csvUrl,
+    }).catch(() => [] as Record<string, unknown>[]);
 
     for (const row of rows) {
       const hts10 = parseHts10(row);

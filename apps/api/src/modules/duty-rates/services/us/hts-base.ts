@@ -13,10 +13,10 @@
 
 import { UsitcClient } from './usitc-client.js';
 import { DEBUG } from '../../utils/utils.js';
-import { resolveUsitcDutySourceUrls } from './source-urls.js';
-
-let sourceConfigPromise: Promise<{ baseUrl: string; csvUrl: string }> | null = null;
-let client: UsitcClient | null = null;
+import {
+  resolveUsitcDutySourceUrls,
+  type ResolveUsitcDutySourceUrlsOptions,
+} from './source-urls.js';
 
 // ---------------- tiny utils ----------------
 const norm = (s: string) =>
@@ -74,21 +74,41 @@ function to4(ch: number) {
 }
 
 // ---------------- CSV fallback (cached) ----------------
-let csvCache: Record<string, unknown>[] | null = null;
+type UsitcSourceConfig = { baseUrl: string; csvUrl: string };
+type UsitcSourceState = { client: UsitcClient; csvCache: Record<string, unknown>[] | null };
 
-async function getSourceConfig() {
-  if (!sourceConfigPromise) {
-    sourceConfigPromise = resolveUsitcDutySourceUrls();
-  }
-  return await sourceConfigPromise;
+const sourceConfigByKey = new Map<string, Promise<UsitcSourceConfig>>();
+const sourceStateByKey = new Map<string, UsitcSourceState>();
+
+function sourceOptionsKey(opts: ResolveUsitcDutySourceUrlsOptions = {}): string {
+  const baseUrl = opts.baseUrl ?? '';
+  const csvUrl = opts.csvUrl ?? '';
+  return `${baseUrl}::${csvUrl}`;
 }
 
-async function getClient() {
-  if (!client) {
-    const { baseUrl } = await getSourceConfig();
-    client = new UsitcClient(baseUrl);
-  }
-  return client;
+async function getSourceConfig(
+  opts: ResolveUsitcDutySourceUrlsOptions = {}
+): Promise<UsitcSourceConfig> {
+  const key = sourceOptionsKey(opts);
+  const cached = sourceConfigByKey.get(key);
+  if (cached) return await cached;
+
+  const promise = resolveUsitcDutySourceUrls(opts);
+  sourceConfigByKey.set(key, promise);
+  return await promise;
+}
+
+async function getSourceState(
+  opts: ResolveUsitcDutySourceUrlsOptions = {}
+): Promise<UsitcSourceState> {
+  const { baseUrl, csvUrl } = await getSourceConfig(opts);
+  const key = `${baseUrl}::${csvUrl}`;
+  const cached = sourceStateByKey.get(key);
+  if (cached) return cached;
+
+  const state: UsitcSourceState = { client: new UsitcClient(baseUrl), csvCache: null };
+  sourceStateByKey.set(key, state);
+  return state;
 }
 
 function parseCsv(text: string): Array<Record<string, string>> {
@@ -154,36 +174,48 @@ function parseCsv(text: string): Array<Record<string, string>> {
   return out;
 }
 
-async function loadCsvIfAvailable(): Promise<void> {
-  if (csvCache !== null) return; // already attempted
-  const { csvUrl } = await getSourceConfig();
+async function loadCsvIfAvailable(
+  opts: ResolveUsitcDutySourceUrlsOptions = {}
+): Promise<UsitcSourceState> {
+  const sourceState = await getSourceState(opts);
+  if (sourceState.csvCache !== null) return sourceState; // already attempted
+
+  const { csvUrl } = await getSourceConfig(opts);
   if (!csvUrl) {
-    csvCache = [];
-    return;
+    sourceState.csvCache = [];
+    return sourceState;
   }
+
   try {
-    const client = await getClient();
-    await client.warm();
-    const csv = await client.getText(csvUrl, 'text/csv,application/octet-stream,text/plain,*/*');
+    await sourceState.client.warm();
+    const csv = await sourceState.client.getText(
+      csvUrl,
+      'text/csv,application/octet-stream,text/plain,*/*'
+    );
     const rows = parseCsv(csv);
-    csvCache = rows as unknown as Record<string, unknown>[];
+    sourceState.csvCache = rows as unknown as Record<string, unknown>[];
     if (DEBUG) console.log(`[HTS] CSV loaded: rows=${rows.length}`);
   } catch (e: any) {
-    csvCache = [];
+    sourceState.csvCache = [];
     if (DEBUG) console.warn('[HTS] CSV load failed:', e?.message || String(e));
   }
+
+  return sourceState;
 }
 
 // ---------------- public: chapter export ----------------
 /** Fetch one chapter as array of row objects. Uses CSV cache if present; otherwise HTS JSON (with retries). */
-export async function exportChapterJson(chapter: number): Promise<Record<string, unknown>[]> {
-  await loadCsvIfAvailable();
-  const client = await getClient();
+export async function exportChapterJson(
+  chapter: number,
+  sourceOpts: ResolveUsitcDutySourceUrlsOptions = {}
+): Promise<Record<string, unknown>[]> {
+  const sourceState = await loadCsvIfAvailable(sourceOpts);
+  const client = sourceState.client;
   const chapterPrefix = pad2(chapter);
 
   // 1) CSV path
-  if (csvCache && csvCache.length) {
-    const filtered = csvCache.filter((row) => {
+  if (sourceState.csvCache && sourceState.csvCache.length) {
+    const filtered = sourceState.csvCache.filter((row) => {
       const code = parseHts10(row);
       return code ? code.slice(0, 2) === chapterPrefix : false;
     });

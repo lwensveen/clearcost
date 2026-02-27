@@ -8,12 +8,16 @@ export async function importUsPreferential({
   importId,
   owner,
   membershipCsvUrl,
+  baseUrl,
+  csvUrl,
 }: {
   effectiveFrom?: Date;
   skipFree?: boolean;
   importId?: string;
   owner?: string;
   membershipCsvUrl?: string;
+  baseUrl?: string;
+  csvUrl?: string;
 } = {}) {
   if (DEBUG) {
     console.log('[US Duties] FTA starting', {
@@ -22,6 +26,8 @@ export async function importUsPreferential({
       importId: importId ?? null,
       owner: owner ?? 'US',
       membershipCsvUrl: membershipCsvUrl ?? null,
+      baseUrl: baseUrl ?? null,
+      csvUrl: csvUrl ?? null,
     });
   }
 
@@ -30,6 +36,8 @@ export async function importUsPreferential({
     skipFree,
     owner,
     membershipCsvUrl,
+    baseUrl,
+    csvUrl,
   });
 
   if (DEBUG) {

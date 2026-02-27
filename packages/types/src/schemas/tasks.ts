@@ -101,6 +101,11 @@ export const TasksDutyJpFtaBodySchema = TasksDutyHs6BatchPartnerGeoIdsBodySchema
   tariffIndexUrl: z.string().url().optional(),
 });
 
+export const TasksDutyUsBodySchema = z.object({
+  baseUrl: z.string().url().optional(),
+  csvUrl: z.string().url().optional(),
+});
+
 export const TasksDutyMyOfficialExcelBodySchema = z.object({
   url: z.string().url().optional(),
   sheet: z.union([z.string(), z.coerce.number()]).optional(),

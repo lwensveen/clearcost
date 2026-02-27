@@ -420,6 +420,8 @@ Both HTTP workflows (`cron-daily-http.yml` and `cron-hourly-http.yml`) require:
 | `CN_FTA_OFFICIAL_EXCEL_URL` | secret | yes      | Required CN FTA official Excel import source URL.     |
 | `JP_TARIFF_INDEX`           | secret | yes      | Required JP tariff index URL for official imports.    |
 | `UK_10_DATA_API_BASE`       | secret | yes      | Required UK Tariff API base URL for official imports. |
+| `HTS_API_BASE`              | secret | yes      | Required USITC HTS base URL for US duty imports.      |
+| `HTS_CSV_URL`               | secret | no       | Optional USITC HTS CSV snapshot URL override.         |
 | `UK_REMEDY_MEASURE_TYPES`   | var    | no       | UK remedy measure types (defaults to `552,551,695`).  |
 | `EU_TARIC_REMEDY_TYPES`     | var    | no       | Enables EU remedies surcharge import when non-empty.  |
 | `IMPORTS_PRUNE_DAYS`        | var    | no       | Retention window for prune step (default `90`).       |
