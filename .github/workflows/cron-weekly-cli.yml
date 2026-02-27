@@ -60,52 +60,68 @@ jobs:
         working-directory: apps/api
         run: bun run src/lib/run-cron.ts import:hs:ahtn --url "$AHTN_SOURCE_URL"
 
-      # ---------- Duties (WITS) ----------
-      - name: Duties — WITS (ASEAN)
+      # ---------- Duties (official) ----------
+      - name: Duties — ASEAN (official)
         if: ${{ env.ENABLE_WITS_BACKFILL == 'true' }}
         working-directory: apps/api
         run: |
-          OUT=$(bun run src/lib/run-cron.ts import:duties:wits \
-            --dests SG,MY,TH,ID,PH,VN,BN,KH,LA,MM \
-            --partners SG,MY,TH,ID,PH,VN,BN,KH,LA,MM \
-            --backfillYears 1 \
-            --concurrency 4 2>&1)
+          OUT=$(bun run src/lib/run-cron.ts import:duties:asean-all-official \
+            --countries SG,TH,ID,PH,BN,KH,LA,MM 2>&1)
           echo "$OUT"
-          FETCHED=$(echo "$OUT" | sed -nE 's/.*fetchedRows:\s*([0-9]+).*/\1/p' | tail -n1)
-          if [ -z "$FETCHED" ] || [ "$FETCHED" -lt 1 ]; then
-            echo "[duties:wits:asean] expected >0 fetchedRows, got ${FETCHED:-missing}"
+          COUNT=$(echo "$OUT" | sed -nE 's/.*count:\s*([0-9]+).*/\1/p' | tail -n1)
+          if [ -z "$COUNT" ] || [ "$COUNT" -lt 1 ]; then
+            echo "[duties:asean:official] expected >0 count, got ${COUNT:-missing}"
             exit 1
           fi
 
-      - name: Duties — WITS (Japan + partners)
+      - name: Duties — MY (official)
         if: ${{ env.ENABLE_WITS_BACKFILL == 'true' }}
         working-directory: apps/api
         run: |
-          OUT=$(bun run src/lib/run-cron.ts import:duties:wits \
-            --dests JP \
-            --partners CN,KR,AU,NZ,TH,MY,ID,PH,VN,LA,KH,BN,SG,CA,MX,EU,GB,US \
-            --backfillYears 1 \
-            --concurrency 3 2>&1)
+          OUT=$(bun run src/lib/run-cron.ts import:duties:my-all-official 2>&1)
           echo "$OUT"
-          FETCHED=$(echo "$OUT" | sed -nE 's/.*fetchedRows:\s*([0-9]+).*/\1/p' | tail -n1)
-          if [ -z "$FETCHED" ] || [ "$FETCHED" -lt 1 ]; then
-            echo "[duties:wits:japan] expected >0 fetchedRows, got ${FETCHED:-missing}"
+          COUNT=$(echo "$OUT" | sed -nE 's/.*count:\s*([0-9]+).*/\1/p' | tail -n1)
+          if [ -z "$COUNT" ] || [ "$COUNT" -lt 1 ]; then
+            echo "[duties:my:official] expected >0 count, got ${COUNT:-missing}"
             exit 1
           fi
 
-      - name: Duties — WITS (China + partners)
+      - name: Duties — VN (official)
         if: ${{ env.ENABLE_WITS_BACKFILL == 'true' }}
         working-directory: apps/api
         run: |
-          OUT=$(bun run src/lib/run-cron.ts import:duties:wits \
-            --dests CN \
+          OUT=$(bun run src/lib/run-cron.ts import:duties:vn-all-official 2>&1)
+          echo "$OUT"
+          COUNT=$(echo "$OUT" | sed -nE 's/.*count:\s*([0-9]+).*/\1/p' | tail -n1)
+          if [ -z "$COUNT" ] || [ "$COUNT" -lt 1 ]; then
+            echo "[duties:vn:official] expected >0 count, got ${COUNT:-missing}"
+            exit 1
+          fi
+
+      - name: Duties — JP (official + partners)
+        if: ${{ env.ENABLE_WITS_BACKFILL == 'true' }}
+        working-directory: apps/api
+        run: |
+          OUT=$(bun run src/lib/run-cron.ts import:duties:jp-all \
+            --partners CN,KR,AU,NZ,TH,MY,ID,PH,VN,LA,KH,BN,SG,CA,MX,EU,GB,US 2>&1)
+          echo "$OUT"
+          COUNT=$(echo "$OUT" | sed -nE 's/.*count:\s*([0-9]+).*/\1/p' | tail -n1)
+          if [ -z "$COUNT" ] || [ "$COUNT" -lt 1 ]; then
+            echo "[duties:jp:official] expected >0 count, got ${COUNT:-missing}"
+            exit 1
+          fi
+
+      - name: Duties — CN FTA (official + partners)
+        if: ${{ env.ENABLE_WITS_BACKFILL == 'true' }}
+        working-directory: apps/api
+        run: |
+          OUT=$(bun run src/lib/run-cron.ts import:duties:cn-fta-official \
             --partners EU,US,GB,JP,KR,AU,NZ,CA,MX,CL,PE,PK,CH,NO,IS,LI,SG,MY,TH,ID,PH,VN,LA,KH,BN \
-            --backfillYears 1 \
-            --concurrency 3 2>&1)
+            --batchSize 5000 2>&1)
           echo "$OUT"
-          FETCHED=$(echo "$OUT" | sed -nE 's/.*fetchedRows:\s*([0-9]+).*/\1/p' | tail -n1)
-          if [ -z "$FETCHED" ] || [ "$FETCHED" -lt 1 ]; then
-            echo "[duties:wits:china] expected >0 fetchedRows, got ${FETCHED:-missing}"
+          COUNT=$(echo "$OUT" | sed -nE 's/.*count:\s*([0-9]+).*/\1/p' | tail -n1)
+          if [ -z "$COUNT" ] || [ "$COUNT" -lt 1 ]; then
+            echo "[duties:cn-fta:official] expected >0 count, got ${COUNT:-missing}"
             exit 1
           fi
 

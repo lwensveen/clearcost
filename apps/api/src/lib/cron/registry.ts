@@ -3,6 +3,11 @@ import { fxRefresh } from './commands/fx.js';
 import { vatAuto } from './commands/vat.js';
 import { dutiesJson } from './commands/duties/duties-json.js';
 import { dutiesWits } from './commands/duties/duties-wits.js';
+import {
+  dutiesAseanAllOfficial,
+  dutiesAseanFtaOfficial,
+  dutiesAseanMfnOfficial,
+} from './commands/duties/duties-asean.js';
 import { surchargesJson } from './commands/surcharges-json.js';
 import {
   surchargesUsAll,
@@ -37,7 +42,12 @@ import {
 import { vatLlmCrossCheck, vatLlmGrok, vatLlmOpenAI } from './commands/vat-llm.js';
 import { dutiesEuBackfill, dutiesEuDaily } from './commands/duties/duties-eu.js';
 import { dutiesJpAll, dutiesJpFta, dutiesJpMfn } from './commands/duties/duties-jp.js';
-import { dutiesCnMfnPdf } from './commands/duties/duties-cn.js';
+import { dutiesCnFtaOfficial, dutiesCnMfnPdf } from './commands/duties/duties-cn.js';
+import {
+  dutiesKrAllOfficial,
+  dutiesKrFtaOfficial,
+  dutiesKrMfnOfficial,
+} from './commands/duties/duties-kr.js';
 import {
   dutiesMyAllOfficial,
   dutiesMyFtaOfficial,
@@ -64,6 +74,10 @@ export const commands: Record<string, Command> = {
   'import:de-minimis:zonos': deMinimisZonos,
 
   'import:duties': dutiesJson,
+  'import:duties:asean-all-official': dutiesAseanAllOfficial,
+  'import:duties:asean-fta-official': dutiesAseanFtaOfficial,
+  'import:duties:asean-mfn-official': dutiesAseanMfnOfficial,
+  'import:duties:cn-fta-official': dutiesCnFtaOfficial,
   'import:duties:cn-mfn-pdf': dutiesCnMfnPdf,
   'import:duties:eu-backfill': dutiesEuBackfill,
   'import:duties:eu-daily': dutiesEuDaily,
@@ -76,6 +90,9 @@ export const commands: Record<string, Command> = {
   'import:duties:my-all-official': dutiesMyAllOfficial,
   'import:duties:my-fta-official': dutiesMyFtaOfficial,
   'import:duties:my-mfn-official': dutiesMyMfnOfficial,
+  'import:duties:kr-all-official': dutiesKrAllOfficial,
+  'import:duties:kr-fta-official': dutiesKrFtaOfficial,
+  'import:duties:kr-mfn-official': dutiesKrMfnOfficial,
   'import:duties:us-all': dutiesUsAll,
   'import:duties:us-fta': dutiesUsFta,
   'import:duties:us-mfn': dutiesUsMfn,
