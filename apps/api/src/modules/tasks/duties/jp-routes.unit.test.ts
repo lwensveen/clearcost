@@ -41,6 +41,24 @@ beforeEach(() => {
 });
 
 describe('jp duties WITS explicit FTA routes', () => {
+  it('passes tariffIndexUrl override on /jp-mfn', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/cron/import/duties/jp-mfn',
+      payload: { tariffIndexUrl: 'https://example.com/jp-tariff/index.htm', dryRun: true },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.importJpMfn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tariffIndexUrl: 'https://example.com/jp-tariff/index.htm',
+        dryRun: true,
+      })
+    );
+    await app.close();
+  });
+
   it('uses official importer on /jp-fta', async () => {
     const app = await buildApp();
     const res = await app.inject({
@@ -59,6 +77,29 @@ describe('jp duties WITS explicit FTA routes', () => {
       })
     );
     expect(mocks.importJpPreferentialWits).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('passes tariffIndexUrl override on /jp-fta', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/cron/import/duties/jp-fta',
+      payload: {
+        partnerGeoIds: ['US'],
+        tariffIndexUrl: 'https://example.com/jp-tariff/index.htm',
+        dryRun: true,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.importJpPreferentialOfficial).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tariffIndexUrl: 'https://example.com/jp-tariff/index.htm',
+        partnerGeoIds: ['US'],
+        dryRun: true,
+      })
+    );
     await app.close();
   });
 

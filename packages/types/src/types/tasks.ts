@@ -16,6 +16,10 @@ import {
   TasksDutyMyOfficialExcelBodySchema,
   TasksDutyMyOfficialPdfBodySchema,
   TasksDutyPhBodySchema,
+  TasksDutyJpFtaBodySchema,
+  TasksDutyJpMfnBodySchema,
+  TasksDutyUkFtaBodySchema,
+  TasksDutyUkMfnBodySchema,
   TasksDutyWitsAseanBodySchema,
   TasksDutyWitsGenericBodySchema,
   TasksDutyWitsJapanBodySchema,
@@ -43,6 +47,10 @@ export type TasksDutyHs6BatchPartnerGeoIdsBody = z.infer<
 export type TasksDutyCnMfnPdfBody = z.infer<typeof TasksDutyCnMfnPdfBodySchema>;
 export type TasksDutyCnFtaOfficialExcelBody = z.infer<typeof TasksDutyCnFtaOfficialExcelBodySchema>;
 export type TasksDutyEuDailyBody = z.infer<typeof TasksDutyEuDailyBodySchema>;
+export type TasksDutyUkMfnBody = z.infer<typeof TasksDutyUkMfnBodySchema>;
+export type TasksDutyUkFtaBody = z.infer<typeof TasksDutyUkFtaBodySchema>;
+export type TasksDutyJpMfnBody = z.infer<typeof TasksDutyJpMfnBodySchema>;
+export type TasksDutyJpFtaBody = z.infer<typeof TasksDutyJpFtaBodySchema>;
 export type TasksDutyJsonImportResponse = z.infer<typeof TasksDutyJsonImportResponseSchema>;
 export type TasksDutyMyOfficialExcelBody = z.infer<typeof TasksDutyMyOfficialExcelBodySchema>;
 export type TasksDutyMyOfficialPdfBody = z.infer<typeof TasksDutyMyOfficialPdfBodySchema>;

@@ -85,6 +85,22 @@ export const TasksDutyEuDailyBodySchema = z.object({
   dryRun: z.boolean().optional(),
 });
 
+export const TasksDutyUkMfnBodySchema = TasksDutyHs6BatchBodySchema.extend({
+  apiBaseUrl: z.string().url().optional(),
+});
+
+export const TasksDutyUkFtaBodySchema = TasksDutyHs6BatchPartnersBodySchema.extend({
+  apiBaseUrl: z.string().url().optional(),
+});
+
+export const TasksDutyJpMfnBodySchema = TasksDutyHs6BatchDryRunBodySchema.extend({
+  tariffIndexUrl: z.string().url().optional(),
+});
+
+export const TasksDutyJpFtaBodySchema = TasksDutyHs6BatchPartnerGeoIdsBodySchema.extend({
+  tariffIndexUrl: z.string().url().optional(),
+});
+
 export const TasksDutyMyOfficialExcelBodySchema = z.object({
   url: z.string().url().optional(),
   sheet: z.union([z.string(), z.coerce.number()]).optional(),

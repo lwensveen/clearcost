@@ -9,6 +9,7 @@ type Params = {
   batchSize?: number;
   importId?: string;
   dryRun?: boolean;
+  tariffIndexUrl?: string;
   useWitsFallback?: boolean;
   strictOfficial?: boolean;
 };
@@ -107,11 +108,16 @@ export async function importJpPreferential({
   batchSize = 5_000,
   importId,
   dryRun,
+  tariffIndexUrl,
   useWitsFallback = false,
   strictOfficial = true,
 }: Params) {
   const partners = normalizePartnerGeoIds(partnerGeoIds);
-  const officialRows = await fetchJpPreferentialDutyRates({ hs6List, partnerGeoIds: partners });
+  const officialRows = await fetchJpPreferentialDutyRates({
+    hs6List,
+    partnerGeoIds: partners,
+    tariffIndexUrl,
+  });
 
   if (strictOfficial && officialRows.length === 0) {
     throw new Error(

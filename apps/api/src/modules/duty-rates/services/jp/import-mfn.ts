@@ -8,6 +8,7 @@ type Params = {
   batchSize?: number;
   importId?: string;
   dryRun?: boolean;
+  tariffIndexUrl?: string;
   useWitsFallback?: boolean; // default false (official-first)
 };
 
@@ -16,9 +17,10 @@ export async function importJpMfn({
   batchSize = 5_000,
   importId,
   dryRun,
+  tariffIndexUrl,
   useWitsFallback = false,
 }: Params) {
-  const officialRows = await fetchJpMfnDutyRates({ hs6List });
+  const officialRows = await fetchJpMfnDutyRates({ hs6List, tariffIndexUrl });
 
   let witsRows: DutyRateInsert[] = [];
   if (useWitsFallback) {

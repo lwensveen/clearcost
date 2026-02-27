@@ -7,6 +7,7 @@ import { httpFetch } from '../../../../lib/http.js';
 
 type FetchOpts = {
   editionBase?: string;
+  tariffIndexUrl?: string;
   hs6List?: string[];
   partnerGeoIds?: string[];
   userAgent?: string;
@@ -74,7 +75,9 @@ function resolveHeaderRow(tableRows: HTMLElement[]): string[] {
 export async function fetchJpPreferentialDutyRates(
   options: FetchOpts = {}
 ): Promise<DutyRateInsert[]> {
-  const editionBaseUrl = options.editionBase ?? (await getLatestJpTariffBase());
+  const editionBaseUrl =
+    options.editionBase ??
+    (await getLatestJpTariffBase({ tariffIndexUrl: options.tariffIndexUrl }));
   const effectiveFrom = options.effectiveFrom ?? parseJpEditionEffectiveFrom(editionBaseUrl);
   if (!effectiveFrom) {
     throw new Error(

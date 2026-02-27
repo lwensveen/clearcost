@@ -7,6 +7,8 @@ import { httpFetch } from '../../../../lib/http.js';
 type FetchOpts = {
   /** Override the dated base (e.g., https://www.customs.go.jp/english/tariff/2025_04_01/index.htm) */
   editionBase?: string;
+  /** Override the JP tariff index URL used to resolve latest edition. */
+  tariffIndexUrl?: string;
   /** Optional HS6 filter to limit scope */
   hs6List?: string[];
   /** Optional custom User-Agent */
@@ -34,7 +36,9 @@ export function parseJpEditionEffectiveFrom(editionBaseUrl: string): Date | null
 }
 
 export async function fetchJpMfnDutyRates(options: FetchOpts = {}): Promise<DutyRateInsert[]> {
-  const editionBaseUrl = options.editionBase ?? (await getLatestJpTariffBase());
+  const editionBaseUrl =
+    options.editionBase ??
+    (await getLatestJpTariffBase({ tariffIndexUrl: options.tariffIndexUrl }));
   const effectiveFrom = options.effectiveFrom ?? parseJpEditionEffectiveFrom(editionBaseUrl);
   if (!effectiveFrom) {
     throw new Error(

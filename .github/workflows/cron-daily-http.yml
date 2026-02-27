@@ -42,6 +42,8 @@ jobs:
       KR_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.KR_FTA_OFFICIAL_EXCEL_URL || '' }}
       CN_MFN_PDF_URL: ${{ secrets.CN_MFN_PDF_URL || '' }}
       CN_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.CN_FTA_OFFICIAL_EXCEL_URL || '' }}
+      JP_TARIFF_INDEX: ${{ secrets.JP_TARIFF_INDEX || '' }}
+      UK_10_DATA_API_BASE: ${{ secrets.UK_10_DATA_API_BASE || '' }}
       UK_REMEDY_MEASURE_TYPES: ${{ vars.UK_REMEDY_MEASURE_TYPES || '552,551,695' }}
       EU_TARIC_REMEDY_TYPES: ${{ vars.EU_TARIC_REMEDY_TYPES || '' }}
       PRUNE_DAYS: ${{ vars.IMPORTS_PRUNE_DAYS || 90 }}
@@ -94,7 +96,12 @@ jobs:
 
       - name: JP Duties — MFN (Customs)
         run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/jp-mfn --body '{}')
+          if [ -z "${JP_TARIFF_INDEX:-}" ]; then
+            echo "[duties:jp-mfn-official] missing JP_TARIFF_INDEX"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$JP_TARIFF_INDEX" '{tariffIndexUrl: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/jp-mfn --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
@@ -104,7 +111,12 @@ jobs:
 
       - name: JP Duties — FTA (strict official default)
         run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/jp-fta --body '{}')
+          if [ -z "${JP_TARIFF_INDEX:-}" ]; then
+            echo "[duties:jp-fta-official] missing JP_TARIFF_INDEX"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$JP_TARIFF_INDEX" '{tariffIndexUrl: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/jp-fta --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
@@ -144,7 +156,12 @@ jobs:
 
       - name: UK Duties — MFN
         run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/uk-mfn --body '{}')
+          if [ -z "${UK_10_DATA_API_BASE:-}" ]; then
+            echo "[duties:uk-mfn-official] missing UK_10_DATA_API_BASE"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$UK_10_DATA_API_BASE" '{apiBaseUrl: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/uk-mfn --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
@@ -154,7 +171,12 @@ jobs:
 
       - name: UK Duties — FTA
         run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/uk-fta --body '{}')
+          if [ -z "${UK_10_DATA_API_BASE:-}" ]; then
+            echo "[duties:uk-fta-official] missing UK_10_DATA_API_BASE"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$UK_10_DATA_API_BASE" '{apiBaseUrl: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/uk-fta --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then

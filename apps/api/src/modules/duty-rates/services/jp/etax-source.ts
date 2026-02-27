@@ -2,8 +2,16 @@ import { parse } from 'node-html-parser';
 import { httpFetch } from '../../../../lib/http.js';
 import { resolveJpTariffDutySourceUrls } from './source-urls.js';
 
-export async function getLatestJpTariffBase(): Promise<string> {
-  const { tariffIndexUrl } = await resolveJpTariffDutySourceUrls();
+type GetLatestJpTariffBaseOptions = {
+  tariffIndexUrl?: string;
+};
+
+export async function getLatestJpTariffBase(
+  options: GetLatestJpTariffBaseOptions = {}
+): Promise<string> {
+  const { tariffIndexUrl } = await resolveJpTariffDutySourceUrls({
+    tariffIndexUrl: options.tariffIndexUrl,
+  });
 
   const res = await httpFetch(tariffIndexUrl, { redirect: 'follow' });
   if (!res.ok) throw new Error(`JP index fetch ${res.status}`);
