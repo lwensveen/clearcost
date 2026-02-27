@@ -121,16 +121,22 @@ const ASEAN_FTA_REQUIRED_LANES: ReadonlyArray<DutyCoverageRequirement> = [
 const ASEAN_FTA_FRESHNESS_THRESHOLD_HOURS = 192;
 const ASEAN_MFN_FRESHNESS_THRESHOLD_HOURS = 192;
 const JP_REQUIRED_JOBS = ['duties:jp-mfn-official', 'duties:jp-fta-official'] as const;
+const KR_REQUIRED_JOBS = ['duties:kr-mfn-official', 'duties:kr-fta-official'] as const;
 const CN_REQUIRED_JOBS = ['duties:cn-mfn-official', 'duties:cn-fta-official'] as const;
 const UK_REQUIRED_JOBS = ['duties:uk-mfn-official', 'duties:uk-fta-official'] as const;
 const US_REQUIRED_JOBS = ['duties:us-mfn-official', 'duties:us-fta-official'] as const;
 const JP_FRESHNESS_THRESHOLD_HOURS = 192;
+const KR_FRESHNESS_THRESHOLD_HOURS = 192;
 const CN_FRESHNESS_THRESHOLD_HOURS = 192;
 const UK_FRESHNESS_THRESHOLD_HOURS = 192;
 const US_FRESHNESS_THRESHOLD_HOURS = 192;
 const JP_REQUIRED_DUTY_DATASETS: ReadonlyArray<DutyDatasetCoverageRequirement> = [
   { dest: 'JP', dutyRule: 'mfn', expectedSources: ['official'] },
   { dest: 'JP', dutyRule: 'fta', expectedSources: ['official'] },
+] as const;
+const KR_REQUIRED_DUTY_DATASETS: ReadonlyArray<DutyDatasetCoverageRequirement> = [
+  { dest: 'KR', dutyRule: 'mfn', expectedSources: ['official'] },
+  { dest: 'KR', dutyRule: 'fta', expectedSources: ['official'] },
 ] as const;
 const CN_REQUIRED_DUTY_DATASETS: ReadonlyArray<DutyDatasetCoverageRequirement> = [
   { dest: 'CN', dutyRule: 'mfn', expectedSources: ['official'] },
@@ -394,6 +400,9 @@ export const coverageSnapshot: Command = async (args) => {
   const jpFreshness = await Promise.all(
     JP_REQUIRED_JOBS.map((job) => getImportJobFreshness(job, now, JP_FRESHNESS_THRESHOLD_HOURS))
   );
+  const krFreshness = await Promise.all(
+    KR_REQUIRED_JOBS.map((job) => getImportJobFreshness(job, now, KR_FRESHNESS_THRESHOLD_HOURS))
+  );
   const cnFreshness = await Promise.all(
     CN_REQUIRED_JOBS.map((job) => getImportJobFreshness(job, now, CN_FRESHNESS_THRESHOLD_HOURS))
   );
@@ -584,6 +593,16 @@ export const coverageSnapshot: Command = async (args) => {
           : `${jobFreshness.job} latest success ${jobFreshness.lastSuccessAt.toISOString()} (threshold ${jobFreshness.thresholdHours}h)`,
     });
   }
+  for (const jobFreshness of krFreshness) {
+    checks.push({
+      key: `freshness.kr.${jobFreshness.job}`,
+      ok: jobFreshness.stale !== true,
+      detail:
+        jobFreshness.lastSuccessAt == null
+          ? `No successful import run for ${jobFreshness.job}`
+          : `${jobFreshness.job} latest success ${jobFreshness.lastSuccessAt.toISOString()} (threshold ${jobFreshness.thresholdHours}h)`,
+    });
+  }
   for (const jobFreshness of cnFreshness) {
     checks.push({
       key: `freshness.cn.${jobFreshness.job}`,
@@ -665,6 +684,14 @@ export const coverageSnapshot: Command = async (args) => {
       detail: `JP ${requirement.dutyRule.toUpperCase()} official coverage (${requirement.expectedSources.join('/')})`,
     });
   }
+  for (const requirement of KR_REQUIRED_DUTY_DATASETS) {
+    const dataset = formatDutyDatasetCoverageRequirement(requirement);
+    checks.push({
+      key: `duties.kr.dataset.${dataset}`,
+      ok: hasDutyDatasetCoverage(dutyRows, requirement),
+      detail: `KR ${requirement.dutyRule.toUpperCase()} official coverage (${requirement.expectedSources.join('/')})`,
+    });
+  }
   for (const requirement of CN_REQUIRED_DUTY_DATASETS) {
     const dataset = formatDutyDatasetCoverageRequirement(requirement);
     checks.push({
@@ -743,6 +770,9 @@ export const coverageSnapshot: Command = async (args) => {
       jpDutyDatasets: JP_REQUIRED_DUTY_DATASETS.map((req) =>
         formatDutyDatasetCoverageRequirement(req)
       ),
+      krDutyDatasets: KR_REQUIRED_DUTY_DATASETS.map((req) =>
+        formatDutyDatasetCoverageRequirement(req)
+      ),
       cnDutyDatasets: CN_REQUIRED_DUTY_DATASETS.map((req) =>
         formatDutyDatasetCoverageRequirement(req)
       ),
@@ -795,6 +825,16 @@ export const coverageSnapshot: Command = async (args) => {
       },
       jp: {
         jobs: jpFreshness.map((jobFreshness) => ({
+          job: jobFreshness.job,
+          thresholdHours: jobFreshness.thresholdHours,
+          lastSuccessAt: jobFreshness.lastSuccessAt?.toISOString() ?? null,
+          lastAttemptAt: jobFreshness.lastAttemptAt?.toISOString() ?? null,
+          ageHours: jobFreshness.ageHours,
+          stale: jobFreshness.stale,
+        })),
+      },
+      kr: {
+        jobs: krFreshness.map((jobFreshness) => ({
           job: jobFreshness.job,
           thresholdHours: jobFreshness.thresholdHours,
           lastSuccessAt: jobFreshness.lastSuccessAt?.toISOString() ?? null,

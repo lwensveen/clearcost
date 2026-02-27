@@ -37,6 +37,8 @@ jobs:
       VN_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.VN_FTA_OFFICIAL_EXCEL_URL || '' }}
       SG_MFN_OFFICIAL_EXCEL_URL: ${{ secrets.SG_MFN_OFFICIAL_EXCEL_URL || '' }}
       SG_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.SG_FTA_OFFICIAL_EXCEL_URL || '' }}
+      KR_MFN_OFFICIAL_EXCEL_URL: ${{ secrets.KR_MFN_OFFICIAL_EXCEL_URL || '' }}
+      KR_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.KR_FTA_OFFICIAL_EXCEL_URL || '' }}
       UK_REMEDY_MEASURE_TYPES: ${{ vars.UK_REMEDY_MEASURE_TYPES || '552,551,695' }}
       EU_TARIC_REMEDY_TYPES: ${{ vars.EU_TARIC_REMEDY_TYPES || '' }}
       PRUNE_DAYS: ${{ vars.IMPORTS_PRUNE_DAYS || 90 }}
@@ -104,6 +106,36 @@ jobs:
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
             echo "[duties:jp-fta-official] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
+
+      - name: KR Duties — MFN (official Excel)
+        run: |
+          if [ -z "${KR_MFN_OFFICIAL_EXCEL_URL:-}" ]; then
+            echo "[duties:kr-mfn-official] missing KR_MFN_OFFICIAL_EXCEL_URL"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$KR_MFN_OFFICIAL_EXCEL_URL" '{url: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/kr-mfn/official/excel --body "$BODY")
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[duties:kr-mfn-official] expected >0 imported rows, got $ROWS"
+            exit 1
+          fi
+
+      - name: KR Duties — FTA (official Excel)
+        run: |
+          if [ -z "${KR_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
+            echo "[duties:kr-fta-official] missing KR_FTA_OFFICIAL_EXCEL_URL"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$KR_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/kr-fta/official/excel --body "$BODY")
+          echo "$OUT" | jq .
+          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
+          if [ "$ROWS" -lt 1 ]; then
+            echo "[duties:kr-fta-official] expected >0 imported rows, got $ROWS"
             exit 1
           fi
 

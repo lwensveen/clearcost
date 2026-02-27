@@ -11,6 +11,7 @@ import fxRoutes from './fx-routes.js';
 import hsRoutes from './hs-routes.js';
 import importsPruneRoutes from './prune-routes.js';
 import jpDutyRoutes from './duties/jp-routes.js';
+import krDutyRoutes from './duties/kr-routes.js';
 import noticesRoutes from './notices-routes.js';
 import surchargeEuRoutes from './surcharges/eu-routes.js';
 import surchargeJsonRoute from './surcharges/generic-json.js';
@@ -40,6 +41,7 @@ export default function taskRoutes(app: FastifyInstance) {
   cnDutyRoutes(app);
   euDutyRoutes(app);
   jpDutyRoutes(app);
+  krDutyRoutes(app);
   ukDutyRoutes(app);
   usDutyRoutes(app);
   witsDutyRoutes(app);

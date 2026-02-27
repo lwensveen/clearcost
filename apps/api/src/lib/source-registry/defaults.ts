@@ -78,6 +78,8 @@ export const OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS = [
   'duties.us.usitc.csv',
   'duties.us.trade_programs.members_csv',
   'duties.jp.customs.tariff_index',
+  'duties.kr.official.mfn_excel',
+  'duties.kr.official.fta_excel',
   'duties.cn.taxbook.pdf',
   'duties.cn.official.fta_excel',
   'duties.id.btki.xlsx',
