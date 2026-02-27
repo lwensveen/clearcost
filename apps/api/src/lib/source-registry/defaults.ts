@@ -1,3 +1,5 @@
+import { DUTY_COUNTRY_SCAFFOLD_SOURCE_KEYS } from '../cron/commands/duties/duties-country-scaffold-data.js';
+
 type SourceDataset =
   | 'fx'
   | 'vat'
@@ -16,6 +18,7 @@ export type SourceRegistryDefaultEntry = {
   key: string;
   dataset: SourceDataset;
   sourceType: SourceType;
+  enabled: boolean;
   scheduleHint: SourceScheduleHint;
   expectedFormat: SourceExpectedFormat;
   authStrategy: SourceAuthStrategy;
@@ -71,15 +74,37 @@ export const OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS = [
   'duties.eu.taric.component',
   'duties.eu.taric.duty_expression',
   'duties.eu.taric.geo_description',
+  'duties.au.official.mfn_excel',
+  'duties.au.official.fta_excel',
   'duties.bn.official.mfn_excel',
   'duties.bn.official.fta_excel',
+  'duties.ca.official.mfn_excel',
+  'duties.ca.official.fta_excel',
+  'duties.ch.official.mfn_excel',
+  'duties.ch.official.fta_excel',
+  'duties.cl.official.mfn_excel',
+  'duties.cl.official.fta_excel',
   'duties.uk.tariff.api_base',
   'duties.us.usitc.base',
   'duties.us.usitc.csv',
   'duties.us.trade_programs.members_csv',
+  'duties.is.official.mfn_excel',
+  'duties.is.official.fta_excel',
   'duties.jp.customs.tariff_index',
   'duties.kr.official.mfn_excel',
   'duties.kr.official.fta_excel',
+  'duties.li.official.mfn_excel',
+  'duties.li.official.fta_excel',
+  'duties.mx.official.mfn_excel',
+  'duties.mx.official.fta_excel',
+  'duties.no.official.mfn_excel',
+  'duties.no.official.fta_excel',
+  'duties.nz.official.mfn_excel',
+  'duties.nz.official.fta_excel',
+  'duties.pe.official.mfn_excel',
+  'duties.pe.official.fta_excel',
+  'duties.pk.official.mfn_excel',
+  'duties.pk.official.fta_excel',
   'duties.cn.taxbook.pdf',
   'duties.cn.official.fta_excel',
   'duties.id.btki.xlsx',
@@ -139,6 +164,13 @@ export const NON_REGISTRY_RUNTIME_SOURCE_KEYS = [
   'seed.trade_programs.us',
 ] as const;
 const OPTIONAL_FALLBACK_SOURCE_KEY_SET = new Set<string>(OPTIONAL_FALLBACK_SOURCE_KEYS);
+const OFFICIAL_DUTY_REQUIRED_SOURCE_KEY_SET = new Set<string>(OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS);
+export const OPTIONAL_DUTY_COUNTRY_SCAFFOLD_SOURCE_KEYS = DUTY_COUNTRY_SCAFFOLD_SOURCE_KEYS.filter(
+  (key) => !OFFICIAL_DUTY_REQUIRED_SOURCE_KEY_SET.has(key)
+);
+const OPTIONAL_DUTY_COUNTRY_SCAFFOLD_SOURCE_KEY_SET = new Set<string>(
+  OPTIONAL_DUTY_COUNTRY_SCAFFOLD_SOURCE_KEYS
+);
 const TASK_ONLY_MANUAL_SOURCE_KEY_SET = new Set<string>([
   'de-minimis.baseline.seed',
   'freight.cards.json',
@@ -163,6 +195,7 @@ export const ALL_REQUIRED_SOURCE_KEYS = uniqueSourceKeys([
 ]);
 export const SOURCE_REGISTRY_SEEDED_SOURCE_KEYS = uniqueSourceKeys([
   ...ALL_REQUIRED_SOURCE_KEYS,
+  ...OPTIONAL_DUTY_COUNTRY_SCAFFOLD_SOURCE_KEYS,
   ...OPTIONAL_LLM_SOURCE_KEYS,
 ]);
 export const ALL_KNOWN_SOURCE_KEYS = uniqueSourceKeys([
@@ -229,6 +262,11 @@ function inferAuthStrategy(sourceType: SourceType): SourceAuthStrategy {
   return 'none';
 }
 
+function inferEnabled(key: string): boolean {
+  if (OPTIONAL_DUTY_COUNTRY_SCAFFOLD_SOURCE_KEY_SET.has(key)) return false;
+  return true;
+}
+
 export const SOURCE_REGISTRY_DEFAULT_ENTRIES: ReadonlyArray<SourceRegistryDefaultEntry> =
   SOURCE_REGISTRY_SEEDED_SOURCE_KEYS.map((key) => {
     const sourceType = inferSourceType(key);
@@ -236,6 +274,7 @@ export const SOURCE_REGISTRY_DEFAULT_ENTRIES: ReadonlyArray<SourceRegistryDefaul
       key,
       dataset: inferDataset(key),
       sourceType,
+      enabled: inferEnabled(key),
       scheduleHint: inferScheduleHint(key, sourceType),
       expectedFormat: inferExpectedFormat(sourceType),
       authStrategy: inferAuthStrategy(sourceType),

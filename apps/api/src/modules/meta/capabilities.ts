@@ -1,4 +1,5 @@
 import { COMMAND_KEYS } from '../../lib/cron/command-keys.js';
+import { DUTY_COUNTRY_SCAFFOLD_SLUGS } from '../../lib/cron/commands/duties/duties-country-scaffold-data.js';
 
 type DatasetKey =
   | 'duties'
@@ -33,12 +34,17 @@ const FRESHNESS_THRESHOLD_HOURS: Record<DatasetKey, number | null> = {
 };
 
 const REGION_PREFIX_MAP: Array<[prefix: string, region: string]> = [
+  ...DUTY_COUNTRY_SCAFFOLD_SLUGS.map((slug) => [slug, slug.toUpperCase()] as [string, string]),
   ['eu', 'EU'],
   ['us', 'US'],
   ['uk', 'UK'],
   ['jp', 'JP'],
   ['cn', 'CN'],
+  ['bn', 'BN'],
   ['id', 'ID'],
+  ['kh', 'KH'],
+  ['la', 'LA'],
+  ['mm', 'MM'],
   ['my', 'MY'],
   ['ph', 'PH'],
   ['sg', 'SG'],

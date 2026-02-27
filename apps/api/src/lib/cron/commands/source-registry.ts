@@ -33,6 +33,7 @@ export const sourceRegistryBootstrap: Command = async (argv = []) => {
               key: entry.key,
               dataset: entry.dataset,
               sourceType: entry.sourceType,
+              enabled: entry.enabled,
               scheduleHint: entry.scheduleHint,
               expectedFormat: entry.expectedFormat,
               authStrategy: entry.authStrategy,

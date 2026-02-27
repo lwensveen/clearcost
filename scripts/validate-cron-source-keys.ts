@@ -2,11 +2,20 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ALL_KNOWN_SOURCE_KEYS } from '../apps/api/src/lib/source-registry/defaults.ts';
+import { DUTY_COUNTRY_SCAFFOLD_SOURCE_KEYS } from '../apps/api/src/lib/cron/commands/duties/duties-country-scaffold-data.ts';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const commandsDir = join(repoRoot, 'apps', 'api', 'src', 'lib', 'cron', 'commands');
+const DUTY_COUNTRY_SCAFFOLD_MFN_SOURCE_KEYS = DUTY_COUNTRY_SCAFFOLD_SOURCE_KEYS.filter((key) =>
+  key.endsWith('.mfn_excel')
+);
+const DUTY_COUNTRY_SCAFFOLD_FTA_SOURCE_KEYS = DUTY_COUNTRY_SCAFFOLD_SOURCE_KEYS.filter((key) =>
+  key.endsWith('.fta_excel')
+);
 const SOURCE_KEY_IDENTIFIER_MAP: Record<string, string[]> = {
   PROGRAMS_MEMBERS_SOURCE_KEY: ['duties.us.trade_programs.members_csv'],
+  countryMfnSourceKey: DUTY_COUNTRY_SCAFFOLD_MFN_SOURCE_KEYS,
+  countryFtaSourceKey: DUTY_COUNTRY_SCAFFOLD_FTA_SOURCE_KEYS,
 };
 
 function listCommandFiles(dir: string): string[] {

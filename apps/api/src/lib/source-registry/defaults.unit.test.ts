@@ -5,6 +5,7 @@ import {
   NON_REGISTRY_RUNTIME_SOURCE_KEYS,
   OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS,
   OFFICIAL_FX_REQUIRED_SOURCE_KEYS,
+  OPTIONAL_DUTY_COUNTRY_SCAFFOLD_SOURCE_KEYS,
   OPTIONAL_LLM_SOURCE_KEYS,
   OPTIONAL_FALLBACK_SOURCE_KEYS,
   SOURCE_REGISTRY_SEEDED_SOURCE_KEYS,
@@ -32,6 +33,7 @@ describe('source registry defaults', () => {
     for (const key of OFFICIAL_DUTY_REQUIRED_SOURCE_KEYS) expect(keys.has(key)).toBe(true);
     for (const key of OFFICIAL_FX_REQUIRED_SOURCE_KEYS) expect(keys.has(key)).toBe(true);
     for (const key of OPTIONAL_FALLBACK_SOURCE_KEYS) expect(keys.has(key)).toBe(true);
+    for (const key of OPTIONAL_DUTY_COUNTRY_SCAFFOLD_SOURCE_KEYS) expect(keys.has(key)).toBe(true);
     for (const key of TASK_ONLY_REQUIRED_SOURCE_KEYS) expect(keys.has(key)).toBe(true);
     for (const key of OPTIONAL_LLM_SOURCE_KEYS) expect(keys.has(key)).toBe(true);
   });
@@ -60,5 +62,12 @@ describe('source registry defaults', () => {
     expect(byKey.get('duties.llm.openai')?.sourceType).toBe('llm');
     expect(byKey.get('duties.llm.openai')?.scheduleHint).toBe('manual');
     expect(byKey.get('duties.llm.openai')?.authStrategy).toBe('api_key');
+  });
+
+  it('keeps optional scaffold duty source keys disabled by default', () => {
+    const byKey = new Map(SOURCE_REGISTRY_DEFAULT_ENTRIES.map((entry) => [entry.key, entry]));
+    for (const key of OPTIONAL_DUTY_COUNTRY_SCAFFOLD_SOURCE_KEYS) {
+      expect(byKey.get(key)?.enabled).toBe(false);
+    }
   });
 });

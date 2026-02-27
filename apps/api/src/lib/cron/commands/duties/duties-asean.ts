@@ -278,3 +278,71 @@ export const dutiesAseanAllOfficial: Command = async (args) => {
     updated: mfn.updated + fta.updated,
   });
 };
+
+function withCountriesArg(args: string[], countries: string): string[] {
+  return [`--countries=${countries}`, ...args.filter((arg) => !arg.startsWith('--countries='))];
+}
+
+// BN
+export const dutiesBnMfnOfficial: Command = async (args) =>
+  dutiesAseanMfnOfficial(withCountriesArg(args, 'bn'));
+export const dutiesBnFtaOfficial: Command = async (args) =>
+  dutiesAseanFtaOfficial(withCountriesArg(args, 'bn'));
+export const dutiesBnAllOfficial: Command = async (args) =>
+  dutiesAseanAllOfficial(withCountriesArg(args, 'bn'));
+
+// KH
+export const dutiesKhMfnOfficial: Command = async (args) =>
+  dutiesAseanMfnOfficial(withCountriesArg(args, 'kh'));
+export const dutiesKhFtaOfficial: Command = async (args) =>
+  dutiesAseanFtaOfficial(withCountriesArg(args, 'kh'));
+export const dutiesKhAllOfficial: Command = async (args) =>
+  dutiesAseanAllOfficial(withCountriesArg(args, 'kh'));
+
+// LA
+export const dutiesLaMfnOfficial: Command = async (args) =>
+  dutiesAseanMfnOfficial(withCountriesArg(args, 'la'));
+export const dutiesLaFtaOfficial: Command = async (args) =>
+  dutiesAseanFtaOfficial(withCountriesArg(args, 'la'));
+export const dutiesLaAllOfficial: Command = async (args) =>
+  dutiesAseanAllOfficial(withCountriesArg(args, 'la'));
+
+// MM
+export const dutiesMmMfnOfficial: Command = async (args) =>
+  dutiesAseanMfnOfficial(withCountriesArg(args, 'mm'));
+export const dutiesMmFtaOfficial: Command = async (args) =>
+  dutiesAseanFtaOfficial(withCountriesArg(args, 'mm'));
+export const dutiesMmAllOfficial: Command = async (args) =>
+  dutiesAseanAllOfficial(withCountriesArg(args, 'mm'));
+
+// ID
+export const dutiesIdMfnOfficial: Command = async (args) =>
+  dutiesAseanMfnOfficial(withCountriesArg(args, 'id'));
+export const dutiesIdFtaOfficial: Command = async (args) =>
+  dutiesAseanFtaOfficial(withCountriesArg(args, 'id'));
+export const dutiesIdAllOfficial: Command = async (args) =>
+  dutiesAseanAllOfficial(withCountriesArg(args, 'id'));
+
+// PH
+export const dutiesPhMfnOfficial: Command = async (args) =>
+  dutiesAseanMfnOfficial(withCountriesArg(args, 'ph'));
+export const dutiesPhFtaOfficial: Command = async (args) =>
+  dutiesAseanFtaOfficial(withCountriesArg(args, 'ph'));
+export const dutiesPhAllOfficial: Command = async (args) =>
+  dutiesAseanAllOfficial(withCountriesArg(args, 'ph'));
+
+// SG
+export const dutiesSgMfnOfficial: Command = async (args) =>
+  dutiesAseanMfnOfficial(withCountriesArg(args, 'sg'));
+export const dutiesSgFtaOfficial: Command = async (args) =>
+  dutiesAseanFtaOfficial(withCountriesArg(args, 'sg'));
+export const dutiesSgAllOfficial: Command = async (args) =>
+  dutiesAseanAllOfficial(withCountriesArg(args, 'sg'));
+
+// TH
+export const dutiesThMfnOfficial: Command = async (args) =>
+  dutiesAseanMfnOfficial(withCountriesArg(args, 'th'));
+export const dutiesThFtaOfficial: Command = async (args) =>
+  dutiesAseanFtaOfficial(withCountriesArg(args, 'th'));
+export const dutiesThAllOfficial: Command = async (args) =>
+  dutiesAseanAllOfficial(withCountriesArg(args, 'th'));
