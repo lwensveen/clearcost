@@ -416,6 +416,8 @@ Both HTTP workflows (`cron-daily-http.yml` and `cron-hourly-http.yml`) require:
 | `SG_FTA_OFFICIAL_EXCEL_URL` | secret | yes      | Required SG FTA official Excel import source URL.    |
 | `KR_MFN_OFFICIAL_EXCEL_URL` | secret | yes      | Required KR MFN official Excel import source URL.    |
 | `KR_FTA_OFFICIAL_EXCEL_URL` | secret | yes      | Required KR FTA official Excel import source URL.    |
+| `CN_MFN_PDF_URL`            | secret | yes      | Required CN MFN official PDF import source URL.      |
+| `CN_FTA_OFFICIAL_EXCEL_URL` | secret | yes      | Required CN FTA official Excel import source URL.    |
 | `UK_REMEDY_MEASURE_TYPES`   | var    | no       | UK remedy measure types (defaults to `552,551,695`). |
 | `EU_TARIC_REMEDY_TYPES`     | var    | no       | Enables EU remedies surcharge import when non-empty. |
 | `IMPORTS_PRUNE_DAYS`        | var    | no       | Retention window for prune step (default `90`).      |

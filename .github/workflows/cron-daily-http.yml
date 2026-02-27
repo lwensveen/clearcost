@@ -40,6 +40,8 @@ jobs:
       SG_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.SG_FTA_OFFICIAL_EXCEL_URL || '' }}
       KR_MFN_OFFICIAL_EXCEL_URL: ${{ secrets.KR_MFN_OFFICIAL_EXCEL_URL || '' }}
       KR_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.KR_FTA_OFFICIAL_EXCEL_URL || '' }}
+      CN_MFN_PDF_URL: ${{ secrets.CN_MFN_PDF_URL || '' }}
+      CN_FTA_OFFICIAL_EXCEL_URL: ${{ secrets.CN_FTA_OFFICIAL_EXCEL_URL || '' }}
       UK_REMEDY_MEASURE_TYPES: ${{ vars.UK_REMEDY_MEASURE_TYPES || '552,551,695' }}
       EU_TARIC_REMEDY_TYPES: ${{ vars.EU_TARIC_REMEDY_TYPES || '' }}
       PRUNE_DAYS: ${{ vars.IMPORTS_PRUNE_DAYS || 90 }}
@@ -250,9 +252,14 @@ jobs:
             exit 1
           fi
 
-      - name: CN Duties — MFN (official PDF default)
+      - name: CN Duties — MFN (official PDF)
         run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/cn-mfn --body '{}')
+          if [ -z "${CN_MFN_PDF_URL:-}" ]; then
+            echo "[duties:cn-mfn-official] missing CN_MFN_PDF_URL"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$CN_MFN_PDF_URL" '{url: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/cn-mfn/official/pdf --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then
@@ -260,9 +267,14 @@ jobs:
             exit 1
           fi
 
-      - name: CN Duties — FTA (strict official default)
+      - name: CN Duties — FTA (official Excel)
         run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/cn-fta --body '{}')
+          if [ -z "${CN_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
+            echo "[duties:cn-fta-official] missing CN_FTA_OFFICIAL_EXCEL_URL"
+            exit 1
+          fi
+          BODY=$(jq -n --arg url "$CN_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
+          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/cn-fta/official/excel --body "$BODY")
           echo "$OUT" | jq .
           ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
           if [ "$ROWS" -lt 1 ]; then

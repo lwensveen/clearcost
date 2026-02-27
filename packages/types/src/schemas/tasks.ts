@@ -68,6 +68,12 @@ export const TasksDutyCnMfnPdfBodySchema = z.object({
   dryRun: z.boolean().optional(),
 });
 
+export const TasksDutyCnFtaOfficialExcelBodySchema =
+  TasksDutyHs6BatchPartnerGeoIdsBodySchema.extend({
+    url: z.string().url().optional(),
+    sheet: z.union([z.string(), z.coerce.number()]).optional(),
+  });
+
 export const TasksDutyEuDailyBodySchema = z.object({
   date: z
     .string()

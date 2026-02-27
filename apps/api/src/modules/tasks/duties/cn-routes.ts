@@ -7,6 +7,7 @@ import {
 import { importCnMfnFromPdf } from '../../duty-rates/services/cn/import-mfn-pdf.js';
 import { resolveSourceDownloadUrl } from '../../../lib/source-registry.js';
 import {
+  TasksDutyCnFtaOfficialExcelBodySchema,
   TasksDutyCnMfnPdfBodySchema,
   TasksDutyMyOfficialPdfBodySchema,
   TasksDutyHs6BatchDryRunBodySchema,
@@ -135,6 +136,41 @@ export default function cnDutyRoutes(app: FastifyInstance) {
           partnerGeoIds,
           batchSize,
           dryRun,
+          importId: req.importCtx?.runId,
+        });
+        return reply.send(res);
+      }
+    );
+  }
+
+  // CN Preferential (official Excel explicit)
+  {
+    const Body = TasksDutyCnFtaOfficialExcelBodySchema;
+
+    app.post(
+      '/cron/import/duties/cn-fta/official/excel',
+      {
+        preHandler: app.requireApiKey(['tasks:duties:cn']),
+        schema: { body: Body },
+        config: {
+          importMeta: {
+            importSource: 'OFFICIAL',
+            job: 'duties:cn-fta-official',
+            sourceKey: 'duties.cn.official.fta_excel',
+          },
+        },
+      },
+      async (req, reply) => {
+        const { url, sheet, hs6, partnerGeoIds, batchSize, dryRun } = Body.parse(req.body ?? {});
+        const res = await importCnPreferential({
+          hs6List: hs6,
+          partnerGeoIds,
+          batchSize,
+          dryRun,
+          strictOfficial: true,
+          useWitsFallback: false,
+          officialExcelUrl: url,
+          sheet,
           importId: req.importCtx?.runId,
         });
         return reply.send(res);

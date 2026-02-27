@@ -1,6 +1,7 @@
 import { z } from 'zod/v4';
 import {
   TasksDeMinimisImportBodySchema,
+  TasksDutyCnFtaOfficialExcelBodySchema,
   TasksDutyCnMfnPdfBodySchema,
   TasksDutyEuDailyBodySchema,
   TasksDutyHs6BatchBodySchema,
@@ -40,6 +41,7 @@ export type TasksDutyHs6BatchPartnerGeoIdsBody = z.infer<
   typeof TasksDutyHs6BatchPartnerGeoIdsBodySchema
 >;
 export type TasksDutyCnMfnPdfBody = z.infer<typeof TasksDutyCnMfnPdfBodySchema>;
+export type TasksDutyCnFtaOfficialExcelBody = z.infer<typeof TasksDutyCnFtaOfficialExcelBodySchema>;
 export type TasksDutyEuDailyBody = z.infer<typeof TasksDutyEuDailyBodySchema>;
 export type TasksDutyJsonImportResponse = z.infer<typeof TasksDutyJsonImportResponseSchema>;
 export type TasksDutyMyOfficialExcelBody = z.infer<typeof TasksDutyMyOfficialExcelBodySchema>;

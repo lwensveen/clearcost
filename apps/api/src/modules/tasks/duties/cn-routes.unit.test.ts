@@ -120,6 +120,28 @@ describe('cn duties official-first defaults', () => {
     await app.close();
   });
 
+  it('uses official Excel override route on /cn-fta/official/excel', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/cron/import/duties/cn-fta/official/excel',
+      payload: { url: 'https://example.com/cn-fta.xlsx', partnerGeoIds: ['JP'], sheet: 'FTA' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mocks.importCnPreferential).toHaveBeenCalledWith(
+      expect.objectContaining({
+        partnerGeoIds: ['JP'],
+        strictOfficial: true,
+        useWitsFallback: false,
+        officialExcelUrl: 'https://example.com/cn-fta.xlsx',
+        sheet: 'FTA',
+      })
+    );
+    expect(mocks.importCnPreferentialFromWits).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it('uses WITS importer on /cn-fta/wits', async () => {
     const app = await buildApp();
     const res = await app.inject({
