@@ -40,7 +40,7 @@ export default function deMinimisRoutes(app: FastifyInstance) {
     {
       preHandler: app.requireApiKey(['de-minimis:write']),
       schema: { body: DeMinimisEvalBodySchema, response: { 200: DeMinimisEvalResponseSchema } },
-      config: { rateLimit: { max: 240, timeWindow: '1 minute' } },
+      config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
       const { dest, goodsDest, freightDest, fxAsOf } = DeMinimisEvalBodySchema.parse(req.body);

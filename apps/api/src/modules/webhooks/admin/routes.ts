@@ -33,6 +33,7 @@ export default function webhookAdminRoutes(app: FastifyInstance) {
         querystring: WebhookEndpointsListQuerySchema,
         response: { 200: WebhookEndpointsListResponseSchema },
       },
+      config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
     },
     async (req) => {
       const { ownerId } = WebhookEndpointsListQuerySchema.parse(req.query);
@@ -66,6 +67,7 @@ export default function webhookAdminRoutes(app: FastifyInstance) {
         body: WebhookEndpointCreateBodySchema,
         response: { 201: WebhookEndpointCreateResponseSchema, 500: ErrorResponseSchema },
       },
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
       const body = WebhookEndpointCreateBodySchema.parse(req.body);
@@ -114,6 +116,7 @@ export default function webhookAdminRoutes(app: FastifyInstance) {
         params: WebhookEndpointRotateParamsSchema,
         response: { 200: WebhookEndpointRotateResponseSchema, 404: ErrorResponseSchema },
       },
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
       const { id } = WebhookEndpointRotateParamsSchema.parse(req.params);

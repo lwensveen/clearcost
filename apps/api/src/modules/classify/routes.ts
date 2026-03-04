@@ -19,7 +19,7 @@ export default function classifyRoutes(app: FastifyInstance) {
         headers: IdempotencyHeaderSchema,
         response: { 200: ClassifyResponseSchema },
       },
-      config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
       const headers = IdempotencyHeaderSchema.parse(req.headers);

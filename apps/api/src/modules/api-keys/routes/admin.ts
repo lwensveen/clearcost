@@ -34,6 +34,7 @@ export default function apiKeyAdminRoutes(app: FastifyInstance) {
           200: ApiKeyAdminListResponseSchema,
         },
       },
+      config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
     },
     async (req) => {
       const { ownerId, activeOnly } = ApiKeyAdminListQuerySchema.parse(req.query);
@@ -78,6 +79,7 @@ export default function apiKeyAdminRoutes(app: FastifyInstance) {
           500: ApiKeyErrorResponseSchema,
         },
       },
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
       const body = ApiKeyAdminCreateBodySchema.parse(req.body);
@@ -136,6 +138,7 @@ export default function apiKeyAdminRoutes(app: FastifyInstance) {
           404: ApiKeyErrorResponseSchema,
         },
       },
+      config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
       const { id } = ApiKeyIdParamSchema.parse(req.params);
@@ -179,6 +182,7 @@ export default function apiKeyAdminRoutes(app: FastifyInstance) {
           404: ApiKeyErrorResponseSchema,
         },
       },
+      config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
       const { id } = ApiKeyIdParamSchema.parse(req.params);
@@ -231,6 +235,7 @@ export default function apiKeyAdminRoutes(app: FastifyInstance) {
           500: ApiKeyErrorResponseSchema,
         },
       },
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
       const { id } = ApiKeyIdParamSchema.parse(req.params);
@@ -316,6 +321,7 @@ export default function apiKeyAdminRoutes(app: FastifyInstance) {
           400: ApiKeyErrorResponseSchema,
         },
       },
+      config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
     },
     async (_req, reply) => {
       return reply

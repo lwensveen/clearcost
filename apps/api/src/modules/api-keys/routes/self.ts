@@ -26,6 +26,7 @@ export default function apiKeySelfRoutes(app: FastifyInstance) {
           401: ApiKeyErrorResponseSchema,
         },
       },
+      config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
       const { id } = req.apiKey!;
@@ -64,6 +65,7 @@ export default function apiKeySelfRoutes(app: FastifyInstance) {
           500: ApiKeyErrorResponseSchema,
         },
       },
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
       const curr = req.apiKey!;
@@ -136,6 +138,7 @@ export default function apiKeySelfRoutes(app: FastifyInstance) {
           404: ApiKeyErrorResponseSchema,
         },
       },
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     },
     async (req, reply) => {
       const { id } = req.apiKey!;
