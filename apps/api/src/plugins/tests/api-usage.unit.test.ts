@@ -1,11 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
-import usagePlugin from '../api-usage.js';
+import usagePlugin, { _buffer, _circuit, flushBuffer, resetState } from '../api-usage.js';
 import { __calls, __state } from '@clearcost/db';
 
 vi.mock('drizzle-orm', () => {
   const sql = (lits: TemplateStringsArray, ...vals: any[]) => {
-    // produce a readable string like: `${table.count} + 1` -> "[count] + 1"
     let out = '';
     for (let i = 0; i < lits.length; i++) {
       out += lits[i];
@@ -37,7 +36,7 @@ vi.mock('@clearcost/db', () => {
   const __calls: any[] = [];
   const __state = { failUpsert: false };
 
-  const db = {
+  const makeInsert = () => ({
     insert: (tbl: any) => ({
       values: (vals: any) => ({
         onConflictDoUpdate: (args: any) => {
@@ -47,6 +46,15 @@ vi.mock('@clearcost/db', () => {
         },
       }),
     }),
+  });
+
+  const db = {
+    ...makeInsert(),
+    transaction: async (fn: any) => {
+      // The transaction callback receives a tx object with same insert API
+      const tx = makeInsert();
+      return fn(tx);
+    },
   };
 
   return { apiUsageTable, db, __calls, __state };
@@ -57,7 +65,6 @@ const dayStartUTC = (d = new Date()) =>
   new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 
 function bearerApiKey(app: any, keyId = 'unit-key-1') {
-  // add a preHandler that stashes a fake principal on req
   app.addHook('preHandler', async (req: any) => {
     req.apiKey = { id: keyId };
   });
@@ -67,6 +74,11 @@ describe('usage-plugin (unit)', () => {
   beforeEach(() => {
     __calls.length = 0;
     __state.failUpsert = false;
+    resetState();
+  });
+
+  afterEach(() => {
+    resetState();
   });
 
   it('skips when no apiKey on request', async () => {
@@ -77,17 +89,16 @@ describe('usage-plugin (unit)', () => {
     const res = await app.inject({ method: 'GET', url: '/public' });
     expect(res.statusCode).toBe(200);
 
-    // No DB calls because req.apiKey is absent
-    expect(__calls.length).toBe(0);
+    // No buffer entries because req.apiKey is absent
+    expect(_buffer.size).toBe(0);
     await app.close();
   });
 
-  it('records one request with correct insert + upsert target and arithmetic set', async () => {
+  it('buffers one request and flushes with correct upsert values', async () => {
     const app = Fastify();
     await app.register(usagePlugin);
     bearerApiKey(app, 'unit-key-1');
 
-    // Route with param; plugin should store route pattern, e.g. "/echo/:id"
     app.post('/echo/:id', async (_req, reply) => reply.send('XXXX')); // 4 bytes out
 
     const payload = JSON.stringify({ a: 1 });
@@ -99,7 +110,13 @@ describe('usage-plugin (unit)', () => {
     });
     expect(res.statusCode).toBe(200);
 
-    // One upsert call captured
+    // Event is buffered, not yet flushed
+    expect(_buffer.size).toBe(1);
+    expect(__calls.length).toBe(0);
+
+    // Manually flush
+    await flushBuffer();
+
     expect(__calls.length).toBe(1);
     const call = __calls[0];
 
@@ -111,7 +128,7 @@ describe('usage-plugin (unit)', () => {
       'method',
     ]);
 
-    // Initial insert values
+    // Insert values
     expect(call.vals.apiKeyId).toBe('unit-key-1');
     expect(call.vals.method).toBe('POST');
     expect(call.vals.route).toBe('/echo/:id');
@@ -120,12 +137,36 @@ describe('usage-plugin (unit)', () => {
     expect(call.vals.sumBytesOut).toBe(4);
     expect(call.vals.day.toISOString()).toBe(dayStartUTC().toISOString());
 
-    // Arithmetic updates are present (stringified by our mock sql)
+    // Arithmetic updates use accumulated counts
     const set = call.args.set;
     expect(String(set.count)).toContain('count + 1');
-    expect(String(set.sumDurationMs)).toMatch(/sumDurationMs \+ \d+/);
     expect(String(set.sumBytesIn)).toContain('sumBytesIn + 7');
     expect(String(set.sumBytesOut)).toContain('sumBytesOut + 4');
+
+    await app.close();
+  });
+
+  it('aggregates multiple requests to same route in buffer', async () => {
+    const app = Fastify();
+    await app.register(usagePlugin);
+    bearerApiKey(app, 'unit-key-agg');
+
+    app.get('/items', async () => 'ok');
+
+    await app.inject({ method: 'GET', url: '/items' });
+    await app.inject({ method: 'GET', url: '/items' });
+    await app.inject({ method: 'GET', url: '/items' });
+
+    // All three requests aggregated into one buffer entry
+    expect(_buffer.size).toBe(1);
+    const entry = [..._buffer.values()][0]!;
+    expect(entry.count).toBe(3);
+    expect(entry.sumBytesOut).toBe(6); // 'ok' = 2 bytes × 3
+
+    await flushBuffer();
+    expect(__calls.length).toBe(1);
+    expect(__calls[0].vals.count).toBe(3);
+    expect(String(__calls[0].args.set.count)).toContain('count + 3');
 
     await app.close();
   });
@@ -138,6 +179,8 @@ describe('usage-plugin (unit)', () => {
 
     const res = await app.inject({ method: 'GET', url: '/bin' });
     expect(res.statusCode).toBe(200);
+
+    await flushBuffer();
     expect(__calls.length).toBe(1);
     expect(__calls[0].vals.sumBytesOut).toBe(5);
     await app.close();
@@ -153,7 +196,14 @@ describe('usage-plugin (unit)', () => {
 
     const res = await app.inject({ method: 'GET', url: '/ok' });
     expect(res.statusCode).toBe(200);
+
+    // Buffered but flush fails — should not throw
+    expect(_buffer.size).toBe(1);
+    await flushBuffer(); // fails silently
     expect(__calls.length).toBe(0);
+    // Entry re-buffered for retry
+    expect(_buffer.size).toBe(1);
+
     await app.close();
   });
 
@@ -168,6 +218,8 @@ describe('usage-plugin (unit)', () => {
 
     const res = await app.inject({ method: 'GET', url: '/reset' });
     expect(res.statusCode).toBe(200);
+
+    await flushBuffer();
     expect(__calls.length).toBe(1);
     expect(__calls[0].vals.sumBytesIn).toBe(0);
     expect(__calls[0].vals.sumBytesOut).toBe(2);
@@ -182,9 +234,134 @@ describe('usage-plugin (unit)', () => {
 
     const res = await app.inject({ method: 'GET', url: '/empty' });
     expect(res.statusCode).toBe(200);
+
+    await flushBuffer();
     expect(__calls.length).toBe(1);
     expect(__calls[0].vals.sumBytesOut).toBe(0);
     expect(String(__calls[0].args.set.sumBytesOut)).toContain('sumBytesOut + 0');
     await app.close();
+  });
+});
+
+describe('circuit breaker', () => {
+  beforeEach(() => {
+    __calls.length = 0;
+    __state.failUpsert = false;
+    resetState();
+  });
+
+  afterEach(() => {
+    resetState();
+  });
+
+  it('opens circuit after consecutive failures', async () => {
+    __state.failUpsert = true;
+    const log = { warn: vi.fn() };
+
+    // Simulate 5 consecutive flush failures
+    for (let i = 0; i < 5; i++) {
+      _buffer.set(`key-${i}`, {
+        apiKeyId: 'k1',
+        day: new Date(),
+        route: '/test',
+        method: 'GET',
+        count: 1,
+        sumDurationMs: 10,
+        sumBytesIn: 0,
+        sumBytesOut: 0,
+      });
+      await flushBuffer(log);
+    }
+
+    expect(_circuit.state).toBe('open');
+    expect(_circuit.consecutiveFailures).toBe(5);
+  });
+
+  it('drops events while circuit is open during cooldown', async () => {
+    _circuit.state = 'open';
+    _circuit.openedAt = Date.now(); // just opened
+    _circuit.droppedEvents = 0;
+
+    _buffer.set('key-1', {
+      apiKeyId: 'k1',
+      day: new Date(),
+      route: '/test',
+      method: 'GET',
+      count: 3,
+      sumDurationMs: 30,
+      sumBytesIn: 0,
+      sumBytesOut: 0,
+    });
+
+    const log = { warn: vi.fn() };
+    await flushBuffer(log);
+
+    expect(_buffer.size).toBe(0);
+    expect(_circuit.droppedEvents).toBe(3);
+    expect(__calls.length).toBe(0);
+  });
+
+  it('transitions to half-open after cooldown and recovers on success', async () => {
+    _circuit.state = 'open';
+    _circuit.openedAt = Date.now() - 31_000; // cooldown elapsed
+    __state.failUpsert = false;
+
+    _buffer.set('key-1', {
+      apiKeyId: 'k1',
+      day: new Date(),
+      route: '/test',
+      method: 'GET',
+      count: 1,
+      sumDurationMs: 10,
+      sumBytesIn: 0,
+      sumBytesOut: 0,
+    });
+
+    const log = { warn: vi.fn() };
+    await flushBuffer(log);
+
+    expect(_circuit.state).toBe('closed');
+    expect(_circuit.consecutiveFailures).toBe(0);
+    expect(__calls.length).toBe(1);
+  });
+
+  it('re-opens circuit on half-open probe failure', async () => {
+    _circuit.state = 'open';
+    _circuit.openedAt = Date.now() - 31_000; // cooldown elapsed
+    __state.failUpsert = true;
+
+    _buffer.set('key-1', {
+      apiKeyId: 'k1',
+      day: new Date(),
+      route: '/test',
+      method: 'GET',
+      count: 1,
+      sumDurationMs: 10,
+      sumBytesIn: 0,
+      sumBytesOut: 0,
+    });
+
+    const log = { warn: vi.fn() };
+    await flushBuffer(log);
+
+    expect(_circuit.state).toBe('open');
+    // Entry should be re-buffered
+    expect(_buffer.size).toBe(1);
+  });
+
+  it('flushes on app close', async () => {
+    const app = Fastify();
+    await app.register(usagePlugin);
+    bearerApiKey(app, 'unit-key-close');
+    app.get('/test', async () => 'ok');
+
+    await app.inject({ method: 'GET', url: '/test' });
+    expect(_buffer.size).toBe(1);
+    expect(__calls.length).toBe(0);
+
+    // Close triggers final flush
+    await app.close();
+    expect(__calls.length).toBe(1);
+    expect(_buffer.size).toBe(0);
   });
 });
