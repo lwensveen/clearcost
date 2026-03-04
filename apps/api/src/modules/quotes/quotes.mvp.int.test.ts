@@ -189,6 +189,50 @@ describeIfDb('quotes MVP e2e', () => {
     await app.close();
   });
 
+  it('POST /v1/quotes resolves EU-wide dest=EU duty rows for NL destination', async () => {
+    // Replace the NL-specific duty with an EU-wide row (mimicking real TARIC import).
+    await db.execute(sql`DELETE FROM duty_rates WHERE dest = 'NL'`);
+    await db.insert(dutyRatesTable).values({
+      dest: 'EU',
+      partner: '',
+      hs6: '850440',
+      source: 'official',
+      ratePct: '3.700',
+      dutyRule: 'mfn',
+      currency: 'EUR',
+      effectiveFrom: EFFECTIVE_FROM,
+      effectiveTo: null,
+      notes: 'TARIC EU-wide MFN duty',
+    });
+
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/quotes',
+      headers: { 'idempotency-key': 'idem_mvp_e2e_eu_dest' },
+      payload: {
+        origin: 'US',
+        dest: 'NL',
+        itemValue: { amount: 100, currency: 'USD' },
+        dimsCm: { l: 20, w: 15, h: 10 },
+        weightKg: 1.2,
+        categoryKey: 'electronics_accessories',
+        hs6: '850440',
+        mode: 'air',
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as Record<string, any>;
+    // Same duty math as the happy path: EU-wide row has the same 3.7% rate.
+    expect(body.dutyAmount).toBe(3.4);
+    expect(body.vatAmount).toBe(20.03);
+    expect(body.totalLandedCost).toBe(115.43);
+
+    await app.close();
+  });
+
   it('POST /v1/quotes rejects above-de-minimis requests', async () => {
     const app = await buildApp();
 

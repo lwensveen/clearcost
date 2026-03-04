@@ -415,6 +415,9 @@ async function quoteLandedCostMvp(
 
   if (!MVP_SUPPORTED_ORIGINS.has(originCountry)) throw unsupportedScopeError();
   if (!MVP_SUPPORTED_DESTINATIONS.has(destCountry)) throw unsupportedScopeError();
+  if (originCountry === destCountry) {
+    throw unsupportedScopeError('Same-country lanes are not supported');
+  }
   if (!MVP_SUPPORTED_CURRENCIES.has(inputCurrency)) throw unsupportedScopeError();
 
   const destCurrency = resolveDestinationCurrency(destCountry);

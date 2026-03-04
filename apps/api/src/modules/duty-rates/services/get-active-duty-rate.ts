@@ -1,6 +1,7 @@
 import { db, dutyRatesTable } from '@clearcost/db';
 import { and, asc, desc, eq, gt, isNull, lte, or, sql, SQL } from 'drizzle-orm';
 import type { LookupResult } from '../../../lib/lookup-meta.js';
+import { isEuMember } from '../../../lib/eu.js';
 
 export type DutyRateRow = {
   id: string;
@@ -137,7 +138,14 @@ async function getDutyDatasetInfo(
       effectiveFrom: dutyRatesTable.effectiveFrom,
     })
     .from(dutyRatesTable)
-    .where(and(eq(dutyRatesTable.dest, destA2), officialOnlyWhere ?? sql`TRUE`))
+    .where(
+      and(
+        isEuMember(destA2)
+          ? or(eq(dutyRatesTable.dest, destA2), eq(dutyRatesTable.dest, 'EU'))
+          : eq(dutyRatesTable.dest, destA2),
+        officialOnlyWhere ?? sql`TRUE`
+      )
+    )
     .orderBy(desc(dutyRatesTable.effectiveFrom))
     .limit(1);
 
@@ -171,9 +179,14 @@ export async function getActiveDutyRateWithMeta(
 
     const officialOnlyWhere = opts.mvpOfficialOnly ? eq(dutyRatesTable.source, 'official') : null;
 
-    // Base validity & key filter
+    // Base validity & key filter.
+    // For EU member states, also match dest='EU' (TARIC imports EU-wide duties).
+    const destCondition = isEuMember(destA2)
+      ? or(eq(dutyRatesTable.dest, destA2), eq(dutyRatesTable.dest, 'EU'))
+      : eq(dutyRatesTable.dest, destA2);
+
     const baseWhere = and(
-      eq(dutyRatesTable.dest, destA2),
+      destCondition,
       eq(dutyRatesTable.hs6, hs6Key),
       lte(dutyRatesTable.effectiveFrom, on),
       or(isNull(dutyRatesTable.effectiveTo), gt(dutyRatesTable.effectiveTo, on)),

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { noteHasPartnerToken, partnerTokenPattern } from './get-active-duty-rate.js';
+import { isEuMember } from '../../../lib/eu.js';
 
 describe('partner notes token matching', () => {
   it('builds non-letter boundary pattern for valid ISO2 partner', () => {
@@ -21,5 +22,23 @@ describe('partner notes token matching', () => {
     expect(noteHasPartnerToken('china tariff schedule', 'IN')).toBe(false);
     expect(noteHasPartnerToken('beginning of period', 'IN')).toBe(false);
     expect(noteHasPartnerToken('Kingdom rules apply', 'GB')).toBe(false);
+  });
+});
+
+describe('EU member dest normalization', () => {
+  it('recognises EU member states for dest fallback', () => {
+    expect(isEuMember('NL')).toBe(true);
+    expect(isEuMember('DE')).toBe(true);
+    expect(isEuMember('FR')).toBe(true);
+  });
+
+  it('rejects non-EU countries', () => {
+    expect(isEuMember('US')).toBe(false);
+    expect(isEuMember('GB')).toBe(false);
+    expect(isEuMember('CN')).toBe(false);
+  });
+
+  it('does not treat EU pseudo-code as a member', () => {
+    expect(isEuMember('EU')).toBe(false);
   });
 });

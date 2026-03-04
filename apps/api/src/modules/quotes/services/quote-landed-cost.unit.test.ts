@@ -1620,6 +1620,25 @@ describe('quoteLandedCost MVP mode', () => {
     });
   });
 
+  it('rejects same-country lanes (e.g. NL -> NL)', async () => {
+    mockMerchantContext(undefined, []);
+    mocks.resolveHs6Mock.mockResolvedValue('850440');
+
+    await expect(
+      quoteLandedCost(
+        {
+          ...mvpBaseInput,
+          origin: 'NL',
+          dest: 'NL',
+        },
+        { mvpMode: true }
+      )
+    ).rejects.toMatchObject({
+      statusCode: 422,
+      code: 'unsupported_lane_or_scope',
+    });
+  });
+
   it('fails clearly when required VAT data is missing', async () => {
     mockMerchantContext(undefined, []);
     mocks.resolveHs6Mock.mockResolvedValue('850440');
