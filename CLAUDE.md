@@ -48,6 +48,7 @@ bun run test:watch               # vitest watch mode
 **Per-workspace:** `cd apps/api && bun run test` works for focused runs.
 
 **Validation scripts (run in CI):**
+
 - `bun run validate-envs` — env vars declared in `turbo.json`
 - `bun run validate-tests` — test file naming conventions
 - `bun run validate-docs` — docs wiring
