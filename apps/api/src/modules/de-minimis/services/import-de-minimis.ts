@@ -190,9 +190,12 @@ export async function importDeMinimis(
       try {
         await db.insert(provenanceTable).values(provRows);
       } catch (e) {
-        if (process.env.DEBUG === '1') {
-          console.warn('[DeMinimis] provenance insert failed (non-fatal):', (e as Error).message);
-        }
+        console.error('[DeMinimis] provenance insert failed (non-fatal)', {
+          importId: opts.importId,
+          resourceType: 'de_minimis',
+          batchSize: provRows.length,
+          error: (e as Error).message,
+        });
       }
     }
 

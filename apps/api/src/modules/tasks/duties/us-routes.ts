@@ -21,7 +21,8 @@ export default function usDutyRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { baseUrl, csvUrl } = TasksDutyUsBodySchema.parse(req.body ?? {});
       const importId = req.importCtx?.runId;
-      const res = await importUsMfn({ importId, baseUrl, csvUrl });
+      const sourceKey = req.importCtx?.runPatch?.sourceKey;
+      const res = await importUsMfn({ importId, sourceKey, baseUrl, csvUrl });
       return reply.send(res);
     }
   );
@@ -43,7 +44,8 @@ export default function usDutyRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { baseUrl, csvUrl } = TasksDutyUsBodySchema.parse(req.body ?? {});
       const importId = req.importCtx?.runId;
-      const res = await importUsPreferential({ importId, baseUrl, csvUrl });
+      const sourceKey = req.importCtx?.runPatch?.sourceKey;
+      const res = await importUsPreferential({ importId, sourceKey, baseUrl, csvUrl });
       return reply.send(res);
     }
   );

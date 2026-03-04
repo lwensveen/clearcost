@@ -9,6 +9,7 @@ type DutyRateSelectRow = typeof dutyRatesTable.$inferSelect;
 
 type ProvOpts = {
   importId?: string;
+  sourceKey?: string;
   makeSourceRef?: (row: DutyRateSelectRow) => string | undefined; // e.g., 'wits:US:ERGA:mfn:hs6=010121:y=2022'
 };
 
@@ -140,6 +141,7 @@ export async function batchUpsertDutyRatesFromStream(
           importId: opts.importId!,
           resourceType: 'duty_rate' as const,
           resourceId: row.id,
+          sourceKey: opts.sourceKey ?? null,
           sourceRef,
           rowHash: sha256Hex(
             JSON.stringify({
@@ -161,9 +163,12 @@ export async function batchUpsertDutyRatesFromStream(
       try {
         await db.insert(provenanceTable).values(provRows);
       } catch (e) {
-        if (DEBUG) {
-          console.warn('[Duties] provenance insert failed (non-fatal):', (e as Error).message);
-        }
+        console.error('[Duties] provenance insert failed (non-fatal)', {
+          importId: opts.importId,
+          resourceType: 'duty_rate',
+          batchSize: provRows.length,
+          error: (e as Error).message,
+        });
       }
     }
 

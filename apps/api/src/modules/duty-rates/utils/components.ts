@@ -118,6 +118,7 @@ export async function upsertComponentsForParents(params: {
   parents: ParentKey[];
   componentsByKey: Map<string, DutyComponentInput[]>;
   importId?: string;
+  sourceKey?: string;
   makeSourceRef?: (ctx: { parent: ParentKey; component: DutyComponentInput }) => string | undefined;
   validate?: boolean;
 }) {
@@ -295,6 +296,7 @@ export async function upsertComponentsForParents(params: {
         importId: params.importId!,
         resourceType: 'duty_rate_component' as const,
         resourceId: row.id,
+        sourceKey: params.sourceKey ?? null,
         sourceRef: clamp(sourceRef, 255),
         sourceHash: null,
         rowHash,
@@ -304,7 +306,12 @@ export async function upsertComponentsForParents(params: {
     try {
       await db.insert(provenanceTable).values(provenanceRows);
     } catch (error) {
-      console.warn('[Components] provenance insert failed:', (error as Error).message);
+      console.error('[Components] provenance insert failed (non-fatal)', {
+        importId: params.importId,
+        resourceType: 'duty_rate_component',
+        batchSize: provenanceRows.length,
+        error: (error as Error).message,
+      });
     }
   }
 

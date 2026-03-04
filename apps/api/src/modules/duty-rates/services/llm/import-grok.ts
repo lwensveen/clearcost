@@ -46,7 +46,7 @@ const LLM_SOURCE: DutyInsert['source'] =
 
 export async function importDutyRatesFromGrok(
   effectiveOn?: Date,
-  opts: { importId?: string; prompt?: string; model?: string } = {}
+  opts: { importId?: string; sourceKey?: string; prompt?: string; model?: string } = {}
 ) {
   const ef = (effectiveOn ?? new Date()).toISOString().slice(0, 10);
   const apiKey = process.env.XAI_API_KEY || process.env.GROK_API_KEY;
@@ -98,13 +98,17 @@ export async function importDutyRatesFromGrok(
   const res = await batchUpsertDutyRatesFromStream(rows, {
     source: LLM_SOURCE,
     importId: opts.importId,
+    sourceKey: opts.sourceKey,
     makeSourceRef: (row) =>
       sourceByKey.get(
         `${row.dest}|${row.partner || ''}|${row.hs6}|${String(row.dutyRule)}|${(row.effectiveFrom as Date).toISOString().slice(0, 10)}`
       ) || undefined,
   });
 
-  await upsertDutyRateComponentsForLLM(payload.rows, { importId: opts.importId });
+  await upsertDutyRateComponentsForLLM(payload.rows, {
+    importId: opts.importId,
+    sourceKey: opts.sourceKey,
+  });
 
   return { ...res, usedModel: data?.model ?? body.model };
 }

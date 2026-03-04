@@ -42,6 +42,7 @@ export async function importDutyRatesFromLLM(
   rows: LlmDutyRow[],
   opts: {
     importId?: string;
+    sourceKey?: string;
     /** Narrow callback: you only need a few fields to build your sourceRef key */
     makeSourceRef?: (row: {
       dest: string;
@@ -82,10 +83,14 @@ export async function importDutyRatesFromLLM(
   const res = await batchUpsertDutyRatesFromStream(headline, {
     source: 'llm',
     importId: opts.importId,
+    sourceKey: opts.sourceKey,
     makeSourceRef: makeSourceRefWrapped,
   });
 
-  await upsertDutyRateComponentsForLLM(rows, { importId: opts.importId });
+  await upsertDutyRateComponentsForLLM(rows, {
+    importId: opts.importId,
+    sourceKey: opts.sourceKey,
+  });
 
   return { ok: true as const, inserted: res.inserted, updated: res.updated, count: res.count };
 }

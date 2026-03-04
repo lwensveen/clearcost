@@ -22,12 +22,14 @@ export default function ukDutyRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { hs6, batchSize, apiBaseUrl } = TasksDutyUkMfnBodySchema.parse(req.body ?? {});
       const importId = req.importCtx?.runId;
+      const sourceKey = req.importCtx?.runPatch?.sourceKey;
 
       const res = await batchUpsertDutyRatesFromStream(
         streamUkMfnDutyRates({ hs6List: hs6, apiBaseUrl }),
         {
           batchSize,
           importId,
+          sourceKey,
           makeSourceRef: (row) => `uk:tt:erga-omnes:hs6=${row.hs6}`,
         }
       );
@@ -55,12 +57,14 @@ export default function ukDutyRoutes(app: FastifyInstance) {
         req.body ?? {}
       );
       const importId = req.importCtx?.runId;
+      const sourceKey = req.importCtx?.runPatch?.sourceKey;
 
       const res = await batchUpsertDutyRatesFromStream(
         streamUkPreferentialDutyRates({ hs6List: hs6, partners, apiBaseUrl }),
         {
           batchSize,
           importId,
+          sourceKey,
           makeSourceRef: (row) => `uk:tt:pref:partner=${row.partner ?? 'group'}:hs6=${row.hs6}`,
         }
       );

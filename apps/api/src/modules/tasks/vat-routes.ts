@@ -20,8 +20,11 @@ export default function vatRoutes(app: FastifyInstance) {
 
       const importId = req.importCtx?.runId;
 
+      const sourceKey = req.importCtx?.runPatch?.sourceKey;
+
       const res = await importVatRules(rows, {
         importId,
+        sourceKey,
         source: 'official',
         makeSourceRef: (r) => {
           const note = (r.notes ?? '').toLowerCase();

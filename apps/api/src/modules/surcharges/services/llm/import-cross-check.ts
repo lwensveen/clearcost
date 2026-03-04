@@ -92,6 +92,7 @@ export async function importSurchargesCrossChecked(
   effectiveOn?: Date,
   opts: {
     importId?: string;
+    sourceKey?: string;
     mode?: 'strict' | 'prefer_official' | 'any';
     promptOA?: string;
     promptGX?: string;
@@ -161,6 +162,7 @@ export async function importSurchargesCrossChecked(
 
   const res = await importSurchargesFromLLM(decided, {
     importId: opts.importId,
+    sourceKey: opts.sourceKey,
     getSourceRef: (row) => row.source_url,
   });
 

@@ -7,6 +7,7 @@ import { sha256Hex } from '../../../lib/provenance.js';
 
 type ImportOpts = {
   importId?: string;
+  sourceKey?: string;
   makeSourceRef?: (row: VatRuleInsert) => string | undefined;
   /**
    * Provenance classification for imported VAT rows.
@@ -85,6 +86,7 @@ export async function importVatRules(rows: VatRuleInsert[] | Array<any>, opts: I
       importId: opts.importId!,
       resourceType: 'vat_rule' as const,
       resourceId: r.id,
+      sourceKey: opts.sourceKey ?? null,
       sourceRef: opts.makeSourceRef?.({
         dest: r.dest,
         vatRateKind: r.vatRateKind,

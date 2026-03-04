@@ -97,6 +97,7 @@ type ImportAhtnOpts = {
   url?: string; // CSV URL; default: source_registry hs.asean.ahtn.csv with env fallback
   batchSize?: number; // default 2000
   importId?: string; // provenance run id (optional)
+  sourceKey?: string; // provenance source key (optional)
   makeSourceRef?: (code8: string) => string | undefined; // optional provenance source ref builder
 };
 
@@ -120,6 +121,7 @@ export async function importAhtnAliases(opts: ImportAhtnOpts = {}): Promise<Impo
         importId: string;
         resourceType: 'hs_code_alias';
         resourceId: string;
+        sourceKey?: string | null;
         sourceRef?: string;
         rowHash: string;
       }[] = [];
@@ -158,6 +160,7 @@ export async function importAhtnAliases(opts: ImportAhtnOpts = {}): Promise<Impo
             importId: opts.importId,
             resourceType: 'hs_code_alias',
             resourceId: row.id,
+            sourceKey: opts.sourceKey ?? null,
             sourceRef: opts.makeSourceRef?.(row.code) ?? `ahtn8:${row.code}`,
             rowHash: sha256Hex(
               JSON.stringify({

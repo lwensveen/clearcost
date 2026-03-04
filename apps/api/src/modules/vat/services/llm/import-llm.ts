@@ -18,7 +18,7 @@ const keyOf = (r: {
 
 export async function importVatFromLLM(
   rows: LlmVat[],
-  opts: { importId?: string } = {}
+  opts: { importId?: string; sourceKey?: string } = {}
 ): Promise<{ ok: true; count: number }> {
   if (!rows?.length) {
     throw new Error('[VAT LLM import] source produced 0 rows.');
@@ -51,6 +51,7 @@ export async function importVatFromLLM(
 
   const res = await importVatRules(mapped, {
     importId: opts.importId,
+    sourceKey: opts.sourceKey,
     source: 'llm',
     makeSourceRef: (row) => srcByKey.get(keyOf(row)),
   });

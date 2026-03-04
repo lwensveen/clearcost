@@ -28,7 +28,7 @@ export const surchargesLlmOpenAI: Command = async (args) => {
         prompt: flags.prompt,
       },
     },
-    async (importId) => {
+    async (importId, sourceKey) => {
       const { rows, usedModel } = await importSurchargesFromOpenAI(effectiveOn, {
         model: flags.model,
         prompt: flags.prompt,
@@ -36,6 +36,7 @@ export const surchargesLlmOpenAI: Command = async (args) => {
 
       const res = await importSurchargesFromLLM(rows, {
         importId,
+        sourceKey,
         getSourceRef: (r) => r.source_url,
       });
 
@@ -69,7 +70,7 @@ export const surchargesLlmGrok: Command = async (args) => {
         prompt: flags.prompt,
       },
     },
-    async (importId) => {
+    async (importId, sourceKey) => {
       const { rows, usedModel } = await importSurchargesFromGrok(effectiveOn, {
         model: flags.model,
         prompt: flags.prompt,
@@ -77,6 +78,7 @@ export const surchargesLlmGrok: Command = async (args) => {
 
       const res = await importSurchargesFromLLM(rows, {
         importId,
+        sourceKey,
         getSourceRef: (r) => r.source_url,
       });
 
@@ -113,9 +115,10 @@ export const surchargesLlmCrossCheck: Command = async (args) => {
         modelGX: flags.modelGX,
       },
     },
-    async (importId) => {
+    async (importId, sourceKey) => {
       const res = await importSurchargesCrossChecked(effectiveOn, {
         importId,
+        sourceKey,
         mode,
         modelOA: flags.modelOA,
         modelGX: flags.modelGX,

@@ -94,6 +94,7 @@ export async function importSurchargesFromLLM(
   rows: LlmSurcharge[],
   opts: {
     importId?: string;
+    sourceKey?: string;
     getSourceRef?: (row: LlmSurcharge) => string | undefined;
   } = {}
 ): Promise<{ ok: true; inserted: number; updated: number; count: number }> {
@@ -250,6 +251,7 @@ export async function importSurchargesFromLLM(
         importId: opts.importId!,
         resourceType: 'surcharge' as const,
         resourceId: row.id,
+        sourceKey: opts.sourceKey ?? null,
         sourceRef: sourceRef ? sourceRef.slice(0, 255) : undefined,
         rowHash: sha256Hex(
           JSON.stringify({
@@ -279,8 +281,13 @@ export async function importSurchargesFromLLM(
 
     try {
       await db.insert(provenanceTable).values(provRows);
-    } catch {
-      // non-fatal
+    } catch (e) {
+      console.error('[Surcharges LLM] provenance insert failed (non-fatal)', {
+        importId: opts.importId,
+        resourceType: 'surcharge',
+        batchSize: provRows.length,
+        error: (e as Error).message,
+      });
     }
   } else {
     for (const r of ret) {

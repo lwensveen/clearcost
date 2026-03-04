@@ -45,6 +45,7 @@ export default function freightRoutes(app: FastifyInstance) {
 
       const res = await importFreightCards(rows, {
         importId: req.importCtx?.runId,
+        sourceKey: req.importCtx?.runPatch?.sourceKey,
         enforceCoverageGuardrails: true,
         makeSourceRef: (c) =>
           `file:freight/freight-cards.json:${c.origin}-${c.dest}:${c.freightMode}/${c.freightUnit}:ef=${new Date(c.effectiveFrom).toISOString().slice(0, 10)}`,

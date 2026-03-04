@@ -5,9 +5,16 @@ import { DEBUG } from '../../utils/utils.js';
 export async function importUsMfn({
   effectiveFrom,
   importId,
+  sourceKey,
   baseUrl,
   csvUrl,
-}: { effectiveFrom?: Date; importId?: string; baseUrl?: string; csvUrl?: string } = {}) {
+}: {
+  effectiveFrom?: Date;
+  importId?: string;
+  sourceKey?: string;
+  baseUrl?: string;
+  csvUrl?: string;
+} = {}) {
   if (DEBUG) {
     console.log('[US Duties] MFN starting', {
       effectiveFrom: effectiveFrom ? effectiveFrom.toISOString() : null,
@@ -36,6 +43,7 @@ export async function importUsMfn({
   const res = await batchUpsertDutyRatesFromStream(rows, {
     batchSize: 5000,
     importId,
+    sourceKey,
     makeSourceRef: (row) =>
       `usitc:hts:col1-general:hs6=${row.hs6}:ef=${row.effectiveFrom?.toISOString().slice(0, 10)}`,
   });

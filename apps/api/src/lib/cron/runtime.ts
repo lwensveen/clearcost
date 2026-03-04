@@ -47,7 +47,7 @@ export async function withRun<T>(
     sourceKey?: string;
     sourceUrl?: string;
   },
-  work: (importId: string) => Promise<{ inserted: number; payload: T }>
+  work: (importId: string, sourceKey?: string) => Promise<{ inserted: number; payload: T }>
 ): Promise<T> {
   const lockKey = ctx.lockKey ?? makeLockKey({ importSource: ctx.importSource, job: ctx.job });
   const paramsRecord =
@@ -82,7 +82,7 @@ export async function withRun<T>(
       ...startParams,
     });
     runId = run.id;
-    const { inserted, payload } = await work(run.id);
+    const { inserted, payload } = await work(run.id, sourceKey);
 
     importRowsInserted.inc({ importSource: ctx.importSource, job: ctx.job }, inserted ?? 0);
     setLastRunNow({ importSource: ctx.importSource, job: ctx.job });

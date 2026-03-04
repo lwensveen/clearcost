@@ -15,7 +15,8 @@ export default function hsRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const importId = req.importCtx?.runId;
-      const res = await importEuHs6FromTaric({ importId });
+      const sourceKey = req.importCtx?.runPatch?.sourceKey;
+      const res = await importEuHs6FromTaric({ importId, sourceKey });
       return reply.send(res);
     }
   );
@@ -37,10 +38,13 @@ export default function hsRoutes(app: FastifyInstance) {
       };
       const importId = req.importCtx?.runId;
 
+      const sourceKey = req.importCtx?.runPatch?.sourceKey;
+
       const res = await importAhtnAliases({
         url,
         batchSize,
         importId,
+        sourceKey,
         makeSourceRef: (code8) => `ahtn8:${code8}`,
       });
 

@@ -21,6 +21,8 @@ type ImportOpts = {
   activeOn?: Date;
   /** Optional provenance import id (threaded from route plugin) */
   importId?: string;
+  /** Optional source key for provenance tracking */
+  sourceKey?: string;
   /** Optional custom sourceRef builder for provenance */
   makeSourceRef?: (code6: string) => string | undefined;
 };
@@ -66,6 +68,7 @@ export async function importEuHs6FromTaric(opts: ImportOpts = {}) {
     importId: string;
     resourceType: 'hs_code';
     resourceId: string;
+    sourceKey?: string | null;
     sourceRef?: string;
     rowHash: string;
   }[] = [];
@@ -90,6 +93,7 @@ export async function importEuHs6FromTaric(opts: ImportOpts = {}) {
             importId: opts.importId,
             resourceType: 'hs_code',
             resourceId: row.id,
+            sourceKey: opts.sourceKey ?? null,
             sourceRef: opts.makeSourceRef?.(row.hs6) ?? `taric:hs6:${row.hs6}`,
             rowHash: sha256Hex(JSON.stringify({ hs6: row.hs6, title: row.title })),
           });

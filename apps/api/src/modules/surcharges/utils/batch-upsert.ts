@@ -249,9 +249,12 @@ export async function batchUpsertSurchargesFromStream(
       try {
         await db.insert(provenanceTable).values(provRows);
       } catch (e) {
-        if (process.env.DEBUG === '1') {
-          console.warn('[Surcharges] provenance insert failed (non-fatal):', (e as Error).message);
-        }
+        console.error('[Surcharges] provenance insert failed (non-fatal)', {
+          importId: opts.importId,
+          resourceType: 'surcharge',
+          batchSize: provRows.length,
+          error: (e as Error).message,
+        });
       }
     }
 

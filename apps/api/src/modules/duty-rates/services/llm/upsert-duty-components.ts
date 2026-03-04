@@ -40,7 +40,7 @@ function normalizeDutyRule(v: string): DutyRuleValue {
 
 export async function upsertDutyRateComponentsForLLM(
   rows: LlmDutyRowForComponents[],
-  opts: { importId?: string } = {}
+  opts: { importId?: string; sourceKey?: string } = {}
 ): Promise<{ ok: true; inserted: number; updated: number; count: number }> {
   let inserted = 0;
   let updated = 0;
@@ -121,6 +121,7 @@ export async function upsertDutyRateComponentsForLLM(
             importId: opts.importId!,
             resourceType: 'duty_rate' as const, // attach provenance to parent duty_rate
             resourceId: parent.id,
+            sourceKey: opts.sourceKey ?? null,
             sourceRef: `${r.source_url}#component`,
             rowHash: sha256Hex(
               JSON.stringify({
@@ -138,8 +139,14 @@ export async function upsertDutyRateComponentsForLLM(
             ),
           }))
         );
-      } catch {
-        // non-fatal
+      } catch (e) {
+        console.error('[Duties LLM] provenance insert failed (non-fatal)', {
+          importId: opts.importId,
+          resourceType: 'duty_rate',
+          dest,
+          hs6,
+          error: (e as Error).message,
+        });
       }
     }
   }

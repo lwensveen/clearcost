@@ -7,6 +7,7 @@ import { requireFreightIso3 } from './lane-country-code.js';
 type ImportOpts = {
   batchSize?: number;
   importId?: string;
+  sourceKey?: string;
   makeSourceRef?: (card: FreightCardImport) => string | undefined;
   enforceCoverageGuardrails?: boolean;
   minCoverageRetention?: number;
@@ -211,6 +212,7 @@ export async function importFreightCards(cards: FreightCardImport[], opts: Impor
           importId: opts.importId,
           resourceType: 'freight_card',
           resourceId: cardId,
+          sourceKey: opts.sourceKey ?? null,
           sourceRef: opts.makeSourceRef?.(card),
           rowHash: sha256Hex(JSON.stringify(canonical)),
         });

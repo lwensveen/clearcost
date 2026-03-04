@@ -6,6 +6,7 @@ export async function importUsPreferential({
   effectiveFrom,
   skipFree,
   importId,
+  sourceKey,
   owner,
   membershipCsvUrl,
   baseUrl,
@@ -14,6 +15,7 @@ export async function importUsPreferential({
   effectiveFrom?: Date;
   skipFree?: boolean;
   importId?: string;
+  sourceKey?: string;
   owner?: string;
   membershipCsvUrl?: string;
   baseUrl?: string;
@@ -62,6 +64,7 @@ export async function importUsPreferential({
   const res = await batchUpsertDutyRatesFromStream(rows, {
     batchSize: 5000,
     importId,
+    sourceKey,
     makeSourceRef: (row) => {
       const partner = row.partner ?? 'special';
       const ymd = row.effectiveFrom?.toISOString().slice(0, 10);

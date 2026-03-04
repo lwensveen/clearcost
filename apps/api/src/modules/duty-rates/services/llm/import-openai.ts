@@ -51,7 +51,7 @@ function pickHeadlinePct(components: z.infer<typeof LlmComponent>[]) {
  */
 export async function importDutyRatesFromOpenAI(
   effectiveOn?: Date,
-  opts: { importId?: string; prompt?: string; model?: string } = {}
+  opts: { importId?: string; sourceKey?: string; prompt?: string; model?: string } = {}
 ) {
   const ef = (effectiveOn ?? new Date()).toISOString().slice(0, 10);
 
@@ -105,6 +105,7 @@ export async function importDutyRatesFromOpenAI(
   const res = await batchUpsertDutyRatesFromStream(rows, {
     source: 'llm',
     importId: opts.importId,
+    sourceKey: opts.sourceKey,
     makeSourceRef: (row) =>
       sourceByKey.get(
         `${row.dest}|${row.partner || ''}|${row.hs6}|${String(
@@ -113,7 +114,10 @@ export async function importDutyRatesFromOpenAI(
       ) || undefined,
   });
 
-  await upsertDutyRateComponentsForLLM(payload.rows, { importId: opts.importId });
+  await upsertDutyRateComponentsForLLM(payload.rows, {
+    importId: opts.importId,
+    sourceKey: opts.sourceKey,
+  });
 
   return { usedModel: data?.model ?? body.model, ...res };
 }
