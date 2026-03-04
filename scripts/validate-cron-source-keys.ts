@@ -2,7 +2,10 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ALL_KNOWN_SOURCE_KEYS } from '../apps/api/src/lib/source-registry/defaults.ts';
-import { DUTY_COUNTRY_SCAFFOLD_SOURCE_KEYS } from '../apps/api/src/lib/cron/commands/duties/duties-country-scaffold-data.ts';
+import {
+  DUTY_COUNTRY_SCAFFOLD_SLUGS,
+  DUTY_COUNTRY_SCAFFOLD_SOURCE_KEYS,
+} from '../apps/api/src/lib/cron/commands/duties/duties-country-scaffold-data.ts';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const commandsDir = join(repoRoot, 'apps', 'api', 'src', 'lib', 'cron', 'commands');
@@ -17,6 +20,17 @@ const SOURCE_KEY_IDENTIFIER_MAP: Record<string, string[]> = {
   countryMfnSourceKey: DUTY_COUNTRY_SCAFFOLD_MFN_SOURCE_KEYS,
   countryFtaSourceKey: DUTY_COUNTRY_SCAFFOLD_FTA_SOURCE_KEYS,
 };
+
+// Map per-country identifier constants (e.g. AD_MFN_OFFICIAL_SOURCE_KEY) to their source keys
+for (const slug of DUTY_COUNTRY_SCAFFOLD_SLUGS) {
+  const cc = slug.toUpperCase();
+  SOURCE_KEY_IDENTIFIER_MAP[`${cc}_MFN_OFFICIAL_SOURCE_KEY`] = [
+    `duties.${slug}.official.mfn_excel`,
+  ];
+  SOURCE_KEY_IDENTIFIER_MAP[`${cc}_FTA_OFFICIAL_SOURCE_KEY`] = [
+    `duties.${slug}.official.fta_excel`,
+  ];
+}
 
 function listCommandFiles(dir: string): string[] {
   const out: string[] = [];

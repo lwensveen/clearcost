@@ -337,6 +337,20 @@
       "when": 1772359200000,
       "tag": "0047_still_quicksilver",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1772569520276,
+      "tag": "0048_minor_lila_cheney",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1772755200000,
+      "tag": "0049_seed_scaffold_country_sources",
+      "breakpoints": true
     }
   ]
 }
