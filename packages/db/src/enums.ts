@@ -208,6 +208,7 @@ export const resourceTypeEnum = pgEnum('resource_type', [
   'duty_rate',
   'duty_rate_component',
   'freight_card',
+  'fx_rate',
   'hs_code',
   'hs_code_alias',
   'surcharge',

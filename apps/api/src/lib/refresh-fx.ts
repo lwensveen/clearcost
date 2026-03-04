@@ -1,6 +1,7 @@
-import { db, fxRatesTable } from '@clearcost/db';
+import { db, fxRatesTable, provenanceTable } from '@clearcost/db';
 import { XMLParser } from 'fast-xml-parser';
 import { httpFetch } from './http.js';
+import { sha256Hex, startImportRun, finishImportRun } from './provenance.js';
 import { resolveSourceDownloadUrl } from './source-registry.js';
 
 export type FxRefreshResult = { fxAsOf: string; inserted: number; base: 'EUR' };
@@ -58,7 +59,8 @@ export function parseEcb(xml: string): { fxAsOf: string; rates: Record<string, n
 
 export async function upsertFxRatesEUR(
   fxAsOfIso: string,
-  rates: Record<string, number>
+  rates: Record<string, number>,
+  opts?: { importId?: string }
 ): Promise<number> {
   const rows = Object.entries(rates)
     .filter(([c]) => c !== 'EUR')
@@ -72,14 +74,43 @@ export async function upsertFxRatesEUR(
   let inserted = 0;
 
   for (const row of rows) {
-    await db
+    const ret = await db
       .insert(fxRatesTable)
       .values(row)
       .onConflictDoNothing({
         target: [fxRatesTable.base, fxRatesTable.quote, fxRatesTable.fxAsOf],
-      });
+      })
+      .returning({ id: fxRatesTable.id });
 
-    inserted += 1;
+    if (ret.length > 0) {
+      inserted += 1;
+
+      if (opts?.importId && ret[0]) {
+        try {
+          await db.insert(provenanceTable).values({
+            importId: opts.importId,
+            resourceType: 'fx_rate',
+            resourceId: ret[0].id,
+            sourceKey: 'fx.ecb.daily',
+            rowHash: sha256Hex(
+              JSON.stringify({
+                base: row.base,
+                quote: row.quote,
+                rate: row.rate,
+                fxAsOf: row.fxAsOf.toISOString(),
+              })
+            ),
+          });
+        } catch (e) {
+          console.error('[FX] provenance insert failed (non-fatal)', {
+            importId: opts.importId,
+            resourceType: 'fx_rate',
+            quote: row.quote,
+            error: (e as Error).message,
+          });
+        }
+      }
+    }
   }
 
   return inserted;
@@ -90,8 +121,25 @@ export async function refreshFx(): Promise<FxRefreshResult> {
     sourceKey: 'fx.ecb.daily',
     fallbackUrl: ECB_DAILY_XML_URL,
   });
-  const xml = await fetchEcbXml(sourceUrl);
-  const { fxAsOf, rates } = parseEcb(xml);
-  const inserted = await upsertFxRatesEUR(fxAsOf, rates);
-  return { fxAsOf, inserted, base: 'EUR' };
+
+  const run = await startImportRun({
+    importSource: 'ECB',
+    job: 'fx:daily',
+    sourceKey: 'fx.ecb.daily',
+    sourceUrl,
+  });
+
+  try {
+    const xml = await fetchEcbXml(sourceUrl);
+    const { fxAsOf, rates } = parseEcb(xml);
+    const inserted = await upsertFxRatesEUR(fxAsOf, rates, { importId: run.id });
+    await finishImportRun(run.id, { importStatus: 'succeeded', inserted });
+    return { fxAsOf, inserted, base: 'EUR' };
+  } catch (err) {
+    await finishImportRun(run.id, {
+      importStatus: 'failed',
+      error: (err as Error).message,
+    });
+    throw err;
+  }
 }
