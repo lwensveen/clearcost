@@ -30,6 +30,21 @@ async function start() {
 
   await publicApp.listen({ port: env.publicPort, host: env.publicHost });
   await internalApp.listen({ port: env.internalPort, host: env.internalHost });
+
+  let closing = false;
+  const shutdown = async (signal: string) => {
+    if (closing) return;
+    closing = true;
+    console.log(`${signal} received, shutting down gracefully…`);
+    const results = await Promise.allSettled([publicApp.close(), internalApp.close()]);
+    for (const r of results) {
+      if (r.status === 'rejected') console.error('Shutdown error:', r.reason);
+    }
+    process.exit(0);
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 start().catch((err) => {
