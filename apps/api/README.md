@@ -437,6 +437,123 @@ For scaffolded country duty routes, the API also accepts per-country env fallbac
 - `${ISO2}_FTA_OFFICIAL_EXCEL_URL` for `/internal/cron/import/duties/{iso2}-fta`
 
 Example: `AU_MFN_OFFICIAL_EXCEL_URL`, `AU_FTA_OFFICIAL_EXCEL_URL`.
+Daily HTTP cron also forwards optional secrets for `AR`, `BD`, `BR`, `CO`, `EG`, `GH`, `IL`, `IN`,
+`KE`, `NG`, `RU`, `SA`, `TR`, `TW`, `UA`, and `ZA`
+(`{ISO2}_MFN_OFFICIAL_EXCEL_URL`, `{ISO2}_FTA_OFFICIAL_EXCEL_URL`) to support
+`import:duties:country-official-enabled-all` without additional workflow edits.
+
+Canada uses a dedicated MFN importer (`import:duties:ca-mfn-official`) that accepts an official
+CBSA workbook directly or a ZIP archive containing a CSV/XLS/XLSX tariff table.
+New Zealand uses a dedicated MFN importer (`import:duties:nz-mfn-official`) that accepts official
+NZ Customs workbook/CSV inputs directly or tariff `.tar.gz` bundles containing those tables.
+Australia uses a dedicated MFN importer (`import:duties:au-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Switzerland uses a dedicated MFN importer (`import:duties:ch-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Mexico uses a dedicated MFN importer (`import:duties:mx-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Norway uses a dedicated MFN importer (`import:duties:no-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Iceland uses a dedicated MFN importer (`import:duties:is-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Liechtenstein uses a dedicated MFN importer (`import:duties:li-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Chile uses a dedicated MFN importer (`import:duties:cl-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Peru uses a dedicated MFN importer (`import:duties:pe-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Pakistan uses a dedicated MFN importer (`import:duties:pk-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Panama uses a dedicated MFN importer (`import:duties:pa-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Poland uses a dedicated MFN importer (`import:duties:pl-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Portugal uses a dedicated MFN importer (`import:duties:pt-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+France uses a dedicated MFN importer (`import:duties:fr-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Spain uses a dedicated MFN importer (`import:duties:es-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Germany uses a dedicated MFN importer (`import:duties:de-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Italy uses a dedicated MFN importer (`import:duties:it-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Netherlands uses a dedicated MFN importer (`import:duties:nl-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Austria uses a dedicated MFN importer (`import:duties:at-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Belgium uses a dedicated MFN importer (`import:duties:be-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Bulgaria uses a dedicated MFN importer (`import:duties:bg-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Denmark uses a dedicated MFN importer (`import:duties:dk-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Estonia uses a dedicated MFN importer (`import:duties:ee-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Finland uses a dedicated MFN importer (`import:duties:fi-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Lithuania uses a dedicated MFN importer (`import:duties:lt-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Latvia uses a dedicated MFN importer (`import:duties:lv-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Luxembourg uses a dedicated MFN importer (`import:duties:lu-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Malta uses a dedicated MFN importer (`import:duties:mt-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Romania uses a dedicated MFN importer (`import:duties:ro-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Sweden uses a dedicated MFN importer (`import:duties:se-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Slovenia uses a dedicated MFN importer (`import:duties:si-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Slovakia uses a dedicated MFN importer (`import:duties:sk-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Ireland uses a dedicated MFN importer (`import:duties:ie-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Czechia uses a dedicated MFN importer (`import:duties:cz-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Croatia uses a dedicated MFN importer (`import:duties:hr-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Cyprus uses a dedicated MFN importer (`import:duties:cy-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Greece uses a dedicated MFN importer (`import:duties:gr-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Hungary uses a dedicated MFN importer (`import:duties:hu-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+United Arab Emirates uses a dedicated MFN importer (`import:duties:ae-mfn-official`) that accepts
+official workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Argentina uses a dedicated MFN importer (`import:duties:ar-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Brazil uses a dedicated MFN importer (`import:duties:br-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Colombia uses a dedicated MFN importer (`import:duties:co-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Bangladesh uses a dedicated MFN importer (`import:duties:bd-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Egypt uses a dedicated MFN importer (`import:duties:eg-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Kenya uses a dedicated MFN importer (`import:duties:ke-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Ghana uses a dedicated MFN importer (`import:duties:gh-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+India uses a dedicated MFN importer (`import:duties:in-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Israel uses a dedicated MFN importer (`import:duties:il-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Russia uses a dedicated MFN importer (`import:duties:ru-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Ukraine uses a dedicated MFN importer (`import:duties:ua-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Nigeria uses a dedicated MFN importer (`import:duties:ng-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Saudi Arabia uses a dedicated MFN importer (`import:duties:sa-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+South Africa uses a dedicated MFN importer (`import:duties:za-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Turkey uses a dedicated MFN importer (`import:duties:tr-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
+Taiwan uses a dedicated MFN importer (`import:duties:tw-mfn-official`) that accepts official
+workbook/CSV sources directly or ZIP bundles containing tariff tables.
 
 To run all country official imports in one CLI step (only where both MFN+FTA sources are configured),
 use `bun run src/lib/run-cron.ts import:duties:country-official-enabled-all`.

@@ -1,0 +1,112 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  withRunMock: vi.fn(),
+  resolveMtDutySourceUrlsMock: vi.fn(),
+  importMtMfnOfficialMock: vi.fn(),
+  importFtaExcelMock: vi.fn(),
+}));
+
+vi.mock('../../runtime.js', () => ({
+  withRun: mocks.withRunMock,
+}));
+
+vi.mock('../../../../modules/duty-rates/services/mt/source-urls.js', () => ({
+  MT_MFN_OFFICIAL_SOURCE_KEY: 'duties.mt.official.mfn_excel',
+  MT_FTA_OFFICIAL_SOURCE_KEY: 'duties.mt.official.fta_excel',
+  resolveMtDutySourceUrls: mocks.resolveMtDutySourceUrlsMock,
+}));
+
+vi.mock('../../../../modules/duty-rates/services/mt/import-mfn-official.js', () => ({
+  importMtMfnOfficial: mocks.importMtMfnOfficialMock,
+}));
+
+vi.mock(
+  '../../../../modules/duty-rates/services/asean/shared/import-preferential-official-excel.js',
+  () => ({
+    importAseanPreferentialOfficialFromExcel: mocks.importFtaExcelMock,
+  })
+);
+
+import { dutiesMtAllOfficial, dutiesMtMfnOfficial } from './duties-mt.js';
+
+describe('duties-mt commands', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    mocks.withRunMock.mockImplementation(async (_ctx, work) => {
+      const out = await work('run-123');
+      return out.payload;
+    });
+    mocks.resolveMtDutySourceUrlsMock.mockResolvedValue({
+      mfnUrl: 'https://official.test/mt-mfn.xlsx',
+      ftaUrl: 'https://official.test/mt-fta.xlsx',
+    });
+    mocks.importMtMfnOfficialMock.mockResolvedValue({
+      ok: true,
+      inserted: 2,
+      updated: 0,
+      count: 2,
+      dryRun: false,
+      scanned: 2,
+      kept: 2,
+      skipped: 0,
+      sourceFile: 'malta-tariff.xlsx',
+    });
+    mocks.importFtaExcelMock.mockResolvedValue({
+      ok: true,
+      inserted: 1,
+      updated: 0,
+      count: 1,
+      dryRun: false,
+      scanned: 1,
+      kept: 1,
+      skipped: 0,
+    });
+  });
+
+  it('runs MT MFN official import with source metadata', async () => {
+    await dutiesMtMfnOfficial([
+      '--url=https://override.test/mt-mfn.xlsx',
+      '--sheet=Tariff',
+      '--dryRun=1',
+    ]);
+
+    expect(mocks.resolveMtDutySourceUrlsMock).toHaveBeenCalledWith({
+      mfnUrl: 'https://override.test/mt-mfn.xlsx',
+    });
+    expect(mocks.importMtMfnOfficialMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        urlOrPath: 'https://official.test/mt-mfn.xlsx',
+        sheet: 'Tariff',
+        dryRun: true,
+        importId: 'run-123',
+      })
+    );
+    const [ctx] = mocks.withRunMock.mock.calls[0] ?? [];
+    expect(ctx).toMatchObject({
+      importSource: 'OFFICIAL',
+      job: 'duties:mt-mfn-official',
+      sourceKey: 'duties.mt.official.mfn_excel',
+      sourceUrl: 'https://official.test/mt-mfn.xlsx',
+    });
+  });
+
+  it('runs both MT official steps for import:duties:mt-all-official', async () => {
+    await dutiesMtAllOfficial(['--agreement=fta', '--partner=MT']);
+
+    expect(mocks.withRunMock).toHaveBeenCalledTimes(2);
+    const [mfnCall, ftaCall] = mocks.withRunMock.mock.calls;
+    expect(mfnCall?.[0]).toMatchObject({ job: 'duties:mt-mfn-official' });
+    expect(ftaCall?.[0]).toMatchObject({ job: 'duties:mt-fta-official' });
+    expect(mocks.importFtaExcelMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dest: 'MT',
+        agreement: 'fta',
+        partner: 'MT',
+        importId: 'run-123',
+      })
+    );
+  });
+});

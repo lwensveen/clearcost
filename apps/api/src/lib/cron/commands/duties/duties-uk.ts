@@ -31,13 +31,14 @@ export const dutiesUkMfnOfficial: Command = async (args) => {
         sourceKey: DUTIES_UK_SOURCE_KEY,
       },
     },
-    async (importId) => {
+    async (importId, sourceKey) => {
       const res = await batchUpsertDutyRatesFromStream(
         streamUkMfnDutyRates({ hs6List: hs6, apiBaseUrl: source.apiBaseUrl }),
         {
           batchSize,
           dryRun,
           importId,
+          sourceKey,
           makeSourceRef: (row) => `uk:tt:erga-omnes:hs6=${row.hs6}`,
         }
       );
@@ -72,7 +73,7 @@ export const dutiesUkFtaOfficial: Command = async (args) => {
         sourceKey: DUTIES_UK_SOURCE_KEY,
       },
     },
-    async (importId) => {
+    async (importId, sourceKey) => {
       const res = await batchUpsertDutyRatesFromStream(
         streamUkPreferentialDutyRates({
           hs6List: hs6,
@@ -83,6 +84,7 @@ export const dutiesUkFtaOfficial: Command = async (args) => {
           batchSize,
           dryRun,
           importId,
+          sourceKey,
           makeSourceRef: (row) => `uk:tt:pref:partner=${row.partner ?? 'group'}:hs6=${row.hs6}`,
         }
       );
