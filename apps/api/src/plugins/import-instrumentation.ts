@@ -187,7 +187,13 @@ const plugin: FastifyPluginAsync = async (app) => {
 
     // 4) heartbeat every 30s so "stuck" runs can be detected
     const hb = setInterval(() => {
-      heartBeatImportRun(run.id).catch(() => {});
+      heartBeatImportRun(run.id).catch((err) => {
+        console.error('[ImportInstrumentation] heartbeat failed', {
+          runId: run.id,
+          job: meta.job,
+          error: (err as Error).message,
+        });
+      });
     }, 30_000);
     hb.unref?.();
 
