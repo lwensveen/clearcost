@@ -73,3 +73,30 @@ export const HealthFreshnessResponseSchema = z.object({
     notices: HealthDatasetFreshnessSchema,
   }),
 });
+
+export const HealthSourceEntrySchema = z.object({
+  key: z.string(),
+  dataset: z.string(),
+  sourceType: z.string(),
+  enabled: z.boolean(),
+  scheduleHint: z.string(),
+  slaMaxAgeHours: z.number().nullable(),
+  lastVerifiedAt: z.coerce.date().nullable(),
+  lastImport: z
+    .object({
+      id: z.string(),
+      status: z.string(),
+      job: z.string(),
+      at: z.coerce.date().nullable(),
+      inserted: z.number().nullable(),
+      error: z.string().nullable(),
+    })
+    .nullable(),
+  ageHours: z.number().nullable(),
+  stale: z.boolean().nullable(),
+});
+
+export const HealthSourcesResponseSchema = z.object({
+  now: z.coerce.date(),
+  sources: z.array(HealthSourceEntrySchema),
+});

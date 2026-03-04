@@ -6,8 +6,9 @@ import {
   HealthFreshnessResponseSchema,
   HealthImportsQuerySchema,
   HealthImportsResponseSchema,
+  HealthSourcesResponseSchema,
 } from '@clearcost/types';
-import { getDatasetFreshnessSnapshot } from '../services.js';
+import { getDatasetFreshnessSnapshot, getSourceRegistrySnapshot } from '../services.js';
 
 function toDate(v: unknown): Date | null {
   if (v == null) return null;
@@ -94,6 +95,23 @@ export default function healthAdminRoutes(app: FastifyInstance) {
       const snapshot = await getDatasetFreshnessSnapshot();
       reply.header('cache-control', 'public, max-age=30, stale-while-revalidate=120');
       return HealthFreshnessResponseSchema.parse(snapshot);
+    }
+  );
+
+  // Source registry snapshot (admin/ops only)
+  app.get(
+    '/sources',
+    {
+      preHandler: app.requireApiKey(['ops:health']),
+      schema: {
+        response: { 200: HealthSourcesResponseSchema },
+      },
+      config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
+    },
+    async (req, reply) => {
+      const snapshot = await getSourceRegistrySnapshot();
+      reply.header('cache-control', 'public, max-age=30, stale-while-revalidate=120');
+      return HealthSourcesResponseSchema.parse(snapshot);
     }
   );
 }

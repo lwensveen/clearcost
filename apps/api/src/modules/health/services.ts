@@ -1,4 +1,4 @@
-import { db } from '@clearcost/db';
+import { db, sourceRegistryTable } from '@clearcost/db';
 import { sql } from 'drizzle-orm';
 import { HealthSchema, type Health } from '@clearcost/types';
 
@@ -367,6 +367,88 @@ export async function getMvpFreshnessSnapshot() {
   }
 
   return { now, datasets };
+}
+
+export async function getSourceRegistrySnapshot() {
+  const now = new Date();
+
+  type SourceRow = {
+    key: string;
+    dataset: string;
+    source_type: string;
+    enabled: boolean;
+    schedule_hint: string;
+    sla_max_age_hours: number | null;
+    last_verified_at: Date | string | null;
+    last_import_id: string | null;
+    last_import_status: string | null;
+    last_import_job: string | null;
+    last_import_at: Date | string | null;
+    last_import_inserted: number | null;
+    last_import_error: string | null;
+  };
+
+  const { rows } = await db.execute<SourceRow>(sql`
+    SELECT
+      sr.key,
+      sr.dataset,
+      sr.source_type,
+      sr.enabled,
+      sr.schedule_hint,
+      sr.sla_max_age_hours,
+      sr.last_verified_at,
+      i.id            AS last_import_id,
+      i.import_status AS last_import_status,
+      i.job           AS last_import_job,
+      COALESCE(i.finished_at, i.started_at) AS last_import_at,
+      i.inserted      AS last_import_inserted,
+      i.error         AS last_import_error
+    FROM ${sourceRegistryTable} sr
+    LEFT JOIN LATERAL (
+      SELECT *
+      FROM imports
+      WHERE source_key = sr.key
+        AND import_status = 'succeeded'
+      ORDER BY COALESCE(finished_at, started_at) DESC NULLS LAST
+      LIMIT 1
+    ) i ON true
+    ORDER BY sr.key
+  `);
+
+  const sources = rows.map((r) => {
+    const slaMaxAgeHours = r.sla_max_age_hours != null ? Number(r.sla_max_age_hours) : null;
+    const lastImportAt = toDateOrNull(r.last_import_at);
+
+    const ageHours =
+      lastImportAt == null ? null : Math.max(0, (now.getTime() - lastImportAt.getTime()) / 36e5);
+
+    const stale =
+      slaMaxAgeHours == null ? null : lastImportAt == null ? true : ageHours! > slaMaxAgeHours;
+
+    return {
+      key: r.key,
+      dataset: r.dataset,
+      sourceType: r.source_type,
+      enabled: r.enabled,
+      scheduleHint: r.schedule_hint,
+      slaMaxAgeHours,
+      lastVerifiedAt: toDateOrNull(r.last_verified_at),
+      lastImport: r.last_import_id
+        ? {
+            id: r.last_import_id,
+            status: r.last_import_status!,
+            job: r.last_import_job!,
+            at: lastImportAt,
+            inserted: r.last_import_inserted != null ? Number(r.last_import_inserted) : null,
+            error: r.last_import_error ?? null,
+          }
+        : null,
+      ageHours: ageHours != null ? Math.round(ageHours * 100) / 100 : null,
+      stale,
+    };
+  });
+
+  return { now, sources };
 }
 
 export { HealthSchema };

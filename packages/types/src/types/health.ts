@@ -4,9 +4,11 @@ import {
   HealthImportsQuerySchema,
   HealthImportsResponseSchema,
   HealthSchema,
+  HealthSourcesResponseSchema,
 } from '../schemas/index.js';
 
 export type Health = z.infer<typeof HealthSchema>;
 export type HealthImportsQuery = z.infer<typeof HealthImportsQuerySchema>;
 export type HealthImportsResponse = z.infer<typeof HealthImportsResponseSchema>;
 export type HealthFreshnessResponse = z.infer<typeof HealthFreshnessResponseSchema>;
+export type HealthSourcesResponse = z.infer<typeof HealthSourcesResponseSchema>;
