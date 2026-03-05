@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClearCost Widget Demo</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+      background: #f9fafb;
+      color: #111827;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      color: #6b7280;
+      margin-bottom: 2rem;
+    }
+
+    h2 {
+      font-size: 1.125rem;
+      margin-top: 2.5rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    p {
+      line-height: 1.6;
+      color: #374151;
+    }
+
+    code {
+      background: #f3f4f6;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.875rem;
+    }
+
+    pre {
+      background: #1f2937;
+      color: #e5e7eb;
+      padding: 1rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 0.8125rem;
+      line-height: 1.5;
+    }
+
+    .widget-container {
+      margin: 1rem 0;
+    }
+
+    /* Custom theme for the second demo */
+    .dark-theme {
+      --cc-font-family: 'Georgia', serif;
+      --cc-bg: #1f2937;
+      --cc-border: #374151;
+      --cc-radius: 8px;
+      --cc-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      --cc-text: #f9fafb;
+      --cc-text-secondary: #d1d5db;
+      --cc-text-muted: #9ca3af;
+      --cc-btn-bg: #4f46e5;
+      --cc-btn-border: #4f46e5;
+      --cc-btn-radius: 6px;
+      --cc-btn-text: #ffffff;
+    }
+
+    .brand-theme {
+      --cc-font-family: ui-sans-serif, system-ui, sans-serif;
+      --cc-bg: #fef3c7;
+      --cc-border: #f59e0b;
+      --cc-radius: 16px;
+      --cc-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);
+      --cc-text: #78350f;
+      --cc-text-secondary: #92400e;
+      --cc-text-muted: #b45309;
+      --cc-btn-bg: #f59e0b;
+      --cc-btn-border: #d97706;
+      --cc-btn-radius: 999px;
+      --cc-btn-text: #ffffff;
+    }
+
+    .note {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.875rem;
+      color: #1e40af;
+      margin: 1rem 0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 600px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>ClearCost Widget Demo</h1>
+  <p class="subtitle">
+    Interactive demo of the <code>@clearcost/widget</code> embeddable component.
+  </p>
+
+  <div class="note">
+    <strong>Note:</strong> This demo uses a mock proxy endpoint. In production, replace
+    <code>proxyUrl</code> with your server-side proxy that forwards requests to the ClearCost API
+    with your API key.
+  </div>
+
+  <!-- ================================================================== -->
+  <h2>1. Default theme</h2>
+  <p>
+    Minimal setup with just <code>data-clearcost</code> attributes. Uses the default light theme
+    with system fonts.
+  </p>
+
+  <div class="widget-container">
+    <div
+      data-clearcost
+      data-origin="US"
+      data-dest="DE"
+      data-price="120"
+      data-currency="USD"
+      data-l="20"
+      data-w="15"
+      data-h="10"
+      data-weight="1.2"
+      data-category-key="general"
+      data-mode="air"
+    ></div>
+  </div>
+
+  <pre>&lt;div data-clearcost
+  data-origin="US" data-dest="DE"
+  data-price="120" data-currency="USD"
+  data-l="20" data-w="15" data-h="10"
+  data-weight="1.2"
+  data-category-key="general"
+  data-mode="air"&gt;&lt;/div&gt;</pre>
+
+  <!-- ================================================================== -->
+  <h2>2. Custom themes via CSS variables</h2>
+  <p>
+    Theme the widget with CSS custom properties. Wrap the widget in a container with your
+    <code>--cc-*</code> variable overrides.
+  </p>
+
+  <div class="grid">
+    <div>
+      <p style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.5rem;">Dark theme</p>
+      <div class="widget-container dark-theme">
+        <div
+          data-clearcost
+          data-origin="CN"
+          data-dest="US"
+          data-price="85"
+          data-currency="USD"
+          data-l="15"
+          data-w="10"
+          data-h="8"
+          data-weight="0.8"
+          data-hs6="850440"
+          data-mode="sea"
+        ></div>
+      </div>
+    </div>
+
+    <div>
+      <p style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.5rem;">Brand theme</p>
+      <div class="widget-container brand-theme">
+        <div
+          data-clearcost
+          data-origin="GB"
+          data-dest="AU"
+          data-price="200"
+          data-currency="GBP"
+          data-l="30"
+          data-w="20"
+          data-h="15"
+          data-weight="2.5"
+          data-category-key="electronics"
+          data-mode="air"
+        ></div>
+      </div>
+    </div>
+  </div>
+
+  <pre>.dark-theme {
+  --cc-bg: #1f2937;
+  --cc-border: #374151;
+  --cc-text: #f9fafb;
+  --cc-text-secondary: #d1d5db;
+  --cc-btn-bg: #4f46e5;
+  --cc-btn-border: #4f46e5;
+  --cc-btn-text: #ffffff;
+}</pre>
+
+  <!-- ================================================================== -->
+  <h2>3. Available CSS custom properties</h2>
+
+  <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+    <thead>
+      <tr style="text-align: left; border-bottom: 2px solid #e5e7eb;">
+        <th style="padding: 0.5rem;">Variable</th>
+        <th style="padding: 0.5rem;">Default</th>
+        <th style="padding: 0.5rem;">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="border-bottom: 1px solid #f3f4f6;">
+        <td style="padding: 0.5rem;"><code>--cc-font-family</code></td>
+        <td style="padding: 0.5rem;">system-ui</td>
+        <td style="padding: 0.5rem;">Font stack</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #f3f4f6;">
+        <td style="padding: 0.5rem;"><code>--cc-bg</code></td>
+        <td style="padding: 0.5rem;">#ffffff</td>
+        <td style="padding: 0.5rem;">Background color</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #f3f4f6;">
+        <td style="padding: 0.5rem;"><code>--cc-border</code></td>
+        <td style="padding: 0.5rem;">#e5e7eb</td>
+        <td style="padding: 0.5rem;">Border color</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #f3f4f6;">
+        <td style="padding: 0.5rem;"><code>--cc-radius</code></td>
+        <td style="padding: 0.5rem;">12px</td>
+        <td style="padding: 0.5rem;">Border radius</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #f3f4f6;">
+        <td style="padding: 0.5rem;"><code>--cc-shadow</code></td>
+        <td style="padding: 0.5rem;">0 1px 2px rgba(…)</td>
+        <td style="padding: 0.5rem;">Box shadow</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #f3f4f6;">
+        <td style="padding: 0.5rem;"><code>--cc-text</code></td>
+        <td style="padding: 0.5rem;">#111827</td>
+        <td style="padding: 0.5rem;">Primary text color</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #f3f4f6;">
+        <td style="padding: 0.5rem;"><code>--cc-text-secondary</code></td>
+        <td style="padding: 0.5rem;">#374151</td>
+        <td style="padding: 0.5rem;">Row label color</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #f3f4f6;">
+        <td style="padding: 0.5rem;"><code>--cc-text-muted</code></td>
+        <td style="padding: 0.5rem;">#6b7280</td>
+        <td style="padding: 0.5rem;">Incoterm / muted text</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #f3f4f6;">
+        <td style="padding: 0.5rem;"><code>--cc-btn-bg</code></td>
+        <td style="padding: 0.5rem;">#ffffff</td>
+        <td style="padding: 0.5rem;">Button background</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #f3f4f6;">
+        <td style="padding: 0.5rem;"><code>--cc-btn-border</code></td>
+        <td style="padding: 0.5rem;">#e5e7eb</td>
+        <td style="padding: 0.5rem;">Button border</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #f3f4f6;">
+        <td style="padding: 0.5rem;"><code>--cc-btn-radius</code></td>
+        <td style="padding: 0.5rem;">8px</td>
+        <td style="padding: 0.5rem;">Button border radius</td>
+      </tr>
+      <tr>
+        <td style="padding: 0.5rem;"><code>--cc-btn-text</code></td>
+        <td style="padding: 0.5rem;">inherit</td>
+        <td style="padding: 0.5rem;">Button text color</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ================================================================== -->
+  <h2>4. Integration code</h2>
+
+  <p><strong>Script tag (vanilla):</strong></p>
+  <pre>&lt;script src="https://cdn.jsdelivr.net/npm/@clearcost/widget"&gt;&lt;/script&gt;
+&lt;script&gt;
+  ClearCostWidget.mountAll({
+    proxyUrl: '/api/clearcost/quote'
+  });
+&lt;/script&gt;</pre>
+
+  <p><strong>React:</strong></p>
+  <pre>import { ClearCostQuote } from '@clearcost/widget/react';
+
+&lt;ClearCostQuote
+  origin="US" dest="DE"
+  price={120} currency="USD"
+  l={20} w={15} h={10}
+  weight={1.2}
+  proxyUrl="/api/clearcost/quote"
+/&gt;</pre>
+
+  <p><strong>Vue:</strong></p>
+  <pre>import { ClearCostQuote } from '@clearcost/widget/vue';
+
+&lt;ClearCostQuote
+  origin="US" dest="DE"
+  :price="120" currency="USD"
+  :l="20" :w="15" :h="10"
+  :weight="1.2"
+  proxy-url="/api/clearcost/quote"
+/&gt;</pre>
+
+  <!-- ================================================================== -->
+  <!-- Mock proxy + widget initialization -->
+  <!-- ================================================================== -->
+  <script type="module">
+    // Mock proxy for demo purposes — intercepts fetch and returns static data
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url, init) => {
+      if (typeof url === 'string' && url.includes('/mock-proxy/quote')) {
+        const body = JSON.parse(init?.body ?? '{}');
+        const itemValue = body.itemValue?.amount ?? 100;
+        const duty = +(itemValue * 0.05).toFixed(2);
+        const vat = +(itemValue * 0.19).toFixed(2);
+        const freight = +(itemValue * 0.08).toFixed(2);
+        const fees = +(itemValue * 0.01).toFixed(2);
+        const cif = +(itemValue + freight).toFixed(2);
+        const total = +(itemValue + freight + duty + vat + fees).toFixed(2);
+
+        await new Promise((r) => setTimeout(r, 600)); // simulate latency
+
+        return new Response(
+          JSON.stringify({
+            components: { CIF: cif, duty, vat, fees },
+            total,
+            incoterm: 'DAP',
+            currency: body.itemValue?.currency ?? 'USD',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      return originalFetch(url, init);
+    };
+
+    // Import and mount the widget
+    import { mountAll } from './src/index.ts';
+    mountAll({ proxyUrl: '/mock-proxy/quote' });
+  </script>
+</body>
+</html>
