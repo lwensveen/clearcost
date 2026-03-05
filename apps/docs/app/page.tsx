@@ -25,6 +25,28 @@ export default function Home() {
           </li>
         </ol>
 
+        <div>
+          <h2 className="text-lg font-semibold mb-2">Quick integration</h2>
+          <pre
+            style={{
+              background: 'var(--gray-alpha-100)',
+              borderRadius: 8,
+              padding: 16,
+              fontSize: 13,
+              lineHeight: 1.5,
+              overflowX: 'auto',
+            }}
+          >
+            <code>{`curl -X POST "$API/v1/quotes" \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: $CLEARCOST_API_KEY" \\
+  -d '{"origin":"US","dest":"DE",
+       "itemValue":{"amount":120,"currency":"USD"},
+       "dimsCm":{"l":20,"w":15,"h":10},
+       "weightKg":1.2,"categoryKey":"general","mode":"air"}'`}</code>
+          </pre>
+        </div>
+
         <div className={styles.ctas}>
           <Link className={styles.primary} href="/api-reference">
             Quotes API
