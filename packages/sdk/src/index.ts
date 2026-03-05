@@ -9,6 +9,10 @@ export type {
   ManifestSummary,
   ManifestDetail,
   ListManifestsResult,
+  ManifestComputeResponse,
+  ManifestQuotesResponse,
+  ManifestQuotesHistoryResponse,
+  ManifestItemsImportResponse,
 } from './types.js';
 
-export type { SDKOptions, IdemOptions } from './types.js';
+export type { SDKOptions, IdemOptions, RetryOptions } from './types.js';

@@ -3,10 +3,15 @@ import {
   ClassifyResponse,
   IdemOptions,
   ListManifestsResult,
+  ManifestComputeResponse,
   ManifestCreateInput,
   ManifestDetail,
+  ManifestItemsImportResponse,
+  ManifestQuotesHistoryResponse,
+  ManifestQuotesResponse,
   QuoteInput,
   QuoteResponse,
+  RetryOptions,
   SDKOptions,
 } from './types.js';
 
@@ -47,6 +52,58 @@ function joinUrl(base: string, path: string) {
   return `${b}${p}`;
 }
 
+// Retry defaults
+const DEFAULT_RETRY: Required<RetryOptions> = {
+  maxRetries: 3,
+  initialDelayMs: 500,
+  maxDelayMs: 30_000,
+  retryableStatuses: [429, 500, 502, 503, 504],
+};
+
+/** Visible for testing — override in tests to avoid real timers. */
+export let _sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Replace the internal sleep function (useful in tests to avoid real delays).
+ * Returns the previous sleep so it can be restored.
+ */
+export function _setSleep(fn: (ms: number) => Promise<void>): (ms: number) => Promise<void> {
+  const prev = _sleep;
+  _sleep = fn;
+  return prev;
+}
+
+/**
+ * Compute exponential backoff with full jitter.
+ * delay = random(0, min(maxDelay, initialDelay * 2^attempt))
+ */
+function backoffDelay(attempt: number, initial: number, max: number): number {
+  const exp = Math.min(max, initial * 2 ** attempt);
+  return Math.floor(Math.random() * exp);
+}
+
+/**
+ * Parse the Retry-After header value (seconds or HTTP-date) into milliseconds.
+ * Returns undefined if the header is absent or unparseable.
+ */
+function parseRetryAfter(res: Response): number | undefined {
+  const header = res.headers.get('retry-after');
+  if (!header) return undefined;
+
+  // Numeric seconds
+  const secs = Number(header);
+  if (!Number.isNaN(secs) && secs > 0) return secs * 1000;
+
+  // HTTP-date
+  const date = new Date(header).getTime();
+  if (!Number.isNaN(date)) {
+    const delta = date - Date.now();
+    return delta > 0 ? delta : 0;
+  }
+
+  return undefined;
+}
+
 async function http<T = unknown>(
   opts: SDKOptions,
   path: string,
@@ -63,26 +120,63 @@ async function http<T = unknown>(
     ...(init.headers as Record<string, string> | undefined),
   };
 
-  const res = await f(joinUrl(opts.baseUrl, path), { ...init, headers, cache: 'no-store' });
-  const idemKey = res.headers.get('Idempotency-Key') ?? undefined;
+  const retryConfig =
+    opts.retry === false
+      ? { ...DEFAULT_RETRY, maxRetries: 0 }
+      : { ...DEFAULT_RETRY, ...opts.retry };
 
-  const text = await res.text();
-  const ctype = res.headers.get('content-type') ?? '';
+  let lastError: Error | undefined;
 
-  if (!res.ok) {
-    // Try to surface a useful error message when JSON-shaped
-    try {
-      const j = text ? JSON.parse(text) : null;
-      const msg = j?.error?.message ?? j?.error ?? j?.message ?? (text || 'request failed');
-      throw new Error(`${res.status} ${msg}`);
-    } catch {
-      throw new Error(`${res.status} ${text || 'request failed'}`);
+  for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
+    // Wait before retrying (skip delay on first attempt)
+    if (attempt > 0) {
+      await _sleep(backoffDelay(attempt - 1, retryConfig.initialDelayMs, retryConfig.maxDelayMs));
     }
+
+    let res: Response;
+    try {
+      res = await f(joinUrl(opts.baseUrl, path), { ...init, headers, cache: 'no-store' });
+    } catch (err: any) {
+      // Network-level errors (DNS, connection refused, etc.) — retryable
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt < retryConfig.maxRetries) continue;
+      throw lastError;
+    }
+
+    const idemKey = res.headers.get('Idempotency-Key') ?? undefined;
+    const text = await res.text();
+    const ctype = res.headers.get('content-type') ?? '';
+
+    if (!res.ok) {
+      // Check if this status is retryable
+      if (retryConfig.retryableStatuses.includes(res.status) && attempt < retryConfig.maxRetries) {
+        // Honour Retry-After header when present (e.g. 429)
+        const retryAfterMs = parseRetryAfter(res);
+        if (retryAfterMs !== undefined) {
+          const clamped = Math.min(retryAfterMs, retryConfig.maxDelayMs);
+          await _sleep(clamped);
+        }
+        continue;
+      }
+
+      // Non-retryable or final attempt — throw
+      try {
+        const j = text ? JSON.parse(text) : null;
+        const msg = j?.error?.message ?? j?.error ?? j?.message ?? (text || 'request failed');
+        throw new Error(`${res.status} ${msg}`);
+      } catch (e) {
+        if (e instanceof Error && e.message.startsWith(`${res.status} `)) throw e;
+        throw new Error(`${res.status} ${text || 'request failed'}`);
+      }
+    }
+
+    // Parse JSON when possible, otherwise return raw text
+    const data: any = ctype.includes('application/json') ? (text ? JSON.parse(text) : null) : text;
+    return { data: data as T, idemKey };
   }
 
-  // Parse JSON when possible, otherwise return raw text
-  const data: any = ctype.includes('application/json') ? (text ? JSON.parse(text) : null) : text;
-  return { data: data as T, idemKey };
+  // Should be unreachable, but satisfies TypeScript
+  throw lastError ?? new Error('request failed');
 }
 
 // -------------------------------
@@ -177,7 +271,7 @@ export async function importManifestItemsCsv(
   id: string,
   csv: string,
   opts?: { mode?: 'append' | 'replace'; dryRun?: boolean }
-): Promise<unknown> {
+): Promise<ManifestItemsImportResponse> {
   const q = new URLSearchParams();
   if (opts?.mode) q.set('mode', opts.mode);
   if (opts?.dryRun != null) q.set('dryRun', String(!!opts.dryRun));
@@ -185,7 +279,7 @@ export async function importManifestItemsCsv(
     q.toString() ? `?${q.toString()}` : ''
   }`;
 
-  const { data } = await http<unknown>(sdk, path, {
+  const { data } = await http<ManifestItemsImportResponse>(sdk, path, {
     method: 'POST',
     headers: { 'content-type': 'text/csv' },
     // body must be plain text (CSV)
@@ -199,23 +293,36 @@ export async function computeManifest(
   id: string,
   allocation: 'chargeable' | 'volumetric' | 'weight',
   opts: { idempotencyKey?: string; dryRun?: boolean } = {}
-): Promise<{ result: unknown; idempotencyKey: string }> {
+): Promise<{ result: ManifestComputeResponse; idempotencyKey: string }> {
   const idem = opts.idempotencyKey ?? (await genIdemKey());
-  const { data } = await http<unknown>(sdk, `/v1/manifests/${encodeURIComponent(id)}/compute`, {
-    method: 'POST',
-    idem,
-    body: JSON.stringify({ allocation, dryRun: !!opts.dryRun }),
-  });
+  const { data } = await http<ManifestComputeResponse>(
+    sdk,
+    `/v1/manifests/${encodeURIComponent(id)}/compute`,
+    {
+      method: 'POST',
+      idem,
+      body: JSON.stringify({ allocation, dryRun: !!opts.dryRun }),
+    }
+  );
   return { result: data, idempotencyKey: idem };
 }
 
-export async function getManifestQuotes(sdk: SDKOptions, id: string): Promise<unknown> {
-  const { data } = await http<unknown>(sdk, `/v1/manifests/${encodeURIComponent(id)}/quotes`);
+export async function getManifestQuotes(
+  sdk: SDKOptions,
+  id: string
+): Promise<ManifestQuotesResponse> {
+  const { data } = await http<ManifestQuotesResponse>(
+    sdk,
+    `/v1/manifests/${encodeURIComponent(id)}/quotes`
+  );
   return data;
 }
 
-export async function getManifestQuotesHistory(sdk: SDKOptions, id: string): Promise<unknown> {
-  const { data } = await http<unknown>(
+export async function getManifestQuotesHistory(
+  sdk: SDKOptions,
+  id: string
+): Promise<ManifestQuotesHistoryResponse> {
+  const { data } = await http<ManifestQuotesHistoryResponse>(
     sdk,
     `/v1/manifests/${encodeURIComponent(id)}/quotes/history`
   );
