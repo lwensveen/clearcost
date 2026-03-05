@@ -1,6 +1,7 @@
 import { z } from 'zod/v4';
 import { ManifestItemInsertSchema } from './manifest-items.js';
 import { ErrorResponseSchema } from './errors.js';
+import { ManifestQuoteItemSchema, ManifestQuoteSummarySchema } from './manifest-quotes.js';
 
 export const ManifestIdParamSchema = z.object({ manifestId: z.string().uuid() });
 
@@ -14,15 +15,15 @@ export const ManifestComputeResponseSchema = z.object({
   manifestId: z.string().uuid(),
   allocation: z.enum(['chargeable', 'volumetric', 'weight']),
   dryRun: z.boolean(),
-  summary: z.unknown().nullable(),
-  items: z.array(z.unknown()),
+  summary: ManifestQuoteSummarySchema.nullable(),
+  items: z.array(ManifestQuoteItemSchema),
 });
 
 export const ManifestQuotesResponseSchema = z.object({
   ok: z.literal(true),
   manifestId: z.string().uuid(),
-  summary: z.unknown().nullable(),
-  items: z.array(z.unknown()),
+  summary: ManifestQuoteSummarySchema.nullable(),
+  items: z.array(ManifestQuoteItemSchema),
 });
 
 export const ManifestQuotesByKeyParamsSchema = z.object({
