@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "shopify app dev",
-    "build": "shopify app build",
+    "build": "echo 'Shopify app builds via shopify app build — skipping in turbo'",
+    "build:shopify": "shopify app build",
     "deploy": "shopify app deploy",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

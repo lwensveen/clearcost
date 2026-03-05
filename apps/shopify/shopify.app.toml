@@ -3,7 +3,8 @@
 
 name = "ClearCost"
 client_id = ""
-application_url = ""
+application_url = "https://localhost"
+embedded = true
 
 scopes = ""
 
@@ -25,12 +26,11 @@ api_version = "2025-01"
   uri = "/webhooks"
 
   [[webhooks.subscriptions]]
-  topics = ["customers/data_request", "customers/redact", "shop/redact"]
+  compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
   uri = "/webhooks"
-  compliance_topics = true
 
 [app_proxy]
-url = ""
+url = "https://localhost"
 subpath = "clearcost"
 prefix = "apps"
 
