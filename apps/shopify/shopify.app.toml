@@ -1,0 +1,38 @@
+# ClearCost Shopify App — Configuration
+# See https://shopify.dev/docs/apps/tools/cli/configuration
+
+name = "ClearCost"
+client_id = ""
+application_url = ""
+
+scopes = ""
+
+[access_scopes]
+# No admin API scopes needed — the app only stores settings and proxies requests
+
+[auth]
+redirect_urls = [
+  "https://localhost/auth/callback",
+  "https://localhost/auth/shopify/callback",
+  "https://localhost/api/auth/callback",
+]
+
+[webhooks]
+api_version = "2025-01"
+
+  [[webhooks.subscriptions]]
+  topics = ["app/uninstalled"]
+  uri = "/webhooks"
+
+  [[webhooks.subscriptions]]
+  topics = ["customers/data_request", "customers/redact", "shop/redact"]
+  uri = "/webhooks"
+  compliance_topics = true
+
+[app_proxy]
+url = ""
+subpath = "clearcost"
+prefix = "apps"
+
+[pos]
+embedded = false

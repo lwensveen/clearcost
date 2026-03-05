@@ -1,0 +1,14 @@
+{
+  "name": "clearcost-duties-extension",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@shopify/ui-extensions-react": "^2025.1.0",
+    "@shopify/ui-extensions": "^2025.1.0",
+    "react": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "typescript": "5.9.3"
+  }
+}
