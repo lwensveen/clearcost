@@ -2,14 +2,43 @@
   "name": "@clearcost/widget",
   "version": "0.1.0",
   "devDependencies": {
+    "@angular/core": "^19.0.0",
+    "@types/react": "^19.0.0",
     "esbuild": "^0.27.3",
-    "typescript": "5.9.3"
+    "react": "^19.0.0",
+    "typescript": "5.9.3",
+    "vue": "^3.5.0"
+  },
+  "peerDependencies": {
+    "@angular/core": ">=17",
+    "react": ">=18",
+    "vue": ">=3"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true },
+    "vue": { "optional": true },
+    "@angular/core": { "optional": true }
   },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.esm.js",
       "default": "./dist/index.esm.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.esm.js",
+      "default": "./dist/react.esm.js"
+    },
+    "./vue": {
+      "types": "./dist/vue.d.ts",
+      "import": "./dist/vue.esm.js",
+      "default": "./dist/vue.esm.js"
+    },
+    "./angular": {
+      "types": "./dist/angular.d.ts",
+      "import": "./dist/angular.esm.js",
+      "default": "./dist/angular.esm.js"
     }
   },
   "files": [
@@ -21,10 +50,13 @@
   "module": "dist/index.esm.js",
   "private": true,
   "scripts": {
-    "build": "bun run build:types && bun run build:esm && bun run build:umd",
+    "build": "bun run build:types && bun run build:esm && bun run build:umd && bun run build:react && bun run build:vue && bun run build:angular",
     "build:esm": "esbuild src/index.ts --bundle --format=esm --target=es2020 --sourcemap --minify --outfile=dist/index.esm.js",
     "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
     "build:umd": "esbuild src/index.ts --bundle --format=iife --global-name=ClearCostWidget --target=es2020 --sourcemap --minify --outfile=dist/index.umd.js",
+    "build:react": "esbuild src/react.tsx --bundle --format=esm --target=es2020 --sourcemap --minify --jsx=automatic --external:react --external:react/jsx-runtime --outfile=dist/react.esm.js",
+    "build:vue": "esbuild src/vue.ts --bundle --format=esm --target=es2020 --sourcemap --minify --external:vue --outfile=dist/vue.esm.js",
+    "build:angular": "esbuild src/angular.ts --bundle --format=esm --target=es2020 --sourcemap --minify --external:@angular/core --outfile=dist/angular.esm.js",
     "prepare": "bun run build"
   },
   "sideEffects": false,

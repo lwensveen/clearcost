@@ -1,4 +1,4 @@
-type QuoteBody = {
+export type QuoteBody = {
   origin: string;
   dest: string;
   itemValue: { amount: number; currency: string };
@@ -9,7 +9,7 @@ type QuoteBody = {
   mode: 'air' | 'sea';
 };
 
-type SDK = {
+export type SDK = {
   baseUrl?: string; // e.g. https://api.clearcost.dev
   apiKey?: string; // only if calling API directly (not recommended for browser)
   proxyUrl?: string; // e.g. /api/clearcost/quote (recommended)
@@ -21,7 +21,75 @@ type Opts = SDK & {
   currency?: string; // display currency override
 };
 
-function formatMoney(x: number, currency: string, locale = 'en-US') {
+// ---------------------------------------------------------------------------
+// CSS custom property theming
+// ---------------------------------------------------------------------------
+
+const STYLE_ID = 'cc-widget-styles';
+
+const CSS = /* css */ `
+.cc-wrap {
+  font-family: var(--cc-font-family, ui-sans-serif, system-ui, sans-serif);
+  background: var(--cc-bg, #ffffff);
+  border: 1px solid var(--cc-border, #e5e7eb);
+  border-radius: var(--cc-radius, 12px);
+  padding: 12px;
+  box-shadow: var(--cc-shadow, 0 1px 2px rgba(0,0,0,.06));
+  color: var(--cc-text, #111827);
+}
+.cc-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cc-header-total {
+  font-weight: 600;
+}
+.cc-rows {
+  font-size: 12px;
+  color: var(--cc-text-secondary, #374151);
+  line-height: 1.4;
+}
+.cc-row {
+  display: flex;
+  justify-content: space-between;
+}
+.cc-incoterm {
+  margin-top: 6px;
+  color: var(--cc-text-muted, #6b7280);
+}
+.cc-btn {
+  padding: 8px 12px;
+  border-radius: var(--cc-btn-radius, 8px);
+  border: 1px solid var(--cc-btn-border, #e5e7eb);
+  background: var(--cc-btn-bg, #ffffff);
+  color: var(--cc-btn-text, inherit);
+  cursor: pointer;
+  font-family: inherit;
+}
+.cc-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.cc-result {
+  margin-top: 8px;
+}
+`;
+
+function injectStyles() {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById(STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = CSS;
+  document.head.appendChild(style);
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+export function formatMoney(x: number, currency: string, locale = 'en-US') {
   try {
     return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(x);
   } catch {
@@ -47,7 +115,7 @@ async function genIdemKey(): Promise<string> {
   return `ck_idem_${b64url}`;
 }
 
-async function callQuote(body: QuoteBody, sdk: SDK): Promise<any> {
+export async function callQuote(body: QuoteBody, sdk: SDK): Promise<any> {
   const idem = await genIdemKey();
 
   if (sdk.proxyUrl) {
@@ -74,19 +142,23 @@ async function callQuote(body: QuoteBody, sdk: SDK): Promise<any> {
   return res.json();
 }
 
+// ---------------------------------------------------------------------------
+// DOM rendering
+// ---------------------------------------------------------------------------
+
 function render(el: HTMLElement, quote: any, displayCurrency: string, locale: string) {
   const { components, total, incoterm } = quote;
   const cur = displayCurrency || (quote?.currency ?? 'USD');
 
-  const mk = (tag: string, style?: string, text?: string) => {
+  const mk = (tag: string, cls?: string, text?: string) => {
     const n = document.createElement(tag);
-    if (style) n.setAttribute('style', style);
+    if (cls) n.className = cls;
     if (text != null) n.textContent = text;
     return n;
   };
   const money = (x: number) => formatMoney(Number(x) || 0, cur, locale);
   const row = (label: string, amount: number) => {
-    const d = mk('div', 'display:flex; justify-content:space-between;');
+    const d = mk('div', 'cc-row');
     d.appendChild(mk('span', undefined, label));
     d.appendChild(mk('span', undefined, money(amount)));
     return d;
@@ -94,17 +166,14 @@ function render(el: HTMLElement, quote: any, displayCurrency: string, locale: st
 
   const freight = Number(components.CIF || 0) - Number(quote.itemValue || 0);
 
-  const wrap = mk(
-    'div',
-    'font-family: ui-sans-serif, system-ui; border:1px solid #e5e7eb; border-radius:12px; padding:12px; box-shadow:0 1px 2px rgba(0,0,0,.06)'
-  );
+  const wrap = mk('div', 'cc-wrap');
 
-  const header = mk('div', 'display:flex; justify-content:space-between; margin-bottom:8px;');
+  const header = mk('div', 'cc-header');
   header.appendChild(mk('strong', undefined, 'Landed cost'));
-  header.appendChild(mk('span', 'font-weight:600', money(total)));
+  header.appendChild(mk('span', 'cc-header-total', money(total)));
   wrap.appendChild(header);
 
-  const list = mk('div', 'font-size:12px; color:#374151; line-height:1.4');
+  const list = mk('div', 'cc-rows');
   list.appendChild(row('Freight', freight));
   list.appendChild(row('Duty', Number(components.duty || 0)));
   list.appendChild(row('VAT', Number(components.vat || 0)));
@@ -113,7 +182,7 @@ function render(el: HTMLElement, quote: any, displayCurrency: string, locale: st
   }
   list.appendChild(row('Fees', Number(components.fees || 0)));
 
-  const inc = mk('div', 'margin-top:6px; color:#6b7280', 'Incoterm: ');
+  const inc = mk('div', 'cc-incoterm', 'Incoterm: ');
   const strong = mk('strong', undefined, (incoterm ?? 'DAP') + '');
   inc.appendChild(strong);
   list.appendChild(inc);
@@ -123,6 +192,10 @@ function render(el: HTMLElement, quote: any, displayCurrency: string, locale: st
   while (el.firstChild) el.removeChild(el.firstChild);
   el.appendChild(wrap);
 }
+
+// ---------------------------------------------------------------------------
+// Boot & mount
+// ---------------------------------------------------------------------------
 
 function parseEl(el: HTMLElement): QuoteBody {
   const g = (k: string) => el.getAttribute(k) ?? '';
@@ -145,12 +218,11 @@ async function bootOne(el: HTMLElement, opts: Opts) {
 
   const button = document.createElement('button');
   button.textContent = 'Estimate duties & taxes';
-  button.style.cssText =
-    'padding:8px 12px;border-radius:8px;border:1px solid #e5e7eb;background:white;cursor:pointer;';
+  button.className = 'cc-btn';
   el.appendChild(button);
 
   const box = document.createElement('div');
-  box.style.marginTop = '8px';
+  box.className = 'cc-result';
   el.appendChild(box);
 
   async function run() {
@@ -174,6 +246,7 @@ async function bootOne(el: HTMLElement, opts: Opts) {
 }
 
 export function mountAll(opts: Opts) {
+  injectStyles();
   const nodes = Array.from(document.querySelectorAll<HTMLElement>('[data-clearcost]'));
   nodes.forEach((el) => void bootOne(el, opts));
 }

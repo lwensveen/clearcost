@@ -1,13 +1,17 @@
 {
   "extends": "@clearcost/typescript-config/base.json",
   "compilerOptions": {
-    "outDir": "dist"
+    "outDir": "dist",
+    "jsx": "react-jsx",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
   "include": [
     "src"
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "src/**/*.test.ts"
   ]
 }
