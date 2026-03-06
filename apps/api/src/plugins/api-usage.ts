@@ -51,7 +51,7 @@ function makeBufferKey(apiKeyId: string, day: Date, route: string, method: strin
 // ---------------------------------------------------------------------------
 // Flush logic
 // ---------------------------------------------------------------------------
-export async function flushBuffer(log?: { warn: (...args: any[]) => void }): Promise<void> {
+export async function flushBuffer(log?: { warn: (...args: unknown[]) => void }): Promise<void> {
   if (_buffer.size === 0) return;
 
   // Snapshot and clear so new events accumulate in a fresh map
@@ -71,40 +71,39 @@ export async function flushBuffer(log?: { warn: (...args: any[]) => void }): Pro
   }
 
   try {
-    // Batch upsert all buffered entries in a single transaction
-    await db.transaction(async (tx) => {
-      for (const entry of entries) {
-        await tx
-          .insert(apiUsageTable)
-          .values({
-            apiKeyId: entry.apiKeyId,
-            day: entry.day,
-            route: entry.route,
-            method: entry.method,
-            count: entry.count,
-            sumDurationMs: entry.sumDurationMs,
-            sumBytesIn: entry.sumBytesIn,
-            sumBytesOut: entry.sumBytesOut,
-            lastAt: new Date(),
-          })
-          .onConflictDoUpdate({
-            target: [
-              apiUsageTable.apiKeyId,
-              apiUsageTable.day,
-              apiUsageTable.route,
-              apiUsageTable.method,
-            ],
-            set: {
-              count: sql`${apiUsageTable.count} + ${entry.count}`,
-              sumDurationMs: sql`${apiUsageTable.sumDurationMs} + ${entry.sumDurationMs}`,
-              sumBytesIn: sql`${apiUsageTable.sumBytesIn} + ${entry.sumBytesIn}`,
-              sumBytesOut: sql`${apiUsageTable.sumBytesOut} + ${entry.sumBytesOut}`,
-              lastAt: new Date(),
-              updatedAt: new Date(),
-            },
-          });
-      }
-    });
+    // Bulk upsert all buffered entries in a single multi-row INSERT statement
+    const now = new Date();
+    const rows = entries.map((entry) => ({
+      apiKeyId: entry.apiKeyId,
+      day: entry.day,
+      route: entry.route,
+      method: entry.method,
+      count: entry.count,
+      sumDurationMs: entry.sumDurationMs,
+      sumBytesIn: entry.sumBytesIn,
+      sumBytesOut: entry.sumBytesOut,
+      lastAt: now,
+    }));
+
+    await db
+      .insert(apiUsageTable)
+      .values(rows)
+      .onConflictDoUpdate({
+        target: [
+          apiUsageTable.apiKeyId,
+          apiUsageTable.day,
+          apiUsageTable.route,
+          apiUsageTable.method,
+        ],
+        set: {
+          count: sql`${apiUsageTable.count} + excluded.count`,
+          sumDurationMs: sql`${apiUsageTable.sumDurationMs} + excluded.sum_duration_ms`,
+          sumBytesIn: sql`${apiUsageTable.sumBytesIn} + excluded.sum_bytes_in`,
+          sumBytesOut: sql`${apiUsageTable.sumBytesOut} + excluded.sum_bytes_out`,
+          lastAt: now,
+          updatedAt: now,
+        },
+      });
 
     // Success -> close circuit
     if (_circuit.state !== 'closed') {
@@ -165,7 +164,7 @@ export async function flushBuffer(log?: { warn: (...args: any[]) => void }): Pro
   }
 }
 
-function logDroppedIfNeeded(log?: { warn: (...args: any[]) => void }): void {
+function logDroppedIfNeeded(log?: { warn: (...args: unknown[]) => void }): void {
   if (_circuit.droppedEvents === 0) return;
   const now = Date.now();
   if (now - _circuit.lastDroppedLogAt < MAX_DROPPED_LOG_INTERVAL_MS) return;
@@ -202,8 +201,8 @@ export default fp(
       clearInterval(flushTimer);
       try {
         await flushBuffer(app.log);
-      } catch {
-        // Best effort on shutdown
+      } catch (err) {
+        app.log.error({ err }, 'usage metering final flush failed on shutdown');
       }
     });
 

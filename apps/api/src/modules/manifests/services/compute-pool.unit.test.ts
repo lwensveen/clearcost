@@ -51,17 +51,10 @@ describe('computePool', () => {
       fixedFreightTotal: '30',
     });
 
-    mocks.selectMock
-      .mockImplementationOnce(() => ({
-        from: () => ({
-          where: () => ({
-            limit: async () => [],
-          }),
-        }),
-      }))
-      .mockImplementationOnce(() => ({
-        from: () => ({
-          where: async () => [
+    mocks.selectMock.mockImplementationOnce(() => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => [
             {
               id: 'item-1',
               itemValueAmount: '100',
@@ -75,7 +68,8 @@ describe('computePool', () => {
             },
           ],
         }),
-      }));
+      }),
+    }));
 
     mocks.getCurrencyForCountryMock.mockReturnValue('EUR');
 

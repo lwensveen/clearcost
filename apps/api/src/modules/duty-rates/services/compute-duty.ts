@@ -220,7 +220,8 @@ export async function computeDutyForRateId(
         lte(dutyRateComponentsTable.effectiveFrom, on),
         or(isNull(dutyRateComponentsTable.effectiveTo), gt(dutyRateComponentsTable.effectiveTo, on))
       )
-    );
+    )
+    .limit(50);
 
   const destCurrency = normalizeCurrency(opts?.destCurrency ?? null);
   let fxMissingRate = false;

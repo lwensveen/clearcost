@@ -93,7 +93,8 @@ export async function lookupDutyRateIds(keys: ParentKey[]) {
           keys.map((key) => key.dutyRule)
         )
       )
-    );
+    )
+    .limit(keys.length * 5);
 
   const keyOf = (key: ParentKey) =>
     `${key.dest}::${key.partner ?? ''}::${key.hs6}::${key.dutyRule}::${

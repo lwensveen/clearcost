@@ -27,7 +27,8 @@ export async function loadMembershipFromDb(): Promise<Map<string, ProgramMember[
     .from(tradeProgramMembersTable)
     .innerJoin(tradeProgramsTable, eq(tradeProgramMembersTable.programId, tradeProgramsTable.id))
     .innerJoin(jurisdictionsTable, eq(tradeProgramsTable.ownerId, jurisdictionsTable.id))
-    .innerJoin(countriesTable, eq(tradeProgramMembersTable.countryId, countriesTable.id));
+    .innerJoin(countriesTable, eq(tradeProgramMembersTable.countryId, countriesTable.id))
+    .limit(10000);
 
   const byProg = new Map<string, ProgramMember[]>();
 

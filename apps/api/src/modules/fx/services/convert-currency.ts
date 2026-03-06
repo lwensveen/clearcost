@@ -60,12 +60,14 @@ async function convertCurrencyInternal(
     return { amount: amount * rate, meta: { missingRate: false, error: null } };
   }
 
-  // 3) triangulate via hubs
+  // 3) triangulate via hubs (parallel fetch both legs per hub)
   for (const hub of HUBS) {
     if (hub === src || hub === dst) continue; // skip trivial hub
 
-    const legA = await fetchRate(src, hub, opts.on);
-    const legB = await fetchRate(hub, dst, opts.on);
+    const [legA, legB] = await Promise.all([
+      fetchRate(src, hub, opts.on),
+      fetchRate(hub, dst, opts.on),
+    ]);
 
     if (legA != null && legB != null) {
       const rate = legA * legB;

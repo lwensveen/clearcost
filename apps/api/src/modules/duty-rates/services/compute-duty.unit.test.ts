@@ -25,7 +25,9 @@ import { computeDutyForRateId, computeDutyFromComponents } from './compute-duty.
 function mockComponentRows(rows: unknown[]) {
   mocks.selectMock.mockReturnValue({
     from: () => ({
-      where: async () => rows,
+      where: () => ({
+        limit: async () => rows,
+      }),
     }),
   });
 }

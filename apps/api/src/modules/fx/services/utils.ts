@@ -40,6 +40,7 @@ const DEFAULT_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 type CacheEntry = { value: number; expiresAt: number };
 const fxCache = new Map<string, CacheEntry>();
+const FX_CACHE_MAX_SIZE = 5000;
 
 /** Build a stable cache key: YYYY-MM-DD or 'latest' + pair 'FROM-TO' (uppercased) */
 export function buildFxCacheKey(on: Date | undefined, from: string, to: string): string {
@@ -59,5 +60,17 @@ export function fxCacheGet(key: string): number | null {
 
 export function fxCacheSet(key: string, value: number, ttlMs: number = DEFAULT_TTL_MS): void {
   if (!Number.isFinite(value) || value <= 0) return; // don't poison cache
+  // Evict expired entries if cache is getting large
+  if (fxCache.size >= FX_CACHE_MAX_SIZE) {
+    const now = Date.now();
+    for (const [k, v] of fxCache) {
+      if (now > v.expiresAt) fxCache.delete(k);
+    }
+    // If still too large, evict oldest entries
+    if (fxCache.size >= FX_CACHE_MAX_SIZE) {
+      const firstKey = fxCache.keys().next().value;
+      if (firstKey) fxCache.delete(firstKey);
+    }
+  }
   fxCache.set(key, { value, expiresAt: Date.now() + ttlMs });
 }

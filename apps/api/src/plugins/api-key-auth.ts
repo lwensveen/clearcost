@@ -153,6 +153,7 @@ declare module 'fastify' {
       prefix: string;
       isDemo?: boolean;
       rateLimitPerMin?: number | null;
+      allowedOrigins?: string[];
     };
   }
   interface FastifyInstance {
@@ -192,6 +193,76 @@ function isKeyRateLimited(keyId: string, limit: number): boolean {
   return entry.count > limit;
 }
 
+// Periodic cleanup of stale rate-limit entries
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of keyRateLimitCounters) {
+    if (now - entry.windowStart >= WINDOW_MS * 2) {
+      keyRateLimitCounters.delete(key);
+    }
+  }
+}, WINDOW_MS * 2).unref();
+
+// ── API-key verification cache (short-lived, avoids scrypt on every request) ──
+const AUTH_CACHE_TTL_MS = 30_000; // 30 seconds
+const AUTH_CACHE_MAX_SIZE = 1000;
+
+type AuthCacheEntry = {
+  apiKey: NonNullable<FastifyRequest['apiKey']>;
+  expiresAt: number;
+};
+const authCache = new Map<string, AuthCacheEntry>();
+
+function authCacheGet(tokenHash: string): AuthCacheEntry['apiKey'] | null {
+  const entry = authCache.get(tokenHash);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    authCache.delete(tokenHash);
+    return null;
+  }
+  return entry.apiKey;
+}
+
+function authCacheSet(tokenHash: string, apiKey: AuthCacheEntry['apiKey']): void {
+  // Evict oldest entries if cache is full
+  if (authCache.size >= AUTH_CACHE_MAX_SIZE) {
+    const firstKey = authCache.keys().next().value;
+    if (firstKey) authCache.delete(firstKey);
+  }
+  authCache.set(tokenHash, { apiKey, expiresAt: Date.now() + AUTH_CACHE_TTL_MS });
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of authCache) {
+    if (now > entry.expiresAt) {
+      authCache.delete(key);
+    }
+  }
+}, AUTH_CACHE_TTL_MS).unref();
+
+// ── Buffered lastUsedAt updates (once per key per minute) ───────────────
+const LAST_USED_BUFFER_MS = 60_000; // 1 minute
+const lastUsedAtBuffer = new Map<string, number>(); // apiKeyId -> lastFlushedTs
+
+function shouldUpdateLastUsedAt(apiKeyId: string): boolean {
+  const now = Date.now();
+  const last = lastUsedAtBuffer.get(apiKeyId);
+  if (last && now - last < LAST_USED_BUFFER_MS) return false;
+  lastUsedAtBuffer.set(apiKeyId, now);
+  return true;
+}
+
+// Periodic cleanup of stale lastUsedAt buffer entries
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, ts] of lastUsedAtBuffer) {
+    if (now - ts >= LAST_USED_BUFFER_MS * 5) {
+      lastUsedAtBuffer.delete(key);
+    }
+  }
+}, LAST_USED_BUFFER_MS * 5).unref();
+
 // Definite string to avoid TS2345
 const PEPPER: string = process.env.API_KEY_PEPPER ?? '';
 const INTERNAL_SIGNING_SECRET: string = process.env.INTERNAL_SIGNING_SECRET ?? '';
@@ -202,8 +273,20 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
       throw new Error('API_KEY_PEPPER must be set in production');
     }
 
+    if (process.env.NODE_ENV !== 'production' && !PEPPER) {
+      app.log.warn(
+        'API_KEY_PEPPER is not set — API key hashing is running without a pepper. Set API_KEY_PEPPER for production-equivalent security.'
+      );
+    }
+
     if (process.env.NODE_ENV === 'production' && !INTERNAL_SIGNING_SECRET) {
       throw new Error('INTERNAL_SIGNING_SECRET must be set in production');
+    }
+
+    if (process.env.NODE_ENV !== 'production' && !INTERNAL_SIGNING_SECRET) {
+      app.log.warn(
+        'INTERNAL_SIGNING_SECRET is not set — internal request signing is disabled. Set INTERNAL_SIGNING_SECRET for production-equivalent security.'
+      );
     }
 
     function verifyInternalSignature(req: FastifyRequest): boolean {
@@ -223,16 +306,19 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
 
       const variants = new Set<string>();
 
-      const url1 = String((req as any).url ?? '');
+      const url1 = String((req as unknown as { url?: string }).url ?? '');
       if (url1) variants.add(url1);
 
-      const url2 = typeof (req.raw as any)?.url === 'string' ? (req.raw as any).url : '';
+      const rawUrl = (req.raw as { url?: unknown }).url;
+      const url2 = typeof rawUrl === 'string' ? rawUrl : '';
       if (url2) variants.add(url2);
 
       // Canonicalize: path + sorted query from req.query (if available)
       try {
         const pathOnly = (url1 || url2).split('?')[0] || '';
-        const qs = req.query ? new URLSearchParams(req.query as any).toString() : '';
+        const qs = req.query
+          ? new URLSearchParams(req.query as Record<string, string>).toString()
+          : '';
         variants.add(qs ? `${pathOnly}?${qs}` : pathOnly);
       } catch {
         /* ignore canonicalization errors */
@@ -271,6 +357,48 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
           }
 
           const { keyId, secret, prefix: presentedPrefix } = presented;
+          const tokenHash = sha256Hex(Buffer.from(presented.raw));
+
+          // ── Check auth cache (avoids DB + scrypt on every request) ──
+          const cached = authCacheGet(tokenHash);
+          if (cached) {
+            req.apiKey = cached;
+
+            // Still enforce scopes, owner, origin, and rate limit for cached entries
+            if (requiredScopes.length) {
+              const has = requiredScopes.every(
+                (s) => cached.scopes.includes(s) || cached.scopes.includes('admin:all')
+              );
+              if (!has)
+                return reply
+                  .code(403)
+                  .send(errorResponseForStatus(403, 'Missing required scope(s)'));
+            }
+
+            const ownerFrom = opts.ownerFrom?.(req);
+            if (ownerFrom && cached.ownerId !== ownerFrom && !cached.scopes.includes('admin:all')) {
+              return reply.code(403).send(errorResponseForStatus(403, 'Owner mismatch'));
+            }
+
+            const reqOrigin =
+              typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
+            if (
+              cached.allowedOrigins?.length &&
+              reqOrigin &&
+              !cached.scopes.includes('admin:all')
+            ) {
+              if (!cached.allowedOrigins.includes(reqOrigin))
+                return reply.code(403).send(errorResponseForStatus(403, 'Origin not allowed'));
+            }
+
+            if (cached.rateLimitPerMin && isKeyRateLimited(cached.keyId, cached.rateLimitPerMin)) {
+              return reply.code(429).send(errorResponseForStatus(429, 'Rate limit exceeded'));
+            }
+
+            return;
+          }
+
+          // ── Full DB lookup + scrypt verification ──
           const rows = await db
             .select()
             .from(apiKeysTable)
@@ -325,13 +453,21 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
             prefix: row.prefix,
             isDemo: isDemoKey(row),
             rateLimitPerMin: row.rateLimitPerMin,
+            allowedOrigins,
           };
 
-          void db
-            .update(apiKeysTable)
-            .set({ lastUsedAt: new Date() })
-            .where(eq(apiKeysTable.id, row.id))
-            .catch(() => {});
+          // Populate auth cache after successful verification
+          authCacheSet(tokenHash, req.apiKey);
+
+          if (shouldUpdateLastUsedAt(row.id)) {
+            void db
+              .update(apiKeysTable)
+              .set({ lastUsedAt: new Date() })
+              .where(eq(apiKeysTable.id, row.id))
+              .catch((err) => {
+                app.log.error({ err, apiKeyId: row.id }, 'lastUsedAt update failed');
+              });
+          }
         };
       }
     );

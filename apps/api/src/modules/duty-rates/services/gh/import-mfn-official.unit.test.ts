@@ -13,6 +13,10 @@ vi.mock('../../utils/batch-upsert.js', () => ({
   batchUpsertDutyRatesFromStream: mocks.batchUpsertDutyRatesFromStreamMock,
 }));
 
+vi.mock('../../../../lib/safe-path.js', () => ({
+  validateSourcePath: (p: string) => p,
+}));
+
 import { importGhMfnOfficial } from './import-mfn-official.js';
 
 type TempFixture = { dir: string; path: string };

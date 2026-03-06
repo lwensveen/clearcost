@@ -36,25 +36,20 @@ vi.mock('@clearcost/db', () => {
   const __calls: any[] = [];
   const __state = { failUpsert: false };
 
-  const makeInsert = () => ({
+  const db = {
     insert: (tbl: any) => ({
       values: (vals: any) => ({
         onConflictDoUpdate: (args: any) => {
           if (__state.failUpsert) throw new Error('upsert failed');
-          __calls.push({ tbl, vals, args });
+          // Support bulk (array) and single-row inserts
+          const rows = Array.isArray(vals) ? vals : [vals];
+          for (const v of rows) {
+            __calls.push({ tbl, vals: v, args });
+          }
           return Promise.resolve();
         },
       }),
     }),
-  });
-
-  const db = {
-    ...makeInsert(),
-    transaction: async (fn: any) => {
-      // The transaction callback receives a tx object with same insert API
-      const tx = makeInsert();
-      return fn(tx);
-    },
   };
 
   return { apiUsageTable, db, __calls, __state };
@@ -137,11 +132,11 @@ describe('usage-plugin (unit)', () => {
     expect(call.vals.sumBytesOut).toBe(4);
     expect(call.vals.day.toISOString()).toBe(dayStartUTC().toISOString());
 
-    // Arithmetic updates use accumulated counts
+    // Arithmetic updates use excluded.* for bulk upsert
     const set = call.args.set;
-    expect(String(set.count)).toContain('count + 1');
-    expect(String(set.sumBytesIn)).toContain('sumBytesIn + 7');
-    expect(String(set.sumBytesOut)).toContain('sumBytesOut + 4');
+    expect(String(set.count)).toContain('count + excluded.count');
+    expect(String(set.sumBytesIn)).toContain('sumBytesIn + excluded.sum_bytes_in');
+    expect(String(set.sumBytesOut)).toContain('sumBytesOut + excluded.sum_bytes_out');
 
     await app.close();
   });
@@ -166,7 +161,7 @@ describe('usage-plugin (unit)', () => {
     await flushBuffer();
     expect(__calls.length).toBe(1);
     expect(__calls[0].vals.count).toBe(3);
-    expect(String(__calls[0].args.set.count)).toContain('count + 3');
+    expect(String(__calls[0].args.set.count)).toContain('count + excluded.count');
 
     await app.close();
   });
@@ -238,7 +233,9 @@ describe('usage-plugin (unit)', () => {
     await flushBuffer();
     expect(__calls.length).toBe(1);
     expect(__calls[0].vals.sumBytesOut).toBe(0);
-    expect(String(__calls[0].args.set.sumBytesOut)).toContain('sumBytesOut + 0');
+    expect(String(__calls[0].args.set.sumBytesOut)).toContain(
+      'sumBytesOut + excluded.sum_bytes_out'
+    );
     await app.close();
   });
 });

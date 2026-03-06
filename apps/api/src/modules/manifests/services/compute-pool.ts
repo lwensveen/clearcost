@@ -4,11 +4,45 @@ import {
   manifestItemsTable,
   manifestQuotesTable,
   manifestsTable,
-  merchantProfilesTable,
 } from '@clearcost/db';
 import { getCurrencyForCountry } from '@clearcost/types';
 import { eq } from 'drizzle-orm';
 import { quoteLandedCost } from '../../quotes/services/quote-landed-cost.js';
+
+/** Simple concurrency limiter (like p-limit) to cap parallel async work. */
+function pLimit(concurrency: number) {
+  let active = 0;
+  const queue: Array<() => void> = [];
+  const next = () => {
+    if (queue.length > 0 && active < concurrency) {
+      active++;
+      queue.shift()!();
+    }
+  };
+  return <T>(fn: () => Promise<T>): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      const run = () => {
+        fn()
+          .then(resolve, reject)
+          .finally(() => {
+            active--;
+            next();
+          });
+      };
+      queue.push(run);
+      next();
+    });
+}
+
+/**
+ * Safely convert a DB numeric (string) field to a finite number.
+ * Returns `fallback` (default 0) if the value is null/undefined/NaN/Infinity.
+ */
+function safeNumeric(value: string | number | null | undefined, fallback = 0): number {
+  if (value == null) return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
 
 /** Local helpers (match your quotes utils) */
 function volumetricKg(dims: { l: number; w: number; h: number }) {
@@ -44,13 +78,6 @@ export async function computePool(manifestId: string, opts: ComputePoolOpts = {}
   });
   if (!manifest) throw new Error('Manifest not found');
 
-  const profile = await db
-    .select()
-    .from(merchantProfilesTable)
-    .where(eq(merchantProfilesTable.ownerId, manifest.ownerId))
-    .limit(1)
-    .then((r) => r[0]);
-
   const { origin, dest, shippingMode } = manifest;
   const currency = getCurrencyForCountry(dest);
   if (!currency) {
@@ -64,7 +91,8 @@ export async function computePool(manifestId: string, opts: ComputePoolOpts = {}
   const items = await db
     .select()
     .from(manifestItemsTable)
-    .where(eq(manifestItemsTable.manifestId, manifestId));
+    .where(eq(manifestItemsTable.manifestId, manifestId))
+    .limit(5000);
 
   if (items.length === 0) {
     return { ok: true as const, manifestId, insertedItems: 0, insertedRollup: 0, totals: null };
@@ -76,7 +104,7 @@ export async function computePool(manifestId: string, opts: ComputePoolOpts = {}
 
   const enriched = items.map((it) => {
     const dims = it.dimsCm ?? { l: 0, w: 0, h: 0 };
-    const wKg = Number(it.weightKg ?? 0);
+    const wKg = safeNumeric(it.weightKg);
     const quantityRaw = Number(it.quantity ?? NaN);
     const litersRaw = Number(it.liters ?? NaN);
     const volKg = volumetricKg(dims);
@@ -115,53 +143,51 @@ export async function computePool(manifestId: string, opts: ComputePoolOpts = {}
   }
 
   const now = new Date();
-  const itemResults: Array<{
-    itemId: string;
-    hs6: string;
-    chargeableKg: number;
-    freightShare: number;
-    components: { CIF: number; duty: number; vat: number; fees: number; checkoutVAT?: number };
-    total: number;
-    guaranteedMax: number;
-    currency: string;
-  }> = [];
+  const limit = pLimit(5); // 5 concurrent quote computations
 
-  for (let i = 0; i < enriched.length; i++) {
-    const it = enriched[i]!;
-    const freightShare = shares[i]!;
+  const itemResults = await Promise.all(
+    enriched.map((it, i) =>
+      limit(async () => {
+        const freightShare = shares[i]!;
 
-    const res = await quoteLandedCost(
-      {
-        origin,
-        dest,
-        mode: shippingMode as 'air' | 'sea',
-        itemValue: {
-          amount: Number(it.itemValueAmount ?? 0),
-          currency: String(it.itemValueCurrency ?? 'USD'),
-        },
-        dimsCm: { l: Number(it.dims.l ?? 0), w: Number(it.dims.w ?? 0), h: Number(it.dims.h ?? 0) },
-        weightKg: Number(it.weightKgNum ?? 0),
-        quantity: it.quantityNum,
-        liters: it.litersNum,
-        categoryKey: String(it.categoryKey ?? ''),
-        hs6: it.hs6 ? String(it.hs6) : undefined,
-      },
-      { freightInDestOverride: freightShare, fxAsOf: now }
-    );
+        const res = await quoteLandedCost(
+          {
+            origin,
+            dest,
+            mode: shippingMode,
+            itemValue: {
+              amount: safeNumeric(it.itemValueAmount),
+              currency: String(it.itemValueCurrency ?? 'USD'),
+            },
+            dimsCm: {
+              l: Number(it.dims.l ?? 0),
+              w: Number(it.dims.w ?? 0),
+              h: Number(it.dims.h ?? 0),
+            },
+            weightKg: it.weightKgNum,
+            quantity: it.quantityNum,
+            liters: it.litersNum,
+            categoryKey: String(it.categoryKey ?? ''),
+            hs6: it.hs6 ? String(it.hs6) : undefined,
+          },
+          { freightInDestOverride: freightShare, fxAsOf: now }
+        );
 
-    const q = res.quote;
+        const q = res.quote;
 
-    itemResults.push({
-      itemId: it.id as string,
-      hs6: q.hs6,
-      chargeableKg: q.chargeableKg,
-      freightShare,
-      components: q.components,
-      total: q.total,
-      guaranteedMax: q.guaranteedMax,
-      currency,
-    });
-  }
+        return {
+          itemId: it.id,
+          hs6: q.hs6,
+          chargeableKg: q.chargeableKg,
+          freightShare,
+          components: q.components,
+          total: q.total,
+          guaranteedMax: q.guaranteedMax,
+          currency,
+        };
+      })
+    )
+  );
 
   let insertedItemRows = 0;
   let insertedRollupRows = 0;
@@ -172,22 +198,23 @@ export async function computePool(manifestId: string, opts: ComputePoolOpts = {}
         .delete(manifestItemQuotesTable)
         .where(eq(manifestItemQuotesTable.manifestId, manifestId));
 
-      for (const r of itemResults) {
-        await tx.insert(manifestItemQuotesTable).values({
-          manifestId,
-          itemId: r.itemId,
-          currency,
-          hs6: r.hs6,
-          basis: String(enriched.find((x) => x.id === r.itemId)!.basis),
-          chargeableKg: String(r.chargeableKg),
-          freightShare: String(r.freightShare),
-          components: r.components,
-          total: String(r.total),
-          guaranteedMax: String(r.guaranteedMax),
-          // incoterm defaults to DAP per schema
-        });
-        insertedItemRows++;
+      const insertRows = itemResults.map((r) => ({
+        manifestId,
+        itemId: r.itemId,
+        currency,
+        hs6: r.hs6,
+        basis: String(enriched.find((x) => x.id === r.itemId)!.basis),
+        chargeableKg: String(r.chargeableKg),
+        freightShare: String(r.freightShare),
+        components: r.components,
+        total: String(r.total),
+        guaranteedMax: String(r.guaranteedMax),
+        // incoterm defaults to DAP per schema
+      }));
+      if (insertRows.length) {
+        await tx.insert(manifestItemQuotesTable).values(insertRows);
       }
+      insertedItemRows = insertRows.length;
 
       const itemsCount = itemResults.length;
       const freightTotal = itemResults.reduce((s, r) => s + r.freightShare, 0);
