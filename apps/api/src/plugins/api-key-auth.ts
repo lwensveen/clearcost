@@ -152,6 +152,7 @@ declare module 'fastify' {
       keyId: string;
       prefix: string;
       isDemo?: boolean;
+      rateLimitPerMin?: number | null;
     };
   }
   interface FastifyInstance {
@@ -172,6 +173,24 @@ type RequireApiKeyOptions = {
   optional?: boolean;
   internalSigned?: boolean;
 };
+
+// ── Per-key rate limiting (fixed-window, in-memory) ─────────────────────
+const keyRateLimitCounters = new Map<string, { count: number; windowStart: number }>();
+
+const WINDOW_MS = 60_000; // 1 minute
+
+function isKeyRateLimited(keyId: string, limit: number): boolean {
+  const now = Date.now();
+  const entry = keyRateLimitCounters.get(keyId);
+
+  if (!entry || now - entry.windowStart >= WINDOW_MS) {
+    keyRateLimitCounters.set(keyId, { count: 1, windowStart: now });
+    return false;
+  }
+
+  entry.count++;
+  return entry.count > limit;
+}
 
 // Definite string to avoid TS2345
 const PEPPER: string = process.env.API_KEY_PEPPER ?? '';
@@ -294,6 +313,10 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
               return reply.code(403).send(errorResponseForStatus(403, 'Origin not allowed'));
           }
 
+          if (row.rateLimitPerMin && isKeyRateLimited(row.keyId, row.rateLimitPerMin)) {
+            return reply.code(429).send(errorResponseForStatus(429, 'Rate limit exceeded'));
+          }
+
           req.apiKey = {
             id: row.id,
             ownerId: row.ownerId,
@@ -301,6 +324,7 @@ export const apiKeyAuthPlugin: FastifyPluginAsync = fp(
             keyId: row.keyId,
             prefix: row.prefix,
             isDemo: isDemoKey(row),
+            rateLimitPerMin: row.rateLimitPerMin,
           };
 
           void db
