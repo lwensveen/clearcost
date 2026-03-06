@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { billingAccountsTable, db, manifestItemsTable, manifestsTable } from '@clearcost/db';
+import { db, manifestItemsTable, manifestsTable } from '@clearcost/db';
 import { eq, sql } from 'drizzle-orm';
+import { getPlan, type PlanKey } from './plan-utils.js';
 
 /** Per-plan limits, overrideable via env */
 function int(env: string | undefined, def: number) {
@@ -26,18 +27,6 @@ const LIMITS = {
     maxItemsPerManifest: int(process.env.CC_LIMIT_SCALE_MAX_ITEMS_PER_MANIFEST, 100_000),
   },
 } as const;
-
-type PlanKey = keyof typeof LIMITS;
-
-async function getPlan(ownerId: string): Promise<PlanKey> {
-  const [row] = await db
-    .select({ plan: billingAccountsTable.plan })
-    .from(billingAccountsTable)
-    .where(eq(billingAccountsTable.ownerId, ownerId))
-    .limit(1);
-  const p = (row?.plan ?? 'free').toLowerCase();
-  return (p in LIMITS ? p : 'free') as PlanKey;
-}
 
 async function countManifests(ownerId: string): Promise<number> {
   const [r] = await db

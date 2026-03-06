@@ -8,6 +8,8 @@ import {
 import { getCurrencyForCountry } from '@clearcost/types';
 import { eq } from 'drizzle-orm';
 import { quoteLandedCost } from '../../quotes/services/quote-landed-cost.js';
+import { safeNumeric } from '../../../lib/numeric.js';
+import { volumetricKg, volumeM3 } from '../../quotes/utils.js';
 
 /** Simple concurrency limiter (like p-limit) to cap parallel async work. */
 function pLimit(concurrency: number) {
@@ -32,32 +34,6 @@ function pLimit(concurrency: number) {
       queue.push(run);
       next();
     });
-}
-
-/**
- * Safely convert a DB numeric (string) field to a finite number.
- * Returns `fallback` (default 0) if the value is null/undefined/NaN/Infinity.
- */
-function safeNumeric(value: string | number | null | undefined, fallback = 0): number {
-  if (value == null) return fallback;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-/** Local helpers (match your quotes utils) */
-function volumetricKg(dims: { l: number; w: number; h: number }) {
-  const l = Number(dims?.l ?? 0),
-    w = Number(dims?.w ?? 0),
-    h = Number(dims?.h ?? 0);
-  if (!(l && w && h)) return 0;
-  return (l * w * h) / 5000; // IATA-ish divisor
-}
-function volumeM3(dims: { l: number; w: number; h: number }) {
-  const l = Number(dims?.l ?? 0),
-    w = Number(dims?.w ?? 0),
-    h = Number(dims?.h ?? 0);
-  if (!(l && w && h)) return 0;
-  return (l * w * h) / 1_000_000;
 }
 
 type AllocationMode = 'chargeable' | 'volumetric' | 'weight';

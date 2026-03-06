@@ -80,7 +80,9 @@ function mockMerchantContext(profile: unknown = undefined, regs: unknown[] = [])
     }))
     .mockImplementationOnce(() => ({
       from: () => ({
-        where: async () => regs,
+        where: () => ({
+          limit: async () => regs,
+        }),
       }),
     }));
 }

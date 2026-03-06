@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { apiUsageTable, billingAccountsTable, db } from '@clearcost/db';
+import { apiUsageTable, db } from '@clearcost/db';
 import { and, eq, ilike, sql } from 'drizzle-orm';
+import { getPlan, type PlanKey } from './plan-utils.js';
 
 /** UTC midnight Date for today (matches pg DATE, mode: 'date') */
 function dayStartUTC(d = new Date()): Date {
@@ -13,19 +14,6 @@ const LIMITS = {
   growth: { computePerDay: 2000 },
   scale: { computePerDay: 10000 },
 } as const;
-
-type PlanKey = keyof typeof LIMITS;
-
-async function getPlan(ownerId: string): Promise<PlanKey> {
-  const rows = await db
-    .select({ plan: billingAccountsTable.plan })
-    .from(billingAccountsTable)
-    .where(eq(billingAccountsTable.ownerId, ownerId))
-    .limit(1);
-
-  const planStr = (rows[0]?.plan ?? 'free').toLowerCase();
-  return planStr in LIMITS ? (planStr as PlanKey) : 'free';
-}
 
 async function getTodayComputeUsed(apiKeyId: string): Promise<number> {
   const today = dayStartUTC();

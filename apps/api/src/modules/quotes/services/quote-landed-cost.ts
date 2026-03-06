@@ -26,20 +26,11 @@ import {
 } from './confidence.js';
 import { toQuoteSourceMetadata } from './source-metadata.js';
 import { getDatasetFreshnessSnapshot, getMvpFreshnessSnapshot } from '../../health/services.js';
+import { safeNumeric } from '../../../lib/numeric.js';
 
 type Unit = 'kg' | 'm3';
 
 countries.registerLocale(en);
-
-/**
- * Safely convert a DB numeric (string) field to a finite number.
- * Returns `fallback` (default 0) if the value is null/undefined/NaN/Infinity.
- */
-function safeNumeric(value: string | number | null | undefined, fallback = 0): number {
-  if (value == null) return fallback;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
-}
 
 const roundMoney = (n: number, ccy: string) => {
   const dp = ccy === 'JPY' ? 0 : 2;
@@ -732,6 +723,7 @@ export async function quoteLandedCost(
               eq(taxRegistrationsTable.isActive, true)
             )
           )
+          .limit(50)
       : Promise.resolve([] as Array<{ jurisdiction: string; scheme: string }>),
   ]);
 
