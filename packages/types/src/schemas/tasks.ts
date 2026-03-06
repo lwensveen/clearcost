@@ -1,6 +1,11 @@
 import { z } from 'zod/v4';
 import { NOTICE_TYPE_VALUES } from '@clearcost/db';
 
+// Reject path traversal sequences (e.g. "..", "~", null bytes) in user-provided paths
+const safePathString = z.string().refine((s) => !/(^|\/)\.\.($|\/)/.test(s) && !s.includes('\0'), {
+  message: 'Path must not contain traversal sequences (..) or null bytes',
+});
+
 // Shared duty import pieces
 const Hs6ListSchema = z.array(z.string().regex(/^\d{6}$/)).optional();
 const BatchSizeSchema = z.coerce.number().int().min(1).max(20_000).optional();
@@ -29,7 +34,7 @@ export const TasksNoticesCrawlBodySchema = z.object({
   excludeHints: z.array(z.string()).optional(),
   maxDepth: z.coerce.number().int().min(0).max(4).default(1),
   concurrency: z.coerce.number().int().min(1).max(10).default(4),
-  outDir: z.string().optional(),
+  outDir: safePathString.optional(),
   dest: z
     .string()
     .length(2)
@@ -159,7 +164,7 @@ export const TasksDutyIdBtkiCrawlBodySchema = z.object({
   startUrl: z.string().url().optional(),
   maxDepth: z.coerce.number().int().min(0).max(5).optional(),
   concurrency: z.coerce.number().int().min(1).max(8).optional(),
-  outDir: z.string().optional(),
+  outDir: safePathString.optional(),
   includeHints: z.array(z.string()).optional(),
   excludeHints: z.array(z.string()).optional(),
 });
@@ -220,7 +225,13 @@ export const TasksSurchargeUsAllBodySchema = z.object({
 });
 
 export const TasksSurchargeGenericJsonBodySchema = z.object({
-  path: z.string().min(1).optional(),
+  path: z
+    .string()
+    .min(1)
+    .refine((s) => !/(^|\/)\.\.($|\/)/.test(s) && !s.includes('\0'), {
+      message: 'Path must not contain traversal sequences (..) or null bytes',
+    })
+    .optional(),
 });
 
 export const TasksDutyJsonImportResponseSchema = z.object({

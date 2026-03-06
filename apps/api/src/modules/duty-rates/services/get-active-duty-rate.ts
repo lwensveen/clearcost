@@ -254,7 +254,7 @@ export async function getActiveDutyRateWithMeta(
           asc(dutyRatesTable.ratePct),
           desc(dutyRatesTable.effectiveFrom)
         )
-        .limit(100);
+        .limit(50);
 
       const notesRow = notesRows.find((row) => isGlobalPartnerRow(row.partner));
       const viaNotes = asDutyRateRow(notesRow);
@@ -288,7 +288,7 @@ export async function getActiveDutyRateWithMeta(
       .from(dutyRatesTable)
       .where(baseWhere)
       .orderBy(...orderBys)
-      .limit(partnerIso2 ? 500 : 1);
+      .limit(partnerIso2 ? 100 : 1);
 
     const row = partnerIso2
       ? rows.find((candidate) => isPartnerCompatibleFallbackRow(candidate.partner, partnerIso2))

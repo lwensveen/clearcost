@@ -38,7 +38,7 @@ function compose10(itemRaw: string, statRaw: string, defaultStatIfMissing = true
   return null;
 }
 
-async function httpJson<T = any>(url: string): Promise<T> {
+async function httpJson<T = unknown>(url: string): Promise<T> {
   const res = await httpFetch(url, {
     headers: { 'user-agent': 'clearcost-importer' },
     timeoutMs: 60000,
@@ -75,25 +75,34 @@ type TableInfo = { name: string; columns: string[] };
 async function listTables(apiBaseUrl: string, versionId: string): Promise<TableInfo[]> {
   const url = `${apiBaseUrl}/v1/datasets/${DATASET_ID}/versions/${versionId}/tables?format=json`;
   try {
-    const j = await httpJson<any>(url);
+    const j = await httpJson<unknown>(url);
+    const mapTable = (t: unknown): TableInfo => {
+      const rec = t as Record<string, unknown>;
+      return {
+        name: String(rec.name ?? rec.table ?? rec.id ?? ''),
+        columns: Array.isArray(rec.columns)
+          ? (rec.columns as unknown[])
+              .map((c) => {
+                const col = c as Record<string, unknown>;
+                return String(col.name ?? c ?? '');
+              })
+              .filter(Boolean)
+          : [],
+      };
+    };
     if (Array.isArray(j)) {
-      return j.map((t: any) => ({
-        name: String(t.name ?? t.table ?? t.id ?? ''),
-        columns: Array.isArray(t.columns)
-          ? t.columns.map((c: any) => String(c.name ?? c ?? '')).filter(Boolean)
-          : [],
-      }));
+      return j.map(mapTable);
     }
-    if (j && Array.isArray(j.tables)) {
-      return j.tables.map((t: any) => ({
-        name: String(t.name ?? t.table ?? t.id ?? ''),
-        columns: Array.isArray(t.columns)
-          ? t.columns.map((c: any) => String(c.name ?? c ?? '')).filter(Boolean)
-          : [],
-      }));
+    const jRec = j as Record<string, unknown>;
+    if (jRec && Array.isArray(jRec.tables)) {
+      return (jRec.tables as unknown[]).map(mapTable);
     }
-  } catch (e) {
-    if (DEBUG) console.warn('[UK] listTables failed; using known guesses:', (e as Error).message);
+  } catch (e: unknown) {
+    if (DEBUG)
+      console.warn(
+        '[UK] listTables failed; using known guesses:',
+        e instanceof Error ? e.message : e
+      );
   }
   return [
     { name: 'commodities-report', columns: [] },

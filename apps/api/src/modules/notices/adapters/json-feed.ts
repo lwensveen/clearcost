@@ -20,12 +20,12 @@ export type JsonFeedOpts = {
   userAgent?: string;
 };
 
-function pickArray(root: unknown, path?: string): any[] {
-  if (!path) return Array.isArray(root) ? (root as any[]) : [];
+function pickArray(root: unknown, path?: string): unknown[] {
+  if (!path) return Array.isArray(root) ? root : [];
   const parts = path.split('.').filter(Boolean);
-  let node: any = root;
+  let node: unknown = root;
   for (const p of parts) {
-    node = node?.[p];
+    node = (node as Record<string, unknown>)?.[p];
     if (!node) return [];
   }
   return Array.isArray(node) ? node : [];

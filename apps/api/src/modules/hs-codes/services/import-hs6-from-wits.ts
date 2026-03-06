@@ -25,11 +25,14 @@ function isHS6(code?: string) {
   return !!code && /^\d{6}$/.test(code);
 }
 
-function takeName(v: any): string {
+function takeName(v: unknown): string {
   if (v == null) return '';
   if (typeof v === 'string') return v;
   if (Array.isArray(v)) return takeName(v[0]);
-  if (typeof v === 'object') return v.value ?? v.en ?? v.label ?? v['#text'] ?? '';
+  if (typeof v === 'object') {
+    const rec = v as Record<string, unknown>;
+    return String(rec.value ?? rec.en ?? rec.label ?? rec['#text'] ?? '');
+  }
   return String(v);
 }
 
@@ -54,23 +57,25 @@ async function fetchHs6ViaData(year: number, sourceUrls: WitsHsSourceUrls) {
   const url = `${sourceUrls.dataBaseUrl}/${path}?startPeriod=${year}&endPeriod=${year}&detail=DataOnly`;
   const r = await httpFetch(url, { headers: { ...baseHeaders, accept: ACCEPT_DATA } });
   if (!r.ok) throw new Error(`WITS /data fetch failed ${r.status} ${r.statusText}`);
-  const json: any = await r.json();
+  const json = (await r.json()) as Record<string, unknown>;
 
-  const seriesDims: any[] = json?.structure?.dimensions?.series ?? [];
-  const prodIdx = seriesDims.findIndex((d: any) =>
+  const structure = json?.structure as Record<string, unknown> | undefined;
+  const dimensions = structure?.dimensions as Record<string, unknown> | undefined;
+  const seriesDims = (dimensions?.series ?? []) as Array<Record<string, unknown>>;
+  const prodIdx = seriesDims.findIndex((d) =>
     String(d?.id ?? '')
       .toUpperCase()
       .includes('PRODUCT')
   );
   if (prodIdx < 0) throw new Error('WITS /data: PRODUCT dimension not found');
-  const values: any[] = seriesDims[prodIdx]?.values ?? [];
+  const values = (seriesDims[prodIdx]?.values ?? []) as Array<Record<string, unknown>>;
 
   const uniq = new Map<string, string>();
   for (const v of values) {
-    const code = v?.id;
+    const code = v?.id as string | undefined;
     if (!isHS6(code)) continue;
     const title = sanitizeTitle(takeName(v?.name));
-    if (!uniq.has(code)) uniq.set(code, title || '—');
+    if (!uniq.has(code as string)) uniq.set(code as string, title || '—');
   }
   return Array.from(uniq, ([hs6, title]) => ({ hs6, title }));
 }
@@ -81,52 +86,72 @@ async function fetchHs6ViaDSD_JSON(sourceUrls: WitsHsSourceUrls) {
     headers: { ...baseHeaders, accept: ACCEPT_STRUCT },
   });
   if (!r.ok) throw new Error(`WITS /datastructure fetch failed ${r.status} ${r.statusText}`);
-  const json: any = await r.json();
+  const json = (await r.json()) as Record<string, unknown>;
 
   // Handle both {structure:{codelists:{codelist:[...]}}} and flattened variants
-  const dsd =
-    json?.structure?.dataStructures?.[0]?.dataStructure ?? json?.structure?.dataStructures?.[0];
-  const seriesDims: any[] = dsd?.dimensions?.series ?? dsd?.dimensions?.Series ?? [];
+  const jsonStructure = json?.structure as Record<string, unknown> | undefined;
+  const dataStructures = jsonStructure?.dataStructures as
+    | Array<Record<string, unknown>>
+    | undefined;
+  const dsd = ((dataStructures?.[0] as Record<string, unknown>)?.dataStructure ??
+    dataStructures?.[0]) as Record<string, unknown> | undefined;
+  const dsdDimensions = dsd?.dimensions as Record<string, unknown> | undefined;
+  const seriesDims = (dsdDimensions?.series ?? dsdDimensions?.Series ?? []) as Array<
+    Record<string, unknown>
+  >;
 
-  const productDim = seriesDims.find((d: any) =>
+  const productDim = seriesDims.find((d) =>
     String(d?.id ?? '')
       .toUpperCase()
       .includes('PRODUCT')
   );
+  const prodLocalRep = productDim?.localRepresentation as Record<string, unknown> | undefined;
+  const prodLocalRepAlt = productDim?.LocalRepresentation as Record<string, unknown> | undefined;
+  const prodLocalRepSnake = productDim?.local_representation as Record<string, unknown> | undefined;
+  const enumRef = (prodLocalRep?.enumeration as Record<string, unknown>)?.ref as
+    | Record<string, unknown>
+    | undefined;
+  const enumRefAlt = (prodLocalRepAlt?.Enumeration as Record<string, unknown>)?.Ref as
+    | Record<string, unknown>
+    | undefined;
+  const enumRefSnake = (prodLocalRepSnake?.enumeration as Record<string, unknown>)?.ref as
+    | Record<string, unknown>
+    | undefined;
   const clRefId: string | undefined =
-    productDim?.localRepresentation?.enumeration?.ref?.id ??
-    productDim?.LocalRepresentation?.Enumeration?.Ref?.id ??
-    productDim?.local_representation?.enumeration?.ref?.id;
+    (enumRef?.id as string | undefined) ??
+    (enumRefAlt?.id as string | undefined) ??
+    (enumRefSnake?.id as string | undefined);
 
   // Pull out codelists regardless of shape
-  const clContainer = json?.structure?.codelists;
-  const clArray =
-    (Array.isArray(clContainer?.codelist) ? clContainer.codelist : null) ??
+  const clContainer = jsonStructure?.codelists as Record<string, unknown> | undefined;
+  const clContainerCodelist = clContainer?.codelist;
+  const clArray: Array<Record<string, unknown>> =
+    (Array.isArray(clContainerCodelist) ? clContainerCodelist : null) ??
     (Array.isArray(clContainer) ? clContainer : null) ??
     [];
 
-  const cl: any =
+  const cl: Record<string, unknown> | undefined =
     clArray.find(
-      (c: any) => String(c?.id ?? '').toUpperCase() === String(clRefId ?? '').toUpperCase()
+      (c) => String(c?.id ?? '').toUpperCase() === String(clRefId ?? '').toUpperCase()
     ) ??
-    clArray.find((c: any) =>
+    clArray.find((c) =>
       String(c?.id ?? c?.name ?? '')
         .toUpperCase()
         .includes('PRODUCT')
     ) ??
-    clArray.find((c: any) =>
+    clArray.find((c) =>
       String(c?.id ?? c?.name ?? '')
         .toUpperCase()
         .includes('HS')
     );
 
-  const items: any[] = cl?.items ?? cl?.Codes ?? cl?.code ?? [];
+  const items = (cl?.items ?? cl?.Codes ?? cl?.code ?? []) as Array<Record<string, unknown>>;
   const uniq = new Map<string, string>();
   for (const it of items) {
-    const code = it?.id ?? it?.value ?? it?.code;
+    const code = (it?.id ?? it?.value ?? it?.code) as string | undefined;
     if (!isHS6(code)) continue;
     const title = sanitizeTitle(takeName(it?.name ?? it?.description ?? it?.label));
-    if (!uniq.has(code)) uniq.set(code, title || '—');
+    if (!uniq.has(code as string)) uniq.set(code as string, title || '—');
   }
   return Array.from(uniq, ([hs6, title]) => ({ hs6, title }));
 }
@@ -156,15 +181,18 @@ async function fetchHs6FromWits(year: number, sourceUrls: WitsHsSourceUrls) {
   // Try /data → DSD(JSON) → URL(XML)
   try {
     return await fetchHs6ViaData(year, sourceUrls);
-  } catch (e) {
-    console.warn('HS6: /data failed, trying DSD(JSON):', (e as Error)?.message ?? e);
+  } catch (e: unknown) {
+    console.warn('HS6: /data failed, trying DSD(JSON):', e instanceof Error ? e.message : e);
   }
   try {
     const viaDSD = await fetchHs6ViaDSD_JSON(sourceUrls);
     if (viaDSD.length) return viaDSD;
     console.warn('HS6: DSD(JSON) returned 0 items, falling back to URL/XML');
-  } catch (e) {
-    console.warn('HS6: DSD(JSON) failed, falling back to URL/XML:', (e as Error)?.message ?? e);
+  } catch (e: unknown) {
+    console.warn(
+      'HS6: DSD(JSON) failed, falling back to URL/XML:',
+      e instanceof Error ? e.message : e
+    );
   }
   return await fetchHs6ViaURL_XML(sourceUrls);
 }

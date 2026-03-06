@@ -24,7 +24,10 @@ type ImportOpts = {
  * - Upsert key: (dest, vat_rate_kind, effective_from).
  * - On conflict: updates rate_pct, vat_base, effective_to, notes, updated_at.
  */
-export async function importVatRules(rows: VatRuleInsert[] | Array<any>, opts: ImportOpts = {}) {
+export async function importVatRules(
+  rows: VatRuleInsert[] | Array<Record<string, unknown>>,
+  opts: ImportOpts = {}
+) {
   if (!Array.isArray(rows) || rows.length === 0) {
     throw new Error('[VAT import] source produced 0 rows.');
   }
@@ -32,11 +35,11 @@ export async function importVatRules(rows: VatRuleInsert[] | Array<any>, opts: I
   const importSource = opts.source ?? 'official';
 
   // Normalize inputs to DB column names
-  const mapped = rows.map((r: any) => {
+  const mapped = rows.map((r: Record<string, unknown>) => {
     const dest = String(r.dest ?? '').toUpperCase();
     const vatRateKind = String(r.vatRateKind ?? r.kind ?? 'STANDARD').toUpperCase();
     const vatBase = String(r.vatBase ?? r.base ?? 'CIF_PLUS_DUTY');
-    const ratePct = toNumeric3String(r.ratePct);
+    const ratePct = toNumeric3String(r.ratePct as string | number);
     const effectiveFrom = toDateIfDefined(r.effectiveFrom);
     const effectiveTo = toDateOrNull(r.effectiveTo ?? null);
     const notes = r.notes ?? null;

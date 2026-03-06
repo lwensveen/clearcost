@@ -2,7 +2,7 @@ import type { Command } from '../../runtime.js';
 import { withRun } from '../../runtime.js';
 import { parseFlags } from '../../utils.js';
 import { db, tradeNoticesTable } from '@clearcost/db';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { attachNoticeDoc, markNoticeStatus } from '../../../../modules/notices/registry.js';
 import {
   getCnNoticeSourceConfig,
@@ -85,7 +85,7 @@ export const fetchNoticeDocsCmd: Command = async (argv) => {
     },
     async () => {
       // Build WHERE
-      const conds: any[] = [];
+      const conds: SQL[] = [];
       if (dest) conds.push(eq(tradeNoticesTable.dest, dest));
       if (authority) conds.push(eq(tradeNoticesTable.authority, authority));
       if (statuses.length) conds.push(inArray(tradeNoticesTable.status, statuses));

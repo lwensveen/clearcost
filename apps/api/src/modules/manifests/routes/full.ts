@@ -39,7 +39,8 @@ export default async function manifestsFullRoutes(app: FastifyInstance) {
         .select()
         .from(manifestItemsTable)
         .where(eq(manifestItemsTable.manifestId, id))
-        .orderBy(desc(manifestItemsTable.createdAt));
+        .orderBy(desc(manifestItemsTable.createdAt))
+        .limit(1000);
 
       return {
         manifest: ManifestSelectCoercedSchema.parse(m),

@@ -1,5 +1,5 @@
 // apps/api/src/modules/tasks/notices-routes.ts
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod/v4';
 import { readFile } from 'node:fs/promises';
 import { crawlAuthorityPdfs } from '../notices/crawl-authorities.js';
@@ -32,7 +32,7 @@ function deriveTitleFromUrl(url: string): string {
 }
 
 export default function noticesRoutes(app: FastifyInstance) {
-  async function handle(req: any, reply: any, authority: CnNoticeAuthority) {
+  async function handle(req: FastifyRequest, reply: FastifyReply, authority: CnNoticeAuthority) {
     const body: Body = BodySchema.parse(req.body ?? {});
     const importId = req.importCtx?.runId;
     const {

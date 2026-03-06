@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod/v4';
-import { and, desc, eq } from 'drizzle-orm';
-import { db, manifestItemsTable, manifestsTable } from '@clearcost/db';
+import { count, desc, eq } from 'drizzle-orm';
+import { db, manifestItemsTable } from '@clearcost/db';
 import {
   IdempotencyHeaderSchema,
   ManifestByIdSchema,
@@ -14,19 +14,8 @@ import {
   ManifestItemsReplaceBodySchema,
   ManifestItemsReplaceResponseSchema,
 } from '@clearcost/types';
-import { ImportQuery, mapRecordToItem, parseCsv, RowShape } from './utils.js';
+import { assertOwnsManifest, ImportQuery, mapRecordToItem, parseCsv, RowShape } from './utils.js';
 import { errorResponseForStatus } from '../../../../lib/errors.js';
-
-/** Ensure the manifest belongs to the API key owner */
-async function assertOwnsManifest(manifestId: string, ownerId?: string) {
-  if (!ownerId) return false;
-  const row = await db
-    .select({ id: manifestsTable.id })
-    .from(manifestsTable)
-    .where(and(eq(manifestsTable.id, manifestId), eq(manifestsTable.ownerId, ownerId)))
-    .limit(1);
-  return !!row[0];
-}
 
 /** Minimal CSV serializer */
 function toCsvRow(fields: Array<string | number | null | undefined>) {
@@ -80,16 +69,19 @@ export default async function manifestsBulkRoutes(app: FastifyInstance) {
       if (!g.allowed) return reply.code(g.code).send(errorResponseForStatus(g.code, g.reason));
 
       if (dryRun) {
-        const current = await db
-          .select({ id: manifestItemsTable.id })
+        const rows = await db
+          .select({ total: count() })
           .from(manifestItemsTable)
           .where(eq(manifestItemsTable.manifestId, id));
-        return { replaced: current.length };
+        return { replaced: rows[0]?.total ?? 0 };
       }
 
       await db.transaction(async (tx) => {
         await tx.delete(manifestItemsTable).where(eq(manifestItemsTable.manifestId, id));
-        if (rows.length) await tx.insert(manifestItemsTable).values(rows as any);
+        if (rows.length) {
+          type ItemInsert = typeof manifestItemsTable.$inferInsert;
+          await tx.insert(manifestItemsTable).values(rows as ItemInsert[]);
+        }
       });
 
       return { replaced: rows.length };
@@ -123,7 +115,8 @@ export default async function manifestsBulkRoutes(app: FastifyInstance) {
         .select()
         .from(manifestItemsTable)
         .where(eq(manifestItemsTable.manifestId, id))
-        .orderBy(desc(manifestItemsTable.createdAt));
+        .orderBy(desc(manifestItemsTable.createdAt))
+        .limit(5000);
 
       const items = rows.map((r) => ManifestItemSelectCoercedSchema.parse(r));
 
@@ -165,8 +158,8 @@ export default async function manifestsBulkRoutes(app: FastifyInstance) {
             it.dimsCm?.l ?? 0,
             it.dimsCm?.w ?? 0,
             it.dimsCm?.h ?? 0,
-            it.createdAt?.toISOString?.() ?? (it as any).createdAt,
-            it.updatedAt?.toISOString?.() ?? (it as any).updatedAt,
+            it.createdAt.toISOString(),
+            it.updatedAt.toISOString(),
           ])
         );
       }
@@ -242,11 +235,11 @@ export default async function manifestsBulkRoutes(app: FastifyInstance) {
       if (q.dryRun) {
         let replaced: number | undefined = undefined;
         if (q.mode === 'replace') {
-          const existing = await db
-            .select({ id: manifestItemsTable.id })
+          const countRows = await db
+            .select({ total: count() })
             .from(manifestItemsTable)
             .where(eq(manifestItemsTable.manifestId, id));
-          replaced = existing.length;
+          replaced = countRows[0]?.total ?? 0;
         }
         return {
           mode: q.mode,
@@ -264,16 +257,17 @@ export default async function manifestsBulkRoutes(app: FastifyInstance) {
 
       await db.transaction(async (tx) => {
         if (q.mode === 'replace') {
-          const existing = await tx
-            .select({ id: manifestItemsTable.id })
+          const countRows = await tx
+            .select({ total: count() })
             .from(manifestItemsTable)
             .where(eq(manifestItemsTable.manifestId, id));
-          replaced = existing.length;
+          replaced = countRows[0]?.total ?? 0;
 
           await tx.delete(manifestItemsTable).where(eq(manifestItemsTable.manifestId, id));
         }
         if (rows.length) {
-          await tx.insert(manifestItemsTable).values(rows as any);
+          type ItemInsert = typeof manifestItemsTable.$inferInsert;
+          await tx.insert(manifestItemsTable).values(rows as ItemInsert[]);
           inserted = rows.length;
         }
       });

@@ -133,10 +133,12 @@ async function fetchAllRowsViaJSON(
   jsonUrl: string
 ): Promise<Record<string, unknown>[]> {
   if (!jsonUrl) return [];
-  const json = await client.getJson(jsonUrl);
-  if (Array.isArray(json)) return json;
-  if (Array.isArray(json?.data)) return json.data;
-  if (Array.isArray(json?.rows)) return json.rows;
+  const json = (await client.getJson(jsonUrl)) as Record<string, unknown> | unknown[];
+  if (Array.isArray(json)) return json as Record<string, unknown>[];
+  if (Array.isArray((json as Record<string, unknown>)?.data))
+    return (json as Record<string, unknown>).data as Record<string, unknown>[];
+  if (Array.isArray((json as Record<string, unknown>)?.rows))
+    return (json as Record<string, unknown>).rows as Record<string, unknown>[];
   return [];
 }
 
@@ -167,18 +169,19 @@ async function exportChapterJson(
     while (attempt < MAX_TRIES) {
       attempt++;
       try {
-        const json = await client.getJson(path);
+        const json = (await client.getJson(path)) as Record<string, unknown> | unknown[];
+        const rec = json as Record<string, unknown>;
         const arr = Array.isArray(json)
           ? json
-          : Array.isArray(json?.data)
-            ? json.data
-            : Array.isArray(json?.rows)
-              ? json.rows
+          : Array.isArray(rec?.data)
+            ? rec.data
+            : Array.isArray(rec?.rows)
+              ? rec.rows
               : null;
         if (Array.isArray(arr)) return arr as Record<string, unknown>[];
         throw new Error('Unexpected shape');
-      } catch (e) {
-        const msg = (e as Error).message || String(e);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
         if (attempt >= MAX_TRIES) {
           console.warn(`HTS ch${chapter} ${path} failed: ${msg}`);
           break;

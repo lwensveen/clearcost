@@ -239,13 +239,13 @@ export async function exportChapterJson(
     while (attempt < MAX_TRIES) {
       attempt++;
       try {
-        const json = await client.getJson(path);
+        const json = (await client.getJson(path)) as Record<string, unknown> | unknown[];
         const arr = Array.isArray(json)
           ? json
-          : Array.isArray(json?.data)
-            ? json.data
-            : Array.isArray(json?.rows)
-              ? json.rows
+          : Array.isArray((json as Record<string, unknown>)?.data)
+            ? (json as Record<string, unknown>).data
+            : Array.isArray((json as Record<string, unknown>)?.rows)
+              ? (json as Record<string, unknown>).rows
               : null;
 
         if (Array.isArray(arr)) {

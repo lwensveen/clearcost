@@ -5,9 +5,8 @@ import {
   manifestItemQuotesTable,
   manifestQuotesTable,
   manifestSnapshotsTable,
-  manifestsTable,
 } from '@clearcost/db';
-import { and, desc, eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { withIdempotency } from '../../../../lib/idempotency.js';
 import { computePool } from '../../services/compute-pool.js';
 import { errorResponseForStatus } from '../../../../lib/errors.js';
@@ -21,20 +20,11 @@ import {
   ManifestQuotesHistoryResponseSchema,
   ManifestQuotesResponseSchema,
 } from '@clearcost/types';
+import { assertOwnsManifest } from './utils.js';
 
 function idemKeyFrom(h: unknown) {
   const hdrs = IdempotencyHeaderSchema.parse(h ?? {});
   return hdrs['idempotency-key'] ?? hdrs['x-idempotency-key'] ?? null;
-}
-
-async function assertOwnsManifest(manifestId: string, ownerId?: string) {
-  if (!ownerId) return false;
-  const row = await db
-    .select({ id: manifestsTable.id })
-    .from(manifestsTable)
-    .where(and(eq(manifestsTable.id, manifestId), eq(manifestsTable.ownerId, ownerId)))
-    .limit(1);
-  return !!row[0];
 }
 
 export default function manifestsPublicRoutes(app: FastifyInstance) {
@@ -67,7 +57,7 @@ export default function manifestsPublicRoutes(app: FastifyInstance) {
       },
     },
     async (req, reply) => {
-      const gate = await (req.server as any).enforceComputeLimit?.(req);
+      const gate = await req.server.enforceComputeLimit?.(req);
       if (gate && gate.allowed === false) {
         const msg =
           typeof gate.limit === 'number' && typeof gate.used === 'number'
@@ -159,7 +149,8 @@ export default function manifestsPublicRoutes(app: FastifyInstance) {
       const items = await db
         .select()
         .from(manifestItemQuotesTable)
-        .where(eq(manifestItemQuotesTable.manifestId, manifestId));
+        .where(eq(manifestItemQuotesTable.manifestId, manifestId))
+        .limit(1000);
 
       reply.header('cache-control', 'private, max-age=10, stale-while-revalidate=60');
       return reply.send(

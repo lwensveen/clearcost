@@ -111,8 +111,10 @@ export async function importDeMinimis(
   let sourceRows = 0;
   const importSource: DeMinimisSource = opts.source ?? 'official';
 
-  const isAsync = (s: any): s is AsyncIterable<DeMinimisInsert> =>
-    s && typeof s[Symbol.asyncIterator] === 'function';
+  const isAsync = (
+    s: DeMinimisInsert[] | AsyncIterable<DeMinimisInsert>
+  ): s is AsyncIterable<DeMinimisInsert> =>
+    !!s && typeof (s as AsyncIterable<DeMinimisInsert>)[Symbol.asyncIterator] === 'function';
 
   async function flush() {
     if (!buf.length) return;
@@ -189,12 +191,12 @@ export async function importDeMinimis(
       }));
       try {
         await db.insert(provenanceTable).values(provRows);
-      } catch (e) {
+      } catch (e: unknown) {
         console.error('[DeMinimis] provenance insert failed (non-fatal)', {
           importId: opts.importId,
           resourceType: 'de_minimis',
           batchSize: provRows.length,
-          error: (e as Error).message,
+          error: e instanceof Error ? e.message : String(e),
         });
       }
     }

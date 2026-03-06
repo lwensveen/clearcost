@@ -180,7 +180,7 @@ async function http<T = unknown>(
         const j = text ? JSON.parse(text) : null;
         const msg = j?.error?.message ?? j?.error ?? j?.message ?? (text || 'request failed');
         throw new Error(`${res.status} ${msg}`);
-      } catch (e) {
+      } catch (e: unknown) {
         if (e instanceof Error && e.message.startsWith(`${res.status} `)) throw e;
         throw new Error(`${res.status} ${text || 'request failed'}`);
       }

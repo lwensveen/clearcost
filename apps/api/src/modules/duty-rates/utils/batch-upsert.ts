@@ -162,12 +162,12 @@ export async function batchUpsertDutyRatesFromStream(
 
       try {
         await db.insert(provenanceTable).values(provRows);
-      } catch (e) {
+      } catch (e: unknown) {
         console.error('[Duties] provenance insert failed (non-fatal)', {
           importId: opts.importId,
           resourceType: 'duty_rate',
           batchSize: provRows.length,
-          error: (e as Error).message,
+          error: e instanceof Error ? e.message : String(e),
         });
       }
     }
@@ -175,8 +175,10 @@ export async function batchUpsertDutyRatesFromStream(
     buf = [];
   }
 
-  const isAsyncIterable = (s: any): s is AsyncIterable<DutyRateInsertRow> =>
-    s && typeof s[Symbol.asyncIterator] === 'function';
+  const isAsyncIterable = (
+    s: AsyncIterable<DutyRateInsertRow> | DutyRateInsertRow[]
+  ): s is AsyncIterable<DutyRateInsertRow> =>
+    !!s && typeof (s as AsyncIterable<DutyRateInsertRow>)[Symbol.asyncIterator] === 'function';
 
   if (isAsyncIterable(source)) {
     for await (const row of source) {

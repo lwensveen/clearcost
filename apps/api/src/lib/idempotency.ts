@@ -4,15 +4,16 @@ import { db, idempotencyKeysTable } from '@clearcost/db';
 
 function stableStringify(obj: unknown): string {
   const seen = new WeakSet();
-  const norm = (v: any): any => {
+  const norm = (v: unknown): unknown => {
     if (v && typeof v === 'object') {
-      if (seen.has(v)) return null;
-      seen.add(v);
+      if (seen.has(v as object)) return null;
+      seen.add(v as object);
       if (Array.isArray(v)) return v.map(norm);
+      const obj = v as Record<string, unknown>;
       return Object.fromEntries(
-        Object.keys(v)
+        Object.keys(obj)
           .sort()
-          .map((k) => [k, norm(v[k])])
+          .map((k) => [k, norm(obj[k])])
       );
     }
     return v;

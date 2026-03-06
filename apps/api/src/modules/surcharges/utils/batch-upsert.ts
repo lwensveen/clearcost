@@ -86,8 +86,10 @@ export async function batchUpsertSurchargesFromStream(
   let totalUpdated = 0;
   let buf: SurchargeInsertRow[] = [];
 
-  const isAsyncIterable = (s: any): s is AsyncIterable<SurchargeInsertRow> =>
-    s && typeof s[Symbol.asyncIterator] === 'function';
+  const isAsyncIterable = (
+    s: AsyncIterable<SurchargeInsertRow> | SurchargeInsertRow[]
+  ): s is AsyncIterable<SurchargeInsertRow> =>
+    !!s && typeof (s as AsyncIterable<SurchargeInsertRow>)[Symbol.asyncIterator] === 'function';
 
   async function flush() {
     if (buf.length === 0) return;
@@ -248,12 +250,12 @@ export async function batchUpsertSurchargesFromStream(
 
       try {
         await db.insert(provenanceTable).values(provRows);
-      } catch (e) {
+      } catch (e: unknown) {
         console.error('[Surcharges] provenance insert failed (non-fatal)', {
           importId: opts.importId,
           resourceType: 'surcharge',
           batchSize: provRows.length,
-          error: (e as Error).message,
+          error: e instanceof Error ? e.message : String(e),
         });
       }
     }

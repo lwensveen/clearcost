@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod/v4';
-import { and, desc, eq } from 'drizzle-orm';
-import { db, manifestItemQuotesTable, manifestQuotesTable, manifestsTable } from '@clearcost/db';
+import { desc, eq } from 'drizzle-orm';
+import { db, manifestItemQuotesTable, manifestQuotesTable } from '@clearcost/db';
 import { errorResponseForStatus } from '../../../../lib/errors.js';
 import {
   ManifestByIdSchema,
@@ -10,17 +10,10 @@ import {
   ManifestQuoteResponseSchema,
   ManifestQuoteSelectCoercedSchema,
 } from '@clearcost/types';
+import { assertOwnsManifest } from './utils.js';
 
-/** Ensure the manifest belongs to the caller */
-async function assertOwnsManifest(manifestId: string, ownerId?: string) {
-  if (!ownerId) return false;
-  const row = await db
-    .select({ id: manifestsTable.id })
-    .from(manifestsTable)
-    .where(and(eq(manifestsTable.id, manifestId), eq(manifestsTable.ownerId, ownerId)))
-    .limit(1);
-  return !!row[0];
-}
+type ManifestItemQuoteCoerced = z.infer<typeof ManifestItemQuoteSelectCoercedSchema>;
+type ManifestQuoteCoerced = z.infer<typeof ManifestQuoteSelectCoercedSchema>;
 
 export default async function manifestsQuoteRoute(app: FastifyInstance) {
   app.get(
@@ -62,13 +55,14 @@ export default async function manifestsQuoteRoute(app: FastifyInstance) {
         .select()
         .from(manifestItemQuotesTable)
         .where(eq(manifestItemQuotesTable.manifestId, id))
-        .orderBy(desc(manifestItemQuotesTable.updatedAt));
+        .orderBy(desc(manifestItemQuotesTable.updatedAt))
+        .limit(1000);
 
       const items = itemRows.map((r) => {
-        const it = ManifestItemQuoteSelectCoercedSchema.parse(r);
+        const it: ManifestItemQuoteCoerced = ManifestItemQuoteSelectCoercedSchema.parse(r);
         return {
-          id: (it as any).id,
-          currency: (it as any).currency,
+          id: it.id,
+          currency: it.currency,
           basis: it.basis,
           chargeableKg: it.chargeableKg ?? null,
           freightShare: it.freightShare,
@@ -78,7 +72,7 @@ export default async function manifestsQuoteRoute(app: FastifyInstance) {
 
       const summary = {
         itemsCount: s.itemsCount,
-        currency: (s as any).currency,
+        currency: (s as ManifestQuoteCoerced).currency,
         freight: s.freightTotal,
         duty: s.dutyTotal,
         vat: s.vatTotal,

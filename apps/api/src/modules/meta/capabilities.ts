@@ -172,7 +172,8 @@ export function getMetaCapabilitiesDocument() {
 
   return {
     apiVersion: process.env.npm_package_version ?? '0.0.0',
-    buildSha: process.env.GIT_SHA ?? null,
+    // Redact buildSha in production to avoid leaking deployment details
+    buildSha: process.env.NODE_ENV === 'production' ? null : (process.env.GIT_SHA ?? null),
     datasets,
   };
 }

@@ -111,11 +111,11 @@ function parseOecd(workbook: ReturnType<typeof readXlsx>, debug = false): RowRat
     const sheet = workbook.Sheets[sheetName];
     if (!sheet) continue; // TS: guard undefined worksheets
 
-    const A = xlsxUtils.sheet_to_json<any[]>(sheet, {
+    const A = xlsxUtils.sheet_to_json<unknown[]>(sheet, {
       header: 1,
       raw: false,
       defval: null,
-    }) as any[][];
+    }) as unknown[][];
 
     if (!A.length) continue;
 
@@ -306,11 +306,11 @@ function parseImf(workbook: ReturnType<typeof readXlsx>, debug = false): RowRate
     const sheet = workbook.Sheets[sheetName];
     if (!sheet) continue; // TS: guard undefined worksheets
 
-    const A = xlsxUtils.sheet_to_json<any[]>(sheet, {
+    const A = xlsxUtils.sheet_to_json<unknown[]>(sheet, {
       header: 1,
       raw: false,
       defval: null,
-    }) as any[][];
+    }) as unknown[][];
 
     if (!A.length) continue;
 

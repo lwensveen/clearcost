@@ -42,7 +42,14 @@ async function scrapeAphis(): Promise<{
   truckTransponder?: { amt: string | null; url: string } | null;
   barge?: { amt: string | null; url: string } | null;
 }> {
-  const out: any = {};
+  const out: {
+    vessel?: { amt: string | null; url: string } | null;
+    aircraft?: { amt: string | null; url: string } | null;
+    railcar?: { amt: string | null; url: string } | null;
+    truckSingle?: { amt: string | null; url: string } | null;
+    truckTransponder?: { amt: string | null; url: string } | null;
+    barge?: { amt: string | null; url: string } | null;
+  } = {};
   const { aphisFeesUrl, aphisFy25Url } = await resolveUsSurchargeSourceUrls();
   const pages = [aphisFeesUrl, aphisFy25Url];
 
@@ -75,8 +82,8 @@ async function scrapeAphis(): Promise<{
         const m = H.match(/\bBarge\b[^$]*\$\s*([\d,]+(?:\.\d+)?)/i);
         if (m) out.barge = { amt: toUSD(m[1]!), url };
       }
-    } catch (e) {
-      if (DEBUG) console.warn('[APHIS] scrape failed', url, (e as Error).message);
+    } catch (e: unknown) {
+      if (DEBUG) console.warn('[APHIS] scrape failed', url, e instanceof Error ? e.message : e);
     }
   }
 

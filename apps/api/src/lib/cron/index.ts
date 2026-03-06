@@ -1,11 +1,13 @@
 import { commands } from './registry.js';
 
-function log(...args: any[]) {
+function log(...args: unknown[]) {
   console.log(...args);
 }
 
 function end(code: number): never {
-  const bun = (globalThis as any).Bun;
+  const bun = (globalThis as Record<string, unknown>).Bun as
+    | { exit?: (code: number) => never }
+    | undefined;
   if (bun && typeof bun.exit === 'function') {
     bun.exit(code);
   }
@@ -29,13 +31,13 @@ async function main() {
     const ms = Date.now() - started;
     log(`✔ ${cmd} finished in ${ms}ms`);
     end(0);
-  } catch (err) {
+  } catch (err: unknown) {
     log(`✖ ${cmd} failed:\n`, err instanceof Error ? err.message : err);
     end(1);
   }
 }
 
-main().catch((e) => {
+main().catch((e: unknown) => {
   console.error(e);
   end(1);
 });

@@ -120,11 +120,12 @@ export async function importMyPreferentialFromExcel(options: ImportMyPreferentia
     const ratePct = parsePercentAdValorem(readCell(row, columns.rate), { mapFreeToZero: true });
     if (ratePct == null) continue; // skip specific/compound for now
 
+    const rowRecord = row as Record<string, unknown>;
     const rawNotesValue =
       readCell(row, columns.notes) ??
-      (row as any).Notes ??
-      (row as any).Remarks ??
-      (row as any).Comment ??
+      rowRecord.Notes ??
+      rowRecord.Remarks ??
+      rowRecord.Comment ??
       '';
     const notesText = String(rawNotesValue || '').trim() || options.agreement || undefined;
 

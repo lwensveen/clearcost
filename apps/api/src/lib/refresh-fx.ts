@@ -23,15 +23,34 @@ export async function fetchEcbXml(url = ECB_DAILY_XML_URL): Promise<string> {
   return await res.text();
 }
 
+/** ECB daily XML parsed structure (via fast-xml-parser with attributes). */
+interface EcbCubeEntry {
+  '@_currency'?: string;
+  '@_rate'?: string | number;
+}
+
+interface EcbDailyCube {
+  '@_time'?: string;
+  Cube?: EcbCubeEntry | EcbCubeEntry[];
+}
+
+interface EcbEnvelope {
+  'gesmes:Envelope'?: {
+    Cube?: {
+      Cube?: EcbDailyCube;
+    };
+  };
+}
+
 export function parseEcb(xml: string): { fxAsOf: string; rates: Record<string, number> } {
   const parser = new XMLParser({
     ignoreAttributes: false,
     // default prefix is "@_"; we'll read attributes via that
   });
 
-  let doc: any;
+  let doc: EcbEnvelope;
   try {
-    doc = parser.parse(xml);
+    doc = parser.parse(xml) as EcbEnvelope;
   } catch (e) {
     throw new Error(`ECB XML parse error: ${(e as Error).message}`);
   }

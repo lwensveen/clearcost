@@ -100,7 +100,7 @@ export async function tabulaCsv(pdf: Buffer | string, opts: TabulaOpts = {}): Pr
     throw new Error(
       `Failed to execute Tabula (tried: ${commandsToTry.join(
         ', '
-      )}). Last error: ${String((lastError as any)?.message || lastError)}`
+      )}). Last error: ${lastError instanceof Error ? lastError.message : String(lastError)}`
     );
   } finally {
     await rm(workingDir, { recursive: true, force: true });

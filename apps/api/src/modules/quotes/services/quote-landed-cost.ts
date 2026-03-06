@@ -31,6 +31,16 @@ type Unit = 'kg' | 'm3';
 
 countries.registerLocale(en);
 
+/**
+ * Safely convert a DB numeric (string) field to a finite number.
+ * Returns `fallback` (default 0) if the value is null/undefined/NaN/Infinity.
+ */
+function safeNumeric(value: string | number | null | undefined, fallback = 0): number {
+  if (value == null) return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 const roundMoney = (n: number, ccy: string) => {
   const dp = ccy === 'JPY' ? 0 : 2;
   const f = Math.pow(10, dp);
@@ -517,12 +527,12 @@ async function quoteLandedCostMvp(
   }
 
   const goodsDest = roundMoney(goodsDestOut.amount, destCurrency);
-  const dutyAmount = roundMoney((goodsDest * Number(dutyRow.ratePct)) / 100, destCurrency);
+  const dutyAmount = roundMoney((goodsDest * safeNumeric(dutyRow.ratePct)) / 100, destCurrency);
   const vatBase =
     (vatInfo.vatBase as 'CIF' | 'CIF_PLUS_DUTY') === 'CIF_PLUS_DUTY'
       ? goodsDest + dutyAmount
       : goodsDest;
-  const vatAmount = roundMoney((vatBase * Number(vatInfo.ratePct)) / 100, destCurrency);
+  const vatAmount = roundMoney((vatBase * safeNumeric(vatInfo.ratePct)) / 100, destCurrency);
   const totalLandedCost = roundMoney(goodsDest + dutyAmount + vatAmount, destCurrency);
 
   const volKg = volumetricKg(input.dimsCm);
@@ -813,7 +823,7 @@ export async function quoteLandedCost(
           liters: input.liters,
         },
         {
-          fallbackRatePct: Number(dutyRow.ratePct),
+          fallbackRatePct: safeNumeric(dutyRow.ratePct),
           on: now,
           fxAsOf,
           destCurrency,
@@ -827,7 +837,7 @@ export async function quoteLandedCost(
         dutyFallbackRateDueToMissingContext = !dutyComputed.usedComponents;
       }
     } else {
-      const rate = dutyRow ? Number(dutyRow.ratePct) : 0;
+      const rate = dutyRow ? safeNumeric(dutyRow.ratePct) : 0;
       duty = (rate / 100) * CIF;
     }
   }
@@ -848,7 +858,7 @@ export async function quoteLandedCost(
 
   if (iossEligible) {
     // IOSS: VAT collected at checkout on goods (and optionally shipping)
-    const checkoutRate = (vatInfo ? Number(vatInfo.ratePct) : 0) / 100;
+    const checkoutRate = safeNumeric(vatInfo?.ratePct) / 100;
     const chargeShippingAtCheckout = profile?.chargeShippingAtCheckout ?? false;
     const checkoutVatBase = itemValDest + (chargeShippingAtCheckout ? freightInDest : 0);
     checkoutVAT = checkoutRate * checkoutVatBase;
@@ -856,7 +866,7 @@ export async function quoteLandedCost(
     // Import VAT at border unless de minimis suppresses VAT
     const base = (vatInfo?.vatBase as 'CIF' | 'CIF_PLUS_DUTY') ?? 'CIF_PLUS_DUTY';
     const vatBase = base === 'CIF_PLUS_DUTY' ? CIF + duty : CIF;
-    const vatRate = (vatInfo ? Number(vatInfo.ratePct) : 0) / 100;
+    const vatRate = safeNumeric(vatInfo?.ratePct) / 100;
     vat = vatRate * vatBase;
   }
 

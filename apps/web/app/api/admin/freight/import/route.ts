@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   const json = String(fd.get('json') ?? '[]');
 
   try {
-    const parsed = JSON.parse(json);
+    const parsed: unknown = JSON.parse(json);
 
     if (!Array.isArray(parsed)) throw new Error('Expected array of cards');
 

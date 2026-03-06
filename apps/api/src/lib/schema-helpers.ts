@@ -13,15 +13,17 @@ export const rateLimitHeaders = {
   },
 } as const;
 
-type Schema = Record<string, any>;
+type ResponseSchema = Record<string, unknown> & { headers?: Record<string, unknown> };
+type Schema = Record<string, unknown> & { response?: Record<string, ResponseSchema> };
 
 export function withRateLimit(schema: Schema): Schema {
   return {
     ...schema,
     response: Object.fromEntries(
       Object.entries(schema.response ?? {}).map(([code, s]) => {
-        const headers = { ...(s as any).headers, ...rateLimitHeaders };
-        return [code, { ...(s as any), headers }];
+        const existing = (s as ResponseSchema).headers ?? {};
+        const headers = { ...existing, ...rateLimitHeaders };
+        return [code, { ...s, headers }];
       })
     ),
   };

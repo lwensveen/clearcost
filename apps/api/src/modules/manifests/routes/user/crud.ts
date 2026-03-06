@@ -23,6 +23,7 @@ import {
   ManifestsListResponseSchema,
   ManifestsListQuerySchema,
 } from '@clearcost/types';
+import { assertOwnsManifest } from './utils.js';
 
 /**
  * NOTE:
@@ -34,16 +35,6 @@ import {
 export default async function manifestsCrud(app: FastifyInstance) {
   // Use Zod type provider so route generics drive req/rep typing
   const r = app.withTypeProvider<ZodTypeProvider>();
-
-  async function assertOwnsManifest(manifestId: string, ownerId?: string) {
-    if (!ownerId) return false;
-    const row = await db
-      .select({ id: manifestsTable.id })
-      .from(manifestsTable)
-      .where(and(eq(manifestsTable.id, manifestId), eq(manifestsTable.ownerId, ownerId)))
-      .limit(1);
-    return !!row[0];
-  }
 
   // ────────────────────────────────────────────────────────────────────────────
   // LIST MANIFESTS  GET /v1/manifests?origin=&dest=&mode=&pricingMode=&limit=

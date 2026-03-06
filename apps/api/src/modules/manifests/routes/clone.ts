@@ -55,15 +55,12 @@ export default async function manifestsCloneRoute(app: FastifyInstance) {
         ownerId: true,
         createdAt: true,
         updatedAt: true,
-      }).parse(src as any);
+      }).parse(src as Record<string, unknown>);
 
       type Insert = typeof manifestsTable.$inferInsert;
 
       // Compute a safe cloned name: prefer override, else "<source> (copy)", else "Copy of <id>"
-      const srcName =
-        typeof (src as any)?.name === 'string' && (src as any).name.trim()
-          ? (src as any).name
-          : undefined;
+      const srcName = src.name.trim() ? src.name : undefined;
       const clonedName = overrideName ?? (srcName ? `${srcName} (copy)` : `Copy of ${manifestId}`);
 
       let newId = '';
@@ -90,12 +87,14 @@ export default async function manifestsCloneRoute(app: FastifyInstance) {
         const items = await tx
           .select()
           .from(manifestItemsTable)
-          .where(eq(manifestItemsTable.manifestId, manifestId));
+          .where(eq(manifestItemsTable.manifestId, manifestId))
+          .limit(1000);
 
         if (items.length) {
           type ItemInsert = typeof manifestItemsTable.$inferInsert;
-          const rows: ItemInsert[] = items.map((it: any) => {
-            const { id, manifestId: _old, createdAt, updatedAt, ...rest } = it;
+          type ItemSelect = typeof manifestItemsTable.$inferSelect;
+          const rows: ItemInsert[] = items.map((it: ItemSelect) => {
+            const { id: _id, manifestId: _old, createdAt: _ca, updatedAt: _ua, ...rest } = it;
             return { ...rest, manifestId: newId };
           });
           await tx.insert(manifestItemsTable).values(rows);

@@ -5,6 +5,16 @@ import { and, desc, eq, isNull, lt, lte, sql } from 'drizzle-orm';
 import { httpFetch } from '../../../../lib/http.js';
 import { resolveUsSurchargeSourceUrls } from './source-urls.js';
 
+type FRDocument = {
+  title?: string;
+  body_html?: string;
+  citation?: string;
+  document_number?: string;
+  publication_date?: string;
+  html_url?: string;
+  public_inspection_pdf_url?: string;
+};
+
 const FR_DOCUMENTS_SOURCE_KEY = 'surcharges.us.federal_register.documents_api';
 const HMF_STATUTE_SOURCE_KEY = 'surcharges.us.statute.hmf';
 const MPF_STATUTE_SOURCE_KEY = 'surcharges.us.statute.mpf';
@@ -50,11 +60,11 @@ async function fetchFRDocForFY(
   const r = await httpFetch(url.toString(), { headers: { 'user-agent': 'clearcost-importer' } });
   if (!r.ok) return null;
 
-  const json = await r.json();
-  const docs: any[] = json?.results ?? [];
+  const json = (await r.json()) as { results?: FRDocument[] };
+  const docs: FRDocument[] = json?.results ?? [];
   const pick =
-    docs.find((d) => /customs user fees/i.test(d.title) && /adjust/i.test(d.title)) ||
-    docs.find((d) => /customs user fees/i.test(d.title)) ||
+    docs.find((d) => /customs user fees/i.test(d.title ?? '') && /adjust/i.test(d.title ?? '')) ||
+    docs.find((d) => /customs user fees/i.test(d.title ?? '')) ||
     docs[0];
 
   if (!pick?.body_html) return null;

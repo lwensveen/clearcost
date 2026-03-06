@@ -1,7 +1,20 @@
 import { ManifestItemInsertSchema, ManifestItemsImportQuerySchema } from '@clearcost/types';
 import { z } from 'zod/v4';
+import { and, eq } from 'drizzle-orm';
+import { db, manifestsTable } from '@clearcost/db';
 
 export const ImportQuery = ManifestItemsImportQuerySchema;
+
+/** Ensure the manifest belongs to the API key owner. Shared across manifest routes. */
+export async function assertOwnsManifest(manifestId: string, ownerId?: string): Promise<boolean> {
+  if (!ownerId) return false;
+  const row = await db
+    .select({ id: manifestsTable.id })
+    .from(manifestsTable)
+    .where(and(eq(manifestsTable.id, manifestId), eq(manifestsTable.ownerId, ownerId)))
+    .limit(1);
+  return !!row[0];
+}
 
 export type RowShape = z.input<typeof ManifestItemInsertSchema>;
 
@@ -57,7 +70,7 @@ export function mapRecordToItem(rec: Record<string, string>, manifestId: string)
     h: n(rec['dimsh'] ?? rec['h']) ?? 0,
   };
 
-  const row: any = {
+  return {
     manifestId,
     reference: s(rec['reference']),
     notes: s(rec['notes']),
@@ -69,6 +82,5 @@ export function mapRecordToItem(rec: Record<string, string>, manifestId: string)
     quantity: s(rec['quantity'] ?? rec['qty']),
     liters: s(rec['liters'] ?? rec['litres']),
     dimsCm: dims,
-  };
-  return row;
+  } satisfies RowShape;
 }

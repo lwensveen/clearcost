@@ -20,10 +20,10 @@ describe('schema-helpers', () => {
       };
       const result = withRateLimit(schema);
 
-      expect(result.response['200'].headers).toEqual(
+      expect(result.response!['200']!.headers).toEqual(
         expect.objectContaining({ 'RateLimit-Limit': expect.any(Object) })
       );
-      expect(result.response['400'].headers).toEqual(
+      expect(result.response!['400']!.headers).toEqual(
         expect.objectContaining({ 'RateLimit-Remaining': expect.any(Object) })
       );
     });
@@ -36,8 +36,8 @@ describe('schema-helpers', () => {
       };
       const result = withRateLimit(schema);
 
-      expect(result.response['200'].headers['X-Custom']).toEqual({ schema: { type: 'string' } });
-      expect(result.response['200'].headers['RateLimit-Limit']).toBeDefined();
+      expect(result.response!['200']!.headers!['X-Custom']).toEqual({ schema: { type: 'string' } });
+      expect(result.response!['200']!.headers!['RateLimit-Limit']).toBeDefined();
     });
 
     it('handles schema without response key', () => {

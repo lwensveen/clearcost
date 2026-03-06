@@ -41,8 +41,8 @@ const get = (obj: unknown, path?: string): unknown => {
     .replace(/\[(\w+)\]/g, '.$1')
     .split('.')
     .filter(Boolean);
-  let cur: any = obj;
-  for (const p of parts) cur = cur?.[p];
+  let cur: unknown = obj;
+  for (const p of parts) cur = (cur as Record<string, unknown>)?.[p];
   return cur;
 };
 

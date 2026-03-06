@@ -63,7 +63,7 @@ export async function resolveSourceDownloadUrl(params: {
     throw new Error(
       `[source_registry] source '${params.sourceKey}' has no URL configured and no fallback URL provided`
     );
-  } catch (err) {
+  } catch (err: unknown) {
     if (fallback && isUndefinedTableError(err)) {
       return fallback;
     }

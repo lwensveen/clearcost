@@ -46,7 +46,7 @@ function specificsComparable(a: LlmDutyRow, b: LlmDutyRow): boolean {
   const Bs = b.components.filter((c) => c.type !== 'advalorem');
   if (As.length !== Bs.length) return false;
 
-  const sig = (c: any) =>
+  const sig = (c: LlmDutyRow['components'][number]) =>
     `${c.type}|${(c.currency || '').toUpperCase()}|${c.uom || ''}|${c.qualifier || ''}`;
 
   const mapA = new Map<string, number>(

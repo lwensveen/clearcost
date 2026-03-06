@@ -11,7 +11,8 @@ export async function acquireRunLock(key: string): Promise<boolean> {
   const rows = await db.execute(
     sql<{ locked: boolean | 't' | 'f' }>`SELECT pg_try_advisory_lock(hashtext(${key})) AS locked`
   );
-  const locked = Array.isArray(rows) ? (rows[0]?.locked as any) : (rows as any)?.locked;
+  const result = Array.isArray(rows) ? rows[0] : (rows as unknown as Record<string, unknown>);
+  const locked = (result as Record<string, unknown> | undefined)?.locked;
   return locked === true || locked === 't';
 }
 

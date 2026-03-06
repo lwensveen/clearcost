@@ -30,7 +30,10 @@ export class UsitcClient {
         redirect: 'follow',
       });
       this.storeCookies(res, url);
-      await res.arrayBuffer().catch(() => null);
+      await res.arrayBuffer().catch((err) => {
+        console.error('[USITC] failed to drain warm-up response body:', err);
+        return null;
+      });
     }
   }
 
@@ -105,7 +108,7 @@ export class UsitcClient {
     return this.fetchTextOnce(url, headerModes[headerModes.length - 1]!);
   }
 
-  async getJson(pathOrUrl: string): Promise<any> {
+  async getJson(pathOrUrl: string): Promise<unknown> {
     const text = await this.getText(pathOrUrl, 'application/json,text/plain,*/*');
     const trimmed = text.trim();
     // strict parse
