@@ -3,6 +3,7 @@ import { db, webhookDeliveriesTable, webhookEndpointsTable } from '@clearcost/db
 import crypto from 'node:crypto';
 import { decryptSecret } from './secret-kms.js';
 import { httpFetch } from '../../../lib/http.js';
+import { assertPublicUrl } from '../../../lib/network.js';
 
 type EventName = 'quote.created';
 type Payload = Record<string, unknown>;
@@ -100,6 +101,9 @@ async function sendAttempt(
 ) {
   const ts = Math.floor(Date.now() / 1000);
   const sig = sign(secret, body, ts);
+
+  // SSRF protection: resolve hostname and reject private/internal IPs
+  await assertPublicUrl(url);
 
   let status = 0;
   let text = '';

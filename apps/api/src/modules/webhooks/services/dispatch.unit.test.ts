@@ -173,6 +173,16 @@ vi.mock('@clearcost/db', () => {
   return { db, webhookEndpointsTable, webhookDeliveriesTable };
 });
 
+/* --- mock httpFetch to delegate to our fetchMock without timeouts/retries --- */
+vi.mock('../../../lib/http.js', () => ({
+  httpFetch: (input: any, init: any) => fetch(input, init),
+}));
+
+/* --- mock assertPublicUrl to skip SSRF DNS checks in tests --- */
+vi.mock('../../../lib/network.js', () => ({
+  assertPublicUrl: async () => {},
+}));
+
 /* --- mock decryptSecret --- */
 const decryptSpy = vi.fn<(enc: string, iv: string, tag: string) => string>(() => 'sekret-123');
 

@@ -2,9 +2,33 @@ import { z } from 'zod/v4';
 import { createSelectSchema } from 'drizzle-zod';
 import { webhookDeliveriesTable, webhookEndpointsTable } from '@clearcost/db';
 
+const webhookUrlSchema = z
+  .string()
+  .url()
+  .refine(
+    (url) => {
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol === 'https:') return true;
+        // Allow http only for localhost in development
+        if (
+          parsed.protocol === 'http:' &&
+          (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') &&
+          process.env.NODE_ENV !== 'production'
+        ) {
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    },
+    { message: 'Webhook URL must use HTTPS (HTTP allowed only for localhost in development)' }
+  );
+
 export const WebhookEndpointCreateBodySchema = z.object({
   ownerId: z.string().uuid(),
-  url: z.string().url(),
+  url: webhookUrlSchema,
   events: z.array(z.string()).default([]),
 });
 
