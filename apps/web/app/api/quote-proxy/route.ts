@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-type RateLimitEntry = {
-  count: number;
-  windowStartMs: number;
-};
+import { isRateLimited } from '@/lib/rate-limit';
 
 const RATE_LIMIT_MAX = 20;
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const rateLimitByIp = new Map<string, RateLimitEntry>();
+const RATE_LIMIT_WINDOW_SECONDS = 60;
 
 function getClientIp(req: NextRequest): string {
   const xForwardedFor = req.headers.get('x-forwarded-for');
@@ -22,21 +17,6 @@ function getClientIp(req: NextRequest): string {
   return 'unknown';
 }
 
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const existing = rateLimitByIp.get(ip);
-
-  if (!existing || now - existing.windowStartMs >= RATE_LIMIT_WINDOW_MS) {
-    rateLimitByIp.set(ip, { count: 1, windowStartMs: now });
-    return false;
-  }
-
-  existing.count += 1;
-  if (existing.count > RATE_LIMIT_MAX) return true;
-  rateLimitByIp.set(ip, existing);
-  return false;
-}
-
 function requestIdempotencyKey(req: NextRequest): string | null {
   const idempotencyKey = req.headers.get('idempotency-key')?.trim();
   if (idempotencyKey) return idempotencyKey;
@@ -48,7 +28,13 @@ function requestIdempotencyKey(req: NextRequest): string | null {
 }
 
 export async function POST(req: NextRequest) {
-  if (isRateLimited(getClientIp(req))) {
+  if (
+    await isRateLimited(
+      `quote-proxy:${getClientIp(req)}`,
+      RATE_LIMIT_MAX,
+      RATE_LIMIT_WINDOW_SECONDS
+    )
+  ) {
     return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
   }
 
