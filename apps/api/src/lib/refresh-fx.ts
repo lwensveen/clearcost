@@ -90,49 +90,51 @@ export async function upsertFxRatesEUR(
       fxAsOf: new Date(fxAsOfIso + 'T00:00:00Z'),
     }));
 
-  let inserted = 0;
+  if (rows.length === 0) return 0;
 
-  for (const row of rows) {
-    const ret = await db
-      .insert(fxRatesTable)
-      .values(row)
-      .onConflictDoNothing({
-        target: [fxRatesTable.base, fxRatesTable.quote, fxRatesTable.fxAsOf],
-      })
-      .returning({ id: fxRatesTable.id });
+  // Batch insert all FX rates in a single query
+  const insertedRows = await db
+    .insert(fxRatesTable)
+    .values(rows)
+    .onConflictDoNothing({
+      target: [fxRatesTable.base, fxRatesTable.quote, fxRatesTable.fxAsOf],
+    })
+    .returning({ id: fxRatesTable.id });
 
-    if (ret.length > 0) {
-      inserted += 1;
+  // Batch insert provenance rows for all successfully inserted rates
+  if (opts?.importId && insertedRows.length > 0) {
+    // Build a lookup from row index to the original row data.
+    // insertedRows only contains rows that were actually inserted (not skipped
+    // by onConflictDoNothing), so we pair each with the corresponding source
+    // row using the order returned by the batch insert.
+    const provenanceRows = insertedRows.map((ret, idx) => ({
+      importId: opts.importId!,
+      resourceType: 'fx_rate' as const,
+      resourceId: ret.id,
+      sourceKey: 'fx.ecb.daily',
+      rowHash: sha256Hex(
+        JSON.stringify({
+          base: rows[idx]!.base,
+          quote: rows[idx]!.quote,
+          rate: rows[idx]!.rate,
+          fxAsOf: rows[idx]!.fxAsOf.toISOString(),
+        })
+      ),
+    }));
 
-      if (opts?.importId && ret[0]) {
-        try {
-          await db.insert(provenanceTable).values({
-            importId: opts.importId,
-            resourceType: 'fx_rate',
-            resourceId: ret[0].id,
-            sourceKey: 'fx.ecb.daily',
-            rowHash: sha256Hex(
-              JSON.stringify({
-                base: row.base,
-                quote: row.quote,
-                rate: row.rate,
-                fxAsOf: row.fxAsOf.toISOString(),
-              })
-            ),
-          });
-        } catch (e) {
-          console.error('[FX] provenance insert failed (non-fatal)', {
-            importId: opts.importId,
-            resourceType: 'fx_rate',
-            quote: row.quote,
-            error: (e as Error).message,
-          });
-        }
-      }
+    try {
+      await db.insert(provenanceTable).values(provenanceRows);
+    } catch (e) {
+      console.error('[FX] provenance batch insert failed (non-fatal)', {
+        importId: opts.importId,
+        resourceType: 'fx_rate',
+        count: provenanceRows.length,
+        error: (e as Error).message,
+      });
     }
   }
 
-  return inserted;
+  return insertedRows.length;
 }
 
 export async function refreshFx(): Promise<FxRefreshResult> {

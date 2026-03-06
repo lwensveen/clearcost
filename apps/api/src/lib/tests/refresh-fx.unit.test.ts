@@ -32,7 +32,9 @@ vi.mock('@clearcost/db', () => {
           onConflictDoNothing: (args: any) => ({
             returning: async () => {
               calls.push({ tbl, vals, args });
-              return [{ id: `fx_${vals.quote}_id` }];
+              // vals is now an array of all rows (bulk insert)
+              const rows = Array.isArray(vals) ? vals : [vals];
+              return rows.map((r: any) => ({ id: `fx_${r.quote}_id` }));
             },
           }),
         }),
@@ -90,18 +92,23 @@ describe('upsertFxRatesEUR', () => {
   it('inserts one row per non-EUR quote with correct values and conflict target', async () => {
     const inserted = await fx.upsertFxRatesEUR('2025-08-31', { USD: 1.1, JPY: 160, EUR: 1 });
     expect(inserted).toBe(2);
-    expect(calls.length).toBe(2);
+    // Bulk insert: single call with an array of all rows
+    expect(calls.length).toBe(1);
 
-    for (const c of calls) {
-      expect(Array.isArray(c.args.target)).toBe(true);
-      expect(c.args.target.map((t: any) => t.name)).toEqual(['base', 'quote', 'fxAsOf']);
-      expect(c.vals.base).toBe('EUR');
-      expect(typeof c.vals.quote).toBe('string');
-      expect(typeof c.vals.rate).toBe('string');
-      expect(new Date(c.vals.fxAsOf).toISOString()).toBe('2025-08-31T00:00:00.000Z');
+    const c = calls[0]!;
+    expect(Array.isArray(c.args.target)).toBe(true);
+    expect(c.args.target.map((t: any) => t.name)).toEqual(['base', 'quote', 'fxAsOf']);
+    expect(Array.isArray(c.vals)).toBe(true);
+    expect(c.vals.length).toBe(2);
+
+    for (const row of c.vals) {
+      expect(row.base).toBe('EUR');
+      expect(typeof row.quote).toBe('string');
+      expect(typeof row.rate).toBe('string');
+      expect(new Date(row.fxAsOf).toISOString()).toBe('2025-08-31T00:00:00.000Z');
     }
 
-    const quotes = calls.map((c) => c.vals.quote).sort();
+    const quotes = c.vals.map((r: any) => r.quote).sort();
     expect(quotes).toEqual(['JPY', 'USD']);
   });
 
@@ -114,8 +121,12 @@ describe('upsertFxRatesEUR', () => {
       }
     );
 
-    expect(provCalls.length).toBe(2);
-    for (const p of provCalls) {
+    // Provenance is now a single batch insert with an array of rows
+    expect(provCalls.length).toBe(1);
+    const provRows = provCalls[0]!;
+    expect(Array.isArray(provRows)).toBe(true);
+    expect(provRows.length).toBe(2);
+    for (const p of provRows) {
       expect(p.importId).toBe('test_import_id');
       expect(p.resourceType).toBe('fx_rate');
       expect(p.sourceKey).toBe('fx.ecb.daily');
@@ -188,8 +199,8 @@ describe('refreshFx (integration of parse + upsert)', () => {
     });
 
     expect(res).toEqual({ fxAsOf: '2025-08-31', inserted: 2, base: 'EUR' });
-    expect(calls.length).toBe(2);
-    expect(provCalls.length).toBe(2);
+    expect(calls.length).toBe(1);
+    expect(provCalls.length).toBe(1);
 
     expect(startImportRun).toHaveBeenCalledWith(
       expect.objectContaining({

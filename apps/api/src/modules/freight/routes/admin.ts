@@ -5,6 +5,7 @@ import { and, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm';
 import { withIdempotency } from '../../../lib/idempotency.js';
 import { importFreightCards } from '../services/import-cards.js';
 import { errorResponseForStatus } from '../../../lib/errors.js';
+import { escapeLike } from '../../../lib/sql-utils.js';
 import {
   ErrorResponseSchema,
   FreightCardAdminCreateSchema,
@@ -77,7 +78,7 @@ export default function freightRoutes(app: FastifyInstance) {
         q.dest ? eq(freightRateCardsTable.dest, q.dest) : sql`TRUE`,
         q.freightMode ? eq(freightRateCardsTable.freightMode, q.freightMode) : sql`TRUE`,
         q.freightUnit ? eq(freightRateCardsTable.freightUnit, q.freightUnit) : sql`TRUE`,
-        q.q ? ilike(freightRateCardsTable.carrier, `%${q.q}%`) : sql`TRUE`,
+        q.q ? ilike(freightRateCardsTable.carrier, `%${escapeLike(q.q)}%`) : sql`TRUE`,
         overlapWhere({ from: q.from, to: q.to })
       );
 
@@ -261,7 +262,8 @@ export default function freightRoutes(app: FastifyInstance) {
         .select()
         .from(freightRateStepsTable)
         .where(eq(freightRateStepsTable.cardId, req.params.id))
-        .orderBy(freightRateStepsTable.uptoQty);
+        .orderBy(freightRateStepsTable.uptoQty)
+        .limit(200);
       return reply.send(FreightRateStepsListResponseSchema.parse(rows));
     }
   );
@@ -476,17 +478,13 @@ export default function freightRoutes(app: FastifyInstance) {
             insertedCards++;
 
             if (c.steps?.length) {
-              for (const s of c.steps) {
-                await tx
-                  .insert(freightRateStepsTable)
-                  .values({
-                    cardId: card.id,
-                    uptoQty: String(s.uptoQty),
-                    pricePerUnit: String(s.pricePerUnit),
-                  })
-                  .onConflictDoNothing();
-                insertedSteps++;
-              }
+              const stepsToInsert = c.steps.map((s) => ({
+                cardId: card.id,
+                uptoQty: String(s.uptoQty),
+                pricePerUnit: String(s.pricePerUnit),
+              }));
+              await tx.insert(freightRateStepsTable).values(stepsToInsert).onConflictDoNothing();
+              insertedSteps += c.steps.length;
             }
           }
         });
