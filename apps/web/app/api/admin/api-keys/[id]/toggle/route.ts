@@ -18,6 +18,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // ignore toggle failures
   }
 
-  const url = new URL(`/admin/api-keys?ownerId=${ownerId}`, req.url);
+  const url = new URL(`/admin/api-keys?ownerId=${encodeURIComponent(ownerId)}`, req.url);
   return NextResponse.redirect(url, 302);
 }

@@ -3,6 +3,20 @@ import swaggerUI from '@fastify/swagger-ui';
 import { jsonSchemaTransform, ZodTypeProvider } from 'fastify-type-provider-zod';
 import { FastifyPluginAsync } from 'fastify';
 
+// CSP for /docs routes: only allow same-origin scripts/styles + inline styles
+// needed by Swagger UI for its dynamic rendering.
+const DOCS_CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self' data:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+
 const swaggerPlugin: FastifyPluginAsync = async (app) => {
   app.withTypeProvider<ZodTypeProvider>();
 
@@ -42,6 +56,14 @@ const swaggerPlugin: FastifyPluginAsync = async (app) => {
       deepLinking: true,
       persistAuthorization: true,
     },
+  });
+
+  // Set Content-Security-Policy on all docs-related routes
+  app.addHook('onSend', async (request, reply) => {
+    const url = request.url;
+    if (url === '/docs' || url.startsWith('/docs/') || url === '/openapi.json') {
+      void reply.header('content-security-policy', DOCS_CSP);
+    }
   });
 
   app.get('/openapi.json', async () => app.swagger());

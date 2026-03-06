@@ -24,14 +24,7 @@ export async function POST(req: Request) {
 
   try {
     const { token } = await createKey(ownerId, name, scopes);
-
-    return NextResponse.redirect(
-      new URL(
-        `/admin/api-keys?ownerId=${encodeURIComponent(ownerId)}&token=${encodeURIComponent(token)}`,
-        req.url
-      ),
-      { status: 303 }
-    );
+    return NextResponse.json({ token, ownerId }, { status: 201 });
   } catch (e: unknown) {
     return errorJson(e instanceof Error ? e.message : 'Failed to create key', 500);
   }

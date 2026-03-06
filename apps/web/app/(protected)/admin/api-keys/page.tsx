@@ -82,7 +82,9 @@ async function KeysTable({ ownerId }: { ownerId: string }) {
       <CardHeader className="flex items-center justify-between">
         <CardTitle>Keys for {ownerId}</CardTitle>
         <Button asChild variant="secondary">
-          <Link href={`/admin/api-keys/new?ownerId=${ownerId}`}>Create Key</Link>
+          <Link href={`/admin/api-keys/new?ownerId=${encodeURIComponent(ownerId)}`}>
+            Create Key
+          </Link>
         </Button>
       </CardHeader>
       <CardContent>

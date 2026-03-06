@@ -5,8 +5,8 @@ export const HealthSchema = z.object({
   service: z.string().default('clearcost-api'),
   time: z.object({
     server: z.string(),
-    uptimeSec: z.number(),
-    tz: z.string(),
+    uptimeSec: z.number().nullable(),
+    tz: z.string().nullable(),
   }),
   db: z.object({
     ok: z.boolean(),

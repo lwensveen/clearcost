@@ -4,6 +4,7 @@ import { basename } from 'node:path';
 import unzipper from 'unzipper';
 import * as XLSX from 'xlsx';
 import { httpFetch } from '../../../../lib/http.js';
+import { validateSourcePath } from '../../../../lib/safe-path.js';
 import { batchUpsertDutyRatesFromStream } from '../../utils/batch-upsert.js';
 import {
   parsePercentAdValorem,
@@ -98,14 +99,15 @@ function detectColumns(headers: string[]): ColumnMap | null {
 }
 
 async function loadSourceBuffer(urlOrPath: string): Promise<Buffer> {
-  if (isHttpLike(urlOrPath)) {
-    const response = await httpFetch(urlOrPath, { redirect: 'follow', timeoutMs: 60000 });
+  const safePath = validateSourcePath(urlOrPath);
+  if (isHttpLike(safePath)) {
+    const response = await httpFetch(safePath, { redirect: 'follow', timeoutMs: 60000 });
     if (!response.ok) {
       throw new Error(`GH MFN official source download failed ${response.status}`);
     }
     return Buffer.from(await response.arrayBuffer());
   }
-  return Buffer.from(await readFile(urlOrPath));
+  return Buffer.from(await readFile(safePath));
 }
 
 async function resolveWorkbookBuffer(urlOrPath: string): Promise<ResolvedWorkbook> {

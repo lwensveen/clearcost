@@ -68,6 +68,11 @@ async function buildBaseServer(options: BaseServerOptions) {
   await app.register(helmet, { contentSecurityPolicy: false });
   if (options.enableCors) {
     const ALLOWED_ORIGIN = process.env.WEB_ORIGIN; // e.g. https://app.clearcost.com
+    if (!ALLOWED_ORIGIN) {
+      app.log.warn(
+        'WEB_ORIGIN is not set — CORS is disabled. Set WEB_ORIGIN to the web frontend origin for production.'
+      );
+    }
     await app.register(cors, {
       origin: ALLOWED_ORIGIN ? [ALLOWED_ORIGIN] : false,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -121,9 +126,13 @@ async function buildBaseServer(options: BaseServerOptions) {
 }
 
 export async function buildPublicServer() {
+  // Disable API docs in production unless explicitly enabled via ENABLE_PUBLIC_DOCS=true
+  const enableDocs =
+    process.env.NODE_ENV === 'production' ? process.env.ENABLE_PUBLIC_DOCS === 'true' : true;
+
   const app = await buildBaseServer({
     enableCors: true,
-    enableDocs: true,
+    enableDocs,
     enableHttpMetrics: true,
     enableImportMetrics: false,
     enableImportInstrumentation: true,

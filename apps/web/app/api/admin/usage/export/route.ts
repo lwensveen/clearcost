@@ -17,11 +17,14 @@ export async function GET(req: Request) {
   try {
     const rows = await fetchUsageByKey(apiKeyId, from, to);
     const csv = rowsToCSV(rows);
+    const safeApiKeyId = apiKeyId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeFrom = (from ?? 'start').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeTo = (to ?? 'end').replace(/[^a-zA-Z0-9_-]/g, '_');
     return new NextResponse(csv, {
       status: 200,
       headers: {
         'content-type': 'text/csv; charset=utf-8',
-        'content-disposition': `attachment; filename="usage_${apiKeyId}_${from ?? 'start'}_${to ?? 'end'}.csv"`,
+        'content-disposition': `attachment; filename="usage_${safeApiKeyId}_${safeFrom}_${safeTo}.csv"`,
       },
     });
   } catch (e: unknown) {

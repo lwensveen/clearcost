@@ -312,7 +312,7 @@ describe('quotes routes', () => {
     });
 
     expect(res.statusCode).toBe(500);
-    expect(res.json()).toMatchObject({ error: { message: 'boom' } });
+    expect(res.json()).toMatchObject({ error: { message: 'quote failed' } });
     await app.close();
   });
 

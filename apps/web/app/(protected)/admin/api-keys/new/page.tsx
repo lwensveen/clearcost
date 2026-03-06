@@ -50,7 +50,9 @@ export default function NewKeyPage() {
             </p>
             <code className="block break-all rounded-md border bg-muted p-3 text-sm">{token}</code>
             <Button asChild variant="secondary">
-              <Link href={`/admin/api-keys?ownerId=${defaultOwnerId}`}>Back to keys</Link>
+              <Link href={`/admin/api-keys?ownerId=${encodeURIComponent(defaultOwnerId)}`}>
+                Back to keys
+              </Link>
             </Button>
           </CardContent>
         </Card>
@@ -88,7 +90,9 @@ export default function NewKeyPage() {
                 {pending ? 'Creating\u2026' : 'Create'}
               </Button>
               <Button asChild variant="secondary">
-                <Link href={`/admin/api-keys?ownerId=${defaultOwnerId}`}>Cancel</Link>
+                <Link href={`/admin/api-keys?ownerId=${encodeURIComponent(defaultOwnerId)}`}>
+                  Cancel
+                </Link>
               </Button>
             </div>
           </form>

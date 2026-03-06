@@ -188,7 +188,7 @@ export default function quoteRoutes(app: FastifyInstance) {
             .send(code ? errorResponse(message, code) : errorResponseForStatus(status, message));
         }
         req.log.error({ err, idemKey, msg: 'quote failed' });
-        return reply.code(500).send(errorResponseForStatus(500, message));
+        return reply.code(500).send(errorResponseForStatus(500, 'quote failed'));
       }
     }
   );
@@ -319,7 +319,7 @@ export default function quoteRoutes(app: FastifyInstance) {
 
       const whereSince =
         sinceHours != null
-          ? gt(quoteSnapshotsTable.createdAt, sql`now() - interval '${sinceHours} hours'`)
+          ? gt(quoteSnapshotsTable.createdAt, new Date(Date.now() - sinceHours * 3600_000))
           : undefined;
 
       const rows = await db
@@ -340,7 +340,7 @@ export default function quoteRoutes(app: FastifyInstance) {
 
       const out: RecentQuoteRow[] = rows.map((r) => {
         const created = r.createdAt
-          ? new Date(r.createdAt as any).toISOString()
+          ? new Date(r.createdAt).toISOString()
           : new Date(0).toISOString();
 
         const reqParsed = QuoteInputSchema.safeParse(r.request);

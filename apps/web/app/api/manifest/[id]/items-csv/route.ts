@@ -15,11 +15,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
 
   const { id } = await ctx.params;
   const csv = await exportManifestItemsCsv(sdk(), id);
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, '_');
 
   return new NextResponse(csv, {
     headers: {
       'content-type': 'text/csv; charset=utf-8',
-      'content-disposition': `attachment; filename="manifest-${id}-items.csv"`,
+      'content-disposition': `attachment; filename="manifest-${safeId}-items.csv"`,
       'cache-control': 'no-store',
     },
   });

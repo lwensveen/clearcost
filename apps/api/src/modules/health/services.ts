@@ -38,9 +38,16 @@ const DATASET_FRESHNESS_RULES: Record<DatasetFreshnessKey, DatasetFreshnessRule>
 function toDateOrNull(v: unknown): Date | null {
   if (v == null) return null;
   if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v;
-  const d = new Date(v as string | number);
+  if (typeof v !== 'string' && typeof v !== 'number') return null;
+  const d = new Date(v);
   return Number.isNaN(d.getTime()) ? null : d;
 }
+
+type ImportFreshnessRow = {
+  last_success_at: Date | string | null;
+  last_attempt_at: Date | string | null;
+  source: string | null;
+};
 
 type ImportFreshnessStats = {
   lastSuccessAt: Date | null;
@@ -57,7 +64,7 @@ async function getImportFreshnessStats(jobPrefixes: string[]): Promise<ImportFre
   const whereJobs = sql.join(likeClauses, sql` OR `);
   const attemptAtExpr = sql`COALESCE(finished_at, started_at)`;
 
-  const res = await db.execute(sql`
+  const { rows } = await db.execute<ImportFreshnessRow>(sql`
     SELECT
       MAX(
         CASE
@@ -78,10 +85,7 @@ async function getImportFreshnessStats(jobPrefixes: string[]): Promise<ImportFre
     WHERE (${whereJobs})
   `);
 
-  const row =
-    (res as any)?.rows?.[0] ??
-    (Array.isArray(res) ? (res as Array<Record<string, unknown>>)[0] : null) ??
-    null;
+  const row = rows[0] ?? null;
 
   return {
     lastSuccessAt: toDateOrNull(row?.last_success_at ?? null),
@@ -99,7 +103,7 @@ async function getImportFreshnessStatsForExactJobs(jobs: string[]): Promise<Impo
   const whereJobs = sql.join(exactClauses, sql` OR `);
   const attemptAtExpr = sql`COALESCE(finished_at, started_at)`;
 
-  const res = await db.execute(sql`
+  const { rows } = await db.execute<ImportFreshnessRow>(sql`
     SELECT
       MAX(
         CASE
@@ -120,10 +124,7 @@ async function getImportFreshnessStatsForExactJobs(jobs: string[]): Promise<Impo
     WHERE (${whereJobs})
   `);
 
-  const row =
-    (res as any)?.rows?.[0] ??
-    (Array.isArray(res) ? (res as Array<Record<string, unknown>>)[0] : null) ??
-    null;
+  const row = rows[0] ?? null;
 
   return {
     lastSuccessAt: toDateOrNull(row?.last_success_at ?? null),
@@ -238,12 +239,17 @@ export async function getDatasetFreshnessSnapshot() {
     },
   };
 
-  for (const [dataset, rule] of Object.entries(DATASET_FRESHNESS_RULES) as Array<
+  // Fetch freshness stats for all datasets in parallel — each is an independent DB query.
+  const entries = Object.entries(DATASET_FRESHNESS_RULES) as Array<
     [DatasetFreshnessKey, DatasetFreshnessRule]
-  >) {
-    const { lastSuccessAt, lastAttemptAt, source } = await getImportFreshnessStats(
-      rule.jobPrefixes
-    );
+  >;
+  const results = await Promise.all(
+    entries.map(([, rule]) => getImportFreshnessStats(rule.jobPrefixes))
+  );
+
+  for (let i = 0; i < entries.length; i++) {
+    const [dataset, rule] = entries[i]!;
+    const { lastSuccessAt, lastAttemptAt, source } = results[i]!;
     const latestRunAt = lastSuccessAt;
     const ageHours =
       latestRunAt == null ? null : Math.max(0, (now.getTime() - latestRunAt.getTime()) / 36e5);
@@ -342,12 +348,17 @@ export async function getMvpFreshnessSnapshot() {
     },
   };
 
-  for (const [dataset, rule] of Object.entries(MVP_DATASET_FRESHNESS_RULES) as Array<
+  // Fetch freshness stats for all MVP datasets in parallel — each is an independent DB query.
+  const mvpEntries = Object.entries(MVP_DATASET_FRESHNESS_RULES) as Array<
     [MvpDatasetFreshnessKey, MvpDatasetFreshnessRule]
-  >) {
-    const { lastSuccessAt, lastAttemptAt, source } = await getImportFreshnessStatsForExactJobs(
-      rule.jobs
-    );
+  >;
+  const mvpResults = await Promise.all(
+    mvpEntries.map(([, rule]) => getImportFreshnessStatsForExactJobs(rule.jobs))
+  );
+
+  for (let i = 0; i < mvpEntries.length; i++) {
+    const [dataset, rule] = mvpEntries[i]!;
+    const { lastSuccessAt, lastAttemptAt, source } = mvpResults[i]!;
     const latestRunAt = lastSuccessAt;
     const ageHours =
       latestRunAt == null ? null : Math.max(0, (now.getTime() - latestRunAt.getTime()) / 36e5);
@@ -457,35 +468,40 @@ export async function checkHealth(opts: { publicView?: boolean } = {}): Promise<
   const publicView = opts.publicView ?? false;
   const startedAt = Date.now();
 
-  let dbOk = false;
-  let dbLatencyMs: number | null = null;
-  try {
-    const t0 = Date.now();
-    await db.execute(sql`select 1`);
-    dbOk = true;
-    dbLatencyMs = Date.now() - t0;
-  } catch {
-    dbOk = false;
-    dbLatencyMs = null;
-  }
+  // Run DB ping and FX freshness check in parallel — they are independent.
+  const [dbResult, fxResult] = await Promise.all([
+    (async () => {
+      try {
+        const t0 = Date.now();
+        await db.execute(sql`select 1`);
+        return { ok: true, latencyMs: Date.now() - t0 };
+      } catch {
+        return { ok: false, latencyMs: null };
+      }
+    })(),
+    (async () => {
+      try {
+        const { rows } = await db.execute<{ latest: string | null }>(
+          sql`SELECT MAX(as_of) AS latest FROM fx_rates`
+        );
+        const latest = rows[0]?.latest ?? null;
+        if (latest) {
+          const dt = new Date(latest);
+          const ageHours = Math.max(0, (Date.now() - dt.getTime()) / 36e5);
+          return { ok: ageHours <= FX_MAX_AGE_HOURS, latest: dt.toISOString(), ageHours };
+        }
+        return { ok: false, latest: null, ageHours: null };
+      } catch {
+        return { ok: null, latest: null, ageHours: null };
+      }
+    })(),
+  ]);
 
-  let fxOk: boolean | null = null;
-  let fxLatest: string | null = null;
-  let fxAgeHours: number | null = null;
-  try {
-    const r: any = await db.execute(sql`SELECT MAX(as_of) AS latest FROM fx_rates`);
-    const latest = r?.rows?.[0]?.latest ?? r?.[0]?.latest ?? null;
-    if (latest) {
-      const dt = new Date(latest);
-      fxLatest = dt.toISOString();
-      fxAgeHours = Math.max(0, (Date.now() - dt.getTime()) / 36e5);
-      fxOk = fxAgeHours <= FX_MAX_AGE_HOURS;
-    } else {
-      fxOk = false;
-    }
-  } catch {
-    fxOk = null;
-  }
+  const dbOk = dbResult.ok;
+  const dbLatencyMs = dbResult.latencyMs;
+  const fxOk = fxResult.ok;
+  const fxLatest = fxResult.latest;
+  const fxAgeHours = fxResult.ageHours;
 
   const ok = dbOk && (fxOk === null || fxOk);
 
@@ -502,8 +518,9 @@ export async function checkHealth(opts: { publicView?: boolean } = {}): Promise<
     service: 'clearcost-api',
     time: {
       server: new Date().toISOString(),
-      uptimeSec: Math.floor(process.uptime()),
-      tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      // Redact uptime and timezone in public view to avoid leaking server metadata.
+      uptimeSec: publicView ? null : Math.floor(process.uptime()),
+      tz: publicView ? null : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     },
     db: { ok: dbOk, latencyMs: dbLatencyPublic },
     fxCache: {

@@ -9,10 +9,20 @@ const plugin: FastifyPluginAsync = fp(async (app) => {
 
     const status = Number.isFinite(raw) && raw >= 400 && raw <= 599 ? Number(raw) : 500;
 
-    const code = typeof errRecord.code === 'string' ? errRecord.code : 'ERR_UNEXPECTED';
+    // Redact internal error codes for 5xx to avoid leaking server internals.
+    const code =
+      status >= 500
+        ? 'ERR_INTERNAL'
+        : typeof errRecord.code === 'string'
+          ? errRecord.code
+          : 'ERR_UNEXPECTED';
 
     const message =
-      typeof err.message === 'string' && err.message ? err.message : 'Unexpected error';
+      status >= 500
+        ? 'Internal server error'
+        : typeof err.message === 'string' && err.message
+          ? err.message
+          : 'Unexpected error';
 
     reply.status(status).send({ error: { code, message } });
   });

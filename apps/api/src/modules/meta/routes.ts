@@ -16,8 +16,9 @@ export default async function metaRoutes(app: FastifyInstance) {
     handler: async () => ({ ok: true }),
   });
 
-  // GET /v1/_meta/version
+  // GET /v1/_meta/version (requires auth to avoid leaking build details)
   app.get('/v1/_meta/version', {
+    preHandler: app.requireApiKey(['ops:health']),
     schema: {
       tags: ['_meta'],
       response: {
@@ -32,8 +33,9 @@ export default async function metaRoutes(app: FastifyInstance) {
     }),
   });
 
-  // GET /v1/_meta/openapi (serve generated spec)
+  // GET /v1/_meta/openapi (serve generated spec, requires auth to avoid leaking API surface)
   app.get('/v1/_meta/openapi', {
+    preHandler: app.requireApiKey([], { optional: false }),
     schema: { tags: ['_meta'] },
     handler: async (_req, reply) => {
       const spec = app.swagger();
