@@ -5,6 +5,11 @@ on:
     types: [completed]
   workflow_dispatch: {}
 
+concurrency:
+  group: release
+  # Do not cancel in-progress releases — they should run to completion
+  cancel-in-progress: false
+
 jobs:
   release:
     if: >

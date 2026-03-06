@@ -74,4 +74,12 @@ jobs:
           fi
 
       - name: Run API tests (unit + integration)
-        run: bun run test -- --filter=@clearcost/api
+        run: bun run test -- --filter=@clearcost/api --reporter=default --reporter=junit --outputFile=test-results/api-junit.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: api-test-results-${{ github.run_id }}
+          path: test-results/
+          if-no-files-found: ignore
