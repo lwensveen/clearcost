@@ -15,14 +15,20 @@ export async function GET(req: Request) {
   if (!authResult.ok) return authResult.response;
 
   const { api, key } = getBillingProxyConfig();
-  const r = await fetch(`${api}/v1/billing/compute-usage`, {
-    headers: { 'x-api-key': key },
-    cache: 'no-store',
-  });
-  const body = await r.text();
-  if (!r.ok) return errorJson(body || 'Failed to load usage', r.status);
-  return new NextResponse(body, {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  });
+
+  try {
+    const r = await fetch(`${api}/v1/billing/compute-usage`, {
+      headers: { 'x-api-key': key },
+      cache: 'no-store',
+    });
+    const body = await r.text();
+    if (!r.ok) return errorJson(body || 'Failed to load usage', r.status);
+    return new NextResponse(body, {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  } catch (e: unknown) {
+    console.error('Billing compute-usage proxy error:', e);
+    return errorJson('API unreachable', 502, 'UPSTREAM_UNAVAILABLE');
+  }
 }

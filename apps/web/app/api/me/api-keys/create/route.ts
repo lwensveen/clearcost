@@ -16,6 +16,11 @@ export async function POST(req: Request) {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const { token } = await createKey(ownerId, name, scopes);
-  return NextResponse.json({ token }, { status: 201 });
+  try {
+    const { token } = await createKey(ownerId, name, scopes);
+    return NextResponse.json({ token }, { status: 201 });
+  } catch (e: unknown) {
+    console.error('API key creation error:', e);
+    return errorJson(e instanceof Error ? e.message : 'create failed', 500);
+  }
 }

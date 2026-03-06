@@ -46,7 +46,13 @@ export async function importDeMinimisFromOpenAI(
   const usedModel = resp.model ?? String(opts.model || process.env.OPENAI_MODEL || 'gpt-4o-mini');
   const content = resp.choices?.[0]?.message?.content ?? '{}';
 
-  const parsed = PayloadSchema.parse(JSON.parse(content));
+  let raw: unknown;
+  try {
+    raw = JSON.parse(content);
+  } catch {
+    throw new Error(`OpenAI returned invalid JSON for de minimis: ${content.slice(0, 200)}`);
+  }
+  const parsed = PayloadSchema.parse(raw);
 
   // Build a source map so provenance can write the URL into sourceRef.
   const sourceByKey = new Map<string, string>();

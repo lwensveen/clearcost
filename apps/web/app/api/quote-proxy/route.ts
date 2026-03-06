@@ -48,23 +48,32 @@ export async function POST(req: NextRequest) {
 
   const body = await req.text();
   const idempotencyKey = requestIdempotencyKey(req);
-  const upstream = await fetch(`${baseUrl.replace(/\/$/, '')}/v1/quotes`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': apiKey,
-      ...(idempotencyKey ? { 'idempotency-key': idempotencyKey } : {}),
-    },
-    body,
-    cache: 'no-store',
-  });
 
-  const responseText = await upstream.text();
+  try {
+    const upstream = await fetch(`${baseUrl.replace(/\/$/, '')}/v1/quotes`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiKey,
+        ...(idempotencyKey ? { 'idempotency-key': idempotencyKey } : {}),
+      },
+      body,
+      cache: 'no-store',
+    });
 
-  return new NextResponse(responseText, {
-    status: upstream.status,
-    headers: {
-      'content-type': 'application/json',
-    },
-  });
+    const responseText = await upstream.text();
+
+    return new NextResponse(responseText, {
+      status: upstream.status,
+      headers: {
+        'content-type': 'application/json',
+      },
+    });
+  } catch (e: unknown) {
+    console.error('Quote proxy upstream error:', e);
+    return NextResponse.json(
+      { error: { code: 'UPSTREAM_UNAVAILABLE', message: 'API unreachable' } },
+      { status: 502 }
+    );
+  }
 }

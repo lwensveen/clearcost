@@ -55,7 +55,10 @@ async function* sourceUkRemedyRows(versionId: string, typeIds: string[], apiBase
         AND m.geographical_area__id <> '${ERGA_OMNES_ID}'
     `.trim();
 
-    const s3 = await s3Select(versionId, q, { apiBaseUrl }).catch(() => null);
+    const s3 = await s3Select(versionId, q, { apiBaseUrl }).catch((err) => {
+      console.error('[UK remedies] s3Select failed, falling back to CSV stream:', err);
+      return null;
+    });
     if (s3) {
       for (const r of s3) yield r;
       return;

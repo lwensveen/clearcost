@@ -1,5 +1,5 @@
 import fp from 'fastify-plugin';
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import {
   importErrors,
   importRowsInserted,
@@ -48,7 +48,7 @@ function toRecord(value: unknown): Record<string, unknown> | undefined {
   return value as Record<string, unknown>;
 }
 
-function resolveSourceUrl(meta: ImportMetaConfig, req: any): string | undefined {
+function resolveSourceUrl(meta: ImportMetaConfig, req: FastifyRequest): string | undefined {
   const q = toRecord(req.query);
   const b = toRecord(req.body);
   return firstNonEmptyString(
@@ -61,13 +61,13 @@ function resolveSourceUrl(meta: ImportMetaConfig, req: any): string | undefined 
   );
 }
 
-function resolveSourceKey(meta: ImportMetaConfig, req: any): string | undefined {
+function resolveSourceKey(meta: ImportMetaConfig, req: FastifyRequest): string | undefined {
   const q = toRecord(req.query);
   const b = toRecord(req.body);
   return firstNonEmptyString(meta.sourceKey, q?.sourceKey, b?.sourceKey);
 }
 
-function resolveVersion(meta: ImportMetaConfig, req: any): string | undefined {
+function resolveVersion(meta: ImportMetaConfig, req: FastifyRequest): string | undefined {
   const q = toRecord(req.query);
   const b = toRecord(req.body);
   return firstNonEmptyString(meta.version, q?.version, b?.version);
@@ -77,7 +77,7 @@ function isOpsJob(job: string): boolean {
   return job.trim().toLowerCase().startsWith('ops:');
 }
 
-function isInternalCronRoute(req: any): boolean {
+function isInternalCronRoute(req: FastifyRequest): boolean {
   const routeUrl = req.routeOptions?.url;
   return typeof routeUrl === 'string' && routeUrl.startsWith('/internal/cron/');
 }
@@ -181,7 +181,9 @@ const plugin: FastifyPluginAsync = async (app) => {
     } catch (err) {
       importErrors.inc({ ...meta, stage: 'start' });
       end();
-      await releaseRunLock(lockKey).catch(() => undefined);
+      await releaseRunLock(lockKey).catch((lockErr) => {
+        app.log.error({ err: lockErr, lockKey }, 'releaseRunLock failed during error recovery');
+      });
       throw err;
     }
 
@@ -207,7 +209,7 @@ const plugin: FastifyPluginAsync = async (app) => {
     };
   });
 
-  function stopHeartbeat(req: any) {
+  function stopHeartbeat(req: FastifyRequest) {
     const hb = req?._importHeartbeat as NodeJS.Timeout | undefined;
     if (hb) clearInterval(hb);
     if (req) req._importHeartbeat = undefined;

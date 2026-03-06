@@ -51,14 +51,14 @@ export function getAuth(): AuthInstance {
   const tryRedis = async <T>(fn: () => Promise<T>): Promise<T | null> => {
     try {
       return await fn();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Redis error:', err);
       return null;
     }
   };
 
   const sendMail = async (path: string, body: unknown) => {
-    await fetch(`${apiUrl}${path}`, {
+    const res = await fetch(`${apiUrl}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -66,6 +66,11 @@ export function getAuth(): AuthInstance {
       },
       body: JSON.stringify(body),
     });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      console.error(`sendMail ${path} failed: ${res.status} ${text}`);
+      throw new Error(`Email delivery failed`);
+    }
   };
 
   authInstance = betterAuth({
@@ -110,27 +115,13 @@ export function getAuth(): AuthInstance {
       changeEmail: {
         enabled: true,
         sendChangeEmailVerification: async ({ user, newEmail, url }) => {
-          await fetch(`${apiUrl}/api/change-email-email`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-email-otp-secret': emailOtpApiSecret,
-            },
-            body: JSON.stringify({ email: user.email, newEmail, url }),
-          });
+          await sendMail('/api/change-email-email', { email: user.email, newEmail, url });
         },
       },
       deleteUser: {
         enabled: true,
         sendDeleteAccountVerification: async ({ user, url, token }) => {
-          await fetch(`${apiUrl}/api/delete-account-email`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-email-otp-secret': emailOtpApiSecret,
-            },
-            body: JSON.stringify({ email: user.email, url, token }),
-          });
+          await sendMail('/api/delete-account-email', { email: user.email, url, token });
         },
         beforeDelete: async () => {},
         afterDelete: async () => {},
@@ -144,18 +135,11 @@ export function getAuth(): AuthInstance {
       maxPasswordLength: 128,
       autoSignIn: true,
       sendResetPassword: async ({ user, url, token }) => {
-        await fetch(`${apiUrl}/api/magic-link`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-email-otp-secret': emailOtpApiSecret,
-          },
-          body: JSON.stringify({
-            email: user.email,
-            url,
-            token,
-            type: 'reset-password',
-          }),
+        await sendMail('/api/magic-link', {
+          email: user.email,
+          url,
+          token,
+          type: 'reset-password',
         });
       },
       resetPasswordTokenExpiresIn: 3600,

@@ -34,7 +34,14 @@ export async function fetchJSONWithArtifact<T>(path: string): Promise<JsonArtifa
   }
 
   const raw = Buffer.from(await res.arrayBuffer());
-  const data = JSON.parse(raw.toString('utf8')) as T;
+  let data: T;
+  try {
+    data = JSON.parse(raw.toString('utf8')) as T;
+  } catch {
+    throw new Error(
+      `Failed to parse JSON from ${sourceUrl}: ${raw.toString('utf8').slice(0, 200)}`
+    );
+  }
 
   return {
     data,

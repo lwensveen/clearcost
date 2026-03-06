@@ -80,7 +80,14 @@ export async function importDutyRatesFromOpenAI(
 
   const data = await r.json();
   const content: string = data?.choices?.[0]?.message?.content ?? '{}';
-  const payload = LlmPayload.parse(JSON.parse(content));
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new Error(`OpenAI returned invalid JSON for duties: ${content.slice(0, 200)}`);
+  }
+  const payload = LlmPayload.parse(parsed);
 
   const rows: DutyInsert[] = payload.rows.map((row) => ({
     dest: row.country_code.toUpperCase(),

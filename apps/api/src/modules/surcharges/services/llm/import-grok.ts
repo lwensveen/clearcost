@@ -41,7 +41,14 @@ export async function importSurchargesFromGrok(
   const data = await r.json();
   const raw = data?.choices?.[0]?.message?.content ?? '{}';
   const content = stripJsonFence(raw);
-  const payload = LlmSurchargePayload.parse(JSON.parse(content));
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new Error(`Grok returned invalid JSON for surcharges: ${content.slice(0, 200)}`);
+  }
+  const payload = LlmSurchargePayload.parse(parsed);
 
   return { rows: payload.rows, usedModel: data?.model ?? body.model };
 }

@@ -32,6 +32,13 @@ export async function importVatFromGrok(
 
   const data = await r.json();
   const content: string = data?.choices?.[0]?.message?.content ?? '{}';
-  const payload = LlmVatPayload.parse(JSON.parse(content));
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new Error(`Grok returned invalid JSON for VAT: ${content.slice(0, 200)}`);
+  }
+  const payload = LlmVatPayload.parse(parsed);
   return { rows: payload.rows, usedModel: data?.model ?? body.model };
 }

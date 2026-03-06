@@ -63,7 +63,14 @@ export async function fetchDutyRatesFromGrok(
 
   const data = await r.json();
   const content: string = data?.choices?.[0]?.message?.content ?? '{}';
-  const parsed = LlmPayload.parse(JSON.parse(content));
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(content);
+  } catch {
+    throw new Error(`Grok returned invalid JSON for duties: ${content.slice(0, 200)}`);
+  }
+  const parsed = LlmPayload.parse(raw);
 
   // Fetch-only: return rows without ingesting
   return {

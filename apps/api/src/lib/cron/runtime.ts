@@ -41,7 +41,7 @@ export async function withRun<T>(
   ctx: {
     importSource: ImportSource;
     job: string;
-    params?: any;
+    params?: Record<string, unknown>;
     lockKey?: string;
     version?: string;
     sourceKey?: string;
@@ -50,8 +50,7 @@ export async function withRun<T>(
   work: (importId: string, sourceKey?: string) => Promise<{ inserted: number; payload: T }>
 ): Promise<T> {
   const lockKey = ctx.lockKey ?? makeLockKey({ importSource: ctx.importSource, job: ctx.job });
-  const paramsRecord =
-    ctx.params && typeof ctx.params === 'object' ? (ctx.params as Record<string, unknown>) : null;
+  const paramsRecord = ctx.params ?? null;
   const sourceKey = nonEmptyString(ctx.sourceKey) ?? nonEmptyString(paramsRecord?.sourceKey);
   if (!isOpsJob(ctx.job) && !sourceKey) {
     throw new Error(`[${ctx.job}] sourceKey is required for non-ops cron jobs`);
@@ -101,6 +100,8 @@ export async function withRun<T>(
     }
     throw err;
   } finally {
-    await releaseRunLock(lockKey).catch(() => undefined);
+    await releaseRunLock(lockKey).catch((lockErr) => {
+      console.error('[cron] releaseRunLock failed:', lockKey, lockErr);
+    });
   }
 }

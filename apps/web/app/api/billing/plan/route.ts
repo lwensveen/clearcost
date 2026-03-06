@@ -15,16 +15,22 @@ export async function GET(req: Request) {
   if (!authResult.ok) return authResult.response;
 
   const { api, key } = getBillingProxyConfig();
-  const r = await fetch(`${api}/v1/billing/plan`, {
-    headers: { 'x-api-key': key },
-    cache: 'no-store',
-  });
-  const body = await r.text().catch(() => '');
-  if (!r.ok) {
-    return errorJson(body || 'Failed to load plan', r.status);
+
+  try {
+    const r = await fetch(`${api}/v1/billing/plan`, {
+      headers: { 'x-api-key': key },
+      cache: 'no-store',
+    });
+    const body = await r.text().catch(() => '');
+    if (!r.ok) {
+      return errorJson(body || 'Failed to load plan', r.status);
+    }
+    return new NextResponse(body, {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  } catch (e: unknown) {
+    console.error('Billing plan proxy error:', e);
+    return errorJson('API unreachable', 502, 'UPSTREAM_UNAVAILABLE');
   }
-  return new NextResponse(body, {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  });
 }

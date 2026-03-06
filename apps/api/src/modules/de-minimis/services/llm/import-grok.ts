@@ -57,7 +57,14 @@ export async function importDeMinimisFromGrok(
   const json = await r.json();
 
   const content: string = json?.choices?.[0]?.message?.content ?? '{}';
-  const parsed = PayloadSchema.parse(JSON.parse(content));
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(content);
+  } catch {
+    throw new Error(`Grok returned invalid JSON for de minimis: ${content.slice(0, 200)}`);
+  }
+  const parsed = PayloadSchema.parse(raw);
   const usedModel: string = json?.model || body.model;
 
   // build source map for provenance

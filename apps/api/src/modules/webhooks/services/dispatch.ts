@@ -34,56 +34,61 @@ export async function emitWebhook(ownerId: string, event: EventName, payload: Pa
   const body = JSON.stringify({ type: event, data: payload });
   const now = new Date();
 
-  for (const ep of endpoints) {
+  const matching = endpoints.filter((ep) => {
     const acceptsAll = !ep.events?.length;
-    const acceptsEvent = acceptsAll || ep.events.includes(event);
-    if (!acceptsEvent) continue;
+    return acceptsAll || ep.events.includes(event);
+  });
 
-    // Create delivery record
-    const [delivery] = await db
-      .insert(webhookDeliveriesTable)
-      .values({
-        endpointId: ep.id,
-        event,
-        payload: { type: event, data: payload },
-        attempt: 0,
-        status: 'pending',
-        nextAttemptAt: now,
-      })
-      .returning({ id: webhookDeliveriesTable.id });
-
-    if (!delivery) throw new Error('Failed to create delivery');
-
-    // Decrypt per-endpoint; if it fails, mark as failed immediately
-    let secret: string;
-    try {
-      secret = decryptSecret(ep.secretEnc, ep.secretIv, ep.secretTag);
-    } catch (e: unknown) {
-      await db
-        .update(webhookDeliveriesTable)
-        .set({
-          attempt: 1,
-          status: 'failed',
-          responseStatus: 0,
-          responseBody: `secret decrypt error: ${e instanceof Error ? e.message : String(e)}`.slice(
-            0,
-            4000
-          ),
-          deliveredAt: null,
-          updatedAt: new Date(),
-          nextAttemptAt: null,
+  // Process all matching endpoints in parallel — each endpoint's delivery
+  // creation and dispatch is independent of the others.
+  await Promise.allSettled(
+    matching.map(async (ep) => {
+      // Create delivery record
+      const [delivery] = await db
+        .insert(webhookDeliveriesTable)
+        .values({
+          endpointId: ep.id,
+          event,
+          payload: { type: event, data: payload },
+          attempt: 0,
+          status: 'pending',
+          nextAttemptAt: now,
         })
-        .where(eq(webhookDeliveriesTable.id, delivery.id));
-      continue;
-    }
+        .returning({ id: webhookDeliveriesTable.id });
 
-    // Fire-and-forget in production; await in tests for determinism
-    if (process.env.NODE_ENV === 'test') {
-      await sendAttempt(ep.id, ep.url, secret, delivery.id, body);
-    } else {
-      void sendAttempt(ep.id, ep.url, secret, delivery.id, body);
-    }
-  }
+      if (!delivery) throw new Error('Failed to create delivery');
+
+      // Decrypt per-endpoint; if it fails, mark as failed immediately
+      let secret: string;
+      try {
+        secret = decryptSecret(ep.secretEnc, ep.secretIv, ep.secretTag);
+      } catch (e: unknown) {
+        await db
+          .update(webhookDeliveriesTable)
+          .set({
+            attempt: 1,
+            status: 'failed',
+            responseStatus: 0,
+            responseBody:
+              `secret decrypt error: ${e instanceof Error ? e.message : String(e)}`.slice(0, 4000),
+            deliveredAt: null,
+            updatedAt: new Date(),
+            nextAttemptAt: null,
+          })
+          .where(eq(webhookDeliveriesTable.id, delivery.id));
+        return;
+      }
+
+      // Fire-and-forget in production; await in tests for determinism
+      if (process.env.NODE_ENV === 'test') {
+        await sendAttempt(ep.id, ep.url, secret, delivery.id, body);
+      } else {
+        sendAttempt(ep.id, ep.url, secret, delivery.id, body).catch(() => {
+          /* delivery status is persisted inside sendAttempt; swallow to avoid unhandled rejection */
+        });
+      }
+    })
+  );
 }
 
 async function sendAttempt(
@@ -162,7 +167,10 @@ async function sendAttempt(
 
   if (shouldRetry && next) {
     setTimeout(
-      () => void sendAttempt(endpointId, url, secret, deliveryId, body),
+      () =>
+        sendAttempt(endpointId, url, secret, deliveryId, body).catch(() => {
+          /* delivery status is persisted inside sendAttempt; swallow to avoid unhandled rejection */
+        }),
       backoffMin * 60_000
     );
   }
