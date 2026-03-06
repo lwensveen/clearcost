@@ -185,6 +185,34 @@ async function ensureBillingAccount(ownerId: string) {
   };
 }
 
+// ── Shared billing helpers ───────────────────────────────────────────
+const BILLING_PATH = '/admin/billing';
+const DEFAULT_FALLBACK_ORIGIN = 'http://localhost:3000';
+
+function getAllowedOrigin(): string {
+  return process.env.WEB_ORIGIN ?? DEFAULT_FALLBACK_ORIGIN;
+}
+
+/**
+ * Validate that a user-provided returnUrl matches the allowed origin.
+ * Returns `{ ok: true }` if valid (or absent), or `{ ok: false, message }` on failure.
+ */
+function validateReturnUrl(
+  returnUrl: string | undefined
+): { ok: true } | { ok: false; message: string } {
+  if (!returnUrl) return { ok: true };
+  try {
+    const parsed = new URL(returnUrl);
+    const allowed = new URL(getAllowedOrigin());
+    if (parsed.origin !== allowed.origin) {
+      return { ok: false, message: 'returnUrl must match the allowed origin' };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, message: 'Invalid returnUrl' };
+  }
+}
+
 export default async function billingRoutes(app: FastifyInstance) {
   const billingEnv = validateBillingEnv({ webhookEnabled: true });
   const stripe = new Stripe(billingEnv.stripeSecretKey, {
@@ -215,21 +243,9 @@ export default async function billingRoutes(app: FastifyInstance) {
       if (!PRICE[plan])
         return reply.code(400).send(errorResponseForStatus(400, 'Price not configured'));
 
-      const allowedOrigin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
-
-      // Validate returnUrl against allowed origin
-      if (returnUrl) {
-        try {
-          const parsed = new URL(returnUrl);
-          const allowed = new URL(allowedOrigin);
-          if (parsed.origin !== allowed.origin) {
-            return reply
-              .code(400)
-              .send(errorResponseForStatus(400, 'returnUrl must match the allowed origin'));
-          }
-        } catch {
-          return reply.code(400).send(errorResponseForStatus(400, 'Invalid returnUrl'));
-        }
+      const validation = validateReturnUrl(returnUrl);
+      if (!validation.ok) {
+        return reply.code(400).send(errorResponseForStatus(400, validation.message));
       }
 
       const account = await ensureBillingAccount(ownerId);
@@ -248,8 +264,9 @@ export default async function billingRoutes(app: FastifyInstance) {
           });
       }
 
-      const success = returnUrl ?? `${allowedOrigin}/admin/billing?success=1`;
-      const cancel = returnUrl ?? `${allowedOrigin}/admin/billing?canceled=1`;
+      const origin = getAllowedOrigin();
+      const success = returnUrl ?? `${origin}${BILLING_PATH}?success=1`;
+      const cancel = returnUrl ?? `${origin}${BILLING_PATH}?canceled=1`;
 
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
@@ -288,24 +305,14 @@ export default async function billingRoutes(app: FastifyInstance) {
       if (!account.stripeCustomerId)
         return reply.code(400).send(errorResponseForStatus(400, 'No Stripe customer'));
 
-      const portalAllowedOrigin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
       const portalReturnUrl = req.body?.returnUrl;
 
-      if (portalReturnUrl) {
-        try {
-          const parsed = new URL(portalReturnUrl);
-          const allowed = new URL(portalAllowedOrigin);
-          if (parsed.origin !== allowed.origin) {
-            return reply
-              .code(400)
-              .send(errorResponseForStatus(400, 'returnUrl must match the allowed origin'));
-          }
-        } catch {
-          return reply.code(400).send(errorResponseForStatus(400, 'Invalid returnUrl'));
-        }
+      const validation = validateReturnUrl(portalReturnUrl);
+      if (!validation.ok) {
+        return reply.code(400).send(errorResponseForStatus(400, validation.message));
       }
 
-      const returnUrl = portalReturnUrl ?? `${portalAllowedOrigin}/admin/billing`;
+      const returnUrl = portalReturnUrl ?? `${getAllowedOrigin()}${BILLING_PATH}`;
 
       const portal = await stripe.billingPortal.sessions.create({
         customer: account.stripeCustomerId,
