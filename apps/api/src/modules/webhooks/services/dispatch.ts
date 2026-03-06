@@ -58,14 +58,17 @@ export async function emitWebhook(ownerId: string, event: EventName, payload: Pa
     let secret: string;
     try {
       secret = decryptSecret(ep.secretEnc, ep.secretIv, ep.secretTag);
-    } catch (e: any) {
+    } catch (e: unknown) {
       await db
         .update(webhookDeliveriesTable)
         .set({
           attempt: 1,
           status: 'failed',
           responseStatus: 0,
-          responseBody: `secret decrypt error: ${String(e?.message ?? e)}`.slice(0, 4000),
+          responseBody: `secret decrypt error: ${e instanceof Error ? e.message : String(e)}`.slice(
+            0,
+            4000
+          ),
           deliveredAt: null,
           updatedAt: new Date(),
           nextAttemptAt: null,
@@ -108,9 +111,9 @@ async function sendAttempt(
     });
     status = r.status;
     text = await r.text();
-  } catch (e: any) {
+  } catch (e: unknown) {
     status = 0;
-    text = String(e?.message ?? e);
+    text = e instanceof Error ? e.message : String(e);
   }
 
   const [curr] = await db

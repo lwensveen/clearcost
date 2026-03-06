@@ -90,11 +90,14 @@ export async function withRun<T>(
     await finishImportRun(run.id, { importStatus: 'succeeded', inserted });
 
     return payload;
-  } catch (err: any) {
+  } catch (err: unknown) {
     end();
     importErrors.inc({ importSource: ctx.importSource, job: ctx.job, stage: 'script' });
     if (runId) {
-      await finishImportRun(runId, { importStatus: 'failed', error: String(err?.message ?? err) });
+      await finishImportRun(runId, {
+        importStatus: 'failed',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
     throw err;
   } finally {

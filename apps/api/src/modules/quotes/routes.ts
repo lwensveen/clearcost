@@ -160,13 +160,20 @@ export default function quoteRoutes(app: FastifyInstance) {
 
         quotesMvpTotal.labels(laneLabel, currencyLabel).inc();
         return reply.send(result);
-      } catch (err: any) {
-        const status = Number(err?.statusCode) || 500;
-        const message = err?.message ?? (status === 500 ? 'quote failed' : 'Request failed');
-        const code = typeof err?.code === 'string' ? err.code : null;
+      } catch (err: unknown) {
+        const errRecord = err as Record<string, unknown>;
+        const status = Number(errRecord?.statusCode) || 500;
+        const errMsg =
+          err instanceof Error
+            ? err.message
+            : typeof errRecord?.message === 'string'
+              ? errRecord.message
+              : null;
+        const message = errMsg ?? (status === 500 ? 'quote failed' : 'Request failed');
+        const code = typeof errRecord?.code === 'string' ? errRecord.code : null;
         if (status === 409) {
           req.log.warn({ err, idemKey, msg: 'idempotency conflict' });
-          return reply.code(409).send(errorResponseForStatus(409, err?.message ?? 'Processing'));
+          return reply.code(409).send(errorResponseForStatus(409, errMsg ?? 'Processing'));
         }
         if (status === 400 || status === 422 || status === 503) {
           if (code === 'data_not_ready') {

@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { callQuote, formatMoney } from './index.js';
-import type { QuoteBody, SDK } from './index.js';
+import type { QuoteBody, QuoteResult, SDK } from './index.js';
 
 export type ClearCostQuoteProps = {
   /** ISO 3166-1 alpha-2 origin country code */
@@ -37,14 +37,6 @@ export type ClearCostQuoteProps = {
   locale?: string;
   /** Additional CSS class name */
   className?: string;
-};
-
-type QuoteResult = {
-  components: { CIF: number; duty: number; vat: number; fees: number; checkoutVAT?: number };
-  total: number;
-  incoterm?: string;
-  currency?: string;
-  itemValue?: number;
 };
 
 export function ClearCostQuote(props: ClearCostQuoteProps) {
@@ -94,18 +86,32 @@ export function ClearCostQuote(props: ClearCostQuoteProps) {
       q.itemValue = price;
       setQuote(q);
       setHasRun(true);
-    } catch (e: any) {
-      setError(e?.message ?? 'Request failed');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Request failed');
       setHasRun(true);
     } finally {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [origin, dest, price, currency, l, w, h, weight, categoryKey, hs6, mode, proxyUrl, baseUrl]);
+  }, [
+    origin,
+    dest,
+    price,
+    currency,
+    l,
+    w,
+    h,
+    weight,
+    categoryKey,
+    hs6,
+    mode,
+    proxyUrl,
+    baseUrl,
+    apiKey,
+  ]);
 
   // Auto-calculate on first render
-  const autoRef = useAutoRun(auto, calculate);
-  void autoRef; // consumed by hook
+  useAutoRun(auto, calculate);
 
   const displayCur = currency.toUpperCase();
   const money = (x: number) => formatMoney(Number(x) || 0, displayCur, locale);
@@ -169,11 +175,11 @@ function Row({
 
 /** Runs callback once on mount when `enabled` is true. */
 function useAutoRun(enabled: boolean, fn: () => Promise<void>) {
-  const ran = { current: false };
-  if (enabled && !ran.current) {
-    ran.current = true;
-    // Fire-and-forget on first render pass; React 18/19 safe
-    void fn();
-  }
-  return ran;
+  const ran = useRef(false);
+  useEffect(() => {
+    if (enabled && !ran.current) {
+      ran.current = true;
+      void fn();
+    }
+  }, [enabled, fn]);
 }

@@ -15,6 +15,14 @@ export type SDK = {
   proxyUrl?: string; // e.g. /api/clearcost/quote (recommended)
 };
 
+export type QuoteResult = {
+  components: { CIF: number; duty: number; vat: number; fees: number; checkoutVAT?: number };
+  total: number;
+  incoterm?: string;
+  currency?: string;
+  itemValue?: number;
+};
+
 type Opts = SDK & {
   auto?: boolean; // auto calculate on init
   locale?: string; // e.g. 'en-US'
@@ -98,7 +106,7 @@ export function formatMoney(x: number, currency: string, locale = 'en-US') {
 }
 
 async function genIdemKey(): Promise<string> {
-  const g: any = globalThis as any;
+  const g = globalThis as unknown as { crypto?: Crypto };
   if (!g.crypto) throw new Error('Web Crypto not available');
 
   if (typeof g.crypto.randomUUID === 'function') {
@@ -115,7 +123,7 @@ async function genIdemKey(): Promise<string> {
   return `ck_idem_${b64url}`;
 }
 
-export async function callQuote(body: QuoteBody, sdk: SDK): Promise<any> {
+export async function callQuote(body: QuoteBody, sdk: SDK): Promise<QuoteResult> {
   const idem = await genIdemKey();
 
   if (sdk.proxyUrl) {
@@ -146,7 +154,7 @@ export async function callQuote(body: QuoteBody, sdk: SDK): Promise<any> {
 // DOM rendering
 // ---------------------------------------------------------------------------
 
-function render(el: HTMLElement, quote: any, displayCurrency: string, locale: string) {
+function render(el: HTMLElement, quote: QuoteResult, displayCurrency: string, locale: string) {
   const { components, total, incoterm } = quote;
   const cur = displayCurrency || (quote?.currency ?? 'USD');
 
@@ -230,11 +238,11 @@ async function bootOne(el: HTMLElement, opts: Opts) {
     button.textContent = 'Calculating…';
     try {
       const q = await callQuote(body, opts);
-      (q as any).itemValue = body.itemValue.amount;
+      q.itemValue = body.itemValue.amount;
       render(box, q, currency, locale);
       button.textContent = 'Recalculate';
-    } catch (e: any) {
-      box.textContent = `Failed: ${e?.message ?? e}`;
+    } catch (e: unknown) {
+      box.textContent = `Failed: ${e instanceof Error ? e.message : String(e)}`;
       button.textContent = 'Retry';
     } finally {
       button.disabled = false;

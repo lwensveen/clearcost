@@ -1,14 +1,6 @@
 import { defineComponent, ref, onMounted, h, type PropType } from 'vue';
 import { callQuote, formatMoney } from './index.js';
-import type { QuoteBody, SDK } from './index.js';
-
-type QuoteResult = {
-  components: { CIF: number; duty: number; vat: number; fees: number; checkoutVAT?: number };
-  total: number;
-  incoterm?: string;
-  currency?: string;
-  itemValue?: number;
-};
+import type { QuoteBody, QuoteResult, SDK } from './index.js';
 
 export const ClearCostQuote = defineComponent({
   name: 'ClearCostQuote',
@@ -59,8 +51,8 @@ export const ClearCostQuote = defineComponent({
         q.itemValue = props.price;
         quote.value = q;
         hasRun.value = true;
-      } catch (e: any) {
-        error.value = e?.message ?? 'Request failed';
+      } catch (e: unknown) {
+        error.value = e instanceof Error ? e.message : 'Request failed';
         hasRun.value = true;
       } finally {
         loading.value = false;
@@ -83,7 +75,7 @@ export const ClearCostQuote = defineComponent({
     const row = (label: string, amount: number) =>
       h('div', { class: 'cc-row' }, [h('span', null, label), h('span', null, money(amount))]);
 
-    const children: any[] = [
+    const children: ReturnType<typeof h>[] = [
       h(
         'button',
         { class: 'cc-btn', onClick: calculate, disabled: loading },
@@ -96,7 +88,7 @@ export const ClearCostQuote = defineComponent({
     }
 
     if (quote) {
-      const rows: any[] = [
+      const rows: ReturnType<typeof h>[] = [
         row('Freight', Number(quote.components.CIF || 0) - price),
         row('Duty', Number(quote.components.duty || 0)),
         row('VAT', Number(quote.components.vat || 0)),

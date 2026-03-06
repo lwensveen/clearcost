@@ -102,12 +102,12 @@ export async function withIdempotency<T extends Record<string, unknown>>(
           .where(and(eq(idempotencyKeysTable.scope, scope), eq(idempotencyKeysTable.key, key)));
 
         return data;
-      } catch (err: any) {
+      } catch (err: unknown) {
         await tx
           .update(idempotencyKeysTable)
           .set({
             status: 'failed',
-            response: { error: String(err?.message ?? err) },
+            response: { error: err instanceof Error ? err.message : String(err) },
             updatedAt: new Date(),
             lockedAt: null,
           })

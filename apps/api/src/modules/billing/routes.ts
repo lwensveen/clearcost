@@ -175,7 +175,14 @@ async function ensureBillingAccount(ownerId: string) {
   if (row) return row;
 
   await db.insert(billingAccountsTable).values({ ownerId, plan: 'free', status: 'free' });
-  return { ownerId, plan: 'free', status: 'free' } as any;
+  return {
+    ownerId,
+    plan: 'free',
+    status: 'free',
+    stripeCustomerId: null,
+    priceId: null,
+    currentPeriodEnd: null,
+  };
 }
 
 export default async function billingRoutes(app: FastifyInstance) {
@@ -208,6 +215,23 @@ export default async function billingRoutes(app: FastifyInstance) {
       if (!PRICE[plan])
         return reply.code(400).send(errorResponseForStatus(400, 'Price not configured'));
 
+      const allowedOrigin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
+
+      // Validate returnUrl against allowed origin
+      if (returnUrl) {
+        try {
+          const parsed = new URL(returnUrl);
+          const allowed = new URL(allowedOrigin);
+          if (parsed.origin !== allowed.origin) {
+            return reply
+              .code(400)
+              .send(errorResponseForStatus(400, 'returnUrl must match the allowed origin'));
+          }
+        } catch {
+          return reply.code(400).send(errorResponseForStatus(400, 'Invalid returnUrl'));
+        }
+      }
+
       const account = await ensureBillingAccount(ownerId);
 
       // Ensure Stripe Customer
@@ -224,10 +248,8 @@ export default async function billingRoutes(app: FastifyInstance) {
           });
       }
 
-      const success =
-        returnUrl ?? process.env.WEB_ORIGIN ?? 'http://localhost:3000/admin/billing?success=1';
-      const cancel =
-        returnUrl ?? process.env.WEB_ORIGIN ?? 'http://localhost:3000/admin/billing?canceled=1';
+      const success = returnUrl ?? `${allowedOrigin}/admin/billing?success=1`;
+      const cancel = returnUrl ?? `${allowedOrigin}/admin/billing?canceled=1`;
 
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
@@ -266,8 +288,24 @@ export default async function billingRoutes(app: FastifyInstance) {
       if (!account.stripeCustomerId)
         return reply.code(400).send(errorResponseForStatus(400, 'No Stripe customer'));
 
-      const returnUrl =
-        req.body?.returnUrl ?? process.env.WEB_ORIGIN ?? 'http://localhost:3000/admin/billing';
+      const portalAllowedOrigin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
+      const portalReturnUrl = req.body?.returnUrl;
+
+      if (portalReturnUrl) {
+        try {
+          const parsed = new URL(portalReturnUrl);
+          const allowed = new URL(portalAllowedOrigin);
+          if (parsed.origin !== allowed.origin) {
+            return reply
+              .code(400)
+              .send(errorResponseForStatus(400, 'returnUrl must match the allowed origin'));
+          }
+        } catch {
+          return reply.code(400).send(errorResponseForStatus(400, 'Invalid returnUrl'));
+        }
+      }
+
+      const returnUrl = portalReturnUrl ?? `${portalAllowedOrigin}/admin/billing`;
 
       const portal = await stripe.billingPortal.sessions.create({
         customer: account.stripeCustomerId,
@@ -332,9 +370,10 @@ export default async function billingRoutes(app: FastifyInstance) {
       try {
         const raw = req.rawBody as string;
         event = stripe.webhooks.constructEvent(raw, sig, billingEnv.webhookSecret);
-      } catch (err: any) {
+      } catch (err: unknown) {
         req.log.error({ err }, 'stripe_webhook_verify_failed');
-        return reply.code(400).send(errorResponseForStatus(400, `Webhook Error: ${err.message}`));
+        const msg = err instanceof Error ? err.message : String(err);
+        return reply.code(400).send(errorResponseForStatus(400, `Webhook Error: ${msg}`));
       }
 
       try {
@@ -342,7 +381,7 @@ export default async function billingRoutes(app: FastifyInstance) {
           stripe,
           price: billingEnv.price,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         req.log.error({ err, type: event.type }, 'stripe_webhook_handle_failed');
         return reply.code(500).send(errorResponseForStatus(500, 'Webhook processing failed'));
       }

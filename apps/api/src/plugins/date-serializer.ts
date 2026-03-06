@@ -1,20 +1,23 @@
 import { FastifyPluginAsync } from 'fastify';
 
-export function transformDates(obj: any): any {
+export function transformDates(obj: unknown, seen?: WeakSet<object>): unknown {
   if (obj instanceof Date) {
     return obj.toISOString();
   }
+  if (obj === null || obj === undefined || typeof obj !== 'object') {
+    return obj;
+  }
+  if (!seen) seen = new WeakSet();
+  if (seen.has(obj)) return obj;
+  seen.add(obj);
   if (Array.isArray(obj)) {
-    return obj.map(transformDates);
+    return obj.map((item) => transformDates(item, seen));
   }
-  if (obj && typeof obj === 'object') {
-    const transformed: Record<string, any> = {};
-    for (const key in obj) {
-      transformed[key] = transformDates(obj[key]);
-    }
-    return transformed;
+  const transformed: Record<string, unknown> = {};
+  for (const key in obj) {
+    transformed[key] = transformDates((obj as Record<string, unknown>)[key], seen);
   }
-  return obj;
+  return transformed;
 }
 
 const dateSerializerPlugin: FastifyPluginAsync = async (fastify) => {

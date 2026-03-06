@@ -41,6 +41,12 @@ import { vatOverridesTable } from './vat-overrides.js';
 import { vatRulesTable } from './vat-rules.js';
 import { verificationsTable } from './auth/verifications.js';
 import { webhookDeliveriesTable, webhookEndpointsTable } from './webhooks.js';
+import { dutyRateComponentsRelations } from './relations/duty-rates-components-relations.js';
+import { dutyRatesRelations } from './relations/duty-rates-relations.js';
+import { manifestItemQuotesRelations } from './relations/manifest-item-quotes-relations.js';
+import { manifestItemsRelations } from './relations/manifest-items-relations.js';
+import { manifestQuotesRelations } from './relations/manifest-quotes-relations.js';
+import { manifestsRelations } from './relations/manifests-relations.js';
 
 export * from '../enums.js';
 export * from './api-usage.js';
@@ -86,6 +92,12 @@ export * from './users/users.js';
 export * from './vat-overrides.js';
 export * from './vat-rules.js';
 export * from './webhooks.js';
+export * from './relations/duty-rates-components-relations.js';
+export * from './relations/duty-rates-relations.js';
+export * from './relations/manifest-item-quotes-relations.js';
+export * from './relations/manifest-items-relations.js';
+export * from './relations/manifest-quotes-relations.js';
+export * from './relations/manifests-relations.js';
 
 export const schema = {
   accountsTable,
@@ -132,6 +144,12 @@ export const schema = {
   verificationsTable,
   webhookDeliveriesTable,
   webhookEndpointsTable,
+  dutyRateComponentsRelations,
+  dutyRatesRelations,
+  manifestItemQuotesRelations,
+  manifestItemsRelations,
+  manifestQuotesRelations,
+  manifestsRelations,
 };
 
 export type Schema = typeof schema;

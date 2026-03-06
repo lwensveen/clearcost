@@ -195,9 +195,9 @@ async function loadCsvIfAvailable(
     const rows = parseCsv(csv);
     sourceState.csvCache = rows as unknown as Record<string, unknown>[];
     if (DEBUG) console.log(`[HTS] CSV loaded: rows=${rows.length}`);
-  } catch (e: any) {
+  } catch (e: unknown) {
     sourceState.csvCache = [];
-    if (DEBUG) console.warn('[HTS] CSV load failed:', e?.message || String(e));
+    if (DEBUG) console.warn('[HTS] CSV load failed:', e instanceof Error ? e.message : String(e));
   }
 
   return sourceState;
@@ -255,8 +255,8 @@ export async function exportChapterJson(
           return arr as Record<string, unknown>[];
         }
         throw new Error('Unexpected JSON shape');
-      } catch (e: any) {
-        const msg = String(e?.message ?? e);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
         const looksLikeHtml = /<!DOCTYPE html/i.test(msg) || /Unexpected token</i.test(msg);
         if (looksLikeHtml) {
           if (DEBUG) console.warn(`[HTS] ch${chapter} got HTML; re-warming and retrying`);

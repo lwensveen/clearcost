@@ -12,8 +12,8 @@ export const QuoteSnapshotSelectCoercedSchema = QuoteSnapshotSelectSchema.extend
   // ensure uniform date parsing
   createdAt: z.coerce.date(),
   fxAsOf: z.coerce.date().nullable().optional(),
-  request: z.unknown(),
-  response: z.unknown(),
+  request: z.record(z.string(), z.unknown()),
+  response: z.record(z.string(), z.unknown()),
   dataRuns: z.unknown().nullable().optional(),
   scope: z.string(),
   idemKey: z.string(),

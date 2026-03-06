@@ -110,21 +110,28 @@ export function EditableItemsTable({ id, items: initial }: { id: string; items: 
               <tr key={i} className="odd:bg-white even:bg-neutral-50 align-top">
                 <td className="p-2">
                   <Input
+                    aria-label={`Reference for item ${i + 1}`}
                     value={r.reference ?? ''}
                     onChange={(e) => set(i, { reference: e.target.value })}
                   />
                 </td>
                 <td className="p-2">
-                  <Input value={r.hs6 ?? ''} onChange={(e) => set(i, { hs6: e.target.value })} />
+                  <Input
+                    aria-label={`HS6 code for item ${i + 1}`}
+                    value={r.hs6 ?? ''}
+                    onChange={(e) => set(i, { hs6: e.target.value })}
+                  />
                 </td>
                 <td className="p-2">
                   <Input
+                    aria-label={`Category for item ${i + 1}`}
                     value={r.categoryKey ?? ''}
                     onChange={(e) => set(i, { categoryKey: e.target.value })}
                   />
                 </td>
                 <td className="p-2">
                   <Input
+                    aria-label={`Value for item ${i + 1}`}
                     inputMode="decimal"
                     value={String(r.itemValueAmount ?? '')}
                     onChange={(e) => set(i, { itemValueAmount: e.target.value })}
@@ -133,12 +140,14 @@ export function EditableItemsTable({ id, items: initial }: { id: string; items: 
                 </td>
                 <td className="p-2">
                   <Input
+                    aria-label={`Currency for item ${i + 1}`}
                     value={r.itemValueCurrency ?? 'USD'}
                     onChange={(e) => set(i, { itemValueCurrency: e.target.value.toUpperCase() })}
                   />
                 </td>
                 <td className="p-2">
                   <Input
+                    aria-label={`Weight in kg for item ${i + 1}`}
                     inputMode="decimal"
                     value={String(r.weightKg ?? '')}
                     onChange={(e) => set(i, { weightKg: e.target.value })}
@@ -147,6 +156,7 @@ export function EditableItemsTable({ id, items: initial }: { id: string; items: 
                 </td>
                 <td className="p-2">
                   <Input
+                    aria-label={`Length in cm for item ${i + 1}`}
                     inputMode="numeric"
                     value={String(r.dimsCm?.l ?? 0)}
                     onChange={(e) =>
@@ -157,6 +167,7 @@ export function EditableItemsTable({ id, items: initial }: { id: string; items: 
                 </td>
                 <td className="p-2">
                   <Input
+                    aria-label={`Width in cm for item ${i + 1}`}
                     inputMode="numeric"
                     value={String(r.dimsCm?.w ?? 0)}
                     onChange={(e) =>
@@ -167,6 +178,7 @@ export function EditableItemsTable({ id, items: initial }: { id: string; items: 
                 </td>
                 <td className="p-2">
                   <Input
+                    aria-label={`Height in cm for item ${i + 1}`}
                     inputMode="numeric"
                     value={String(r.dimsCm?.h ?? 0)}
                     onChange={(e) =>
@@ -177,6 +189,7 @@ export function EditableItemsTable({ id, items: initial }: { id: string; items: 
                 </td>
                 <td className="p-2 min-w-[200px]">
                   <Textarea
+                    aria-label={`Notes for item ${i + 1}`}
                     value={r.notes ?? ''}
                     onChange={(e) => set(i, { notes: e.target.value })}
                   />

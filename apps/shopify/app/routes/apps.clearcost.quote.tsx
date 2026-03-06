@@ -37,7 +37,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${settings.apiKey}`,
+        'x-api-key': settings.apiKey,
       },
       body: JSON.stringify({
         origin: settings.originCountry,

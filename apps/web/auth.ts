@@ -98,7 +98,6 @@ export function getAuth(): AuthInstance {
       crossSubDomainCookies: {
         enabled: !!cookieDomain,
         ...(cookieDomain ? { domain: cookieDomain } : {}),
-        // additionalCookies: ['custom_cookie'],
       },
     },
     account: {

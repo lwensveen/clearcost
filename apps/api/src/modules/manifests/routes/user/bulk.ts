@@ -224,8 +224,8 @@ export default async function manifestsBulkRoutes(app: FastifyInstance) {
         try {
           const shaped = mapRecordToItem(recs[i]!, id);
           rows.push(ManifestItemInsertSchema.parse(shaped));
-        } catch (e: any) {
-          errors.push({ line: i + 2, message: e?.message ?? 'Invalid row' }); // +2: header + 1-based
+        } catch (e: unknown) {
+          errors.push({ line: i + 2, message: e instanceof Error ? e.message : 'Invalid row' }); // +2: header + 1-based
         }
       }
 

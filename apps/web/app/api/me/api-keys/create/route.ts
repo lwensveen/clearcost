@@ -17,5 +17,5 @@ export async function POST(req: Request) {
     .filter(Boolean);
 
   const { token } = await createKey(ownerId, name, scopes);
-  return NextResponse.redirect(new URL(`/dashboard/api-keys?token=${token}`, req.url), 302);
+  return NextResponse.json({ token }, { status: 201 });
 }

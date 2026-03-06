@@ -14,4 +14,4 @@ scrape_configs:
 
     authorization:
       type: Bearer
-      credentials: ck_...your_api_key...
+      credentials_file: /run/secrets/clearcost_api_key

@@ -188,8 +188,12 @@ export const fetchNoticeDocsCmd: Command = async (argv) => {
               await markNoticeStatus(n.id, 'ignored', 'non-pdf link and attachNonPdf=0');
               noneFound++;
             }
-          } catch (err: any) {
-            await markNoticeStatus(n.id, 'error', err?.message ?? 'unknown error');
+          } catch (err: unknown) {
+            await markNoticeStatus(
+              n.id,
+              'error',
+              err instanceof Error ? err.message : 'unknown error'
+            );
             failed++;
           }
         }

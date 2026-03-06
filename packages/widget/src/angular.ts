@@ -1,14 +1,6 @@
 import { Component, Input, OnInit, ChangeDetectorRef } from '@angular/core';
 import { callQuote, formatMoney } from './index.js';
-import type { QuoteBody, SDK } from './index.js';
-
-type QuoteResult = {
-  components: { CIF: number; duty: number; vat: number; fees: number; checkoutVAT?: number };
-  total: number;
-  incoterm?: string;
-  currency?: string;
-  itemValue?: number;
-};
+import type { QuoteBody, QuoteResult, SDK } from './index.js';
 
 @Component({
   selector: 'clearcost-quote',
@@ -124,8 +116,8 @@ export class ClearCostQuoteComponent implements OnInit {
       q.itemValue = this.price;
       this.quote = q;
       this.hasRun = true;
-    } catch (e: any) {
-      this.error = e?.message ?? 'Request failed';
+    } catch (e: unknown) {
+      this.error = e instanceof Error ? e.message : 'Request failed';
       this.hasRun = true;
     } finally {
       this.loading = false;

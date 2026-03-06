@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createKey } from '@/lib/api-keys';
 import { requireAdmin } from '@/lib/route-auth';
+import { errorJson } from '@/lib/http';
 
 export async function POST(req: Request) {
   const authResult = await requireAdmin(req);
@@ -15,21 +16,12 @@ export async function POST(req: Request) {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  if (!ownerId || !name) return NextResponse.redirect(new URL('/admin/api-keys', req.url), 302);
+  if (!ownerId || !name) return errorJson('ownerId and name are required', 400);
 
   try {
     const { token } = await createKey(ownerId, name, scopes);
-    const url = new URL(
-      `/admin/api-keys?ownerId=${ownerId}&token=${encodeURIComponent(token)}`,
-      req.url
-    );
-
-    return NextResponse.redirect(url, 302);
+    return NextResponse.json({ token }, { status: 201 });
   } catch (e: unknown) {
-    const url = new URL(`/admin/api-keys?ownerId=${ownerId}`, req.url);
-
-    url.searchParams.set('error', e instanceof Error ? e.message : 'create failed');
-
-    return NextResponse.redirect(url, 302);
+    return errorJson(e instanceof Error ? e.message : 'create failed', 500);
   }
 }
