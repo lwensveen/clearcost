@@ -15,7 +15,8 @@ export async function resolveAhtnSourceUrls(
       fallbackUrl: process.env.AHTN_CSV_URL ?? '',
     });
     return { csvUrl };
-  } catch {
+  } catch (e: unknown) {
+    console.warn('[asean/source-urls] Failed to resolve AHTN CSV URL: %o', e);
     return { csvUrl: process.env.AHTN_CSV_URL ?? '' };
   }
 }

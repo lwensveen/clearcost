@@ -20,6 +20,7 @@ import {
 } from '@clearcost/types';
 import { importVatRules } from '../services/import-vat.js';
 import { errorResponseForStatus } from '../../../lib/errors.js';
+import { escapeLike } from '../../../lib/sql-utils.js';
 
 export default function vatRoutes(app: FastifyInstance) {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -40,7 +41,7 @@ export default function vatRoutes(app: FastifyInstance) {
 
       const where = and(
         dest ? eq(vatRulesTable.dest, dest.toUpperCase()) : sql`TRUE`,
-        q ? ilike(vatRulesTable.dest, `%${q}%`) : sql`TRUE`,
+        q ? ilike(vatRulesTable.dest, `%${escapeLike(q)}%`) : sql`TRUE`,
         from ? gte(vatRulesTable.effectiveFrom, from) : sql`TRUE`,
         to ? lte(vatRulesTable.effectiveFrom, to) : sql`TRUE`
       );

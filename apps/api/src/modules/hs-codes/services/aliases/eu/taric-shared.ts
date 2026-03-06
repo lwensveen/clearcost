@@ -17,6 +17,9 @@ async function fetchXml(url: string) {
 
 // very small tag-extractor (fast-enough for TARIC, matches inner text of simple nodes)
 export function getTag(text: string, tag: string): string | null {
+  if (!/^[a-zA-Z_][\w.-]*$/.test(tag)) {
+    throw new Error(`Invalid XML tag name: ${tag}`);
+  }
   const m = text.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i'));
   return m ? m[1]!.trim() : null;
 }

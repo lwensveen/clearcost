@@ -106,8 +106,8 @@ export default function manifestsPublicRoutes(app: FastifyInstance) {
               dryRun: dryRun,
               dataRuns: null,
             })
-            .catch(() => {
-              /* swallow */
+            .catch((err: unknown) => {
+              req.log.warn({ err }, 'manifest snapshot insert failed');
             });
 
           return out;

@@ -48,7 +48,8 @@ export default function webhookAdminRoutes(app: FastifyInstance) {
           updatedAt: webhookEndpointsTable.updatedAt,
         })
         .from(webhookEndpointsTable)
-        .where(eq(webhookEndpointsTable.ownerId, ownerId));
+        .where(eq(webhookEndpointsTable.ownerId, ownerId))
+        .limit(200);
       return WebhookEndpointsListResponseSchema.parse(rows);
     }
   );

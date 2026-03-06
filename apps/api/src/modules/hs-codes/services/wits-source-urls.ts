@@ -21,7 +21,8 @@ async function resolveOptionalUrl(
   if (override !== undefined) return override;
   try {
     return await resolveSourceDownloadUrl({ sourceKey, fallbackUrl });
-  } catch {
+  } catch (e: unknown) {
+    console.warn('[wits-source-urls] Failed to resolve source URL for key=%s: %o', sourceKey, e);
     return fallbackUrl;
   }
 }

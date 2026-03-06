@@ -59,7 +59,8 @@ export default function apiKeyAdminRoutes(app: FastifyInstance) {
             eq(apiKeysTable.ownerId, ownerId),
             activeOnly ? eq(apiKeysTable.isActive, true) : sql`TRUE`
           )
-        );
+        )
+        .limit(200);
       return ApiKeyAdminListResponseSchema.parse(rows);
     }
   );

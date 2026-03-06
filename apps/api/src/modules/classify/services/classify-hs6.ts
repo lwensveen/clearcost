@@ -1,6 +1,7 @@
 import { categoriesTable, db, hsCodesTable } from '@clearcost/db';
 import { ilike, sql } from 'drizzle-orm';
 import type { ClassifyInput } from '@clearcost/types';
+import { escapeLike } from '../../../lib/sql-utils.js';
 
 // very naive keyword map to start; expand in DB later
 const KWD: Array<{ re: RegExp; hs6: string; score: number }> = [
@@ -36,7 +37,7 @@ export async function classifyHS6(input: ClassifyInput) {
     const hits = await db
       .select({ hs6: hsCodesTable.hs6, title: hsCodesTable.title })
       .from(hsCodesTable)
-      .where(ilike(hsCodesTable.title, `%${q}%`))
+      .where(ilike(hsCodesTable.title, `%${escapeLike(q)}%`))
       .limit(5);
 
     hits.forEach((h, i) => (scores[h.hs6] = Math.max(scores[h.hs6] ?? 0, 0.45 - i * 0.05)));

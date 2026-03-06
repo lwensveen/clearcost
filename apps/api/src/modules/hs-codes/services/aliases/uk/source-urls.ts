@@ -17,7 +17,8 @@ export async function resolveUkTariffHsSourceUrls(
       fallbackUrl: process.env.UK_10_DATA_API_BASE ?? DEFAULT_UK_TARIFF_API_BASE,
     });
     return { apiBaseUrl };
-  } catch {
+  } catch (e: unknown) {
+    console.warn('[uk/source-urls] Failed to resolve UK tariff API base URL: %o', e);
     return { apiBaseUrl: process.env.UK_10_DATA_API_BASE ?? DEFAULT_UK_TARIFF_API_BASE };
   }
 }

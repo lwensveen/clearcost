@@ -105,8 +105,8 @@ export default function noticesRoutes(app: FastifyInstance) {
           try {
             bodyBuffer = await readFile(file.path);
             bytes = bodyBuffer.length;
-          } catch {
-            /* fall through to fetch */
+          } catch (e: unknown) {
+            req.log.warn({ err: e }, 'Failed to read local PDF file, falling through to fetch');
           }
         }
 
@@ -122,8 +122,8 @@ export default function noticesRoutes(app: FastifyInstance) {
               bytes = bodyBuffer.length;
               mime = resp.headers.get('content-type') ?? undefined;
             }
-          } catch {
-            /* ignore fetch errors for attachment */
+          } catch (e: unknown) {
+            req.log.warn({ err: e }, 'Failed to fetch PDF attachment from URL');
           }
         }
 
@@ -137,7 +137,8 @@ export default function noticesRoutes(app: FastifyInstance) {
         });
 
         if (doc) attachedDocs++;
-      } catch {
+      } catch (e: unknown) {
+        req.log.warn({ err: e }, 'Failed to process notice file');
         errors++;
       }
     }

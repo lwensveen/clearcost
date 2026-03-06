@@ -16,7 +16,8 @@ async function resolveOptionalUrl(
       sourceKey,
       fallbackUrl: fallbackEnv ?? '',
     });
-  } catch {
+  } catch (e: unknown) {
+    console.warn('[eu/source-urls] Failed to resolve source URL for key=%s: %o', sourceKey, e);
     return '';
   }
 }

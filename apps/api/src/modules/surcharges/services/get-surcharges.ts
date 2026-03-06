@@ -265,7 +265,8 @@ export async function getSurchargesScopedWithMeta(
         notes: surchargesTable.notes,
       })
       .from(surchargesTable)
-      .where(where);
+      .where(where)
+      .limit(500);
 
     const coerced = rows.map((r) => SelectRowSchema.parse(r));
 

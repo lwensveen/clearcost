@@ -3,6 +3,7 @@ import { z } from 'zod/v4';
 import { db, tradeNoticeDocsTable, tradeNoticesTable } from '@clearcost/db';
 import { and, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm';
 import { errorResponseForStatus } from '../../lib/errors.js';
+import { escapeLike } from '../../lib/sql-utils.js';
 import {
   TradeNoticeByIdSchema,
   TradeNoticeDetailResponseSchema,
@@ -58,7 +59,7 @@ export default function noticesBrowseRoutes(app: FastifyInstance) {
       if (publishedTo) conditions.push(lte(tradeNoticesTable.publishedAt, publishedTo));
 
       if (q) {
-        const like = `%${q}%`;
+        const like = `%${escapeLike(q)}%`;
         conditions.push(
           or(ilike(tradeNoticesTable.title, like), ilike(tradeNoticesTable.url, like))
         );
@@ -166,7 +167,8 @@ export default function noticesBrowseRoutes(app: FastifyInstance) {
         .select()
         .from(tradeNoticeDocsTable)
         .where(eq(tradeNoticeDocsTable.noticeId, id))
-        .orderBy(desc(tradeNoticeDocsTable.createdAt));
+        .orderBy(desc(tradeNoticeDocsTable.createdAt))
+        .limit(100);
 
       return reply.send(
         TradeNoticeDetailResponseSchema.parse({

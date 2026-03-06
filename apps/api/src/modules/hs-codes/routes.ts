@@ -3,6 +3,7 @@ import { db, hsCodeAliasesTable, hsCodesTable } from '@clearcost/db';
 import { and, eq, ilike, or, sql } from 'drizzle-orm';
 import { z } from 'zod/v4';
 import { errorResponseForStatus } from '../../lib/errors.js';
+import { escapeLike } from '../../lib/sql-utils.js';
 import {
   ErrorResponseSchema,
   HsCodesLookupQuerySchema,
@@ -69,6 +70,7 @@ export default function hsRoutes(app: FastifyInstance) {
       }
 
       const query = (q ?? '').trim();
+      const escaped = escapeLike(query);
       const digits = query.replace(/\D/g, '');
 
       // Title contains OR numeric digits align to HS6 substring
@@ -103,8 +105,8 @@ export default function hsRoutes(app: FastifyInstance) {
           // cheap relevance hint: exact title prefix first, then contains, then HS6 numeric match
           _rank: sql<number>`
             (CASE
-               WHEN ${hsCodesTable.title} ILIKE ${query + '%'} THEN 1
-               WHEN ${hsCodesTable.title} ILIKE ${'%' + query + '%'} THEN 2
+               WHEN ${hsCodesTable.title} ILIKE ${escaped + '%'} THEN 1
+               WHEN ${hsCodesTable.title} ILIKE ${'%' + escaped + '%'} THEN 2
                ${digits ? sql`WHEN ${hsCodesTable.hs6} ILIKE ${'%' + digits + '%'} THEN 3` : sql`ELSE 99`}
              END)
           `,
@@ -112,7 +114,7 @@ export default function hsRoutes(app: FastifyInstance) {
         .from(hsCodesTable)
         .where(
           or(
-            ilike(hsCodesTable.title, `%${query}%`),
+            ilike(hsCodesTable.title, `%${escaped}%`),
             digits ? ilike(hsCodesTable.hs6, `%${digits}%`) : sql`FALSE`
           )
         )
