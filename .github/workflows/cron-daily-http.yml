@@ -121,6 +121,7 @@ jobs:
           bun run src/lib/run-cron.ts import:sources:bootstrap
           bun run src/lib/run-cron.ts report:source-registry
 
+      # ── FX ──────────────────────────────────────────────────────────────
       - name: FX daily (ECB)
         run: |
           OUT=$(bun run internal-request -- --path /internal/cron/fx/daily --body '{}')
@@ -131,456 +132,119 @@ jobs:
             exit 1
           fi
 
+      # ── VAT ─────────────────────────────────────────────────────────────
       - name: VAT (OECD/IMF auto)
-        run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/vat/auto --body '{}')
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[vat:auto] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "vat:auto" /internal/cron/import/vat/auto '{}'
 
+      # ── EU Duties ───────────────────────────────────────────────────────
       - name: EU Duties (TARIC — daily)
-        run: |
-          if [ -z "${EU_TARIC_DAILY_LIST:-}" ]; then
-            echo "[duties:eu-daily-official] missing EU_TARIC_DAILY_LIST"
-            exit 1
-          fi
-          BODY=$(jq -n --arg dailyListUrl "$EU_TARIC_DAILY_LIST" '{dailyListUrl: $dailyListUrl}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/eu/daily --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:eu-daily-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:eu-daily" /internal/cron/import/duties/eu/daily --env EU_TARIC_DAILY_LIST --body-key dailyListUrl
 
+      # ── JP Duties ───────────────────────────────────────────────────────
       - name: JP Duties — MFN (Customs)
-        run: |
-          if [ -z "${JP_TARIFF_INDEX:-}" ]; then
-            echo "[duties:jp-mfn-official] missing JP_TARIFF_INDEX"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$JP_TARIFF_INDEX" '{tariffIndexUrl: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/jp-mfn --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:jp-mfn-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:jp-mfn" /internal/cron/import/duties/jp-mfn --env JP_TARIFF_INDEX --body-key tariffIndexUrl
 
       - name: JP Duties — FTA (strict official default)
-        run: |
-          if [ -z "${JP_TARIFF_INDEX:-}" ]; then
-            echo "[duties:jp-fta-official] missing JP_TARIFF_INDEX"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$JP_TARIFF_INDEX" '{tariffIndexUrl: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/jp-fta --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:jp-fta-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:jp-fta" /internal/cron/import/duties/jp-fta --env JP_TARIFF_INDEX --body-key tariffIndexUrl
 
+      # ── KR Duties ───────────────────────────────────────────────────────
       - name: KR Duties — MFN (official Excel)
-        run: |
-          if [ -z "${KR_MFN_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:kr-mfn-official] missing KR_MFN_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$KR_MFN_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/kr-mfn/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:kr-mfn-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:kr-mfn" /internal/cron/import/duties/kr-mfn/official/excel --env KR_MFN_OFFICIAL_EXCEL_URL
 
       - name: KR Duties — FTA (official Excel)
-        run: |
-          if [ -z "${KR_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:kr-fta-official] missing KR_FTA_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$KR_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/kr-fta/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:kr-fta-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:kr-fta" /internal/cron/import/duties/kr-fta/official/excel --env KR_FTA_OFFICIAL_EXCEL_URL
 
+      # ── UK Duties ───────────────────────────────────────────────────────
       - name: UK Duties — MFN
-        run: |
-          if [ -z "${UK_10_DATA_API_BASE:-}" ]; then
-            echo "[duties:uk-mfn-official] missing UK_10_DATA_API_BASE"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$UK_10_DATA_API_BASE" '{apiBaseUrl: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/uk-mfn --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:uk-mfn-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:uk-mfn" /internal/cron/import/duties/uk-mfn --env UK_10_DATA_API_BASE --body-key apiBaseUrl
 
       - name: UK Duties — FTA
-        run: |
-          if [ -z "${UK_10_DATA_API_BASE:-}" ]; then
-            echo "[duties:uk-fta-official] missing UK_10_DATA_API_BASE"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$UK_10_DATA_API_BASE" '{apiBaseUrl: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/uk-fta --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:uk-fta-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:uk-fta" /internal/cron/import/duties/uk-fta --env UK_10_DATA_API_BASE --body-key apiBaseUrl
 
+      # ── ID Duties ───────────────────────────────────────────────────────
       - name: ID Duties — MFN (official)
-        run: |
-          if [ -z "${ID_BTKI_XLSX_URL:-}" ]; then
-            echo "[duties:id-mfn-official] missing ID_BTKI_XLSX_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$ID_BTKI_XLSX_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/id-mfn --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:id-mfn-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:id-mfn" /internal/cron/import/duties/id-mfn --env ID_BTKI_XLSX_URL
 
       - name: ID Duties — FTA (official Excel)
-        run: |
-          if [ -z "${ID_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:id-fta-official] missing ID_FTA_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$ID_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/id-fta/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:id-fta-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:id-fta" /internal/cron/import/duties/id-fta/official/excel --env ID_FTA_OFFICIAL_EXCEL_URL
 
+      # ── MY Duties ───────────────────────────────────────────────────────
       - name: MY Duties — MFN (official Excel)
-        run: |
-          if [ -z "${MY_MFN_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:my-mfn-official] missing MY_MFN_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$MY_MFN_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/my-mfn/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:my-mfn-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
-
-      - name: PH Duties — MFN (official Excel)
-        run: |
-          if [ -z "${PH_TARIFF_EXCEL_URL:-}" ]; then
-            echo "[duties:ph-mfn-official] missing PH_TARIFF_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$PH_TARIFF_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/ph-mfn --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:ph-mfn-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:my-mfn" /internal/cron/import/duties/my-mfn/official/excel --env MY_MFN_OFFICIAL_EXCEL_URL
 
       - name: MY Duties — FTA (official Excel)
-        run: |
-          if [ -z "${MY_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:my-fta-official] missing MY_FTA_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$MY_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/my-fta/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:my-fta-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:my-fta" /internal/cron/import/duties/my-fta/official/excel --env MY_FTA_OFFICIAL_EXCEL_URL
+
+      # ── PH Duties ───────────────────────────────────────────────────────
+      - name: PH Duties — MFN (official Excel)
+        run: .github/scripts/cron-import-step.sh "duties:ph-mfn" /internal/cron/import/duties/ph-mfn --env PH_TARIFF_EXCEL_URL
 
       - name: PH Duties — FTA (official Excel)
-        run: |
-          if [ -z "${PH_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:ph-fta-official] missing PH_FTA_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$PH_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/ph-fta/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:ph-fta-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:ph-fta" /internal/cron/import/duties/ph-fta/official/excel --env PH_FTA_OFFICIAL_EXCEL_URL
 
+      # ── CN Duties ───────────────────────────────────────────────────────
       - name: CN Duties — MFN (official PDF)
-        run: |
-          if [ -z "${CN_MFN_PDF_URL:-}" ]; then
-            echo "[duties:cn-mfn-official] missing CN_MFN_PDF_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$CN_MFN_PDF_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/cn-mfn/official/pdf --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:cn-mfn-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:cn-mfn" /internal/cron/import/duties/cn-mfn/official/pdf --env CN_MFN_PDF_URL
 
       - name: CN Duties — FTA (official Excel)
-        run: |
-          if [ -z "${CN_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:cn-fta-official] missing CN_FTA_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$CN_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/cn-fta/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:cn-fta-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:cn-fta" /internal/cron/import/duties/cn-fta/official/excel --env CN_FTA_OFFICIAL_EXCEL_URL
 
+      # ── TH Duties ───────────────────────────────────────────────────────
       - name: TH Duties — MFN (official Excel)
-        run: |
-          if [ -z "${TH_MFN_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:th-mfn-official] missing TH_MFN_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$TH_MFN_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/th-mfn/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:th-mfn-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:th-mfn" /internal/cron/import/duties/th-mfn/official/excel --env TH_MFN_OFFICIAL_EXCEL_URL
 
       - name: TH Duties — FTA (official Excel)
-        run: |
-          if [ -z "${TH_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:th-fta-official] missing TH_FTA_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$TH_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/th-fta/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:th-fta-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:th-fta" /internal/cron/import/duties/th-fta/official/excel --env TH_FTA_OFFICIAL_EXCEL_URL
 
+      # ── VN Duties ───────────────────────────────────────────────────────
       - name: VN Duties — MFN (official Excel)
-        run: |
-          if [ -z "${VN_MFN_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:vn-mfn-official] missing VN_MFN_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$VN_MFN_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/vn-mfn/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:vn-mfn-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:vn-mfn" /internal/cron/import/duties/vn-mfn/official/excel --env VN_MFN_OFFICIAL_EXCEL_URL
 
       - name: VN Duties — FTA (official Excel)
-        run: |
-          if [ -z "${VN_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:vn-fta-official] missing VN_FTA_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$VN_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/vn-fta/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:vn-fta-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:vn-fta" /internal/cron/import/duties/vn-fta/official/excel --env VN_FTA_OFFICIAL_EXCEL_URL
 
+      # ── SG Duties ───────────────────────────────────────────────────────
       - name: SG Duties — MFN (official Excel)
-        run: |
-          if [ -z "${SG_MFN_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:sg-mfn-official] missing SG_MFN_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$SG_MFN_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/sg-mfn/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:sg-mfn-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:sg-mfn" /internal/cron/import/duties/sg-mfn/official/excel --env SG_MFN_OFFICIAL_EXCEL_URL
 
       - name: SG Duties — FTA (official Excel)
-        run: |
-          if [ -z "${SG_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:sg-fta-official] missing SG_FTA_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$SG_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/sg-fta/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:sg-fta-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:sg-fta" /internal/cron/import/duties/sg-fta/official/excel --env SG_FTA_OFFICIAL_EXCEL_URL
 
+      # ── BN Duties ───────────────────────────────────────────────────────
       - name: BN Duties — MFN (official Excel)
-        run: |
-          if [ -z "${BN_MFN_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:bn-mfn-official] missing BN_MFN_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$BN_MFN_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/bn-mfn/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:bn-mfn-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:bn-mfn" /internal/cron/import/duties/bn-mfn/official/excel --env BN_MFN_OFFICIAL_EXCEL_URL
 
       - name: BN Duties — FTA (official Excel)
-        run: |
-          if [ -z "${BN_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:bn-fta-official] missing BN_FTA_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$BN_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/bn-fta/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:bn-fta-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:bn-fta" /internal/cron/import/duties/bn-fta/official/excel --env BN_FTA_OFFICIAL_EXCEL_URL
 
+      # ── KH Duties ───────────────────────────────────────────────────────
       - name: KH Duties — MFN (official Excel)
-        run: |
-          if [ -z "${KH_MFN_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:kh-mfn-official] missing KH_MFN_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$KH_MFN_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/kh-mfn/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:kh-mfn-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:kh-mfn" /internal/cron/import/duties/kh-mfn/official/excel --env KH_MFN_OFFICIAL_EXCEL_URL
 
       - name: KH Duties — FTA (official Excel)
-        run: |
-          if [ -z "${KH_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:kh-fta-official] missing KH_FTA_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$KH_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/kh-fta/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:kh-fta-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:kh-fta" /internal/cron/import/duties/kh-fta/official/excel --env KH_FTA_OFFICIAL_EXCEL_URL
 
+      # ── LA Duties ───────────────────────────────────────────────────────
       - name: LA Duties — MFN (official Excel)
-        run: |
-          if [ -z "${LA_MFN_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:la-mfn-official] missing LA_MFN_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$LA_MFN_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/la-mfn/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:la-mfn-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:la-mfn" /internal/cron/import/duties/la-mfn/official/excel --env LA_MFN_OFFICIAL_EXCEL_URL
 
       - name: LA Duties — FTA (official Excel)
-        run: |
-          if [ -z "${LA_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:la-fta-official] missing LA_FTA_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$LA_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/la-fta/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:la-fta-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:la-fta" /internal/cron/import/duties/la-fta/official/excel --env LA_FTA_OFFICIAL_EXCEL_URL
 
+      # ── MM Duties ───────────────────────────────────────────────────────
       - name: MM Duties — MFN (official Excel)
-        run: |
-          if [ -z "${MM_MFN_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:mm-mfn-official] missing MM_MFN_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$MM_MFN_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/mm-mfn/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:mm-mfn-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:mm-mfn" /internal/cron/import/duties/mm-mfn/official/excel --env MM_MFN_OFFICIAL_EXCEL_URL
 
       - name: MM Duties — FTA (official Excel)
-        run: |
-          if [ -z "${MM_FTA_OFFICIAL_EXCEL_URL:-}" ]; then
-            echo "[duties:mm-fta-official] missing MM_FTA_OFFICIAL_EXCEL_URL"
-            exit 1
-          fi
-          BODY=$(jq -n --arg url "$MM_FTA_OFFICIAL_EXCEL_URL" '{url: $url}')
-          OUT=$(bun run internal-request -- --path /internal/cron/import/duties/mm-fta/official/excel --body "$BODY")
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[duties:mm-fta-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "duties:mm-fta" /internal/cron/import/duties/mm-fta/official/excel --env MM_FTA_OFFICIAL_EXCEL_URL
 
+      # ── Country official (catch-all) ────────────────────────────────────
       - name: Country Duties — enabled official imports (optional)
         working-directory: apps/api
         run: |
           bun run src/lib/run-cron.ts import:duties:country-official-enabled-all
 
+      # ── US Duties (special — multi-key body) ────────────────────────────
       - name: US Duties — MFN (HTS)
         run: |
           if [ -z "${HTS_API_BASE:-}" ]; then
@@ -611,6 +275,7 @@ jobs:
             exit 1
           fi
 
+      # ── Surcharges ──────────────────────────────────────────────────────
       - name: UK Surcharges — remedies
         run: |
           BODY=$(jq -n --arg s "$UK_REMEDY_MEASURE_TYPES" '{measureTypeIds: ($s | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0)))}')
@@ -635,35 +300,16 @@ jobs:
           fi
 
       - name: US Surcharges — all
-        run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/import/surcharges/us-all --body '{}')
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[surcharges:us-all] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "surcharges:us-all" /internal/cron/import/surcharges/us-all '{}'
 
+      # ── De Minimis ──────────────────────────────────────────────────────
       - name: De Minimis — official
-        run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/de-minimis/import-official --body '{}')
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[de-minimis:import-official] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "de-minimis:official" /internal/cron/de-minimis/import-official '{}'
 
       - name: De Minimis — Zonos
-        run: |
-          OUT=$(bun run internal-request -- --path /internal/cron/de-minimis/import-zonos --body '{}')
-          echo "$OUT" | jq .
-          ROWS=$(echo "$OUT" | jq -r '([.count,.inserted,.updated] | map(select(type=="number")) | add) // 0')
-          if [ "$ROWS" -lt 1 ]; then
-            echo "[de-minimis:import-zonos] expected >0 imported rows, got $ROWS"
-            exit 1
-          fi
+        run: .github/scripts/cron-import-step.sh "de-minimis:zonos" /internal/cron/de-minimis/import-zonos '{}'
 
+      # ── Notices ──────────────────────────────────────────────────────────
       - name: Notices — CN (MOF)
         run: |
           bun run internal-request -- --path /internal/cron/notices/cn/mof --body '{}' | jq .
@@ -676,11 +322,13 @@ jobs:
         run: |
           bun run internal-request -- --path /internal/cron/notices/cn/mofcom --body '{}' | jq .
 
+      # ── Maintenance ─────────────────────────────────────────────────────
       - name: Prune old imports & provenance
         run: |
           BODY="{\"days\": ${PRUNE_DAYS}}"
           bun run internal-request -- --path /internal/cron/imports/prune --body "$BODY" | jq .
 
+      # ── Notifications ───────────────────────────────────────────────────
       - name: Slack (success)
         if: success()
         env:

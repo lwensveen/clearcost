@@ -1,4 +1,8 @@
-name: API CI (tests + typecheck)
+name: API Integration Tests (DB-backed)
+
+# This workflow runs API tests that require a live PostgreSQL database.
+# Unit tests and validation are handled by ci.yml; this workflow adds
+# DB migrations + integration tests that need a real Postgres instance.
 
 on:
   push:
@@ -16,7 +20,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:17-alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -53,15 +57,6 @@ jobs:
           echo "Postgres did not become ready in time" >&2
           exit 1
 
-      - name: Validate docs (tasks scopes)
-        run: bun run validate-docs
-
-      - name: Validate turbo env list
-        run: bun run validate-envs
-
-      - name: Validate duty job alignment
-        run: bun run validate-duty-jobs
-
       - name: Run DB migrations (if available)
         shell: bash
         run: |
@@ -78,8 +73,5 @@ jobs:
             echo "No migrate script found; skipping schema migration"
           fi
 
-      - name: Typecheck API
-        run: cd apps/api && bun run check-types
-
-      - name: Run API tests
+      - name: Run API tests (unit + integration)
         run: bun run test -- --filter=@clearcost/api

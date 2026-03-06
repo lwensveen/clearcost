@@ -1,1 +1,1 @@
-bun run format && bun run lint:fix && bun run check-types && bun test:ci
+bun run format && bun run lint:fix && bun run check-types && turbo run test --filter='[HEAD]'
