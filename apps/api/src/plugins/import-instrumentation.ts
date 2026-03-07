@@ -135,7 +135,7 @@ const plugin: FastifyPluginAsync = async (app) => {
     if (isInternalCronRoute(req) && !isOpsJob(meta.job) && sourceKey) {
       try {
         await assertSourceKeyEnabled({ job: meta.job, sourceKey });
-      } catch (err) {
+      } catch (err: unknown) {
         return reply
           .code(500)
           .send(
@@ -178,7 +178,7 @@ const plugin: FastifyPluginAsync = async (app) => {
     let run: { id: string };
     try {
       run = await startImportRun(startParams);
-    } catch (err) {
+    } catch (err: unknown) {
       importErrors.inc({ ...meta, stage: 'start' });
       end();
       await releaseRunLock(lockKey).catch((lockErr) => {

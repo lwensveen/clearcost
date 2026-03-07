@@ -58,7 +58,7 @@ export async function isRateLimited(
       await r.expire(redisKey, windowSeconds);
     }
     return count > max;
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('Redis rate-limit error, falling back to in-memory:', err);
     return isRateLimitedInMemory(key, max, windowSeconds);
   }

@@ -24,7 +24,7 @@ const dateSerializerPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('onSend', async (request, reply, payload) => {
     try {
       return transformDates(payload);
-    } catch (error) {
+    } catch (error: unknown) {
       fastify.log.error({ error, url: request.url }, 'onSend date transform failed');
       throw fastify.httpErrors.internalServerError('Could not serialize response dates');
     }

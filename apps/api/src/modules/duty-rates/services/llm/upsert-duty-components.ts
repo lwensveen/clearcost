@@ -139,7 +139,7 @@ export async function upsertDutyRateComponentsForLLM(
             ),
           }))
         );
-      } catch (e) {
+      } catch (e: unknown) {
         console.error('[Duties LLM] provenance insert failed (non-fatal)', {
           importId: opts.importId,
           resourceType: 'duty_rate',

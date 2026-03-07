@@ -228,7 +228,7 @@ export async function importUsHts10Aliases(): Promise<ImportUsHts10AliasesResult
       rows = await fetchAllRowsViaCSV(client, csvUrl);
       if (rows.length) console.log(`HTS: CSV rows=${rows.length}`);
     }
-  } catch (e) {
+  } catch (e: unknown) {
     console.warn('HTS: CSV failed:', (e as Error).message);
   }
   try {
@@ -236,7 +236,7 @@ export async function importUsHts10Aliases(): Promise<ImportUsHts10AliasesResult
       rows = await fetchAllRowsViaJSON(client, jsonUrl);
       if (rows.length) console.log(`HTS: JSON rows=${rows.length}`);
     }
-  } catch (e) {
+  } catch (e: unknown) {
     console.warn('HTS: JSON failed:', (e as Error).message);
   }
   if (!rows.length) {
@@ -287,7 +287,7 @@ export async function importUsHts10Aliases(): Promise<ImportUsHts10AliasesResult
       inserted += localIns;
       updated += localUpd;
       if (DEBUG) console.log(`[HTS] Bulk ok: +${buffer.length} (ins=${inserted}, upd=${updated})`);
-    } catch (err) {
+    } catch (err: unknown) {
       const emsg = (err as Error).message || String(err);
       console.warn('Bulk upsert failed, falling back to per-row. Reason:', emsg);
 
@@ -305,7 +305,7 @@ export async function importUsHts10Aliases(): Promise<ImportUsHts10AliasesResult
           const r = ret?.[0];
           if (r?.inserted === 1) inserted++;
           else updated++;
-        } catch (e) {
+        } catch (e: unknown) {
           // If this blows up, log and skip; usually indicates schema mismatch (hs6 NOT NULL) or FK issue.
           if (DEBUG) {
             console.warn(

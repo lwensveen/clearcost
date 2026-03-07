@@ -129,7 +129,7 @@ export async function fetchSdmx(
       if (DEBUG) console.log(' [wits] OK -> series count:', seriesCount);
       if (seriesCount === 0) continue; // empty → try next
       return json;
-    } catch (e) {
+    } catch (e: unknown) {
       if (DEBUG) console.log(' [wits] JSON parse error:', (e as Error).message);
     }
   }

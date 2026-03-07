@@ -106,7 +106,7 @@ export async function evaluateDeMinimis(opts: {
     if (rowCurrency !== destCurrency) {
       try {
         thr = await convertCurrency(rawVal, rowCurrency, destCurrency, { on: day, strict: true });
-      } catch (error) {
+      } catch (error: unknown) {
         throw Object.assign(
           new Error(
             `Unable to convert de minimis threshold ${rowCurrency}->${destCurrency} for ${destCountryIso2}`

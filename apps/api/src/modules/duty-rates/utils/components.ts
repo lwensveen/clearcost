@@ -306,7 +306,7 @@ export async function upsertComponentsForParents(params: {
 
     try {
       await db.insert(provenanceTable).values(provenanceRows);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[Components] provenance insert failed (non-fatal)', {
         importId: params.importId,
         resourceType: 'duty_rate_component',

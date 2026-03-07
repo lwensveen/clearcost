@@ -51,7 +51,7 @@ export function parseEcb(xml: string): { fxAsOf: string; rates: Record<string, n
   let doc: EcbEnvelope;
   try {
     doc = parser.parse(xml) as EcbEnvelope;
-  } catch (e) {
+  } catch (e: unknown) {
     throw new Error(`ECB XML parse error: ${(e as Error).message}`);
   }
 
@@ -124,7 +124,7 @@ export async function upsertFxRatesEUR(
 
     try {
       await db.insert(provenanceTable).values(provenanceRows);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('[FX] provenance batch insert failed (non-fatal)', {
         importId: opts.importId,
         resourceType: 'fx_rate',
@@ -156,7 +156,7 @@ export async function refreshFx(): Promise<FxRefreshResult> {
     const inserted = await upsertFxRatesEUR(fxAsOf, rates, { importId: run.id });
     await finishImportRun(run.id, { importStatus: 'succeeded', inserted });
     return { fxAsOf, inserted, base: 'EUR' };
-  } catch (err) {
+  } catch (err: unknown) {
     await finishImportRun(run.id, {
       importStatus: 'failed',
       error: (err as Error).message,

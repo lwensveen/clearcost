@@ -133,7 +133,7 @@ async function loadSourceRegistryRows(
       })
       .from(sourceRegistryTable)
       .where(inArray(sourceRegistryTable.key, [...keys]));
-  } catch (err) {
+  } catch (err: unknown) {
     if (isUndefinedTableError(err)) return [];
     throw err;
   }
@@ -181,7 +181,7 @@ export const dutiesCountryOfficialEnabledAll: Command = async (args) => {
     try {
       await command(passthroughArgs);
       executed += 1;
-    } catch (err) {
+    } catch (err: unknown) {
       failed.push({
         slug: country.slug,
         commandKey: country.commandKey,

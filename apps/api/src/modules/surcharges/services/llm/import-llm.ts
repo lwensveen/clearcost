@@ -281,7 +281,7 @@ export async function importSurchargesFromLLM(
 
     try {
       await db.insert(provenanceTable).values(provRows);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('[Surcharges LLM] provenance insert failed (non-fatal)', {
         importId: opts.importId,
         resourceType: 'surcharge',

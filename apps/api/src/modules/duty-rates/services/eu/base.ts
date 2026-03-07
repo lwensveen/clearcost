@@ -48,7 +48,7 @@ export async function fetchXmlStream(url: string): Promise<Readable> {
         if (value) src.push(Buffer.from(value));
       }
       src.push(null);
-    } catch (e) {
+    } catch (e: unknown) {
       src.destroy(e as Error);
     }
   })();
@@ -316,7 +316,7 @@ export async function parseDutyExpressions(
   _dutyExprCache.set(key, promise);
   try {
     return await promise;
-  } catch (e) {
+  } catch (e: unknown) {
     _dutyExprCache.delete(key);
     throw e;
   }
@@ -407,7 +407,7 @@ export async function parseGeoAreaDescriptions(
   _geoDescCache.set(key, promise);
   try {
     return await promise;
-  } catch (e) {
+  } catch (e: unknown) {
     _geoDescCache.delete(key);
     throw e;
   }

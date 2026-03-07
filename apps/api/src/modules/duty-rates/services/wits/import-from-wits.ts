@@ -123,7 +123,7 @@ export async function importDutyRatesFromWITS(params: ImportFromWitsParams) {
       let rows: DutyRateInsert[] = [];
       try {
         rows = await job.run();
-      } catch (error) {
+      } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         failedJobs.push({ tag, error: message });
         if (DEBUG) console.warn(`[wits] job ${tag} ${job.ctx.year} failed: ${message}`);

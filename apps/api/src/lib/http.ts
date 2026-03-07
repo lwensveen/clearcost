@@ -56,7 +56,7 @@ export async function httpFetch(
 
       const shouldRetry = retryOn ? retryOn(res) : DEFAULT_RETRY_STATUS.has(res.status);
       if (!shouldRetry || attempt >= maxRetries) return res;
-    } catch (err) {
+    } catch (err: unknown) {
       clearTimeout(timeoutId);
       if (attempt >= maxRetries) throw err;
     }

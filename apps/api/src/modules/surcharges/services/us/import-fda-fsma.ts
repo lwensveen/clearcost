@@ -61,7 +61,7 @@ async function scrapeVQIP(vqipUrl: string): Promise<{
       appFee: appM ? toUSDstr(appM[1]!) : null,
       url: vqipUrl,
     };
-  } catch (e) {
+  } catch (e: unknown) {
     if (DEBUG) console.warn('[FDA] VQIP scrape failed', (e as Error).message);
     return {};
   }
@@ -97,7 +97,7 @@ async function scrapeFsmaReinspection(
           src: url,
         };
       }
-    } catch (e) {
+    } catch (e: unknown) {
       if (DEBUG) console.warn('[FDA] FSMA probe failed', url, (e as Error).message);
     }
   }

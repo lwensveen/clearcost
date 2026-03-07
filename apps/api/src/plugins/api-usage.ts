@@ -114,7 +114,7 @@ export async function flushBuffer(log?: { warn: (...args: unknown[]) => void }):
     }
     _circuit.state = 'closed';
     _circuit.consecutiveFailures = 0;
-  } catch (err) {
+  } catch (err: unknown) {
     _circuit.consecutiveFailures++;
 
     if (_circuit.state === 'half-open' || _circuit.consecutiveFailures >= CB_FAILURE_THRESHOLD) {
@@ -201,7 +201,7 @@ export default fp(
       clearInterval(flushTimer);
       try {
         await flushBuffer(app.log);
-      } catch (err) {
+      } catch (err: unknown) {
         app.log.error({ err }, 'usage metering final flush failed on shutdown');
       }
     });
@@ -259,7 +259,7 @@ export default fp(
             req.log.warn({ err }, 'usage metering early flush error');
           });
         }
-      } catch (err) {
+      } catch (err: unknown) {
         req.log.warn({ err }, 'usage metering failed');
       }
     });

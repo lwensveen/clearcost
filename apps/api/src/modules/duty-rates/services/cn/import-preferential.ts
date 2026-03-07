@@ -131,7 +131,7 @@ export async function importCnPreferential({
         hs6List,
         partnerGeoIds: partners,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       officialError = error;
     }
   }

@@ -91,7 +91,7 @@ export async function tabulaCsv(pdf: Buffer | string, opts: TabulaOpts = {}): Pr
         await execFileAsync(commandName, cliArgs, { maxBuffer: 64 * 1024 * 1024 });
 
         return await readFile(outputPath, 'utf8');
-      } catch (err) {
+      } catch (err: unknown) {
         lastError = err;
         // try next command
       }

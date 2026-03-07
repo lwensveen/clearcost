@@ -37,7 +37,7 @@ export default fp(async (app) => {
         const ts = Math.floor(last.getTime() / 1000);
         lastRun.set({ import_id: r.import_id }, ts);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       app.log.warn({ err }, 'failed to update import last-run gauges');
     }
   };

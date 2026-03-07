@@ -64,7 +64,7 @@ export async function fetchArrayBuffer(
         throw new Error(`Fetch failed ${res.status} ${res.statusText} – ${url}\n${body}`);
       }
       return await res.arrayBuffer();
-    } catch (e) {
+    } catch (e: unknown) {
       lastErr = e;
       await new Promise((r) => setTimeout(r, i * 300));
     }
