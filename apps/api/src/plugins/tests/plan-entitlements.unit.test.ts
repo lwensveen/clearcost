@@ -59,9 +59,9 @@ function fakeReq(ownerId?: string) {
 }
 
 /** Type-narrowing helper: asserts the guard returned a blocked result. */
-function assertBlocked(
-  result: { allowed: boolean },
-): asserts result is { allowed: false; code: number; reason: string } {
+function assertBlocked(result: {
+  allowed: boolean;
+}): asserts result is { allowed: false; code: number; reason: string } {
   expect(result.allowed).toBe(false);
 }
 
@@ -231,11 +231,7 @@ describe('planEntitlements plugin (unit)', () => {
       planState.plan = 'scale';
 
       const app = await makeApp();
-      const result = await app.entitlements.guardReplaceItems(
-        fakeReq('owner-1'),
-        'man-1',
-        100_000
-      );
+      const result = await app.entitlements.guardReplaceItems(fakeReq('owner-1'), 'man-1', 100_000);
 
       expect(result.allowed).toBe(true);
       expect(result.max).toBe(100_000);
@@ -246,11 +242,7 @@ describe('planEntitlements plugin (unit)', () => {
       planState.plan = 'scale';
 
       const app = await makeApp();
-      const result = await app.entitlements.guardReplaceItems(
-        fakeReq('owner-1'),
-        'man-1',
-        100_001
-      );
+      const result = await app.entitlements.guardReplaceItems(fakeReq('owner-1'), 'man-1', 100_001);
 
       assertBlocked(result);
       expect(result.code).toBe(402);

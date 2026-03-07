@@ -56,9 +56,7 @@ async function makeApp() {
 
 function fakeReq(opts: { apiKeyId?: string; ownerId?: string } = {}) {
   return {
-    apiKey: opts.apiKeyId
-      ? { id: opts.apiKeyId, ownerId: opts.ownerId ?? 'owner-1' }
-      : undefined,
+    apiKey: opts.apiKeyId ? { id: opts.apiKeyId, ownerId: opts.ownerId ?? 'owner-1' } : undefined,
   } as any;
 }
 
