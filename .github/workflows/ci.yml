@@ -83,7 +83,7 @@ jobs:
         run: bun run test -- --reporter=default --reporter=junit --outputFile=test-results/junit.xml
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ github.run_id }}
           path: test-results/
